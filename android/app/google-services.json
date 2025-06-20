@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "549026925121",
+    "project_id": "fo-co-co-89gnf5",
+    "storage_bucket": "fo-co-co-89gnf5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:549026925121:android:d04ba497b27e8da82ad4c0",
+        "android_client_info": {
+          "package_name": "com.fococo.fococo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "549026925121-tb14rq9rsk44j5q89c1a7c3qma29651u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fococo.fococo",
+            "certificate_hash": "9bbb3186b2189ef16d8f272bdab59362c395cbb4"
+          }
+        },
+        {
+          "client_id": "549026925121-qru26hoob0e8kjvcp6sa0ebgctmrubjm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPWffPibmbWPdu4V3dmjtOQw-BnGQ-ooQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "549026925121-qru26hoob0e8kjvcp6sa0ebgctmrubjm.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "549026925121-773rrce51d0obqe47otonssbdl61d1ej.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.fococo.fococo"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -3,3 +3,8 @@ export 'package:flutter/material.dart' show Color, Colors;
 export '/flutter_flow/lat_lng.dart';
 
 export 'structs/index.dart';
+export 'user_record.dart';
+export 'golf_rounds_record.dart';
+export 'mental_sessions_record.dart';
+export 'ai_insights_record.dart';
+export 'user_subscriptions_record.dart';

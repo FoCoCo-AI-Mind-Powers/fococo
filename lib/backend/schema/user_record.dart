@@ -61,6 +61,92 @@ class UserRecord extends FirestoreRecord {
   String get appleSubscriptionId => _appleSubscriptionId ?? '';
   bool hasAppleSubscriptionId() => _appleSubscriptionId != null;
 
+  // "googleSubscriptionId" field.
+  String? _googleSubscriptionId;
+  String get googleSubscriptionId => _googleSubscriptionId ?? '';
+  bool hasGoogleSubscriptionId() => _googleSubscriptionId != null;
+
+  // "tokensRemaining" field.
+  int? _tokensRemaining;
+  int get tokensRemaining => _tokensRemaining ?? 0;
+  bool hasTokensRemaining() => _tokensRemaining != null;
+
+  // "totalAIInsightsGenerated" field.
+  int? _totalAIInsightsGenerated;
+  int get totalAIInsightsGenerated => _totalAIInsightsGenerated ?? 0;
+  bool hasTotalAIInsightsGenerated() => _totalAIInsightsGenerated != null;
+
+  // "mentalPerformanceScore" field.
+  double? _mentalPerformanceScore;
+  double get mentalPerformanceScore => _mentalPerformanceScore ?? 0.0;
+  bool hasMentalPerformanceScore() => _mentalPerformanceScore != null;
+
+  // "coachingStreak" field.
+  int? _coachingStreak;
+  int get coachingStreak => _coachingStreak ?? 0;
+  bool hasCoachingStreak() => _coachingStreak != null;
+
+  // "totalModulesCompleted" field.
+  int? _totalModulesCompleted;
+  int get totalModulesCompleted => _totalModulesCompleted ?? 0;
+  bool hasTotalModulesCompleted() => _totalModulesCompleted != null;
+
+  // "notificationSettings" field.
+  NotificationSettingsStruct? _notificationSettings;
+  NotificationSettingsStruct get notificationSettings =>
+      _notificationSettings ?? NotificationSettingsStruct();
+  bool hasNotificationSettings() => _notificationSettings != null;
+
+  // "timezone" field.
+  String? _timezone;
+  String get timezone => _timezone ?? '';
+  bool hasTimezone() => _timezone != null;
+
+  // "createdTime" field.
+  DateTime? _createdTime;
+  DateTime? get createdTime => _createdTime;
+  bool hasCreatedTime() => _createdTime != null;
+
+  // "lastActive" field.
+  DateTime? _lastActive;
+  DateTime? get lastActive => _lastActive;
+  bool hasLastActive() => _lastActive != null;
+
+  // "notificationTokens" field.
+  List<String>? _notificationTokens;
+  List<String> get notificationTokens => _notificationTokens ?? const [];
+  bool hasNotificationTokens() => _notificationTokens != null;
+
+  // "dataProcessingConsent" field.
+  bool? _dataProcessingConsent;
+  bool get dataProcessingConsent => _dataProcessingConsent ?? false;
+  bool hasDataProcessingConsent() => _dataProcessingConsent != null;
+
+  // "marketingConsent" field.
+  bool? _marketingConsent;
+  bool get marketingConsent => _marketingConsent ?? false;
+  bool hasMarketingConsent() => _marketingConsent != null;
+
+  // "lastPrivacyPolicyAccepted" field.
+  DateTime? _lastPrivacyPolicyAccepted;
+  DateTime? get lastPrivacyPolicyAccepted => _lastPrivacyPolicyAccepted;
+  bool hasLastPrivacyPolicyAccepted() => _lastPrivacyPolicyAccepted != null;
+
+  // "appVersion" field.
+  String? _appVersion;
+  String get appVersion => _appVersion ?? '';
+  bool hasAppVersion() => _appVersion != null;
+
+  // "platform" field.
+  String? _platform;
+  String get platform => _platform ?? '';
+  bool hasPlatform() => _platform != null;
+
+  // "referralSource" field.
+  String? _referralSource;
+  String get referralSource => _referralSource ?? '';
+  bool hasReferralSource() => _referralSource != null;
+
   void _initializeFields() {
     _email = snapshotData['email'] as String?;
     _displayName = snapshotData['displayName'] as String?;
@@ -73,6 +159,25 @@ class UserRecord extends FirestoreRecord {
         : VarkPreferencesStruct.maybeFromMap(snapshotData['varkPreferences']);
     _currentMembershipTier = snapshotData['currentMembershipTier'] as String?;
     _appleSubscriptionId = snapshotData['appleSubscriptionId'] as String?;
+    _googleSubscriptionId = snapshotData['googleSubscriptionId'] as String?;
+    _tokensRemaining = castToType<int>(snapshotData['tokensRemaining']);
+    _totalAIInsightsGenerated = castToType<int>(snapshotData['totalAIInsightsGenerated']);
+    _mentalPerformanceScore = castToType<double>(snapshotData['mentalPerformanceScore']);
+    _coachingStreak = castToType<int>(snapshotData['coachingStreak']);
+    _totalModulesCompleted = castToType<int>(snapshotData['totalModulesCompleted']);
+    _notificationSettings = snapshotData['notificationSettings'] is NotificationSettingsStruct
+        ? snapshotData['notificationSettings']
+        : NotificationSettingsStruct.maybeFromMap(snapshotData['notificationSettings']);
+    _timezone = snapshotData['timezone'] as String?;
+    _createdTime = snapshotData['createdTime'] as DateTime?;
+    _lastActive = snapshotData['lastActive'] as DateTime?;
+    _notificationTokens = getDataList(snapshotData['notificationTokens']);
+    _dataProcessingConsent = snapshotData['dataProcessingConsent'] as bool?;
+    _marketingConsent = snapshotData['marketingConsent'] as bool?;
+    _lastPrivacyPolicyAccepted = snapshotData['lastPrivacyPolicyAccepted'] as DateTime?;
+    _appVersion = snapshotData['appVersion'] as String?;
+    _platform = snapshotData['platform'] as String?;
+    _referralSource = snapshotData['referralSource'] as String?;
   }
 
   static CollectionReference get collection =>

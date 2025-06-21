@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:timezone/data/latest.dart' as tz;
 import 'auth/firebase_auth/firebase_user_provider.dart';
 import 'auth/firebase_auth/auth_util.dart';
 
 import 'backend/firebase/firebase_config.dart';
+import 'backend/push_notifications/push_notifications_handler.dart';
+import 'backend/push_notifications/push_notifications_util.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/foundation.dart';
@@ -17,6 +21,12 @@ void main() async {
   usePathUrlStrategy();
 
   await initFirebase();
+
+  // Initialize timezone data for scheduled notifications
+  tz.initializeTimeZones();
+
+  // Set up background message handler for FCM
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   await FlutterFlowTheme.initialize();
 
@@ -52,6 +62,7 @@ class _MyAppState extends State<MyApp> {
 
   List<String> getRouteStack() =>
       _router.routerDelegate.currentConfiguration.matches
+          .whereType<RouteMatch>()
           .map((e) => getRoute(e))
           .toList();
 
@@ -64,8 +75,16 @@ class _MyAppState extends State<MyApp> {
     _appStateNotifier = AppStateNotifier.instance;
     _router = createRouter(_appStateNotifier);
     userStream = foCoCoFirebaseUserStream()
-      ..listen((user) {
+      ..listen((user) async {
         _appStateNotifier.update(user);
+        
+        // Initialize push notifications when user authenticates
+        if (user.loggedIn) {
+          await PushNotificationsUtil.initializeForUser();
+        } else {
+          // Clear notifications on logout
+          await PushNotificationsUtil.handleUserLogout();
+        }
       });
     jwtTokenStream.listen((_) {});
     Future.delayed(

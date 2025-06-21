@@ -359,7 +359,7 @@ extension TextStyleHelper on TextStyle {
     TextDecoration? decoration,
     double? lineHeight,
     List<Shadow>? shadows,
-    String? package,
+    String? package, required double height,
   }) {
     if (useGoogleFonts && fontFamily != null) {
       font = GoogleFonts.getFont(fontFamily,

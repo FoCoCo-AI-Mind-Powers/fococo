@@ -1,5 +1,138 @@
 ---
-description:
-globs:
+description: Building AI features 
+globs: 
 alwaysApply: false
 ---
+Based on the FoCoCo documentation, here are the complete AI features needed:
+
+## Core AI Modules
+
+1. **Post-Round Mental Performance Analyst**
+   - Analyzes golf round data immediately after logging
+   - Correlates mindset rating with score and penalties
+   - NLP sentiment analysis on round notes (Prime tier)
+   - Generates actionable recommendations
+
+2. **Long-Term Mindset Trend Advisor**
+   - Weekly/monthly pattern analysis
+   - Mood fluctuation tracking
+   - Performance correlation analysis
+   - Journal theme extraction (Prime tier)
+   - Recurring pattern identification
+
+3. **Routine Effectiveness Optimizer**
+   - Micro-routine adherence tracking
+   - Effectiveness correlation with performance
+   - Routine adjustment suggestions
+   - Multi-turn troubleshooting (Prime tier)
+
+4. **Personalized Content & Tool Recommender**
+   - Module recommendations based on needs
+   - VARK-aligned content prioritization
+   - Goal-aligned suggestions
+   - Past engagement analysis
+
+## Technical Infrastructure
+
+**AI Service Integration:**
+- OpenAI API integration (GPT-4/GPT-3.5)
+- Cloud Functions for secure API calls
+- API key management in environment variables
+- Request/response formatting
+- Rate limiting and cost tracking
+
+**Context Management (Prime Tier):**
+- Multi-turn conversation support
+- Session ID tracking (`ai_insight_session_id`)
+- Conversation history storage
+- Full context assembly for each turn
+- Token optimization strategies
+
+**Token System:**
+- Token deduction per insight
+- Firestore transaction-based deduction
+- Token purchase integration
+- Real-time balance display
+- Low token warnings
+## Data Processing Features
+
+**Input Data Processing:**
+- Round performance analysis
+- Daily check-in mood tracking
+- Journal entry NLP analysis
+- Micro-routine tracking
+- Goal progress monitoring
+- VARK learning style integration
+
+**Prompt Engineering:**
+- Dynamic prompt construction
+- User context integration
+- VARK-based language adaptation
+- Tier-specific depth control
+- Historical data inclusion
+
+## User Interface Features
+
+**AI Insight Display:**
+- Dashboard insight cards
+- Dedicated AI Insights screen
+- Insight Detail screen
+- Conversational chat interface (Prime)
+- Recommendation cards
+- VARK-adapted content presentation
+
+**Feedback System:**
+- Quick rating (Yes/No, 1-5 stars)
+- Free-text feedback option
+- Feedback aggregation
+- NLP analysis of feedback
+- Prompt refinement based on feedback
+
+## Automation Features
+
+**Triggers:**
+- Post-round completion
+- Daily check-in completion
+- Module completion
+- Scheduled analysis (daily/weekly/monthly)
+- Low engagement detection
+- Goal achievement
+
+**Background Processing:**
+- Periodic trend analysis
+- Feedback consumption
+- Prompt optimization
+- Performance metric calculation
+- Token usage tracking
+
+## Security & Monetization
+
+**Security:**
+- Server-side API calls only
+- Atomic token transactions
+- User authentication verification
+- Secure data retrieval
+- Error handling and fallbacks
+
+**Monetization:**
+- Tier-based access (BASE/PLUS/PRIME)
+- Token-based insights
+- In-app purchase integration
+- Usage tracking and reporting
+- Cost per insight monitoring
+
+## Output Features
+
+**Insight Generation:**
+- Structured JSON responses
+- Natural language formatting
+- Actionable recommendations
+- Module/cue/goal suggestions
+- Sentiment summaries
+
+**Personalization:**
+- VARK-specific phrasing
+- Tier-appropriate depth
+- User history consideration
+- Goal alignment
+- Engagement-based adaptation

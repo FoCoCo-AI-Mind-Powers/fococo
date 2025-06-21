@@ -61,6 +61,7 @@ class _AIInsightWidgetState extends State<AIInsightWidget> {
                   textStyle: FlutterFlowTheme.of(context).titleSmall.override(
                     fontFamily: 'Inter',
                     color: Colors.white,
+                    height: 1.0,
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),

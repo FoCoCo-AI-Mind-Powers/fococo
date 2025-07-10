@@ -134,7 +134,7 @@ class AICostTracker {
       final breakdown = <String, UsageTypeStats>{};
       
       for (final doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         final usageType = data['usageType'] as String;
         final tokens = data['tokensUsed'] as int;
         final cost = data['estimatedCost'] as double;
@@ -247,7 +247,7 @@ class AICostTracker {
       final Map<String, int> usageTypeCount = {};
 
       for (final doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         totalCost += data['estimatedCost'] as double;
         totalRequests++;
         totalTokens += data['tokensUsed'] as int;

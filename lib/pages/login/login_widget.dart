@@ -17,8 +17,11 @@ class LoginWidget extends StatefulWidget {
   State<LoginWidget> createState() => _LoginWidgetState();
 }
 
-class _LoginWidgetState extends State<LoginWidget> {
+class _LoginWidgetState extends State<LoginWidget> with TickerProviderStateMixin {
   late LoginModel _model;
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+  bool _isExpanded = false;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -26,12 +29,38 @@ class _LoginWidgetState extends State<LoginWidget> {
   void initState() {
     super.initState();
     _model = createModel(context, () => LoginModel());
+    
+    // Initialize animation controller
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    
+    _animation = Tween<double>(
+      begin: 0.3, // Start at 30% of screen height
+      end: 0.75,  // Expand to 75% of screen height
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
   }
 
   @override
   void dispose() {
+    _animationController.dispose();
     _model.dispose();
     super.dispose();
+  }
+
+  void _toggleContainer() {
+    setState(() {
+      _isExpanded = !_isExpanded;
+      if (_isExpanded) {
+        _animationController.forward();
+      } else {
+        _animationController.reverse();
+      }
+    });
   }
 
   @override
@@ -44,21 +73,21 @@ class _LoginWidgetState extends State<LoginWidget> {
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: const Color(0xFF0B4D2C), // Golf green primary
-        body: SafeArea(
-          top: true,
-          child: Container(
-            width: MediaQuery.sizeOf(context).width,
-            height: MediaQuery.sizeOf(context).height,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF0B4D2C), Color(0xFF2E8B57)], // Dark to medium green
-                stops: [0.0, 1.0],
-                begin: AlignmentDirectional(0.0, -1.0),
-                end: AlignmentDirectional(0.0, 1.0),
-              ),
+        body: Container(
+          width: MediaQuery.sizeOf(context).width,
+          height: MediaQuery.sizeOf(context).height,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF0B4D2C), Color(0xFF2E8B57)], // Dark to medium green
+              stops: [0.0, 1.0],
+              begin: AlignmentDirectional(0.0, -1.0),
+              end: AlignmentDirectional(0.0, 1.0),
             ),
+          ),
+          child: SafeArea(
+            top: true,
+            bottom: false, // Let container go to bottom
             child: Column(
-              mainAxisSize: MainAxisSize.max,
               children: [
                 // Logo and Brand Section
                 Expanded(
@@ -132,36 +161,124 @@ class _LoginWidgetState extends State<LoginWidget> {
                   ),
                 ),
                 
-                // Authentication Section
-                Expanded(
-                  flex: 3,
-                  child: Container(
-                    width: double.infinity,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(32),
-                        topRight: Radius.circular(32),
-                      ),
+                // Dynamic Authentication Section
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  height: _isExpanded 
+                    ? MediaQuery.of(context).size.height * 0.75 
+                    : MediaQuery.of(context).size.height * 0.3,
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(32),
+                      topRight: Radius.circular(32),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsetsDirectional.fromSTEB(32, 48, 32, 32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.max,
-                        children: [
-                          // Welcome Text
-                          Text(
-                            'Welcome Back',
-                            style: FlutterFlowTheme.of(context).headlineMedium.override(
-                              fontFamily: 'Inter',
-                              color: const Color(0xFF0B4D2C),
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              height: 1.0,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 10,
+                        offset: Offset(0, -5),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(32),
+                      topRight: Radius.circular(32),
+                    ),
+                    child: Column(
+                      children: [
+                        // Handle bar and tap area
+                        GestureDetector(
+                          onTap: _toggleContainer,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Column(
+                              children: [
+                                // Handle bar
+                                Container(
+                                  width: 40,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                
+                                // Title
+                                Text(
+                                  _isExpanded ? 'Welcome Back' : 'Sign In',
+                                  style: FlutterFlowTheme.of(context).headlineMedium.override(
+                                    fontFamily: 'Inter',
+                                    color: const Color(0xFF0B4D2C),
+                                    fontSize: _isExpanded ? 28 : 24,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.0,
+                                  ),
+                                ),
+                                
+                                if (!_isExpanded) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Tap to continue',
+                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                      fontFamily: 'Inter',
+                                      color: Colors.grey[600],
+                                      fontSize: 14,
+                                      height: 1.0,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Icon(
+                                    Icons.keyboard_arrow_up,
+                                    color: Colors.grey[400],
+                                    size: 24,
+                                  ),
+                                ],
+                                
+                                if (_isExpanded) ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'Sign in to continue your mental game journey',
+                                          textAlign: TextAlign.center,
+                                          style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                            fontFamily: 'Inter',
+                                            color: Colors.grey[600],
+                                            fontSize: 16,
+                                            height: 1.0,
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey[600]),
+                                        onPressed: _toggleContainer,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          
+                        ),
+                        
+                        // Expanded content
+                        if (_isExpanded)
+                          Expanded(
+                            child: SingleChildScrollView(
+                              physics: const BouncingScrollPhysics(),
+                              child: Padding(
+                                padding: const EdgeInsetsDirectional.fromSTEB(32, 0, 32, 48),
+                                child: Column(
+                                  children: [
+                                            
                           Text(
                             'Sign in to continue your mental game journey',
                             textAlign: TextAlign.center,
@@ -175,39 +292,64 @@ class _LoginWidgetState extends State<LoginWidget> {
                           const SizedBox(height: 40),
                           
                           // Google Sign In Button
-                          FFButtonWidget(
-                            onPressed: () async {
-                              GoRouter.of(context).prepareAuthEvent();
-                              final user = await authManager.signInWithGoogle(context);
-                              if (user == null) return;
-                              
-                              context.goNamedAuth('dashboard', context.mounted);
-                            },
-                            text: 'Continue with Google',
-                            icon: const FaIcon(
-                              FontAwesomeIcons.google,
+                          Container(
+                            width: double.infinity,
+                            height: 56,
+                            decoration: BoxDecoration(
                               color: Colors.white,
-                              size: 20,
-                            ),
-                            options: FFButtonOptions(
-                              width: double.infinity,
-                              height: 56,
-                              padding: const EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
-                              iconPadding: const EdgeInsetsDirectional.fromSTEB(0, 0, 8, 0),
-                              color: const Color(0xFFDB4437),
-                              textStyle: FlutterFlowTheme.of(context).titleMedium.override(
-                                fontFamily: 'Inter',
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                height: 1.0,
-                              ),
-                              elevation: 3,
-                              borderSide: const BorderSide(
-                                color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.grey.shade300,
                                 width: 1,
                               ),
-                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.1),
+                                  spreadRadius: 1,
+                                  blurRadius: 3,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () async {
+                                  GoRouter.of(context).prepareAuthEvent();
+                                  final user = await authManager.signInWithGoogle(context);
+                                  if (user == null) return;
+                                  
+                                  context.goNamedAuth('dashboard', context.mounted);
+                                },
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    // Google Logo
+                                    Container(
+                                      width: 20,
+                                      height: 20,
+                                      decoration: const BoxDecoration(
+                                        image: DecorationImage(
+                                          image: NetworkImage('https://developers.google.com/identity/images/g-logo.png'),
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Continue with Google',
+                                      style: FlutterFlowTheme.of(context).titleMedium.override(
+                                        fontFamily: 'Inter',
+                                        color: Colors.grey.shade700,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -317,7 +459,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                             ),
                           ),
                           
-                          const Spacer(),
+                          const SizedBox(height: 40),
                           
                           // Terms and Privacy
                           Text(
@@ -330,8 +472,12 @@ class _LoginWidgetState extends State<LoginWidget> {
                               height: 1.0,
                             ),
                           ),
-                        ],
-                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),

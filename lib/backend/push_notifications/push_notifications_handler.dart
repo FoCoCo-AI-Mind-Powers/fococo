@@ -9,7 +9,6 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/schema/index.dart';
-import '/flutter_flow/flutter_flow_util.dart';
 
 // Notification types for the FoCoCo app
 enum NotificationType {
@@ -109,8 +108,8 @@ class PushNotificationsHandler {
       _handleNotificationTap(initialMessage);
     }
 
-    // Get and save FCM token
-    await _updateFCMToken();
+    // Get and save FCM token (with retry logic for iOS APNS)
+    _updateFCMToken();
 
     // Listen for token refresh
     _firebaseMessaging.onTokenRefresh.listen(_onTokenRefresh);
@@ -335,6 +334,29 @@ class PushNotificationsHandler {
 
   Future<void> _updateFCMToken() async {
     try {
+      // For iOS, we need to wait for APNS token to be available
+      if (Platform.isIOS) {
+        try {
+          final apnsToken = await _firebaseMessaging.getAPNSToken();
+          if (apnsToken == null) {
+            if (kDebugMode) {
+              print('📱 APNS token not available yet, skipping FCM token retrieval');
+            }
+            // Schedule a retry after a delay
+            Timer(const Duration(seconds: 5), () => _updateFCMToken());
+            return;
+          }
+          if (kDebugMode) {
+            print('📱 APNS token available: ${apnsToken.substring(0, 20)}...');
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('❌ Error getting APNS token: $e');
+          }
+          return;
+        }
+      }
+
       final String? token = await _firebaseMessaging.getToken();
       if (token != null && currentUserUid.isNotEmpty) {
         await _saveFCMTokenToFirestore(token);
@@ -497,7 +519,16 @@ class PushNotificationsHandler {
 // Background message handler (must be top-level function)
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
   if (kDebugMode) {
     print('📱 Background message received: ${message.notification?.title}');
+    }
+    
+    // Handle background message processing here if needed
+    // For now, just log the message
+  } catch (e) {
+    if (kDebugMode) {
+      print('❌ Error in background message handler: $e');
+    }
   }
 } 

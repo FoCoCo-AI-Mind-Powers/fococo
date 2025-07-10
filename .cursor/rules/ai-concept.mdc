@@ -1,7 +1,5 @@
 ---
-description: Building AI features 
-globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 Based on the FoCoCo documentation, here are the complete AI features needed:
 

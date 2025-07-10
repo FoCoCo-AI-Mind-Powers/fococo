@@ -3,7 +3,6 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'register_model.dart';
 export 'register_model.dart';
 
@@ -49,7 +48,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
-            onPressed: () => context.pop(),
+            onPressed: () => context.safePop(),
           ),
         ),
         body: SafeArea(
@@ -113,11 +112,12 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                         topRight: Radius.circular(32),
                       ),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsetsDirectional.fromSTEB(32, 48, 32, 32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.max,
-                        children: [
+                    child: SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsetsDirectional.fromSTEB(32, 48, 32, 32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
                           // Name Field
                           TextFormField(
                             controller: _model.nameTextController,
@@ -349,6 +349,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                             ],
                           ),
                         ],
+                        ),
                       ),
                     ),
                   ),

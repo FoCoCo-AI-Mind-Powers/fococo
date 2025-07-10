@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:fo_co_co/pages/login/login_widget.dart';
 import 'package:provider/provider.dart';
 import '/backend/backend.dart';
 import '/backend/schema/structs/index.dart';
@@ -38,7 +37,7 @@ class AppStateNotifier extends ChangeNotifier {
   /// Otherwise, this will trigger a refresh and interrupt the action(s).
   bool notifyOnAuthChange = true;
 
-  bool get loading => user == null || showSplashImage;
+  bool get loading => showSplashImage;
   bool get loggedIn => user?.loggedIn ?? false;
   bool get initiallyLoggedIn => initialUser?.loggedIn ?? false;
   bool get shouldRedirect => loggedIn && _redirectLocation != null;
@@ -79,13 +78,13 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
       errorBuilder: (context, state) =>
-          appStateNotifier.loggedIn ? HomePageWidget() : LoginWidget(),
+          appStateNotifier.loggedIn ? DashboardWidget() : HomePageWidget(),
       routes: [
         FFRoute(
           name: '_initialize',
           path: '/',
           builder: (context, _) =>
-              appStateNotifier.loggedIn ? HomePageWidget() : LoginWidget(),
+              appStateNotifier.loggedIn ? DashboardWidget() : HomePageWidget(),
         ),
         FFRoute(
           name: HomePageWidget.routeName,
@@ -96,7 +95,54 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           name: LoginWidget.routeName,
           path: LoginWidget.routePath,
           builder: (context, params) => LoginWidget(),
-        )
+        ),
+        FFRoute(
+          name: DashboardWidget.routeName,
+          path: DashboardWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => DashboardWidget(),
+        ),
+        FFRoute(
+          name: ProfileWidget.routeName,
+          path: ProfileWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => ProfileWidget(),
+        ),
+        FFRoute(
+          name: AiInsightsWidget.routeName,
+          path: AiInsightsWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => AiInsightsWidget(),
+        ),
+        FFRoute(
+          name: GolfRoundsWidget.routeName,
+          path: GolfRoundsWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => GolfRoundsWidget(),
+        ),
+        FFRoute(
+          name: CoachingModulesWidget.routeName,
+          path: CoachingModulesWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => CoachingModulesWidget(),
+        ),
+        FFRoute(
+          name: ProgressWidget.routeName,
+          path: ProgressWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => ProgressWidget(),
+        ),
+        FFRoute(
+          name: AchievementsWidget.routeName,
+          path: AchievementsWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => AchievementsWidget(),
+        ),
+        FFRoute(
+          name: RegisterWidget.routeName,
+          path: RegisterWidget.routePath,
+          builder: (context, params) => RegisterWidget(),
+        ),
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );
 

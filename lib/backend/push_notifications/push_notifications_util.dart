@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/schema/index.dart';
-import '/flutter_flow/flutter_flow_util.dart';
 import 'push_notifications_handler.dart';
 
 /// Utility class for managing push notifications based on user preferences
@@ -14,8 +13,14 @@ class PushNotificationsUtil {
 
   /// Initialize push notifications for the current user
   static Future<void> initializeForUser() async {
+    try {
     await _handler.initialize();
     await _scheduleUserNotifications();
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error initializing push notifications for user: $e');
+      }
+    }
   }
 
   /// Schedule notifications based on user preferences

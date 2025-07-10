@@ -1,7 +1,5 @@
-import '/auth/firebase_auth/auth_util.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'ai_insights_model.dart';
@@ -47,189 +45,263 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: Colors.grey[50],
-        body: SafeArea(
-          top: true,
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              // Header Section
-              Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFFFF6B35), Color(0xFFFF8F65)],
-                    stops: [0.0, 1.0],
-                    begin: AlignmentDirectional(-1.0, -1.0),
-                    end: AlignmentDirectional(1.0, 1.0),
-                  ),
+        body: Column(
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            // Header Section
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFFFF6B35), Color(0xFFFF8F65)],
+                  stops: [0.0, 1.0],
+                  begin: AlignmentDirectional(-1.0, -1.0),
+                  end: AlignmentDirectional(1.0, 1.0),
                 ),
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(24, 20, 24, 0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Header Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
-                                onPressed: () => context.pop(),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'AI Insights',
-                                style: FlutterFlowTheme.of(context).headlineMedium.override(
-                                  fontFamily: 'Inter',
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  height: 1.0,
-                                ),
-                              ),
-                            ],
+              ),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(24, 60, 24, 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'AI Insights',
+                          style: FlutterFlowTheme.of(context).headlineMedium.override(
+                            fontFamily: 'Inter',
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            height: 1.0,
                           ),
+                        ),
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(
+                            Icons.auto_awesome,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // AI Status Card
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsetsDirectional.fromSTEB(20, 16, 20, 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
                           Container(
-                            width: 40,
-                            height: 40,
+                            width: 48,
+                            height: 48,
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(24),
                             ),
                             child: const Icon(
-                              Icons.auto_awesome,
+                              Icons.smart_toy,
                               color: Colors.white,
-                              size: 20,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'AI Analysis Complete',
+                                  style: FlutterFlowTheme.of(context).bodyLarge.override(
+                                    fontFamily: 'Inter',
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.0,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Based on your last 10 rounds',
+                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                    fontFamily: 'Inter',
+                                    color: Colors.white70,
+                                    fontSize: 14,
+                                    height: 1.0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '95%',
+                            style: FlutterFlowTheme.of(context).headlineSmall.override(
+                              fontFamily: 'Inter',
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              height: 1.0,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
-                      
-                      // AI Status Card
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsetsDirectional.fromSTEB(20, 16, 20, 16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              child: const Icon(
-                                Icons.smart_toy,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'AI Analysis Complete',
-                                    style: FlutterFlowTheme.of(context).bodyLarge.override(
-                                      fontFamily: 'Inter',
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.0,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Based on your last 10 rounds',
-                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                      fontFamily: 'Inter',
-                                      color: Colors.white70,
-                                      fontSize: 14,
-                                      height: 1.0,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Text(
-                              '95%',
-                              style: FlutterFlowTheme.of(context).headlineSmall.override(
-                                fontFamily: 'Inter',
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                height: 1.0,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      
-                      // Tab Bar
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: TabBar(
-                          controller: _tabController,
-                          indicator: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          indicatorSize: TabBarIndicatorSize.tab,
-                          labelColor: const Color(0xFFFF6B35),
-                          unselectedLabelColor: Colors.white70,
-                          labelStyle: FlutterFlowTheme.of(context).bodyMedium.override(
-                            fontFamily: 'Inter',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            height: 1.0,
-                          ),
-                          tabs: const [
-                            Tab(text: 'Insights'),
-                            Tab(text: 'Tips'),
-                            Tab(text: 'Plan'),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
-              ),
-              
-              // Tab Content
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    // Insights Tab
-                    _buildInsightsTab(),
+                    ),
+                    const SizedBox(height: 24),
                     
-                    // Tips Tab
-                    _buildTipsTab(),
-                    
-                    // Plan Tab
-                    _buildPlanTab(),
+                    // Tab Bar
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: TabBar(
+                        controller: _tabController,
+                        indicator: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        labelColor: const Color(0xFFFF6B35),
+                        unselectedLabelColor: Colors.white70,
+                        labelStyle: FlutterFlowTheme.of(context).bodyMedium.override(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          height: 1.0,
+                        ),
+                        tabs: const [
+                          Tab(text: 'Insights'),
+                          Tab(text: 'Tips'),
+                          Tab(text: 'Plan'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
+            ),
+            
+            // Tab Content
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Insights Tab
+                  _buildInsightsTab(),
+                  
+                  // Tips Tab
+                  _buildTipsTab(),
+                  
+                  // Plan Tab
+                  _buildPlanTab(),
+                ],
+              ),
+            ),
+          ],
+        ),
+        
+        // Creative Bottom Navigation Bar
+        bottomNavigationBar: Container(
+          height: 85,
+          margin: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0B4D2C).withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
             ],
           ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildNavItem(context, Icons.home_rounded, 'Home', 'dashboard', false),
+              _buildNavItem(context, FontAwesomeIcons.golfBall, 'Rounds', 'golf_rounds', false),
+              _buildNavItem(context, Icons.psychology_rounded, 'Train', 'coaching_modules', false),
+              _buildNavItem(context, Icons.trending_up_rounded, 'Progress', 'progress', false),
+              _buildNavItem(context, Icons.insights_rounded, 'Insights', 'ai_insights', true),
+              _buildNavItem(context, Icons.person_rounded, 'Profile', 'profile', false),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(BuildContext context, IconData icon, String label, String page, bool isActive) {
+    return GestureDetector(
+      onTap: () {
+        if (!isActive) {
+          context.goNamed(page);
+        }
+      },
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF0B4D2C) : Colors.transparent,
+          borderRadius: BorderRadius.circular(15),
+          gradient: isActive
+              ? const LinearGradient(
+                  colors: [Color(0xFF0B4D2C), Color(0xFF2E8B57)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF0B4D2C).withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: isActive ? Colors.white : Colors.grey[400],
+              size: isActive ? 22 : 20,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? Colors.white : Colors.grey[400],
+                fontSize: isActive ? 9 : 8,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ],
         ),
       ),
     );

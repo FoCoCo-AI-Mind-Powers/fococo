@@ -1,3 +1,11 @@
 {
-    "dart.flutterSdkPath": "/Users/mac/flutter"
+  "dart.flutterSdkPath": "~/fvm/versions/3.27.3",
+  "window.autoDetectColorScheme": true,
+  "workbench.preferredLightColorTheme": "Default Light Modern",
+  "workbench.preferredDarkColorTheme": "Cursor Dark",
+  "workbench.colorTheme": "Light Modern",
+  "terminal.integrated.windowsEnableConpty": false,
+  "terminal.integrated.persistentSessionReviveProcess": "never",
+  "terminal.integrated.enablePersistentSessions": false,
+  "dart.debugConsole": "terminal"
 }

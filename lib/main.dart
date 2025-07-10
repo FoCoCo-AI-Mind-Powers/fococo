@@ -9,7 +9,6 @@ import 'auth/firebase_auth/auth_util.dart';
 
 import 'backend/firebase/firebase_config.dart';
 import 'backend/push_notifications/push_notifications_handler.dart';
-import 'backend/push_notifications/push_notifications_util.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/foundation.dart';
@@ -25,8 +24,14 @@ void main() async {
   // Initialize timezone data for scheduled notifications
   tz.initializeTimeZones();
 
-  // Set up background message handler for FCM
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  // Set up background message handler for FCM with error handling
+  try {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    if (kDebugMode) {
+      print('❌ Error setting up background message handler: $e');
+    }
+  }
 
   await FlutterFlowTheme.initialize();
 
@@ -74,23 +79,134 @@ class _MyAppState extends State<MyApp> {
 
     _appStateNotifier = AppStateNotifier.instance;
     _router = createRouter(_appStateNotifier);
-    userStream = foCoCoFirebaseUserStream()
-      ..listen((user) async {
-        _appStateNotifier.update(user);
-        
-        // Initialize push notifications when user authenticates
-        if (user.loggedIn) {
-          await PushNotificationsUtil.initializeForUser();
-        } else {
-          // Clear notifications on logout
-          await PushNotificationsUtil.handleUserLogout();
+    
+    // Initialize the user stream and handle authentication state
+    _initializeUserStream();
+    
+    // Fallback timeout in case user stream doesn't emit immediately
+    Future.delayed(
+      Duration(milliseconds: 2000),
+      () {
+        if (_appStateNotifier.showSplashImage) {
+          if (kDebugMode) {
+            print('⏱️ Splash screen timeout - forcing stop');
+          }
+          _appStateNotifier.stopShowingSplashImage();
+        }
+      },
+    );
+  }
+
+  void _initializeUserStream() {
+    try {
+      userStream = foCoCoFirebaseUserStream();
+      
+      // Listen to the user stream with a subscription
+      userStream.listen(
+        (user) async {
+          if (kDebugMode) {
+            print('🔄 User state changed: ${user.loggedIn ? 'logged in' : 'logged out'}');
+          }
+          
+          _appStateNotifier.update(user);
+          
+          // Stop showing splash screen when user state is determined
+          if (_appStateNotifier.showSplashImage) {
+            if (kDebugMode) {
+              print('🛑 Stopping splash screen');
+            }
+            _appStateNotifier.stopShowingSplashImage();
+          }
+          
+          // Handle user authentication state
+          if (user.loggedIn) {
+            try {
+              // Temporarily disabled to avoid Firestore index issues
+              // await PushNotificationsUtil.initializeForUser();
+              if (kDebugMode) {
+                print('✅ User logged in: ${user.uid}');
+              }
+            } catch (e) {
+              if (kDebugMode) {
+                print('❌ Error initializing push notifications: $e');
+              }
+            }
+          } else {
+            // Clear notifications on logout
+            try {
+              // await PushNotificationsUtil.handleUserLogout();
+              if (kDebugMode) {
+                print('✅ User logged out - showing home page');
+              }
+            } catch (e) {
+              if (kDebugMode) {
+                print('❌ Error handling user logout: $e');
+              }
+            }
+          }
+        },
+        onError: (error) {
+          if (kDebugMode) {
+            print('❌ Error in user stream: $error');
+          }
+          // Stop splash screen even on error to prevent infinite loading
+          if (_appStateNotifier.showSplashImage) {
+            if (kDebugMode) {
+              print('🛑 Stopping splash screen due to error');
+            }
+            _appStateNotifier.stopShowingSplashImage();
+          }
+        },
+      );
+      
+      // Also listen to JWT token changes
+      jwtTokenStream.listen((_) {}, onError: (error) {
+        if (kDebugMode) {
+          print('❌ Error in JWT token stream: $error');
         }
       });
-    jwtTokenStream.listen((_) {});
-    Future.delayed(
-      Duration(milliseconds: 1000),
-      () => _appStateNotifier.stopShowingSplashImage(),
-    );
+      
+      // Force initial user check after a brief delay
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (_appStateNotifier.showSplashImage) {
+          if (kDebugMode) {
+            print('🔄 Forcing initial user check');
+          }
+          // This will trigger the user stream if it hasn't already
+          foCoCoFirebaseUserStream().take(1).listen(
+            (user) {
+              if (kDebugMode) {
+                print('🔄 Initial user check: ${user.loggedIn ? 'logged in' : 'logged out'}');
+              }
+              _appStateNotifier.update(user);
+              if (_appStateNotifier.showSplashImage) {
+                _appStateNotifier.stopShowingSplashImage();
+              }
+            },
+            onError: (error) {
+              if (kDebugMode) {
+                print('❌ Error in initial user check: $error');
+              }
+              if (_appStateNotifier.showSplashImage) {
+                _appStateNotifier.stopShowingSplashImage();
+              }
+            },
+          );
+        }
+      });
+      
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error initializing user stream: $e');
+      }
+      // Ensure splash screen is stopped even if user stream fails
+      if (_appStateNotifier.showSplashImage) {
+        if (kDebugMode) {
+          print('🛑 Stopping splash screen due to initialization error');
+        }
+        _appStateNotifier.stopShowingSplashImage();
+      }
+    }
   }
 
   void setThemeMode(ThemeMode mode) => safeSetState(() {

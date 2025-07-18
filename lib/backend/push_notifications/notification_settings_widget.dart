@@ -310,7 +310,7 @@ class _NotificationSettingsWidgetState extends State<NotificationSettingsWidget>
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: FlutterFlowTheme.of(context).primary.withOpacity(0.1),
+            color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
@@ -339,9 +339,9 @@ class _NotificationSettingsWidgetState extends State<NotificationSettingsWidget>
           value: value,
           onChanged: onChanged,
           activeColor: FlutterFlowTheme.of(context).primary,
-          activeTrackColor: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+          activeTrackColor: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
           inactiveThumbColor: FlutterFlowTheme.of(context).alternate,
-          inactiveTrackColor: FlutterFlowTheme.of(context).alternate.withOpacity(0.3),
+          inactiveTrackColor: FlutterFlowTheme.of(context).alternate.withValues(alpha: 0.3),
         ),
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),

@@ -17,6 +17,9 @@ class GeminiAIClient {
   }) : _apiKey = apiKey,
        _costTracker = costTracker ?? GeminiCostTracker.instance;
 
+  // Add getter to use the _apiKey field
+  String get apiKey => _apiKey;
+
   // ============================================================================
   // GOLF INSIGHT GENERATION
   // ============================================================================

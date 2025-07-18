@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import '/backend/schema/index.dart';
-import '/flutter_flow/flutter_flow_util.dart';
 import '../config/gemini_config.dart';
 
 /// Service for tracking Gemini AI usage, costs, and tokens

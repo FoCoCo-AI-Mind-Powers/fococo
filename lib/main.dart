@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
@@ -72,6 +73,8 @@ class _MyAppState extends State<MyApp> {
           .toList();
 
   late Stream<BaseAuthUser> userStream;
+  StreamSubscription<BaseAuthUser>? userStreamSubscription;
+  StreamSubscription<Future<String?>>? jwtTokenStreamSubscription;
 
   @override
   void initState() {
@@ -83,13 +86,26 @@ class _MyAppState extends State<MyApp> {
     // Initialize the user stream and handle authentication state
     _initializeUserStream();
     
-    // Fallback timeout in case user stream doesn't emit immediately
+    // Reduced timeout to prevent long loading times
     Future.delayed(
-      Duration(milliseconds: 2000),
+      Duration(milliseconds: 800), // Reduced from 2000ms to 800ms
       () {
         if (_appStateNotifier.showSplashImage) {
           if (kDebugMode) {
             print('⏱️ Splash screen timeout - forcing stop');
+          }
+          _appStateNotifier.stopShowingSplashImage();
+        }
+      },
+    );
+
+    // Additional safety timeout for extreme cases
+    Future.delayed(
+      Duration(milliseconds: 1500),
+      () {
+        if (_appStateNotifier.showSplashImage) {
+          if (kDebugMode) {
+            print('🚨 Emergency splash screen timeout - forcing stop');
           }
           _appStateNotifier.stopShowingSplashImage();
         }
@@ -102,46 +118,33 @@ class _MyAppState extends State<MyApp> {
       userStream = foCoCoFirebaseUserStream();
       
       // Listen to the user stream with a subscription
-      userStream.listen(
+      userStreamSubscription = userStream.listen(
         (user) async {
           if (kDebugMode) {
             print('🔄 User state changed: ${user.loggedIn ? 'logged in' : 'logged out'}');
           }
           
-          _appStateNotifier.update(user);
-          
-          // Stop showing splash screen when user state is determined
-          if (_appStateNotifier.showSplashImage) {
-            if (kDebugMode) {
-              print('🛑 Stopping splash screen');
+          if (mounted) {
+            _appStateNotifier.update(user);
+            
+            // Stop showing splash screen immediately when user state is determined
+            if (_appStateNotifier.showSplashImage) {
+              if (kDebugMode) {
+                print('🛑 Stopping splash screen');
+              }
+              _appStateNotifier.stopShowingSplashImage();
             }
-            _appStateNotifier.stopShowingSplashImage();
           }
           
-          // Handle user authentication state
+          // Handle user authentication state (simplified)
           if (user.loggedIn) {
-            try {
-              // Temporarily disabled to avoid Firestore index issues
-              // await PushNotificationsUtil.initializeForUser();
-              if (kDebugMode) {
-                print('✅ User logged in: ${user.uid}');
-              }
-            } catch (e) {
-              if (kDebugMode) {
-                print('❌ Error initializing push notifications: $e');
-              }
+            if (kDebugMode) {
+              print('✅ User logged in: ${user.uid}');
             }
+            // Removed push notification initialization to prevent delays
           } else {
-            // Clear notifications on logout
-            try {
-              // await PushNotificationsUtil.handleUserLogout();
-              if (kDebugMode) {
-                print('✅ User logged out - showing home page');
-              }
-            } catch (e) {
-              if (kDebugMode) {
-                print('❌ Error handling user logout: $e');
-              }
+            if (kDebugMode) {
+              print('✅ User logged out - showing home page');
             }
           }
         },
@@ -149,8 +152,8 @@ class _MyAppState extends State<MyApp> {
           if (kDebugMode) {
             print('❌ Error in user stream: $error');
           }
-          // Stop splash screen even on error to prevent infinite loading
-          if (_appStateNotifier.showSplashImage) {
+          // Stop splash screen immediately on error to prevent infinite loading
+          if (mounted && _appStateNotifier.showSplashImage) {
             if (kDebugMode) {
               print('🛑 Stopping splash screen due to error');
             }
@@ -159,15 +162,15 @@ class _MyAppState extends State<MyApp> {
         },
       );
       
-      // Also listen to JWT token changes
-      jwtTokenStream.listen((_) {}, onError: (error) {
+      // Simplified JWT token stream handling
+      jwtTokenStreamSubscription = jwtTokenStream.listen((_) {}, onError: (error) {
         if (kDebugMode) {
           print('❌ Error in JWT token stream: $error');
         }
       });
       
-      // Force initial user check after a brief delay
-      Future.delayed(Duration(milliseconds: 500), () {
+      // Reduced delay for initial user check
+      Future.delayed(Duration(milliseconds: 200), () { // Reduced from 500ms to 200ms
         if (_appStateNotifier.showSplashImage) {
           if (kDebugMode) {
             print('🔄 Forcing initial user check');
@@ -178,16 +181,18 @@ class _MyAppState extends State<MyApp> {
               if (kDebugMode) {
                 print('🔄 Initial user check: ${user.loggedIn ? 'logged in' : 'logged out'}');
               }
-              _appStateNotifier.update(user);
-              if (_appStateNotifier.showSplashImage) {
-                _appStateNotifier.stopShowingSplashImage();
+              if (mounted) {
+                _appStateNotifier.update(user);
+                if (_appStateNotifier.showSplashImage) {
+                  _appStateNotifier.stopShowingSplashImage();
+                }
               }
             },
             onError: (error) {
               if (kDebugMode) {
                 print('❌ Error in initial user check: $error');
               }
-              if (_appStateNotifier.showSplashImage) {
+              if (mounted && _appStateNotifier.showSplashImage) {
                 _appStateNotifier.stopShowingSplashImage();
               }
             },
@@ -199,8 +204,8 @@ class _MyAppState extends State<MyApp> {
       if (kDebugMode) {
         print('❌ Error initializing user stream: $e');
       }
-      // Ensure splash screen is stopped even if user stream fails
-      if (_appStateNotifier.showSplashImage) {
+      // Ensure splash screen is stopped immediately even if user stream fails
+      if (mounted && _appStateNotifier.showSplashImage) {  
         if (kDebugMode) {
           print('🛑 Stopping splash screen due to initialization error');
         }
@@ -213,6 +218,13 @@ class _MyAppState extends State<MyApp> {
         _themeMode = mode;
         FlutterFlowTheme.saveThemeMode(mode);
       });
+
+  @override
+  void dispose() {
+    userStreamSubscription?.cancel();
+    jwtTokenStreamSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -1,8 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '/backend/schema/index.dart';
-import '/flutter_flow/flutter_flow_util.dart';
 import '../models/gemini_models.dart';
-import '../config/gemini_config.dart';
 
 /// Service for managing AI conversation sessions and context
 class ConversationManager {
@@ -14,7 +13,6 @@ class ConversationManager {
   static const String _conversationCollectionName = 'ai_conversation_sessions';
   static const Duration _sessionTimeout = Duration(hours: 24);
   static const int _maxConversationHistory = 50;
-  static const int _maxContextTokens = 6000;
 
   /// Get or create a conversation session
   Future<ConversationSession> getOrCreateSession({

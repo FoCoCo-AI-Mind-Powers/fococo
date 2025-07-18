@@ -1,7 +1,9 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/fococo_ui_components.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:percent_indicator/percent_indicator.dart';
 import 'progress_model.dart';
 export 'progress_model.dart';
 
@@ -15,8 +17,11 @@ class ProgressWidget extends StatefulWidget {
   State<ProgressWidget> createState() => _ProgressWidgetState();
 }
 
-class _ProgressWidgetState extends State<ProgressWidget> {
+class _ProgressWidgetState extends State<ProgressWidget> with TickerProviderStateMixin {
   late ProgressModel _model;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -24,11 +29,25 @@ class _ProgressWidgetState extends State<ProgressWidget> {
   void initState() {
     super.initState();
     _model = createModel(context, () => ProgressModel());
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic));
+    
+    _animationController.forward();
   }
 
   @override
   void dispose() {
     _model.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -41,172 +60,184 @@ class _ProgressWidgetState extends State<ProgressWidget> {
       },
       child: Scaffold(
         key: scaffoldKey,
-        backgroundColor: Colors.grey[50],
-        body: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              // Header Section with Back Navigation
-              Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF0B4D2C), Color(0xFF2E8B57)],
-                    stops: [0.0, 1.0],
-                    begin: AlignmentDirectional(-1.0, -1.0),
-                    end: AlignmentDirectional(1.0, 1.0),
+        backgroundColor: FlutterFlowTheme.of(context).professionalPrimary,
+        body: CustomScrollView(
+          slivers: [
+            // Enhanced SliverAppBar with Strava-inspired design
+            SliverAppBar(
+              expandedHeight: 320,
+              floating: false,
+              pinned: true,
+              backgroundColor: FlutterFlowTheme.of(context).professionalPrimary,
+              automaticallyImplyLeading: false,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        FlutterFlowTheme.of(context).professionalPrimary,
+                        FlutterFlowTheme.of(context).aiPrimary,
+                      ],
+                      stops: const [0.0, 1.0],
+                      begin: const AlignmentDirectional(-1.0, -1.0),
+                      end: const AlignmentDirectional(1.0, 1.0),
+                    ),
                   ),
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(32),
-                    bottomRight: Radius.circular(32),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(24, 60, 24, 32),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Header Row with Back Button
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: IconButton(
-                                  icon: const Icon(
-                                    Icons.arrow_back_ios_rounded,
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.fromSTEB(24, 60, 24, 32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Progress',
+                                  style: FlutterFlowTheme.of(context).headlineMedium.override(
+                                    fontFamily: 'Montserrat',
                                     color: Colors.white,
-                                    size: 18,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.2,
                                   ),
-                                  onPressed: () => context.safePop(),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Your Mental Game Journey',
+                                  style: FlutterFlowTheme.of(context).bodyLarge.override(
+                                    fontFamily: 'Inter',
+                                    color: Colors.white70,
+                                    fontSize: 16,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
                                 ),
                               ),
-                              const SizedBox(width: 16),
-                              Text(
-                                'Progress',
-                                style: FlutterFlowTheme.of(context).headlineMedium.override(
-                                  fontFamily: 'Inter',
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  height: 1.0,
-                                ),
+                              child: const Icon(
+                                Icons.trending_up_rounded,
+                                color: Colors.white,
+                                size: 24,
                               ),
-                            ],
-                          ),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: IconButton(
-                              icon: const Icon(Icons.more_vert, color: Colors.white, size: 20),
-                              onPressed: () {
-                                // Add menu functionality
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      
-                      // Progress Stats Summary
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildStatCard('Rounds', '12', Icons.golf_course),
-                          _buildStatCard('Avg Score', '78', Icons.trending_down),
-                          _buildStatCard('Best', '72', Icons.emoji_events),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        
+                        // Progress Stats with Strava-inspired design
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildEnhancedStatCard('Rounds', '12', '+3 this week', Icons.golf_course),
+                            _buildEnhancedStatCard('Avg Score', '78', '-2.3 improvement', Icons.trending_down),
+                            _buildEnhancedStatCard('Best', '72', 'Personal best', Icons.emoji_events),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        
+                        // Overall Progress Score
+                        WellnessScoreCard(
+                          score: 78,
+                          title: 'Mental Performance',
+                          subtitle: 'Overall wellness score',
+                          maxScore: 100,
+                          date: DateTime.now(),
+                          subScores: {
+                            'focus': 82.0,
+                            'calm': 76.0,
+                            'energy': 85.0,
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              
-              const SizedBox(height: 24),
-              
-              // Main Content
-              Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(24, 0, 24, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Progress Charts Section
-                    _buildSectionTitle('Performance Trends'),
-                    const SizedBox(height: 16),
-                    _buildProgressChart(),
-                    
-                    const SizedBox(height: 32),
-                    
-                    // Skills Progress Section
-                    _buildSectionTitle('Skills Development'),
-                    const SizedBox(height: 16),
-                    _buildSkillsProgress(),
-                    
-                    const SizedBox(height: 32),
-                    
-                    // Recent Achievements
-                    _buildSectionTitle('Recent Achievements'),
-                    const SizedBox(height: 16),
-                    _buildAchievements(),
-                    
-                    // Bottom padding for nav bar
-                    const SizedBox(height: 120),
-                  ],
+            ),
+            
+            // Main Content
+            SliverList(
+              delegate: SliverChildListDelegate([
+                FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SlideTransition(
+                    position: _slideAnimation,
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(24, 24, 24, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Performance Analytics Section
+                          _buildEnhancedSectionTitle('Performance Analytics', 'Track your improvement over time'),
+                          const SizedBox(height: 16),
+                          _buildProgressChart(),
+                          
+                          const SizedBox(height: 32),
+                          
+                          // Skills Development Section
+                          _buildEnhancedSectionTitle('Skills Development', 'Master each aspect of your mental game'),
+                          const SizedBox(height: 16),
+                          _buildEnhancedSkillsProgress(),
+                          
+                          const SizedBox(height: 32),
+                          
+                          // Achievements & Badges Section
+                          _buildEnhancedSectionTitle('Achievements & Badges', 'Celebrate your milestones'),
+                          const SizedBox(height: 16),
+                          _buildEnhancedAchievements(),
+                          
+                          const SizedBox(height: 32),
+                          
+                          // Progress Insights Section
+                          _buildEnhancedSectionTitle('Progress Insights', 'AI-powered analysis of your journey'),
+                          const SizedBox(height: 16),
+                          _buildProgressInsights(),
+                          
+                          // Bottom padding for nav bar
+                          const SizedBox(height: 120),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ]),
+            ),
+          ],
         ),
         
-        // Creative Bottom Navigation Bar
-        bottomNavigationBar: Container(
-          height: 85,
-          margin: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(25),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0B4D2C).withOpacity(0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildNavItem(context, Icons.home_rounded, 'Home', 'dashboard', false),
-              _buildNavItem(context, FontAwesomeIcons.golfBall, 'Rounds', 'golf_rounds', false),
-              _buildNavItem(context, Icons.psychology_rounded, 'Train', 'coaching_modules', false),
-              _buildNavItem(context, Icons.trending_up_rounded, 'Progress', 'progress', true),
-              _buildNavItem(context, Icons.insights_rounded, 'Insights', 'ai_insights', false),
-              _buildNavItem(context, Icons.person_rounded, 'Profile', 'profile', false),
-            ],
-          ),
+        // Enhanced Bottom Navigation Bar
+        bottomNavigationBar: FoCoCoAnimatedBottomNavBar(
+          currentRoute: 'progress',
         ),
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon) {
+  Widget _buildEnhancedStatCard(String label, String value, String change, IconData icon) {
     return Container(
+      width: 100,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.2),
+          width: 1,
+        ),
       ),
       child: Column(
         children: [
@@ -214,17 +245,32 @@ class _ProgressWidgetState extends State<ProgressWidget> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
+            style: FlutterFlowTheme.of(context).headlineSmall.override(
+              fontFamily: 'Montserrat',
               color: Colors.white,
               fontSize: 20,
               fontWeight: FontWeight.bold,
+              height: 1.2,
             ),
           ),
           Text(
             label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
+            style: FlutterFlowTheme.of(context).labelMedium.override(
+              fontFamily: 'Inter',
+              color: Colors.white.withValues(alpha: 0.8),
               fontSize: 12,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            change,
+            style: FlutterFlowTheme.of(context).labelSmall.override(
+              fontFamily: 'Inter',
+              color: FlutterFlowTheme.of(context).statusActive,
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              height: 1.2,
             ),
           ),
         ],
@@ -232,58 +278,66 @@ class _ProgressWidgetState extends State<ProgressWidget> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: FlutterFlowTheme.of(context).headlineSmall.override(
-        fontFamily: 'Inter',
-        color: const Color(0xFF0B4D2C),
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        height: 1.0,
-      ),
+  Widget _buildEnhancedSectionTitle(String title, String subtitle) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: FlutterFlowTheme.of(context).headlineSmall.override(
+            fontFamily: 'Montserrat',
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: FlutterFlowTheme.of(context).bodyMedium.override(
+            fontFamily: 'Inter',
+            color: Colors.white70,
+            fontSize: 14,
+            height: 1.2,
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildProgressChart() {
-    return Container(
-      width: double.infinity,
-      height: 200,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 8,
-            color: Colors.black.withOpacity(0.1),
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: const Center(
+    return FoCoCoCard(
+      style: FoCoCoCardStyle.standard,
+      child: Container(
+        width: double.infinity,
+        height: 200,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               Icons.analytics_outlined,
               size: 48,
-              color: Color(0xFF059669),
+              color: FlutterFlowTheme.of(context).aiPrimary,
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
               'Score Trend Chart',
-              style: TextStyle(
-                fontSize: 16,
+              style: FlutterFlowTheme.of(context).titleMedium.override(
+                fontFamily: 'Montserrat',
+                fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF0B4D2C),
+                height: 1.2,
               ),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 8),
             Text(
-              'Interactive chart coming soon',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
+              'Interactive chart with your progress over time',
+              style: FlutterFlowTheme.of(context).bodyMedium.override(
+                fontFamily: 'Inter',
+                color: FlutterFlowTheme.of(context).secondaryText,
+                fontSize: 14,
+                height: 1.2,
               ),
             ),
           ],
@@ -292,172 +346,316 @@ class _ProgressWidgetState extends State<ProgressWidget> {
     );
   }
 
-  Widget _buildSkillsProgress() {
+  Widget _buildEnhancedSkillsProgress() {
     final skills = [
-      {'name': 'Driving', 'progress': 0.75, 'icon': Icons.sports_golf},
-      {'name': 'Putting', 'progress': 0.85, 'icon': Icons.golf_course},
-      {'name': 'Short Game', 'progress': 0.65, 'icon': Icons.sports},
-      {'name': 'Mental Game', 'progress': 0.70, 'icon': Icons.psychology},
+      {'name': 'Mental Focus', 'progress': 0.85, 'icon': Icons.psychology_rounded, 'color': FlutterFlowTheme.of(context).mentalFocus},
+      {'name': 'Confidence', 'progress': 0.72, 'icon': Icons.emoji_events, 'color': FlutterFlowTheme.of(context).aiPrimary},
+      {'name': 'Consistency', 'progress': 0.68, 'icon': Icons.trending_up, 'color': FlutterFlowTheme.of(context).performanceGood},
+      {'name': 'Pressure Handling', 'progress': 0.75, 'icon': Icons.compress, 'color': FlutterFlowTheme.of(context).aiPrimary},
     ];
 
     return Column(
-      children: skills.map((skill) => _buildSkillCard(skill)).toList(),
+      children: skills.map((skill) => _buildEnhancedSkillCard(skill)).toList(),
     );
   }
 
-  Widget _buildSkillCard(Map<String, dynamic> skill) {
+  Widget _buildEnhancedSkillCard(Map<String, dynamic> skill) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 4,
-            color: Colors.black.withOpacity(0.05),
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0B4D2C).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              skill['icon'],
-              color: const Color(0xFF0B4D2C),
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      margin: const EdgeInsets.only(bottom: 16),
+      child: FoCoCoCard(
+        style: FoCoCoCardStyle.standard,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text(
-                  skill['name'],
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF0B4D2C),
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: (skill['color'] as Color).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    skill['icon'],
+                    color: skill['color'],
+                    size: 24,
                   ),
                 ),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: skill['progress'],
-                  backgroundColor: Colors.grey[200],
-                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF059669)),
-                  minHeight: 6,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        skill['name'],
+                        style: FlutterFlowTheme.of(context).titleMedium.override(
+                          fontFamily: 'Montserrat',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Level ${((skill['progress'] as double) * 10).toInt()}',
+                        style: FlutterFlowTheme.of(context).bodyMedium.override(
+                          fontFamily: 'Inter',
+                          color: FlutterFlowTheme.of(context).secondaryText,
+                          fontSize: 14,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '${((skill['progress'] as double) * 100).toInt()}%',
+                  style: FlutterFlowTheme.of(context).titleMedium.override(
+                    fontFamily: 'Montserrat',
+                    color: skill['color'],
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    height: 1.2,
+                  ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: 16),
-          Text(
-            '${(skill['progress'] * 100).toInt()}%',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF059669),
+            const SizedBox(height: 16),
+            CircularPercentIndicator(
+              percent: skill['progress'] as double,
+              radius: 60,
+              lineWidth: 8,
+              backgroundColor: FlutterFlowTheme.of(context).accent4,
+              progressColor: skill['color'],
+              center: Text(
+                '${((skill['progress'] as double) * 100).toInt()}%',
+                style: FlutterFlowTheme.of(context).titleMedium.override(
+                  fontFamily: 'Montserrat',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  height: 1.2,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildAchievements() {
+  Widget _buildEnhancedAchievements() {
     return Column(
       children: [
-        _buildAchievementCard(
+        _buildEnhancedAchievementCard(
           'Consistency Master',
           'Played 5 rounds in a row',
           Icons.emoji_events,
-          const Color(0xFFFFC107),
+          const Color(0xFFFFD700),
+          'Gold',
+          true,
         ),
-        _buildAchievementCard(
-          'Sub-80 Streak',
-          'Broke 80 three times this month',
-          Icons.trending_down,
-          const Color(0xFF4CAF50),
+        _buildEnhancedAchievementCard(
+          'Focus Champion',
+          'Maintained focus for 18 holes',
+          Icons.psychology_rounded,
+          const Color(0xFFC0C0C0),
+          'Silver',
+          true,
         ),
-        _buildAchievementCard(
-          'Putting Pro',
-          'Averaged under 30 putts per round',
-          Icons.golf_course,
-          const Color(0xFF2196F3),
+        _buildEnhancedAchievementCard(
+          'Pressure Player',
+          'Performed under pressure',
+          Icons.compress,
+          const Color(0xFFCD7F32),
+          'Bronze',
+          false,
         ),
       ],
     );
   }
 
-  Widget _buildAchievementCard(String title, String description, IconData icon, Color color) {
+  Widget _buildEnhancedAchievementCard(String title, String description, IconData icon, Color color, String tier, bool isUnlocked) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 4,
-            color: Colors.black.withOpacity(0.05),
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF0B4D2C),
-                  ),
+      margin: const EdgeInsets.only(bottom: 16),
+      child: FoCoCoCard(
+        style: FoCoCoCardStyle.standard,
+        child: Row(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: isUnlocked ? color.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: isUnlocked ? color : Colors.grey,
+                  width: 2,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
+              ),
+              child: Icon(
+                icon,
+                color: isUnlocked ? color : Colors.grey,
+                size: 28,
+              ),
             ),
-          ),
-          Icon(
-            Icons.arrow_forward_ios,
-            size: 16,
-            color: Colors.grey[400],
-          ),
-        ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: FlutterFlowTheme.of(context).titleMedium.override(
+                          fontFamily: 'Montserrat',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isUnlocked ? FlutterFlowTheme.of(context).primaryText : Colors.grey,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          tier,
+                          style: FlutterFlowTheme.of(context).labelSmall.override(
+                            fontFamily: 'Inter',
+                            color: color,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                      fontFamily: 'Inter',
+                      color: isUnlocked ? FlutterFlowTheme.of(context).secondaryText : Colors.grey,
+                      fontSize: 14,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isUnlocked)
+              Icon(
+                Icons.check_circle,
+                color: color,
+                size: 24,
+              )
+            else
+              Icon(
+                Icons.lock_outlined,
+                color: Colors.grey,
+                size: 24,
+              ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildProgressInsights() {
+    return Column(
+      children: [
+        AIInsightCard(
+          title: 'Weekly Progress Analysis',
+          content: 'Your mental game consistency has improved by 15% this week. Focus training is showing great results, especially your ability to maintain concentration during challenging situations.',
+          insight: 'Your mental game consistency has improved by 15% this week. Focus training is showing great results, especially your ability to maintain concentration during challenging situations.',
+          sentiment: 'positive',
+          recommendations: [
+            'Continue with daily visualization exercises',
+            'Practice pressure scenarios during training',
+            'Log your mental state after each round',
+          ],
+          timestamp: DateTime.now().subtract(const Duration(hours: 2)),
+          aiModel: 'Progress AI',
+        ),
+        const SizedBox(height: 16),
+        FoCoCoCard(
+          style: FoCoCoCardStyle.standard,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Next Milestone',
+                style: FlutterFlowTheme.of(context).titleMedium.override(
+                  fontFamily: 'Montserrat',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    Icons.flag_outlined,
+                    color: FlutterFlowTheme.of(context).aiPrimary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Achieve Mental Performance Score of 85',
+                          style: FlutterFlowTheme.of(context).bodyLarge.override(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '7 points to go',
+                          style: FlutterFlowTheme.of(context).bodyMedium.override(
+                            fontFamily: 'Inter',
+                            color: FlutterFlowTheme.of(context).secondaryText,
+                            fontSize: 14,
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '92%',
+                    style: FlutterFlowTheme.of(context).titleMedium.override(
+                      fontFamily: 'Montserrat',
+                      color: FlutterFlowTheme.of(context).aiPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              LinearProgressIndicator(
+                value: 0.92,
+                backgroundColor: FlutterFlowTheme.of(context).accent4,
+                valueColor: AlwaysStoppedAnimation<Color>(FlutterFlowTheme.of(context).aiPrimary),
+                minHeight: 8,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -472,11 +670,14 @@ class _ProgressWidgetState extends State<ProgressWidget> {
         width: 50,
         height: 50,
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF0B4D2C) : Colors.transparent,
+          color: isActive ? FlutterFlowTheme.of(context).aiPrimary : Colors.transparent,
           borderRadius: BorderRadius.circular(15),
           gradient: isActive
-              ? const LinearGradient(
-                  colors: [Color(0xFF0B4D2C), Color(0xFF2E8B57)],
+              ? LinearGradient(
+                  colors: [
+                    FlutterFlowTheme.of(context).aiPrimary,
+                    FlutterFlowTheme.of(context).aiSecondary,
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 )
@@ -484,7 +685,7 @@ class _ProgressWidgetState extends State<ProgressWidget> {
           boxShadow: isActive
               ? [
                   BoxShadow(
-                    color: const Color(0xFF0B4D2C).withOpacity(0.3),
+                    color: FlutterFlowTheme.of(context).aiPrimary.withValues(alpha: 0.3),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),

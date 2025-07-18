@@ -1,6 +1,7 @@
 export '/backend/schema/util/schema_util.dart';
 
 export 'approach_stats_struct.dart';
+export 'audio_preferences_struct.dart';
 export 'driving_stats_struct.dart';
 export 'notification_settings_struct.dart';
 export 'putting_stats_struct.dart';

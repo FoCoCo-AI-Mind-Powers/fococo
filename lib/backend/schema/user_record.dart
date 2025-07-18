@@ -97,6 +97,12 @@ class UserRecord extends FirestoreRecord {
       _notificationSettings ?? NotificationSettingsStruct();
   bool hasNotificationSettings() => _notificationSettings != null;
 
+  // "audioPreferences" field.
+  AudioPreferencesStruct? _audioPreferences;
+  AudioPreferencesStruct get audioPreferences =>
+      _audioPreferences ?? AudioPreferencesStruct();
+  bool hasAudioPreferences() => _audioPreferences != null;
+
   // "timezone" field.
   String? _timezone;
   String get timezone => _timezone ?? '';
@@ -168,6 +174,9 @@ class UserRecord extends FirestoreRecord {
     _notificationSettings = snapshotData['notificationSettings'] is NotificationSettingsStruct
         ? snapshotData['notificationSettings']
         : NotificationSettingsStruct.maybeFromMap(snapshotData['notificationSettings']);
+    _audioPreferences = snapshotData['audioPreferences'] is AudioPreferencesStruct
+        ? snapshotData['audioPreferences']
+        : AudioPreferencesStruct.maybeFromMap(snapshotData['audioPreferences']);
     _timezone = snapshotData['timezone'] as String?;
     _createdTime = snapshotData['createdTime'] as DateTime?;
     _lastActive = snapshotData['lastActive'] as DateTime?;
@@ -221,6 +230,7 @@ Map<String, dynamic> createUserRecordData({
   String? golfExperience,
   String? homeClub,
   VarkPreferencesStruct? varkPreferences,
+  AudioPreferencesStruct? audioPreferences,
   String? currentMembershipTier,
   String? appleSubscriptionId,
 }) {
@@ -233,6 +243,7 @@ Map<String, dynamic> createUserRecordData({
       'golfExperience': golfExperience,
       'homeClub': homeClub,
       'varkPreferences': VarkPreferencesStruct().toMap(),
+      'audioPreferences': AudioPreferencesStruct().toMap(),
       'currentMembershipTier': currentMembershipTier,
       'appleSubscriptionId': appleSubscriptionId,
     }.withoutNulls,
@@ -241,6 +252,10 @@ Map<String, dynamic> createUserRecordData({
   // Handle nested data for "varkPreferences" field.
   addVarkPreferencesStructData(
       firestoreData, varkPreferences, 'varkPreferences');
+
+  // Handle nested data for "audioPreferences" field.
+  addAudioPreferencesStructData(
+      firestoreData, audioPreferences, 'audioPreferences');
 
   return firestoreData;
 }

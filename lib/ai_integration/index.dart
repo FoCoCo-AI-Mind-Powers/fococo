@@ -71,7 +71,10 @@ class FoCoCoAI {
   static GeminiAIClient get client => GeminiAIClient(apiKey: 'firebase_ai_logic');
   
   /// Mental Coach System for specialized coaching
-  static MentalCoachSystem get mentalCoach => MentalCoachSystem.instance;
+  static MentalCoachSystem get mentalCoach => MentalCoachSystem(
+    geminiClient: client,
+    costTracker: costTracker,
+  );
   
   /// Conversation Manager for multi-turn conversations
   static ConversationManager get conversations => ConversationManager.instance;
@@ -159,10 +162,10 @@ class FoCoCoAI {
     
     // Create VARK preferences map
     final varkPreferencesMap = {
-      'visual': userProfile.varkPreferences?.visual ?? true,
-      'aural': userProfile.varkPreferences?.aural ?? false,
-      'readWrite': userProfile.varkPreferences?.readWrite ?? false,
-      'kinesthetic': userProfile.varkPreferences?.kinesthetic ?? false,
+      'visual': userProfile.varkPreferences.visual,
+      'aural': userProfile.varkPreferences.aural,
+      'readWrite': userProfile.varkPreferences.readWrite,
+      'kinesthetic': userProfile.varkPreferences.kinesthetic,
     };
     
     return await client.generateMentalCoachingRecommendations(
@@ -482,10 +485,10 @@ extension UserRecordAI on UserRecord {
   }) async {
     return await FoCoCoAI.createPersonalizedContent(
       userId: userId,
-      varkPreferences: varkPreferences ?? VarkPreferencesStruct(),
+      varkPreferences: varkPreferences,
       contentType: contentType,
       topic: topic,
-      userTier: currentMembershipTier ?? 'BASE',
+      userTier: currentMembershipTier,
       additionalContext: additionalContext,
     );
   }

@@ -1,9 +1,6 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/fococo_ui_components.dart';
-import '/ai_integration/index.dart';
-import '/backend/schema/index.dart';
-import '/auth/firebase_auth/auth_util.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'golf_rounds_model.dart';
@@ -113,7 +110,9 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
         ),
         
         // Enhanced Bottom Navigation
-        bottomNavigationBar: _buildEnhancedBottomNav(theme),
+        bottomNavigationBar: FoCoCoAnimatedBottomNavBar(
+          currentRoute: 'golf_rounds',
+        ),
       ),
     );
   }
@@ -160,7 +159,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
                             Text(
                               'Track your journey to lower scores',
                               style: theme.bodyMedium.override(
-                                color: Colors.white.withOpacity(0.8),
+                                color: Colors.white.withValues(alpha: 0.8),
                                 height: 1.2,
                               ),
                             ),
@@ -171,7 +170,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
                         child: IconButton(
@@ -219,7 +218,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
                           'Rounds',
                           '24',
                           'This year',
-                          FontAwesomeIcons.golfBall,
+                          FontAwesomeIcons.golfBallTee,
                           theme.golfPrimary,
                         ),
                       ),
@@ -231,7 +230,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
                   // Tab Bar
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
                     ),
                     child: TabBar(
@@ -274,10 +273,10 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
     return Container(
       padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusM),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -301,7 +300,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
           Text(
             title,
             style: theme.bodySmall.override(
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
               height: 1.2,
             ),
           ),
@@ -444,11 +443,11 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: theme.golfPrimary.withOpacity(0.1),
+                  color: theme.golfPrimary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  FontAwesomeIcons.golfBall,
+                  FontAwesomeIcons.golfBallTee,
                   color: theme.golfPrimary,
                   size: 24,
                 ),
@@ -486,7 +485,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
                   vertical: FlutterFlowTheme.spacingS,
                 ),
                 decoration: BoxDecoration(
-                  color: _getScoreColor(theme, score).withOpacity(0.1),
+                  color: _getScoreColor(theme, score).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
                 ),
                 child: Text(
@@ -638,7 +637,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
                 unit: '% accuracy',
                 percentage: 72.0,
                 icon: Icons.sports_golf_rounded,
-                trend: '+5.2',
+                trend: '+5.2%',
                 primaryColor: theme.golfPrimary,
               ),
               PerformanceMetricCard(
@@ -647,7 +646,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
                 unit: '% on green',
                 percentage: 68.0,
                 icon: Icons.flag_rounded,
-                trend: '+2.8',
+                trend: '+2.8%',
                 primaryColor: theme.golfSecondary,
               ),
               PerformanceMetricCard(
@@ -656,7 +655,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
                 unit: '% up & down',
                 percentage: 78.0,
                 icon: Icons.golf_course_rounded,
-                trend: '-1.2',
+                trend: '-1.2%',
                 primaryColor: theme.performanceAverage,
               ),
               PerformanceMetricCard(
@@ -665,7 +664,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
                 unit: 'avg putts',
                 percentage: 65.0,
                 icon: Icons.circle_outlined,
-                trend: '+0.08',
+                trend: '+0.08%',
                 primaryColor: theme.performancePoor,
               ),
             ],
@@ -754,6 +753,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
           // AI-powered insights
           AIInsightCard(
             title: 'Performance Analysis',
+            content: 'Your driving accuracy has improved by 5.2% over the last month. Focus on maintaining this consistency while working on approach shots to greens.',
             insight: 'Your driving accuracy has improved by 5.2% over the last month. Focus on maintaining this consistency while working on approach shots to greens.',
             sentiment: 'positive',
             recommendations: [
@@ -889,7 +889,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: theme.golfPrimary.withOpacity(0.1),
+            color: theme.golfPrimary.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(
@@ -953,7 +953,13 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
       decoration: BoxDecoration(
         color: theme.primaryBackground,
         borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusXL),
-        boxShadow: theme.shadowL,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: SafeArea(
         child: Padding(
@@ -965,7 +971,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _buildNavItem(theme, Icons.home_rounded, 'Home', 'dashboard', false),
-              _buildNavItem(theme, FontAwesomeIcons.golfBall, 'Rounds', 'golf_rounds', true),
+              _buildNavItem(theme, FontAwesomeIcons.golfBallTee, 'Rounds', 'golf_rounds', true),
               _buildNavItem(theme, Icons.psychology_rounded, 'Train', 'coaching_modules', false),
               _buildNavItem(theme, Icons.trending_up_rounded, 'Progress', 'progress', false),
               _buildNavItem(theme, Icons.insights_rounded, 'Insights', 'ai_insights', false),

@@ -1,11 +1,9 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/fococo_ui_components.dart';
-import '/ai_integration/index.dart';
-import '/backend/schema/index.dart';
-import '/auth/firebase_auth/auth_util.dart';
+
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+
 import 'coaching_modules_model.dart';
 export 'coaching_modules_model.dart';
 
@@ -36,7 +34,7 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
     
     // Initialize animations
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: FlutterFlowTheme.animationGentle,
       vsync: this,
     );
     
@@ -49,7 +47,7 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
     ));
     
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
+      begin: const Offset(0, 0.2),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _animationController,
@@ -85,22 +83,22 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
             position: _slideAnimation,
             child: CustomScrollView(
               slivers: [
-                // Enhanced App Bar with serene design
-                _buildSliverAppBar(theme),
+                // Enhanced App Bar with Calm-inspired serene design
+                _buildCalmInspiredAppBar(theme),
                 
                 // Tab Content
                 SliverFillRemaining(
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      // Learning Path Tab (Duolingo-inspired)
-                      _buildLearningPathTab(theme),
+                      // Mindfulness Library Tab (Calm-inspired)
+                      _buildMindfulnessLibraryTab(theme),
                       
-                      // Today's Sessions Tab (Headspace-inspired)
+                      // Today's Sessions Tab (Calm-inspired)
                       _buildTodaySessionsTab(theme),
                       
-                      // Progress & Insights Tab
-                      _buildProgressTab(theme),
+                      // Progress & Journey Tab (Calm-inspired)
+                      _buildProgressJourneyTab(theme),
                     ],
                   ),
                 ),
@@ -110,15 +108,17 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
         ),
         
         // Enhanced Bottom Navigation
-        bottomNavigationBar: _buildEnhancedBottomNav(theme),
+        bottomNavigationBar: FoCoCoAnimatedBottomNavBar(
+          currentRoute: 'coaching_modules',
+        ),
       ),
     );
   }
 
   /// Enhanced SliverAppBar with Calm-inspired serene design
-  Widget _buildSliverAppBar(FlutterFlowTheme theme) {
+  Widget _buildCalmInspiredAppBar(FlutterFlowTheme theme) {
     return SliverAppBar(
-      expandedHeight: 260,
+      expandedHeight: 280,
       floating: false,
       pinned: true,
       elevation: 0,
@@ -126,19 +126,19 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: BoxDecoration(
-            gradient: theme.sereneGradient,
+            gradient: theme.calmGradient,
             borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(32),
-              bottomRight: Radius.circular(32),
+              bottomLeft: Radius.circular(FlutterFlowTheme.borderRadiusXXL),
+              bottomRight: Radius.circular(FlutterFlowTheme.borderRadiusXXL),
             ),
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(FlutterFlowTheme.spacingL),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header with greeting
+                  // Header with peaceful greeting
                   Row(
                     children: [
                       Expanded(
@@ -146,48 +146,52 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Welcome back, ${currentUserDisplayName.isNotEmpty ? currentUserDisplayName.split(' ').first : 'Golfer'}',
-                              style: theme.headlineMedium.override(
+                              'Find Your Center',
+                              style: theme.headlineMedium.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,
                                 height: 1.2,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: FlutterFlowTheme.spacingXS),
                             Text(
-                              'Ready to strengthen your mental game?',
-                              style: theme.bodyMedium.override(
-                                color: Colors.white.withOpacity(0.8),
+                              'Strengthen your mental game with mindful practice',
+                              style: theme.bodyMedium.copyWith(
+                                color: Colors.white.withValues(alpha: 0.9),
                                 height: 1.2,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      // Daily streak indicator
+                      // Mindfulness streak indicator
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
+                          horizontal: FlutterFlowTheme.spacingM,
+                          vertical: FlutterFlowTheme.spacingS,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusXL),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              FontAwesomeIcons.fire,
-                              color: theme.streakActive,
-                              size: 18,
+                              Icons.spa,
+                              color: theme.mentalPeace,
+                              size: FlutterFlowTheme.iconSizeS,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: FlutterFlowTheme.spacingS),
                             Text(
-                              '7',
-                              style: theme.titleMedium.override(
+                              '7 days',
+                              style: theme.titleSmall.copyWith(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                                 height: 1.2,
                               ),
                             ),
@@ -197,66 +201,87 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
                     ],
                   ),
                   
-                  const SizedBox(height: 24),
+                  const SizedBox(height: FlutterFlowTheme.spacingL),
                   
-                  // Today's motivation
+                  // Today's intention
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(16),
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         width: 1,
                       ),
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.wb_sunny_rounded,
-                          color: Colors.amber,
-                          size: 24,
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.self_improvement,
+                            color: Colors.white,
+                            size: FlutterFlowTheme.iconSizeM,
+                          ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: FlutterFlowTheme.spacingM),
                         Expanded(
-                          child: Text(
-                            'Today\'s focus: Building confidence under pressure',
-                            style: theme.bodyMedium.override(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                              height: 1.2,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Today\'s Intention',
+                                style: theme.bodySmall.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: FlutterFlowTheme.spacingXS),
+                              Text(
+                                'Cultivate inner stillness and focused awareness',
+                                style: theme.bodyMedium.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500,
+                                  height: 1.2,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
                   
-                  const SizedBox(height: 24),
+                  const SizedBox(height: FlutterFlowTheme.spacingL),
                   
-                  // Tab Bar
+                  // Tab Bar with Calm-inspired design
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(24),
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusXL),
                     ),
                     child: TabBar(
                       controller: _tabController,
                       indicator: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusXL),
                       ),
                       indicatorSize: TabBarIndicatorSize.tab,
-                      labelColor: theme.coachingPrimary,
-                      unselectedLabelColor: Colors.white70,
-                      labelStyle: theme.bodyMedium.override(
+                      labelColor: theme.calmPrimary,
+                      unselectedLabelColor: Colors.white.withValues(alpha: 0.7),
+                      labelStyle: theme.bodyMedium.copyWith(
                         fontWeight: FontWeight.w600,
                         height: 1.2,
                       ),
                       tabs: const [
-                        Tab(text: 'Learn'),
+                        Tab(text: 'Library'),
                         Tab(text: 'Today'),
-                        Tab(text: 'Progress'),
+                        Tab(text: 'Journey'),
                       ],
                     ),
                   ),
@@ -269,604 +294,112 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
     );
   }
 
-  /// Learning Path Tab - Duolingo-inspired skill tree
-  Widget _buildLearningPathTab(FlutterFlowTheme theme) {
+  /// Mindfulness Library Tab - Calm-inspired content organization
+  Widget _buildMindfulnessLibraryTab(FlutterFlowTheme theme) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(FlutterFlowTheme.spacingL),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Learning path header
-          Text(
-            'Your Learning Journey',
-            style: theme.headlineSmall.override(
-              fontWeight: FontWeight.w700,
-              color: theme.primaryText,
-              height: 1.2,
-            ),
-          ),
+          // Featured Session
+          _buildFeaturedSession(theme),
           
-          const SizedBox(height: 8),
+          const SizedBox(height: FlutterFlowTheme.spacingXL),
           
-          Text(
-            'Master mental skills step by step',
-            style: theme.bodyMedium.override(
-              color: theme.secondaryText,
-              height: 1.2,
-            ),
-          ),
+          // Categories
+          _buildMindfulnessCategories(theme),
           
-          const SizedBox(height: 32),
+          const SizedBox(height: FlutterFlowTheme.spacingXL),
           
-          // Skill tree - Duolingo style
-          _buildSkillTree(theme),
-          
-          const SizedBox(height: 80),
+          // Popular Sessions
+          _buildPopularSessions(theme),
         ],
       ),
     );
   }
 
-  Widget _buildSkillTree(FlutterFlowTheme theme) {
+  /// Featured Session - Calm-inspired hero content
+  Widget _buildFeaturedSession(FlutterFlowTheme theme) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Level 1 - Foundation
-        _buildSkillLevel(
-          theme,
-          'Foundation',
-          1,
-          [
-            _buildSkillNode(
-              theme,
-              'Breathing Basics',
-              1,
-              3,
-              1.0,
-              true,
-              false,
-              false,
-              Icons.air_rounded,
-            ),
-            _buildSkillNode(
-              theme,
-              'Body Awareness',
-              2,
-              3,
-              0.7,
-              false,
-              false,
-              true,
-              Icons.accessibility_rounded,
-            ),
-          ],
+        Text(
+          'Featured Session',
+          style: theme.headlineSmall.copyWith(
+            fontWeight: FontWeight.w600,
+            color: theme.primaryText,
+          ),
         ),
         
-        const SizedBox(height: 32),
+        const SizedBox(height: FlutterFlowTheme.spacingM),
         
-        // Level 2 - Focus
-        _buildSkillLevel(
-          theme,
-          'Focus Training',
-          2,
-          [
-            _buildSkillNode(
-              theme,
-              'Concentration',
-              1,
-              4,
-              0.5,
-              false,
-              false,
-              false,
-              Icons.center_focus_strong_rounded,
-            ),
-            _buildSkillNode(
-              theme,
-              'Visualization',
-              0,
-              4,
-              0.0,
-              false,
-              true,
-              false,
-              Icons.visibility_rounded,
-            ),
-            _buildSkillNode(
-              theme,
-              'Mindful Practice',
-              0,
-              4,
-              0.0,
-              false,
-              true,
-              false,
-              Icons.self_improvement_rounded,
-            ),
-          ],
-        ),
-        
-        const SizedBox(height: 32),
-        
-        // Level 3 - Performance
-        _buildSkillLevel(
-          theme,
-          'Performance',
-          3,
-          [
-            _buildSkillNode(
-              theme,
-              'Pressure Handling',
-              0,
-              5,
-              0.0,
-              false,
-              true,
-              false,
-              Icons.trending_up_rounded,
-            ),
-            _buildSkillNode(
-              theme,
-              'Flow State',
-              0,
-              5,
-              0.0,
-              false,
-              true,
-              false,
-              Icons.waves_rounded,
-            ),
-          ],
+        FoCoCoMindfulnessCard(
+          title: 'Pre-Round Preparation',
+          description: 'A guided meditation to center your mind and prepare for peak performance on the course.',
+          duration: '12 min',
+          sessionType: 'meditation',
+          progress: 0.0,
+          backgroundImage: 'assets/images/meditation-bg.jpg',
+          onTap: () {
+            // TODO: Navigate to featured session
+          },
         ),
       ],
     );
   }
 
-  Widget _buildSkillLevel(
-    FlutterFlowTheme theme,
-    String title,
-    int level,
-    List<Widget> skills,
-  ) {
+  /// Mindfulness Categories - Calm-inspired organization
+  Widget _buildMindfulnessCategories(FlutterFlowTheme theme) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Level header
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 8,
-              ),
-              decoration: BoxDecoration(
-                color: theme.coachingPrimary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                'Level $level',
-                style: theme.bodySmall.override(
-                  color: theme.coachingPrimary,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                title,
-                style: theme.titleMedium.override(
-                  fontWeight: FontWeight.w600,
-                  color: theme.primaryText,
-                  height: 1.2,
-                ),
-              ),
-            ),
-          ],
+        Text(
+          'Explore by Category',
+          style: theme.headlineSmall.copyWith(
+            fontWeight: FontWeight.w600,
+            color: theme.primaryText,
+          ),
         ),
         
-        const SizedBox(height: 16),
+        const SizedBox(height: FlutterFlowTheme.spacingM),
         
-        // Skills grid
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 1.0,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          children: skills,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSkillNode(
-    FlutterFlowTheme theme,
-    String title,
-    int level,
-    int maxLevel,
-    double progress,
-    bool isCompleted,
-    bool isLocked,
-    bool isActive,
-    IconData icon,
-  ) {
-    return SkillProgressNode(
-      title: title,
-      level: level,
-      maxLevel: maxLevel,
-      progress: progress,
-      isCompleted: isCompleted,
-      isLocked: isLocked,
-      isActive: isActive,
-      onTap: isLocked ? null : () => _showSkillDetails(title, level, maxLevel),
-    );
-  }
-
-  /// Today's Sessions Tab - Headspace-inspired
-  Widget _buildTodaySessionsTab(FlutterFlowTheme theme) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Recommended for today
-          Text(
-            'Recommended for Today',
-            style: theme.headlineSmall.override(
-              fontWeight: FontWeight.w700,
-              color: theme.primaryText,
-              height: 1.2,
+          childAspectRatio: 1.2,
+          mainAxisSpacing: FlutterFlowTheme.spacingM,
+          crossAxisSpacing: FlutterFlowTheme.spacingM,
+          children: [
+            _buildCategoryCard(
+              theme,
+              'Focus',
+              Icons.center_focus_strong,
+              theme.mentalFocus,
+              'Enhance concentration and clarity',
             ),
-          ),
-          
-          const SizedBox(height: 8),
-          
-          Text(
-            'Based on your recent golf performance',
-            style: theme.bodyMedium.override(
-              color: theme.secondaryText,
-              height: 1.2,
+            _buildCategoryCard(
+              theme,
+              'Calm',
+              Icons.spa,
+              theme.mentalCalm,
+              'Find inner peace and stillness',
             ),
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Featured session
-          _buildFeaturedSession(theme),
-          
-          const SizedBox(height: 32),
-          
-          // Quick sessions
-          Text(
-            'Quick Sessions',
-            style: theme.titleMedium.override(
-              fontWeight: FontWeight.w600,
-              color: theme.primaryText,
-              height: 1.2,
+            _buildCategoryCard(
+              theme,
+              'Confidence',
+              Icons.psychology,
+              theme.mentalStrength,
+              'Build unshakeable self-belief',
             ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          _buildQuickSessionsList(theme),
-          
-          const SizedBox(height: 32),
-          
-          // Categories
-          Text(
-            'Browse by Category',
-            style: theme.titleMedium.override(
-              fontWeight: FontWeight.w600,
-              color: theme.primaryText,
-              height: 1.2,
+            _buildCategoryCard(
+              theme,
+              'Breathing',
+              Icons.air,
+              theme.breathingActive,
+              'Master the power of breath',
             ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          _buildCategoryGrid(theme),
-          
-          const SizedBox(height: 80),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeaturedSession(FlutterFlowTheme theme) {
-    return FoCoCoCard(
-      style: FoCoCoCardStyle.premium,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Featured badge
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
-            decoration: BoxDecoration(
-              color: theme.premiumGold,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              'FEATURED TODAY',
-              style: theme.bodySmall.override(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-                height: 1.2,
-              ),
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Session details
-          Row(
-            children: [
-              // Session icon
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: theme.coachingPrimary.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.psychology_rounded,
-                  color: theme.coachingPrimary,
-                  size: 32,
-                ),
-              ),
-              
-              const SizedBox(width: 16),
-              
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Pressure-Free Putting',
-                      style: theme.titleLarge.override(
-                        fontWeight: FontWeight.w700,
-                        color: theme.primaryText,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Learn to stay calm and focused during crucial putts',
-                      style: theme.bodyMedium.override(
-                        color: theme.secondaryText,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.access_time_rounded,
-                          size: 16,
-                          color: theme.coachingPrimary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '12 minutes',
-                          style: theme.bodySmall.override(
-                            color: theme.coachingPrimary,
-                            fontWeight: FontWeight.w600,
-                            height: 1.2,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Icon(
-                          Icons.star_rounded,
-                          size: 16,
-                          color: theme.premiumGold,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Intermediate',
-                          style: theme.bodySmall.override(
-                            color: theme.secondaryText,
-                            height: 1.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Start button
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: () => _startSession('Pressure-Free Putting'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.coachingPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              icon: Icon(
-                Icons.play_arrow_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
-              label: Text(
-                'Start Session',
-                style: theme.titleSmall.override(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickSessionsList(FlutterFlowTheme theme) {
-    return Column(
-      children: [
-        _buildQuickSessionItem(
-          theme,
-          'Pre-Round Confidence',
-          '5 min',
-          'Beginner',
-          Icons.sports_golf_rounded,
-          theme.golfPrimary,
-        ),
-        const SizedBox(height: 16),
-        _buildQuickSessionItem(
-          theme,
-          'Post-Miss Recovery',
-          '3 min',
-          'Intermediate',
-          Icons.refresh_rounded,
-          theme.mindfulnessPrimary,
-        ),
-        const SizedBox(height: 16),
-        _buildQuickSessionItem(
-          theme,
-          'Focus Reset',
-          '4 min',
-          'Beginner',
-          Icons.center_focus_strong_rounded,
-          theme.coachingPrimary,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickSessionItem(
-    FlutterFlowTheme theme,
-    String title,
-    String duration,
-    String difficulty,
-    IconData icon,
-    Color color,
-  ) {
-    return FoCoCoCard(
-      onTap: () => _startSession(title),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
-          ),
-          
-          const SizedBox(width: 16),
-          
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: theme.titleSmall.override(
-                    fontWeight: FontWeight.w600,
-                    color: theme.primaryText,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      duration,
-                      style: theme.bodySmall.override(
-                        color: color,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '•',
-                      style: theme.bodySmall.override(
-                        color: theme.secondaryText,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      difficulty,
-                      style: theme.bodySmall.override(
-                        color: theme.secondaryText,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          Icon(
-            Icons.play_circle_filled_rounded,
-            color: color,
-            size: 32,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryGrid(FlutterFlowTheme theme) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.5,
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      children: [
-        _buildCategoryCard(
-          theme,
-          'Breathing',
-          Icons.air_rounded,
-                     theme.mentalCalm,
-          12,
-        ),
-        _buildCategoryCard(
-          theme,
-          'Confidence',
-          Icons.emoji_emotions_rounded,
-          theme.mindfulnessPrimary,
-          8,
-        ),
-        _buildCategoryCard(
-          theme,
-          'Focus',
-          Icons.center_focus_strong_rounded,
-          theme.coachingPrimary,
-          15,
-        ),
-        _buildCategoryCard(
-          theme,
-          'Pressure',
-          Icons.trending_up_rounded,
-          theme.golfPrimary,
-          6,
+          ],
         ),
       ],
     );
@@ -877,232 +410,695 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
     String title,
     IconData icon,
     Color color,
-    int sessionCount,
+    String description,
   ) {
-    return FoCoCoCard(
-      onTap: () => _showCategory(title),
-      style: FoCoCoCardStyle.standard,
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.calmCardBackground,
+        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
+        boxShadow: [theme.coachingModuleShadow],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            // TODO: Navigate to category
+          },
+          borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
+          child: Padding(
+            padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    size: FlutterFlowTheme.iconSizeL,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: FlutterFlowTheme.spacingM),
+                Text(
+                  title,
+                  style: theme.titleMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.primaryText,
+                  ),
+                ),
+                const SizedBox(height: FlutterFlowTheme.spacingS),
+                Text(
+                  description,
+                  style: theme.bodySmall.copyWith(
+                    color: theme.secondaryText,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Popular Sessions - Calm-inspired content list
+  Widget _buildPopularSessions(FlutterFlowTheme theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Popular Sessions',
+              style: theme.headlineSmall.copyWith(
+                fontWeight: FontWeight.w600,
+                color: theme.primaryText,
+              ),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: () {
+                // TODO: Navigate to all sessions
+              },
+              child: Text(
+                'View All',
+                style: theme.bodyMedium.copyWith(
+                  color: theme.calmPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingM),
+        
+        FoCoCoMindfulnessCard(
+          title: 'Mindful Putting',
+          description: 'Develop present-moment awareness for consistent putting performance.',
+          duration: '8 min',
+          sessionType: 'focus',
+          progress: 0.6,
+          onTap: () {
+            // TODO: Navigate to session
+          },
+        ),
+        
+        FoCoCoMindfulnessCard(
+          title: 'Pressure Management',
+          description: 'Stay calm and composed during high-pressure situations on the course.',
+          duration: '15 min',
+          sessionType: 'meditation',
+          progress: 0.3,
+          onTap: () {
+            // TODO: Navigate to session
+          },
+        ),
+        
+        FoCoCoMindfulnessCard(
+          title: 'Breathing for Golf',
+          description: 'Learn rhythmic breathing techniques to enhance your swing tempo.',
+          duration: '10 min',
+          sessionType: 'breathing',
+          progress: 0.0,
+          onTap: () {
+            // TODO: Navigate to session
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Today's Sessions Tab - Calm-inspired daily practice
+  Widget _buildTodaySessionsTab(FlutterFlowTheme theme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(FlutterFlowTheme.spacingL),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Daily Mindfulness Practice
+          _buildDailyPractice(theme),
+          
+          const SizedBox(height: FlutterFlowTheme.spacingXL),
+          
+          // Breathing Exercise
+          _buildTodaysBreathing(theme),
+          
+          const SizedBox(height: FlutterFlowTheme.spacingXL),
+          
+          // Recommended for Today
+          _buildTodaysRecommendations(theme),
+        ],
+      ),
+    );
+  }
+
+  /// Daily Practice - Calm-inspired daily routine
+  Widget _buildDailyPractice(FlutterFlowTheme theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Daily Practice',
+          style: theme.headlineSmall.copyWith(
+            fontWeight: FontWeight.w600,
+            color: theme.primaryText,
+          ),
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingS),
+        
+        Text(
+          'Your personalized mindfulness routine',
+          style: theme.bodyMedium.copyWith(
+            color: theme.secondaryText,
+          ),
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingM),
+        
+        Container(
+          padding: const EdgeInsets.all(FlutterFlowTheme.spacingL),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                theme.calmPrimary.withValues(alpha: 0.1),
+                theme.calmSecondary.withValues(alpha: 0.05),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
+            border: Border.all(
+              color: theme.calmPrimary.withValues(alpha: 0.2),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: theme.calmPrimary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.self_improvement,
+                      color: Colors.white,
+                      size: FlutterFlowTheme.iconSizeM,
+                    ),
+                  ),
+                  const SizedBox(width: FlutterFlowTheme.spacingM),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Morning Centering',
+                          style: theme.titleMedium.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: theme.primaryText,
+                          ),
+                        ),
+                        const SizedBox(height: FlutterFlowTheme.spacingXS),
+                        Text(
+                          '5 minutes • Not started',
+                          style: theme.bodySmall.copyWith(
+                            color: theme.secondaryText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      // TODO: Start morning practice
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.calmPrimary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusButton),
+                      ),
+                    ),
+                    child: Text('Start'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Today's Breathing Exercise
+  Widget _buildTodaysBreathing(FlutterFlowTheme theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Breathing Exercise',
+          style: theme.headlineSmall.copyWith(
+            fontWeight: FontWeight.w600,
+            color: theme.primaryText,
+          ),
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingS),
+        
+        Text(
+          'Practice mindful breathing to center yourself',
+          style: theme.bodyMedium.copyWith(
+            color: theme.secondaryText,
+          ),
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingM),
+        
+        FoCoCoBreathingWidget(
+          duration: 180,
+          inhaleTime: 4,
+          holdTime: 4,
+          exhaleTime: 4,
+          onStart: () {
+            // TODO: Track breathing session start
+          },
+          onStop: () {
+            // TODO: Track breathing session stop
+          },
+          onComplete: () {
+            // TODO: Track breathing session completion
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Today's Recommendations
+  Widget _buildTodaysRecommendations(FlutterFlowTheme theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Recommended for You',
+          style: theme.headlineSmall.copyWith(
+            fontWeight: FontWeight.w600,
+            color: theme.primaryText,
+          ),
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingS),
+        
+        Text(
+          'Based on your progress and goals',
+          style: theme.bodyMedium.copyWith(
+            color: theme.secondaryText,
+          ),
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingM),
+        
+        FoCoCoMindfulnessCard(
+          title: 'Confidence Building',
+          description: 'Strengthen your mental resilience and self-belief through guided visualization.',
+          duration: '12 min',
+          sessionType: 'meditation',
+          progress: 0.0,
+          onTap: () {
+            // TODO: Navigate to session
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Progress & Journey Tab - Calm-inspired progress tracking
+  Widget _buildProgressJourneyTab(FlutterFlowTheme theme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(FlutterFlowTheme.spacingL),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Journey Overview
+          _buildJourneyOverview(theme),
+          
+          const SizedBox(height: FlutterFlowTheme.spacingXL),
+          
+          // Weekly Progress
+          _buildWeeklyProgress(theme),
+          
+          const SizedBox(height: FlutterFlowTheme.spacingXL),
+          
+          // Achievements
+          _buildMindfulnessAchievements(theme),
+        ],
+      ),
+    );
+  }
+
+  /// Journey Overview - Calm-inspired progress summary
+  Widget _buildJourneyOverview(FlutterFlowTheme theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Your Mindfulness Journey',
+          style: theme.headlineSmall.copyWith(
+            fontWeight: FontWeight.w600,
+            color: theme.primaryText,
+          ),
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingM),
+        
+        Container(
+          padding: const EdgeInsets.all(FlutterFlowTheme.spacingL),
+          decoration: BoxDecoration(
+            gradient: theme.mindfulnessGradient,
+            borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.spa,
+                      color: Colors.white,
+                      size: FlutterFlowTheme.iconSizeL,
+                    ),
+                  ),
+                  const SizedBox(width: FlutterFlowTheme.spacingM),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '127 minutes',
+                          style: theme.headlineMedium.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: FlutterFlowTheme.spacingXS),
+                        Text(
+                          'Total practice time',
+                          style: theme.bodyMedium.copyWith(
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: FlutterFlowTheme.spacingL),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildJourneyStatCard(theme, '15', 'Sessions\nCompleted'),
+                  ),
+                  const SizedBox(width: FlutterFlowTheme.spacingM),
+                  Expanded(
+                    child: _buildJourneyStatCard(theme, '7', 'Day\nStreak'),
+                  ),
+                  const SizedBox(width: FlutterFlowTheme.spacingM),
+                  Expanded(
+                    child: _buildJourneyStatCard(theme, '3', 'Skills\nUnlocked'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildJourneyStatCard(FlutterFlowTheme theme, String value, String label) {
+    return Container(
+      padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusM),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: theme.headlineSmall.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: FlutterFlowTheme.spacingXS),
+          Text(
+            label,
+            style: theme.bodySmall.copyWith(
+              color: Colors.white.withValues(alpha: 0.8),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Weekly Progress - Calm-inspired progress tracking
+  Widget _buildWeeklyProgress(FlutterFlowTheme theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'This Week',
+          style: theme.headlineSmall.copyWith(
+            fontWeight: FontWeight.w600,
+            color: theme.primaryText,
+          ),
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingM),
+        
+        Container(
+          padding: const EdgeInsets.all(FlutterFlowTheme.spacingL),
+          decoration: BoxDecoration(
+            color: theme.calmCardBackground,
+            borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
+            boxShadow: [theme.coachingModuleShadow],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Weekly Goal',
+                    style: theme.titleMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: theme.primaryText,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '5 of 7 days',
+                    style: theme.bodyMedium.copyWith(
+                      color: theme.calmPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: FlutterFlowTheme.spacingM),
+              
+              LinearProgressIndicator(
+                value: 5 / 7,
+                backgroundColor: theme.calmPrimary.withValues(alpha: 0.1),
+                valueColor: AlwaysStoppedAnimation<Color>(theme.calmPrimary),
+                minHeight: 8,
+              ),
+              
+              const SizedBox(height: FlutterFlowTheme.spacingM),
+              
+              Text(
+                'Practice mindfulness for 5 minutes each day',
+                style: theme.bodyMedium.copyWith(
+                  color: theme.secondaryText,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Mindfulness Achievements
+  Widget _buildMindfulnessAchievements(FlutterFlowTheme theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Achievements',
+          style: theme.headlineSmall.copyWith(
+            fontWeight: FontWeight.w600,
+            color: theme.primaryText,
+          ),
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingM),
+        
+        Row(
+          children: [
+            Expanded(
+                             child: _buildAchievementCard(
+                 theme,
+                 'First Steps',
+                 Icons.directions_walk,
+                 'Completed your first session',
+                 true,
+               ),
+            ),
+            const SizedBox(width: FlutterFlowTheme.spacingM),
+            Expanded(
+              child: _buildAchievementCard(
+                theme,
+                'Consistent',
+                Icons.timeline,
+                '7 days in a row',
+                true,
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingM),
+        
+        Row(
+          children: [
+            Expanded(
+              child: _buildAchievementCard(
+                theme,
+                'Focused',
+                Icons.center_focus_strong,
+                'Master focus techniques',
+                false,
+              ),
+            ),
+            const SizedBox(width: FlutterFlowTheme.spacingM),
+            Expanded(
+              child: _buildAchievementCard(
+                theme,
+                'Calm Mind',
+                Icons.spa,
+                'Complete 30 sessions',
+                false,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAchievementCard(
+    FlutterFlowTheme theme,
+    String title,
+    IconData icon,
+    String description,
+    bool isEarned,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
+      decoration: BoxDecoration(
+        color: theme.calmCardBackground,
+        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
+        boxShadow: [theme.coachingModuleShadow],
+        border: isEarned ? Border.all(
+          color: theme.calmPrimary.withValues(alpha: 0.3),
+          width: 2,
+        ) : null,
+      ),
+      child: Column(
         children: [
           Container(
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: isEarned ? theme.calmPrimary : theme.calmMuted,
               shape: BoxShape.circle,
             ),
             child: Icon(
               icon,
-              color: color,
-              size: 28,
+              color: Colors.white,
+              size: FlutterFlowTheme.iconSizeM,
             ),
           ),
-          
-          const SizedBox(height: 16),
-          
+          const SizedBox(height: FlutterFlowTheme.spacingS),
           Text(
             title,
-            style: theme.titleSmall.override(
+            style: theme.titleSmall.copyWith(
               fontWeight: FontWeight.w600,
-              color: theme.primaryText,
-              height: 1.2,
+              color: isEarned ? theme.primaryText : theme.secondaryText,
             ),
           ),
-          
-          const SizedBox(height: 4),
-          
+          const SizedBox(height: FlutterFlowTheme.spacingXS),
           Text(
-            '$sessionCount sessions',
-            style: theme.bodySmall.override(
+            description,
+            style: theme.bodySmall.copyWith(
               color: theme.secondaryText,
-              height: 1.2,
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  /// Progress Tab
-  Widget _buildProgressTab(FlutterFlowTheme theme) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Overall progress
-          Text(
-            'Your Progress',
-            style: theme.headlineSmall.override(
-              fontWeight: FontWeight.w700,
-              color: theme.primaryText,
-              height: 1.2,
-            ),
-          ),
-          
-          const SizedBox(height: 32),
-          
-          // Progress overview cards
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 1.2,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            children: [
-              PerformanceMetricCard(
-                title: 'Sessions',
-                value: '24',
-                unit: 'completed',
-                percentage: 75.0,
-                icon: Icons.self_improvement_rounded,
-                primaryColor: theme.coachingPrimary,
-                trend: '+3 this week',
-              ),
-              PerformanceMetricCard(
-                title: 'Streak',
-                value: '7',
-                unit: 'days',
-                percentage: 70.0,
-                icon: FontAwesomeIcons.fire,
-                primaryColor: theme.streakActive,
-                trend: 'Best: 12 days',
-              ),
-              PerformanceMetricCard(
-                title: 'Focus Score',
-                value: '8.2',
-                unit: '/10',
-                percentage: 82.0,
-                icon: Icons.center_focus_strong_rounded,
-                primaryColor: theme.mentalFocus,
-                trend: '+0.8 this month',
-              ),
-              PerformanceMetricCard(
-                title: 'Confidence',
-                value: '7.6',
-                unit: '/10',
-                percentage: 76.0,
-                icon: Icons.emoji_emotions_rounded,
-                primaryColor: theme.mindfulnessPrimary,
-                trend: '+1.2 this month',
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 48),
-          
-          // Recent achievements
-          Text(
-            'Recent Achievements',
-            style: theme.titleMedium.override(
-              fontWeight: FontWeight.w600,
-              color: theme.primaryText,
-              height: 1.2,
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          SizedBox(
-            height: 200,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                SizedBox(
-                  width: 160,
-                  child: AchievementBadge(
-                    title: 'Mindful Golfer',
-                    description: 'Completed 20 mindfulness sessions',
-                    icon: Icons.self_improvement_rounded,
-                    tier: AchievementTier.gold,
-                    isEarned: true,
-                    earnedDate: DateTime.now().subtract(const Duration(days: 2)),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                SizedBox(
-                  width: 160,
-                  child: AchievementBadge(
-                    title: 'Consistency King',
-                    description: 'Maintained 7-day streak',
-                    icon: FontAwesomeIcons.fire,
-                    tier: AchievementTier.silver,
-                    isEarned: true,
-                    earnedDate: DateTime.now().subtract(const Duration(days: 1)),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                SizedBox(
-                  width: 160,
-                  child: AchievementBadge(
-                    title: 'Focus Master',
-                    description: 'Achieve 9+ focus score',
-                    icon: Icons.center_focus_strong_rounded,
-                    tier: AchievementTier.bronze,
-                    isEarned: false,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 48),
-          
-          // AI insights
-          AIInsightCard(
-            title: 'Mental Training Insights',
-            insight: 'Your breathing exercises are improving your focus scores significantly. Continue the pre-round breathing routine for optimal results.',
-            sentiment: 'positive',
-            recommendations: [
-              'Extend breathing sessions to 8 minutes',
-              'Try advanced visualization techniques',
-              'Practice pressure scenarios',
-            ],
-            timestamp: DateTime.now().subtract(const Duration(hours: 4)),
-            aiModel: 'Mental Coach AI',
-            onFeedback: () {
-              // Handle feedback
-            },
-          ),
-          
-          const SizedBox(height: 80),
-        ],
-      ),
-    );
-  }
-
-  /// Enhanced Bottom Navigation
-  Widget _buildEnhancedBottomNav(FlutterFlowTheme theme) {
+  /// Enhanced Bottom Navigation with Calm-inspired design
+  Widget _buildCalmInspiredBottomNav(FlutterFlowTheme theme) {
     return Container(
-      margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.primaryBackground,
-        borderRadius: BorderRadius.circular(32),
+        color: theme.calmCardBackground,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
           ),
         ],
       ),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
+            horizontal: FlutterFlowTheme.spacingL,
+            vertical: FlutterFlowTheme.spacingS,
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(theme, Icons.home_rounded, 'Home', 'dashboard', false),
-              _buildNavItem(theme, FontAwesomeIcons.golfBall, 'Rounds', 'golf_rounds', false),
-              _buildNavItem(theme, Icons.psychology_rounded, 'Train', 'coaching_modules', true),
-              _buildNavItem(theme, Icons.trending_up_rounded, 'Progress', 'progress', false),
-              _buildNavItem(theme, Icons.insights_rounded, 'Insights', 'ai_insights', false),
-              _buildNavItem(theme, Icons.person_rounded, 'Profile', 'profile', false),
+              _buildNavItem(theme, 'Home', Icons.home, false, () {}),
+              _buildNavItem(theme, 'Training', Icons.spa, true, () {}),
+              _buildNavItem(theme, 'Progress', Icons.trending_up, false, () {}),
+              _buildNavItem(theme, 'Profile', Icons.person, false, () {}),
             ],
           ),
         ),
@@ -1110,117 +1106,42 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
     );
   }
 
-  Widget _buildNavItem(FlutterFlowTheme theme, IconData icon, String label, String page, bool isActive) {
+  Widget _buildNavItem(
+    FlutterFlowTheme theme,
+    String label,
+    IconData icon,
+    bool isActive,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
-      onTap: () {
-        if (!isActive) {
-          context.goNamed(page);
-        }
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: EdgeInsets.symmetric(
-          horizontal: isActive ? 16 : 8,
-          vertical: 8,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: FlutterFlowTheme.spacingM,
+          vertical: FlutterFlowTheme.spacingS,
         ),
         decoration: BoxDecoration(
-          gradient: isActive ? theme.sereneGradient : null,
-          borderRadius: BorderRadius.circular(20),
+          color: isActive ? theme.calmPrimary.withValues(alpha: 0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusM),
         ),
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              color: isActive ? Colors.white : theme.secondaryText,
-              size: 20,
+              size: FlutterFlowTheme.iconSizeM,
+              color: isActive ? theme.calmPrimary : theme.secondaryText,
             ),
-            if (isActive) ...[
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: theme.bodySmall.override(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Helper methods
-  void _showSkillDetails(String title, int level, int maxLevel) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+            const SizedBox(height: FlutterFlowTheme.spacingXS),
             Text(
-              title,
-              style: FlutterFlowTheme.of(context).headlineSmall.override(
-                fontWeight: FontWeight.w700,
-                height: 1.2,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Level $level of $maxLevel',
-              style: FlutterFlowTheme.of(context).bodyMedium.override(
-                color: FlutterFlowTheme.of(context).secondaryText,
-                height: 1.4,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Continue Learning'),
+              label,
+              style: theme.bodySmall.copyWith(
+                color: isActive ? theme.calmPrimary : theme.secondaryText,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _startSession(String sessionName) {
-    // TODO: Implement session start
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Starting Session'),
-        content: Text('$sessionName session will begin soon!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showCategory(String category) {
-    // TODO: Navigate to category page
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(category),
-        content: Text('Browse $category sessions coming soon!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
-          ),
-        ],
       ),
     );
   }

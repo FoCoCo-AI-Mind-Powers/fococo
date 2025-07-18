@@ -7,8 +7,8 @@ import '/backend/schema/structs/index.dart';
 
 import '/auth/base_auth_user_provider.dart';
 
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/fococo_ui_components.dart';
 
 import '/index.dart';
 
@@ -328,16 +328,11 @@ class FFRoute {
                 )
               : builder(context, ffParams);
           final child = appStateNotifier.loading
-              ? Center(
-                  child: SizedBox(
-                    width: 30.0,
-                    height: 30.0,
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        FlutterFlowTheme.of(context).primary,
-                      ),
-                    ),
-                  ),
+              ? FoCoCoAnimatedSplash(
+                  onAnimationComplete: () {
+                    // This will be handled by the main app timeout
+                  },
+                  duration: const Duration(milliseconds: 2000),
                 )
               : page;
 

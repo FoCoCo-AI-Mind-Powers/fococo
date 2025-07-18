@@ -2,10 +2,8 @@ import '/auth/firebase_auth/auth_util.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/fococo_ui_components.dart';
-import '/ai_integration/index.dart';
-import '/backend/schema/index.dart';
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+
 import 'dashboard_model.dart';
 export 'dashboard_model.dart';
 
@@ -76,15 +74,15 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
       },
       child: Scaffold(
         key: scaffoldKey,
-        backgroundColor: theme.primaryBackground,
+        backgroundColor: theme.activityBackground,
         body: FadeTransition(
           opacity: _fadeAnimation,
           child: SlideTransition(
             position: _slideAnimation,
             child: CustomScrollView(
               slivers: [
-                // Enhanced App Bar
-                _buildEnhancedAppBar(theme),
+                // Enhanced App Bar with Strava-inspired design
+                _buildStravaInspiredAppBar(theme),
                 
                 // Main Content
                 SliverToBoxAdapter(
@@ -93,28 +91,23 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Mental Performance Index (Oura Ring-inspired)
-                        _buildMentalPerformanceIndex(theme),
+                        // Current Streak Widget (Strava-inspired)
+                        _buildStravaInspiredStreak(theme),
                         
                         const SizedBox(height: FlutterFlowTheme.spacingL),
                         
-                        // Today's Highlights
-                        _buildTodaysHighlights(theme),
+                        // Performance Metrics (Strava-inspired)
+                        _buildStravaInspiredPerformanceMetrics(theme),
                         
                         const SizedBox(height: FlutterFlowTheme.spacingL),
                         
-                        // Performance Metrics Grid (Strava-inspired)
-                        _buildPerformanceMetrics(theme),
+                        // Recent Activity Feed (Strava-inspired)
+                        _buildStravaInspiredActivityFeed(theme),
                         
                         const SizedBox(height: FlutterFlowTheme.spacingL),
                         
-                        // Recent Activity & Insights
-                        _buildRecentActivity(theme),
-                        
-                        const SizedBox(height: FlutterFlowTheme.spacingL),
-                        
-                        // Achievement Showcase (Duolingo-inspired)
-                        _buildAchievementShowcase(theme),
+                        // Mindfulness Section (Calm-inspired)
+                        _buildCalmInspiredMindfulness(theme),
                         
                         const SizedBox(height: FlutterFlowTheme.spacingL),
                         
@@ -130,15 +123,17 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
             ),
           ),
         ),
-        bottomNavigationBar: _buildEnhancedBottomNav(theme),
+        bottomNavigationBar: FoCoCoAnimatedBottomNavBar(
+          currentRoute: 'dashboard',
+        ),
       ),
     );
   }
 
-  /// Enhanced App Bar with gradient and user info
-  Widget _buildEnhancedAppBar(FlutterFlowTheme theme) {
+  /// Enhanced App Bar with Strava-inspired gradient and user info
+  Widget _buildStravaInspiredAppBar(FlutterFlowTheme theme) {
     return SliverAppBar(
-      expandedHeight: 160,
+      expandedHeight: 180,
       floating: false,
       pinned: true,
       elevation: 0,
@@ -146,7 +141,7 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: BoxDecoration(
-            gradient: theme.golfGradient,
+            gradient: theme.activityGradient,
             borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(FlutterFlowTheme.borderRadiusXXL),
               bottomRight: Radius.circular(FlutterFlowTheme.borderRadiusXXL),
@@ -161,17 +156,24 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
                 children: [
                   Row(
                     children: [
-                      // User Avatar
+                      // User Avatar with Strava-inspired border
                       Container(
-                        width: 56,
-                        height: 56,
+                        width: 60,
+                        height: 60,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                            width: 2,
+                            color: Colors.white.withValues(alpha: 0.4),
+                            width: 3,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: ClipOval(
                           child: currentUserPhoto.isNotEmpty
@@ -189,15 +191,15 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
                       
                       const SizedBox(width: FlutterFlowTheme.spacingM),
                       
-                      // Welcome Message
+                      // Welcome Message with Strava-inspired styling
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Good ${_getTimeOfDayGreeting()}',
-                              style: theme.bodyMedium.override(
-                                color: Colors.white.withOpacity(0.9),
+                              style: theme.bodyMedium.copyWith(
+                                color: Colors.white.withValues(alpha: 0.9),
                                 height: 1.0,
                               ),
                             ),
@@ -206,7 +208,7 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
                               currentUserDisplayName.isNotEmpty 
                                   ? currentUserDisplayName 
                                   : 'Golfer',
-                              style: theme.headlineMedium.override(
+                              style: theme.headlineMedium.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,
                                 height: 1.0,
@@ -214,17 +216,28 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            const SizedBox(height: FlutterFlowTheme.spacingXS),
+                            Text(
+                              'Ready for today\'s training?',
+                              style: theme.bodySmall.copyWith(
+                                color: Colors.white.withValues(alpha: 0.8),
+                              ),
+                            ),
                           ],
                         ),
                       ),
                       
-                      // Notification Bell
+                      // Notification Bell with Strava-inspired design
                       Container(
-                        width: 44,
-                        height: 44,
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
                         ),
                         child: IconButton(
                           onPressed: () {
@@ -248,235 +261,76 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
     );
   }
 
-  /// Mental Performance Index - Oura Ring inspired
-  Widget _buildMentalPerformanceIndex(FlutterFlowTheme theme) {
-    return WellnessScoreCard(
-      score: 78.0, // TODO: Get from actual data
-      date: dateTimeFormat('MMM d, yyyy', DateTime.now()),
-      subScores: {
-        'focus': 82.0,
-        'calm': 75.0,
-        'energy': 77.0,
-      },
-      onTap: () => context.goNamed('ai_insights'),
+  /// Strava-inspired Streak Widget
+  Widget _buildStravaInspiredStreak(FlutterFlowTheme theme) {
+    return FoCoCoStreakWidget(
+      currentStreak: 7, // TODO: Get from user data
+      longestStreak: 15, // TODO: Get from user data
+      streakType: 'Training',
+      isActive: true,
     );
   }
 
-  /// Today's Highlights with streak and goals
-  Widget _buildTodaysHighlights(FlutterFlowTheme theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Today\'s Highlights',
-          style: theme.headlineSmall.override(
-            fontWeight: FontWeight.w700,
-            color: theme.primaryText,
-            height: 1.2,
-          ),
-        ),
-        
-        const SizedBox(height: FlutterFlowTheme.spacingM),
-        
-        // Active Streak
-        StreakIndicator(
-          currentStreak: 7, // TODO: Get from actual data
-          maxStreak: 15,
-          streakType: 'Practice Sessions',
-          isActive: true,
-        ),
-        
-        const SizedBox(height: FlutterFlowTheme.spacingM),
-        
-        // Daily Goals Progress
-        FoCoCoCard(
-          style: FoCoCoCardStyle.standard,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Daily Goals',
-                    style: theme.titleMedium.override(
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                    ),
-                  ),
-                  Text(
-                    '2 of 3 complete',
-                    style: theme.bodySmall.override(
-                      color: theme.success,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: FlutterFlowTheme.spacingM),
-              
-              _buildGoalItem(
-                theme,
-                'Complete mental training session',
-                true,
-                Icons.psychology_rounded,
-              ),
-              _buildGoalItem(
-                theme,
-                'Log golf round with mindset notes',
-                true,
-                FontAwesomeIcons.golfBall,
-              ),
-              _buildGoalItem(
-                theme,
-                'Practice breathing exercise',
-                false,
-                Icons.air_rounded,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGoalItem(FlutterFlowTheme theme, String title, bool isComplete, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: FlutterFlowTheme.spacingS),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: isComplete 
-                  ? theme.success 
-                  : theme.alternate,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              isComplete ? Icons.check_rounded : icon,
-              color: isComplete ? Colors.white : theme.secondaryText,
-              size: 18,
-            ),
-          ),
-          
-          const SizedBox(width: FlutterFlowTheme.spacingM),
-          
-          Expanded(
-            child: Text(
-              title,
-              style: theme.bodyMedium.override(
-                color: isComplete 
-                    ? theme.secondaryText 
-                    : theme.primaryText,
-                decoration: isComplete 
-                    ? TextDecoration.lineThrough 
-                    : null,
-                height: 1.2,
-              ),
-            ),
-          ),
-        ],
+  /// Strava-inspired Performance Metrics
+  Widget _buildStravaInspiredPerformanceMetrics(FlutterFlowTheme theme) {
+    final metrics = [
+      PerformanceMetric(
+        label: 'Mental Focus',
+        value: '85%',
+        score: 85,
+        trend: 5.2,
       ),
+      PerformanceMetric(
+        label: 'Confidence',
+        value: '78%',
+        score: 78,
+        trend: -2.1,
+      ),
+      PerformanceMetric(
+        label: 'Control',
+        value: '92%',
+        score: 92,
+        trend: 8.5,
+      ),
+    ];
+
+    return FoCoCoPerformanceMetrics(
+      metrics: metrics,
+      showTrend: true,
+      compactView: true,
     );
   }
 
-  /// Performance Metrics Grid - Strava inspired
-  Widget _buildPerformanceMetrics(FlutterFlowTheme theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Performance Metrics',
-          style: theme.headlineSmall.override(
-            fontWeight: FontWeight.w700,
-            color: theme.primaryText,
-            height: 1.2,
-          ),
-        ),
-        
-        const SizedBox(height: FlutterFlowTheme.spacingM),
-        
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 1.1,
-          mainAxisSpacing: FlutterFlowTheme.spacingM,
-          crossAxisSpacing: FlutterFlowTheme.spacingM,
-          children: [
-            PerformanceMetricCard(
-              title: 'Avg Score',
-              value: '84',
-              unit: 'strokes',
-              percentage: 73.0,
-              icon: FontAwesomeIcons.golfBall,
-              trend: '-2.3',
-              onTap: () => context.goNamed('golf_rounds'),
-            ),
-            PerformanceMetricCard(
-              title: 'Mental Focus',
-              value: '8.2',
-              unit: '/10',
-              percentage: 82.0,
-              primaryColor: theme.mentalFocus,
-              icon: Icons.psychology_rounded,
-              trend: '+0.5',
-              onTap: () => context.goNamed('progress'),
-            ),
-            PerformanceMetricCard(
-              title: 'Sessions',
-              value: '12',
-              unit: 'this week',
-              percentage: 85.0,
-              primaryColor: theme.coachingPrimary,
-              icon: Icons.self_improvement_rounded,
-              trend: '+3',
-              onTap: () => context.goNamed('coaching_modules'),
-            ),
-            PerformanceMetricCard(
-              title: 'Consistency',
-              value: '76',
-              unit: '%',
-              percentage: 76.0,
-              primaryColor: theme.streakActive,
-              icon: Icons.trending_up_rounded,
-              trend: '+5.2',
-              onTap: () => context.goNamed('progress'),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// Recent Activity with AI insights
-  Widget _buildRecentActivity(FlutterFlowTheme theme) {
+  /// Strava-inspired Activity Feed
+  Widget _buildStravaInspiredActivityFeed(FlutterFlowTheme theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            Icon(
+              Icons.timeline,
+              size: FlutterFlowTheme.iconSizeM,
+              color: theme.activityPrimary,
+            ),
+            const SizedBox(width: FlutterFlowTheme.spacingS),
             Text(
               'Recent Activity',
-              style: theme.headlineSmall.override(
-                fontWeight: FontWeight.w700,
+              style: theme.headlineSmall.copyWith(
+                fontWeight: FontWeight.w600,
                 color: theme.primaryText,
-                height: 1.2,
               ),
             ),
+            const Spacer(),
             TextButton(
-              onPressed: () => context.goNamed('ai_insights'),
+              onPressed: () {
+                // TODO: Navigate to all activities
+              },
               child: Text(
                 'View All',
-                style: theme.titleSmall.override(
-                  color: theme.primary,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
+                style: theme.bodyMedium.copyWith(
+                  color: theme.activityPrimary,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -485,119 +339,76 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
         
         const SizedBox(height: FlutterFlowTheme.spacingM),
         
-        // Recent Golf Round
-        FoCoCoCard(
-          onTap: () => context.goNamed('golf_rounds'),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: theme.golfPrimary.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  FontAwesomeIcons.golfBall,
-                  color: theme.golfPrimary,
-                  size: 24,
-                ),
-              ),
-              
-              const SizedBox(width: FlutterFlowTheme.spacingM),
-              
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Pebble Beach Golf Links',
-                      style: theme.titleMedium.override(
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: FlutterFlowTheme.spacingXS),
-                    Text(
-                      'Shot 82 • Great mental focus on back 9',
-                      style: theme.bodySmall.override(
-                        color: theme.secondaryText,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: FlutterFlowTheme.spacingS,
-                  vertical: FlutterFlowTheme.spacingXS,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.success.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusS),
-                ),
-                child: Text(
-                  '82',
-                  style: theme.titleSmall.override(
-                    color: theme.success,
-                    fontWeight: FontWeight.w700,
-                    height: 1.2,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        // Activity Cards
+        FoCoCoActivityCard(
+          title: 'Morning Practice Round',
+          subtitle: 'Pebble Beach Golf Links',
+          score: '78',
+          date: '2 hours ago',
+          stats: [
+            ActivityStat(label: 'Fairways', value: '12/14'),
+            ActivityStat(label: 'Greens', value: '15/18'),
+            ActivityStat(label: 'Putts', value: '32'),
+          ],
+          achievements: [
+            Achievement(tier: 'gold', icon: Icons.emoji_events, name: 'Best Round'),
+          ],
+          isPersonalRecord: true,
+          onTap: () {
+            // TODO: Navigate to round details
+          },
         ),
         
-        const SizedBox(height: FlutterFlowTheme.spacingM),
-        
-        // Recent AI Insight
-        AIInsightCard(
-          title: 'Mental Performance Analysis',
-          insight: 'Your focus improved significantly during pressure situations. The breathing technique you practiced is showing great results on approach shots.',
-          sentiment: 'positive',
-          recommendations: [
-            'Continue practicing pre-shot routine',
-            'Focus on visualization before long putts',
+        FoCoCoActivityCard(
+          title: 'Mental Training Session',
+          subtitle: 'Focus & Concentration',
+          score: '45 min',
+          date: 'Yesterday',
+          stats: [
+            ActivityStat(label: 'Focus', value: '87%'),
+            ActivityStat(label: 'Completed', value: '100%'),
           ],
-          timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-          aiModel: 'Gemini 2.5 Flash',
-          onFeedback: () {
-            // TODO: Handle feedback
+          achievements: [
+            Achievement(tier: 'silver', icon: Icons.psychology, name: 'Mindful'),
+          ],
+          onTap: () {
+            // TODO: Navigate to session details
           },
         ),
       ],
     );
   }
 
-  /// Achievement Showcase - Duolingo inspired
-  Widget _buildAchievementShowcase(FlutterFlowTheme theme) {
+  /// Calm-inspired Mindfulness Section
+  Widget _buildCalmInspiredMindfulness(FlutterFlowTheme theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            Icon(
+              Icons.spa,
+              size: FlutterFlowTheme.iconSizeM,
+              color: theme.mindfulnessPrimary,
+            ),
+            const SizedBox(width: FlutterFlowTheme.spacingS),
             Text(
-              'Recent Achievements',
-              style: theme.headlineSmall.override(
-                fontWeight: FontWeight.w700,
+              'Mindfulness',
+              style: theme.headlineSmall.copyWith(
+                fontWeight: FontWeight.w600,
                 color: theme.primaryText,
-                height: 1.2,
               ),
             ),
+            const Spacer(),
             TextButton(
-              onPressed: () => context.goNamed('achievements'),
+              onPressed: () {
+                // TODO: Navigate to mindfulness section
+              },
               child: Text(
-                'View All',
-                style: theme.titleSmall.override(
-                  color: theme.primary,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
+                'Explore',
+                style: theme.bodyMedium.copyWith(
+                  color: theme.mindfulnessPrimary,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -606,47 +417,35 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
         
         const SizedBox(height: FlutterFlowTheme.spacingM),
         
-        SizedBox(
-          height: 200,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: [
-              SizedBox(
-                width: 160,
-                child: AchievementBadge(
-                  title: 'Focus Master',
-                  description: 'Completed 10 mindfulness sessions',
-                  icon: Icons.psychology_rounded,
-                  tier: AchievementTier.gold,
-                  isEarned: true,
-                  earnedDate: DateTime.now().subtract(const Duration(days: 1)),
-                ),
-              ),
-              const SizedBox(width: FlutterFlowTheme.spacingM),
-              SizedBox(
-                width: 160,
-                child: AchievementBadge(
-                  title: 'Consistent Player',
-                  description: 'Logged rounds for 7 days straight',
-                  icon: FontAwesomeIcons.fire,
-                  tier: AchievementTier.silver,
-                  isEarned: true,
-                  earnedDate: DateTime.now().subtract(const Duration(days: 3)),
-                ),
-              ),
-              const SizedBox(width: FlutterFlowTheme.spacingM),
-              SizedBox(
-                width: 160,
-                child: AchievementBadge(
-                  title: 'Score Improver',
-                  description: 'Beat personal best by 5 strokes',
-                  icon: Icons.trending_up_rounded,
-                  tier: AchievementTier.bronze,
-                  isEarned: false,
-                ),
-              ),
-            ],
-          ),
+        // Breathing Exercise Card
+        FoCoCoBreathingWidget(
+          duration: 300,
+          inhaleTime: 4,
+          holdTime: 4,
+          exhaleTime: 4,
+          onStart: () {
+            // TODO: Track breathing session start
+          },
+          onStop: () {
+            // TODO: Track breathing session stop
+          },
+          onComplete: () {
+            // TODO: Track breathing session completion
+          },
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingM),
+        
+        // Mindfulness Session Card
+        FoCoCoMindfulnessCard(
+          title: 'Pre-Round Calm',
+          description: 'A 10-minute meditation to prepare your mind for golf',
+          duration: '10 min',
+          sessionType: 'meditation',
+          progress: 0.0,
+          onTap: () {
+            // TODO: Navigate to meditation session
+          },
         ),
       ],
     );
@@ -659,54 +458,68 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
       children: [
         Text(
           'Quick Actions',
-          style: theme.headlineSmall.override(
-            fontWeight: FontWeight.w700,
+          style: theme.headlineSmall.copyWith(
+            fontWeight: FontWeight.w600,
             color: theme.primaryText,
-            height: 1.2,
           ),
         ),
         
         const SizedBox(height: FlutterFlowTheme.spacingM),
         
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 2.5,
-          mainAxisSpacing: FlutterFlowTheme.spacingM,
-          crossAxisSpacing: FlutterFlowTheme.spacingM,
+        Row(
           children: [
-            _buildQuickActionCard(
-              theme,
-              icon: FontAwesomeIcons.golfBall,
-              title: 'Log Round',
-              subtitle: 'Track your game',
-              color: theme.golfPrimary,
-              onTap: () => context.goNamed('golf_rounds'),
+            Expanded(
+              child: _buildQuickActionCard(
+                theme,
+                'Log Round',
+                Icons.golf_course,
+                theme.golfPrimary,
+                () {
+                  // TODO: Navigate to log round
+                },
+              ),
             ),
-            _buildQuickActionCard(
-              theme,
-              icon: Icons.psychology_rounded,
-              title: 'Mental Training',
-              subtitle: 'Practice focus',
-              color: theme.coachingPrimary,
-              onTap: () => context.goNamed('coaching_modules'),
+            const SizedBox(width: FlutterFlowTheme.spacingM),
+            Expanded(
+              child: _buildQuickActionCard(
+                theme,
+                'Training',
+                Icons.fitness_center,
+                theme.coachingPrimary,
+                () {
+                  // TODO: Navigate to training
+                },
+              ),
             ),
-            _buildQuickActionCard(
-              theme,
-              icon: Icons.insights_rounded,
-              title: 'AI Insights',
-              subtitle: 'Get analysis',
-              color: theme.aiPrimary,
-              onTap: () => context.goNamed('ai_insights'),
+          ],
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingM),
+        
+        Row(
+          children: [
+            Expanded(
+              child: _buildQuickActionCard(
+                theme,
+                'AI Insights',
+                Icons.psychology,
+                theme.aiPrimary,
+                () {
+                  // TODO: Navigate to AI insights
+                },
+              ),
             ),
-            _buildQuickActionCard(
-              theme,
-              icon: Icons.trending_up_rounded,
-              title: 'Progress',
-              subtitle: 'View stats',
-              color: theme.streakActive,
-              onTap: () => context.goNamed('progress'),
+            const SizedBox(width: FlutterFlowTheme.spacingM),
+            Expanded(
+              child: _buildQuickActionCard(
+                theme,
+                'Progress',
+                Icons.trending_up,
+                theme.performanceGood,
+                () {
+                  // TODO: Navigate to progress
+                },
+              ),
             ),
           ],
         ),
@@ -715,61 +528,53 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
   }
 
   Widget _buildQuickActionCard(
-    FlutterFlowTheme theme, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return FoCoCoCard(
-      onTap: onTap,
-      style: FoCoCoCardStyle.standard,
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 20,
-            ),
-          ),
-          
-          const SizedBox(width: FlutterFlowTheme.spacingM),
-          
-          Expanded(
+    FlutterFlowTheme theme,
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.primaryBackground,
+        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
+        boxShadow: [theme.activityCardShadow],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
+          child: Padding(
+            padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    size: FlutterFlowTheme.iconSizeM,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: FlutterFlowTheme.spacingS),
                 Text(
                   title,
-                  style: theme.titleSmall.override(
-                    fontWeight: FontWeight.w600,
-                    height: 1.2,
+                  style: theme.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: theme.primaryText,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  subtitle,
-                  style: theme.bodySmall.override(
-                    color: theme.secondaryText,
-                    height: 1.2,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -777,11 +582,15 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
   /// Enhanced Bottom Navigation
   Widget _buildEnhancedBottomNav(FlutterFlowTheme theme) {
     return Container(
-      margin: const EdgeInsets.all(FlutterFlowTheme.spacingM),
       decoration: BoxDecoration(
         color: theme.primaryBackground,
-        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusXL),
-        boxShadow: theme.shadowL,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
       child: SafeArea(
         child: Padding(
@@ -790,14 +599,12 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
             vertical: FlutterFlowTheme.spacingS,
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(theme, Icons.home_rounded, 'Home', 'dashboard', true),
-              _buildNavItem(theme, FontAwesomeIcons.golfBall, 'Rounds', 'golf_rounds', false),
-              _buildNavItem(theme, Icons.psychology_rounded, 'Train', 'coaching_modules', false),
-              _buildNavItem(theme, Icons.trending_up_rounded, 'Progress', 'progress', false),
-              _buildNavItem(theme, Icons.insights_rounded, 'Insights', 'ai_insights', false),
-              _buildNavItem(theme, Icons.person_rounded, 'Profile', 'profile', false),
+              _buildNavItem(theme, 'Home', Icons.home, true, () {}),
+              _buildNavItem(theme, 'Training', Icons.fitness_center, false, () {}),
+              _buildNavItem(theme, 'Progress', Icons.trending_up, false, () {}),
+              _buildNavItem(theme, 'Profile', Icons.person, false, () {}),
             ],
           ),
         ),
@@ -805,42 +612,40 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
     );
   }
 
-  Widget _buildNavItem(FlutterFlowTheme theme, IconData icon, String label, String page, bool isActive) {
+  Widget _buildNavItem(
+    FlutterFlowTheme theme,
+    String label,
+    IconData icon,
+    bool isActive,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
-      onTap: () {
-        if (!isActive) {
-          context.goNamed(page);
-        }
-      },
-      child: AnimatedContainer(
-        duration: FlutterFlowTheme.animationFast,
-        padding: EdgeInsets.symmetric(
-          horizontal: isActive ? FlutterFlowTheme.spacingM : FlutterFlowTheme.spacingS,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: FlutterFlowTheme.spacingM,
           vertical: FlutterFlowTheme.spacingS,
         ),
         decoration: BoxDecoration(
-          gradient: isActive ? theme.golfGradient : null,
-          borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
+          color: isActive ? theme.activityPrimary.withValues(alpha: 0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusM),
         ),
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              color: isActive ? Colors.white : theme.secondaryText,
-              size: 20,
+              size: FlutterFlowTheme.iconSizeM,
+              color: isActive ? theme.activityPrimary : theme.secondaryText,
             ),
-            if (isActive) ...[
-              const SizedBox(width: FlutterFlowTheme.spacingS),
-              Text(
-                label,
-                style: theme.bodySmall.override(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
-                ),
+            const SizedBox(height: FlutterFlowTheme.spacingXS),
+            Text(
+              label,
+              style: theme.bodySmall.copyWith(
+                color: isActive ? theme.activityPrimary : theme.secondaryText,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
               ),
-            ],
+            ),
           ],
         ),
       ),
@@ -849,8 +654,12 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
 
   String _getTimeOfDayGreeting() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Morning';
-    if (hour < 17) return 'Afternoon';
-    return 'Evening';
+    if (hour < 12) {
+      return 'Morning';
+    } else if (hour < 17) {
+      return 'Afternoon';
+    } else {
+      return 'Evening';
+    }
   }
 } 

@@ -1,5 +1,6 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/fococo_ui_components.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'ai_insights_model.dart';
@@ -44,163 +45,149 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
       },
       child: Scaffold(
         key: scaffoldKey,
-        backgroundColor: Colors.grey[50],
-        body: Column(
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            // Header Section
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFFFF6B35), Color(0xFFFF8F65)],
-                  stops: [0.0, 1.0],
-                  begin: AlignmentDirectional(-1.0, -1.0),
-                  end: AlignmentDirectional(1.0, 1.0),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(24, 60, 24, 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Header Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        backgroundColor: FlutterFlowTheme.of(context).professionalPrimary,
+        body: CustomScrollView(
+          slivers: [
+            // Enhanced SliverAppBar with Deep Ocean Blue theme
+            SliverAppBar(
+              expandedHeight: 240,
+              floating: false,
+              pinned: true,
+              backgroundColor: FlutterFlowTheme.of(context).professionalPrimary,
+              automaticallyImplyLeading: false,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        FlutterFlowTheme.of(context).professionalPrimary,
+                        FlutterFlowTheme.of(context).aiPrimary,
+                      ],
+                      stops: const [0.0, 1.0],
+                      begin: const AlignmentDirectional(-1.0, -1.0),
+                      end: const AlignmentDirectional(1.0, 1.0),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.fromSTEB(24, 50, 24, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          'AI Insights',
-                          style: FlutterFlowTheme.of(context).headlineMedium.override(
-                            fontFamily: 'Inter',
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            height: 1.0,
-                          ),
+                        // Header Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'AI Insights',
+                                    style: FlutterFlowTheme.of(context).headlineMedium.override(
+                                      fontFamily: 'Montserrat',
+                                      color: Colors.white,
+                                      fontSize: 26,
+                                      fontWeight: FontWeight.bold,
+                                      height: 1.2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Your Mental Coach',
+                                    style: FlutterFlowTheme.of(context).bodyLarge.override(
+                                      fontFamily: 'Inter',
+                                      color: Colors.white70,
+                                      fontSize: 14,
+                                      height: 1.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.psychology_rounded,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 16),
+                        
+                        // Tab Bar with new design
                         Container(
-                          width: 40,
-                          height: 40,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
+                            color: Colors.white.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              width: 1,
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.auto_awesome,
-                            color: Colors.white,
-                            size: 20,
+                          child: TabBar(
+                            controller: _tabController,
+                            indicator: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            indicatorSize: TabBarIndicatorSize.tab,
+                            labelColor: FlutterFlowTheme.of(context).professionalPrimary,
+                            unselectedLabelColor: Colors.white70,
+                            labelStyle: FlutterFlowTheme.of(context).bodyMedium.override(
+                              fontFamily: 'Montserrat',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              height: 1.2,
+                            ),
+                            tabs: const [
+                              Tab(text: 'Chat'),
+                              Tab(text: 'Insights'),
+                              Tab(text: 'Plan'),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
-                    
-                    // AI Status Card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsetsDirectional.fromSTEB(20, 16, 20, 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            child: const Icon(
-                              Icons.smart_toy,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'AI Analysis Complete',
-                                  style: FlutterFlowTheme.of(context).bodyLarge.override(
-                                    fontFamily: 'Inter',
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.0,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Based on your last 10 rounds',
-                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    color: Colors.white70,
-                                    fontSize: 14,
-                                    height: 1.0,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            '95%',
-                            style: FlutterFlowTheme.of(context).headlineSmall.override(
-                              fontFamily: 'Inter',
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              height: 1.0,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Tab Bar
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: TabBar(
-                        controller: _tabController,
-                        indicator: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        indicatorSize: TabBarIndicatorSize.tab,
-                        labelColor: const Color(0xFFFF6B35),
-                        unselectedLabelColor: Colors.white70,
-                        labelStyle: FlutterFlowTheme.of(context).bodyMedium.override(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          height: 1.0,
-                        ),
-                        tabs: const [
-                          Tab(text: 'Insights'),
-                          Tab(text: 'Tips'),
-                          Tab(text: 'Plan'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+                  ),
+                ),
+              ),
+            ),
+            
+            // AI Status Card - moved here to prevent overflow
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(24, 16, 24, 16),
+                child: AIInsightCard(
+                  title: 'Mental Performance Analysis',
+                  content: 'Based on your last 10 rounds, your mental performance shows strong focus abilities with room for confidence improvement. Your consistency has increased by 12% this month.',
+                  insight: 'Based on your last 10 rounds, your mental performance shows strong focus abilities with room for confidence improvement. Your consistency has increased by 12% this month.',
+                  sentiment: 'positive',
+                  recommendations: [
+                    'Practice visualization techniques before rounds',
+                    'Use positive self-talk during challenging shots',
+                    'Focus on process goals rather than outcome goals',
                   ],
+                  timestamp: DateTime.now(),
+                  aiModel: 'FoCoCo AI Coach',
+                  onFeedback: () => _showFeedbackDialog(context),
+                  onExpand: () => _showInsightDetails(context),
                 ),
               ),
             ),
             
             // Tab Content
-            Expanded(
+            SliverFillRemaining(
               child: TabBarView(
                 controller: _tabController,
                 children: [
@@ -219,93 +206,14 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
         ),
         
         // Creative Bottom Navigation Bar
-        bottomNavigationBar: Container(
-          height: 85,
-          margin: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(25),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0B4D2C).withOpacity(0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildNavItem(context, Icons.home_rounded, 'Home', 'dashboard', false),
-              _buildNavItem(context, FontAwesomeIcons.golfBall, 'Rounds', 'golf_rounds', false),
-              _buildNavItem(context, Icons.psychology_rounded, 'Train', 'coaching_modules', false),
-              _buildNavItem(context, Icons.trending_up_rounded, 'Progress', 'progress', false),
-              _buildNavItem(context, Icons.insights_rounded, 'Insights', 'ai_insights', true),
-              _buildNavItem(context, Icons.person_rounded, 'Profile', 'profile', false),
-            ],
-          ),
+        bottomNavigationBar: FoCoCoAnimatedBottomNavBar(
+          currentRoute: 'ai_insights',
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(BuildContext context, IconData icon, String label, String page, bool isActive) {
-    return GestureDetector(
-      onTap: () {
-        if (!isActive) {
-          context.goNamed(page);
-        }
-      },
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF0B4D2C) : Colors.transparent,
-          borderRadius: BorderRadius.circular(15),
-          gradient: isActive
-              ? const LinearGradient(
-                  colors: [Color(0xFF0B4D2C), Color(0xFF2E8B57)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          boxShadow: isActive
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF0B4D2C).withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: isActive ? Colors.white : Colors.grey[400],
-              size: isActive ? 22 : 20,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? Colors.white : Colors.grey[400],
-                fontSize: isActive ? 9 : 8,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildInsightsTab() {
     return Padding(
@@ -446,7 +354,7 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
             [
               _buildPlanItem('Monday', 'Short Game Practice', '30 min', Icons.flag, false),
               _buildPlanItem('Wednesday', 'Mental Training Module', '15 min', Icons.psychology, true),
-              _buildPlanItem('Friday', 'Driving Range Session', '45 min', FontAwesomeIcons.golfBall, false),
+              _buildPlanItem('Friday', 'Driving Range Session', '45 min', FontAwesomeIcons.golfBallTee, false),
               _buildPlanItem('Saturday', 'Play a Round', '4 hours', Icons.golf_course, false),
             ],
           ),
@@ -466,17 +374,19 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
     required Widget child,
   }) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 8,
-            color: Colors.black.withOpacity(0.1),
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+              decoration: BoxDecoration(
+          color: FlutterFlowTheme.of(context).secondaryBackground,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 8,
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.1),
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
       child: Padding(
         padding: const EdgeInsetsDirectional.fromSTEB(20, 20, 20, 20),
         child: Column(
@@ -488,19 +398,22 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Icon(icon, color: color, size: 20),
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: FlutterFlowTheme.of(context).headlineSmall.override(
-                    fontFamily: 'Inter',
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    height: 1.0,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: FlutterFlowTheme.of(context).headlineSmall.override(
+                      fontFamily: 'Inter',
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      height: 1.0,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -517,37 +430,46 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: FlutterFlowTheme.of(context).bodyMedium.override(
-            fontFamily: 'Inter',
-            fontSize: 14,
-            height: 1.0,
+        Expanded(
+          flex: 2,
+          child: Text(
+            label,
+            style: FlutterFlowTheme.of(context).bodyMedium.override(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              height: 1.0,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              value,
-              style: FlutterFlowTheme.of(context).bodyLarge.override(
-                fontFamily: 'Inter',
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                height: 1.0,
+        Expanded(
+          flex: 1,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                value,
+                style: FlutterFlowTheme.of(context).bodyLarge.override(
+                  fontFamily: 'Inter',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  height: 1.0,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            Text(
-              change,
-              style: FlutterFlowTheme.of(context).bodySmall.override(
-                fontFamily: 'Inter',
-                color: changeColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                height: 1.0,
+              Text(
+                change,
+                style: FlutterFlowTheme.of(context).bodySmall.override(
+                  fontFamily: 'Inter',
+                  color: changeColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  height: 1.0,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
@@ -575,7 +497,7 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
                   description,
                   style: FlutterFlowTheme.of(context).bodySmall.override(
                     fontFamily: 'Inter',
-                    color: Colors.grey[600],
+                    color: FlutterFlowTheme.of(context).secondaryText,
                     fontSize: 12,
                     height: 1.0,
                   ),
@@ -586,7 +508,7 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
           Container(
             padding: const EdgeInsetsDirectional.fromSTEB(8, 4, 8, 4),
             decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withOpacity(0.1),
+              color: const Color(0xFF10B981).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -627,7 +549,7 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
                   suggestion,
                   style: FlutterFlowTheme.of(context).bodySmall.override(
                     fontFamily: 'Inter',
-                    color: Colors.grey[600],
+                    color: FlutterFlowTheme.of(context).secondaryText,
                     fontSize: 12,
                     height: 1.0,
                   ),
@@ -638,7 +560,7 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
           Container(
             padding: const EdgeInsetsDirectional.fromSTEB(8, 4, 8, 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFF59E0B).withOpacity(0.1),
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -704,12 +626,14 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
     return Container(
       margin: const EdgeInsetsDirectional.fromSTEB(0, 0, 0, 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: FlutterFlowTheme.of(context).secondaryBackground,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             blurRadius: 8,
-            color: Colors.black.withOpacity(0.1),
+            color: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.1),
             offset: const Offset(0, 2),
           ),
         ],
@@ -725,7 +649,7 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Icon(icon, color: color, size: 20),
@@ -790,12 +714,14 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
   Widget _buildPlanCard(String title, String description, List<Widget> items) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: FlutterFlowTheme.of(context).secondaryBackground,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             blurRadius: 8,
-            color: Colors.black.withOpacity(0.1),
+            color: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.1),
             offset: const Offset(0, 2),
           ),
         ],
@@ -837,10 +763,14 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
       margin: const EdgeInsetsDirectional.fromSTEB(0, 0, 0, 12),
       padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 16),
       decoration: BoxDecoration(
-        color: isCompleted ? const Color(0xFF10B981).withOpacity(0.1) : Colors.grey[50],
+        color: isCompleted 
+            ? const Color(0xFF10B981).withValues(alpha: 0.1) 
+            : FlutterFlowTheme.of(context).alternate,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isCompleted ? const Color(0xFF10B981) : Colors.grey[200]!,
+          color: isCompleted 
+              ? const Color(0xFF10B981) 
+              : FlutterFlowTheme.of(context).alternate,
           width: 1,
         ),
       ),
@@ -850,7 +780,9 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: isCompleted ? const Color(0xFF10B981) : Colors.grey[400],
+              color: isCompleted 
+                  ? const Color(0xFF10B981) 
+                  : FlutterFlowTheme.of(context).secondaryText,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(
@@ -909,12 +841,14 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
   Widget _buildGoalsCard() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: FlutterFlowTheme.of(context).secondaryBackground,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             blurRadius: 8,
-            color: Colors.black.withOpacity(0.1),
+            color: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.1),
             offset: const Offset(0, 2),
           ),
         ],
@@ -986,9 +920,45 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget> with TickerProvider
           const SizedBox(height: 8),
           LinearProgressIndicator(
             value: percentage,
-            backgroundColor: Colors.grey[200],
+            backgroundColor: FlutterFlowTheme.of(context).alternate,
             valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF6B35)),
             minHeight: 6,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFeedbackDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Feedback'),
+        content: Text('Was this insight helpful?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Yes, helpful'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showInsightDetails(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Insight Details'),
+        content: Text('Full AI analysis and recommendations would be displayed here.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
           ),
         ],
       ),

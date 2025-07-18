@@ -1,22 +1,19 @@
 import 'package:flutter/foundation.dart';
 import '/backend/schema/index.dart';
-import '/flutter_flow/flutter_flow_util.dart';
 import '../gemini_ai_client.dart';
 import '../models/gemini_models.dart';
-import '../config/gemini_config.dart';
-import '../services/conversation_manager.dart';
 import 'gemini_cost_tracker.dart';
 
 /// Specialized mental coaching system with embedded FoCoCo knowledge
 class MentalCoachSystem {
-  MentalCoachSystem._();
+  final GeminiAIClient _geminiClient;
+  final GeminiCostTracker _costTracker;
   
-  static MentalCoachSystem? _instance;
-  static MentalCoachSystem get instance => _instance ??= MentalCoachSystem._();
-
-  final GeminiAIClient _geminiClient = GeminiAIClient(apiKey: 'firebase_ai_logic');
-  final ConversationManager _conversationManager = ConversationManager.instance;
-  final GeminiCostTracker _costTracker = GeminiCostTracker.instance;
+  MentalCoachSystem({
+    required GeminiAIClient geminiClient,
+    required GeminiCostTracker costTracker,
+  })  : _geminiClient = geminiClient,
+        _costTracker = costTracker;
 
   /// Initialize the mental coaching system
   Future<void> initialize() async {
@@ -72,8 +69,8 @@ class MentalCoachSystem {
       // Track usage
       await _costTracker.trackInsightGeneration(
         userId: userId,
-        tokensUsed: insight.tokensUsed ?? 0,
-        estimatedCost: _calculateCost(insight.tokensUsed ?? 0),
+        tokensUsed: insight.tokensUsed,
+        estimatedCost: _calculateCost(insight.tokensUsed),
       );
 
       final analysis = MentalPerformanceAnalysis(
@@ -290,8 +287,8 @@ class MentalCoachSystem {
       // Track usage
       await _costTracker.trackRecommendationGeneration(
         userId: userId,
-        tokensUsed: coachingResponse.tokensUsed ?? 0,
-        estimatedCost: _calculateCost(coachingResponse.tokensUsed ?? 0),
+        tokensUsed: coachingResponse.tokensUsed,
+        estimatedCost: _calculateCost(coachingResponse.tokensUsed),
       );
 
       final recommendations = PersonalizedRecommendations(

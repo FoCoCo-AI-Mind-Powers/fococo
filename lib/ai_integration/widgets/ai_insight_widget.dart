@@ -21,10 +21,12 @@ class AIInsightWidget extends StatefulWidget {
 }
 
 class _AIInsightWidgetState extends State<AIInsightWidget> {
-  bool _isExpanded = false;
-  bool _isRating = false;
-  int _selectedRating = 0;
   final TextEditingController _feedbackController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   void dispose() {

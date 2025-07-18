@@ -1,8 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 
 import '/backend/schema/index.dart';
-import '/flutter_flow/flutter_flow_util.dart';
 import '../config/ai_config.dart';
 
 /// Service for tracking AI usage costs and analytics
@@ -174,7 +174,6 @@ class AICostTracker {
       const dailyCostThreshold = 0.50; // $0.50 per day
       const monthlyCostThreshold = 15.0; // $15.00 per month
       const dailyRequestThreshold = 30;
-      const monthlyRequestThreshold = 300;
 
       // Check daily limits
       if (dailyStats.totalCost >= dailyCostThreshold) {

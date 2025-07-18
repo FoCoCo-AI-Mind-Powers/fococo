@@ -162,6 +162,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                               fontFamily: 'Inter',
                               fontSize: 16,
                               height: 1.0,
+                              color: FlutterFlowTheme.of(context).primaryBackground,
                             ),
                             validator: _model.nameTextControllerValidator.asValidator(context),
                           ),
@@ -211,6 +212,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                               fontFamily: 'Inter',
                               fontSize: 16,
                               height: 1.0,
+                              color: FlutterFlowTheme.of(context).primaryBackground,
                             ),
                             keyboardType: TextInputType.emailAddress,
                             validator: _model.emailTextControllerValidator.asValidator(context),
@@ -272,8 +274,70 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                               fontFamily: 'Inter',
                               fontSize: 16,
                               height: 1.0,
+                              color: FlutterFlowTheme.of(context).primaryBackground,
                             ),
                             validator: _model.passwordTextControllerValidator.asValidator(context),
+                          ),
+                          const SizedBox(height: 20),
+                          
+                          // Confirm Password Field
+                          TextFormField(
+                            controller: _model.confirmPasswordTextController,
+                            focusNode: _model.confirmPasswordFocusNode,
+                            obscureText: !_model.confirmPasswordVisibility,
+                            decoration: InputDecoration(
+                              labelText: 'Confirm Password',
+                              labelStyle: FlutterFlowTheme.of(context).bodyMedium.override(
+                                fontFamily: 'Inter',
+                                color: Colors.grey[600],
+                                height: 1.0,
+                              ),
+                              hintText: 'Confirm your password',
+                              hintStyle: FlutterFlowTheme.of(context).bodyMedium.override(
+                                fontFamily: 'Inter',
+                                color: Colors.grey[400],
+                                height: 1.0,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                  width: 1,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF0B4D2C),
+                                  width: 2,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                              contentPadding: const EdgeInsetsDirectional.fromSTEB(20, 16, 20, 16),
+                              prefixIcon: const Icon(
+                                Icons.lock_outline,
+                                color: Color(0xFF0B4D2C),
+                                size: 20,
+                              ),
+                              suffixIcon: InkWell(
+                                onTap: () => setState(() => _model.confirmPasswordVisibility = !_model.confirmPasswordVisibility),
+                                child: Icon(
+                                  _model.confirmPasswordVisibility 
+                                    ? Icons.visibility_outlined 
+                                    : Icons.visibility_off_outlined,
+                                  color: Colors.grey[600],
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                            style: FlutterFlowTheme.of(context).bodyMedium.override(
+                              fontFamily: 'Inter',
+                              fontSize: 16,
+                              height: 1.0,
+                              color: FlutterFlowTheme.of(context).primaryBackground,
+                            ),
+                            validator: _model.confirmPasswordTextControllerValidator.asValidator(context),
                           ),
                           const SizedBox(height: 32),
                           

@@ -7,5 +7,6 @@
   "terminal.integrated.windowsEnableConpty": false,
   "terminal.integrated.persistentSessionReviveProcess": "never",
   "terminal.integrated.enablePersistentSessions": false,
-  "dart.debugConsole": "terminal"
+  "dart.debugConsole": "terminal",
+  "java.compile.nullAnalysis.mode": "automatic"
 }

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'flutter_flow_theme.dart';
 import 'flutter_flow_util.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 /// FoCoCo Enhanced UI Components - Strava + Calm Inspired
@@ -940,13 +939,29 @@ class FoCoCoLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SvgPicture.asset(
-      'assets/images/FoCoCo - Logo - Icon.svg',
+    // Use PNG logo as fallback due to SVG transparency issues
+    return Image.asset(
+      'assets/images/fococo logo.png',
       width: _logoSize,
       height: _logoSize,
-      colorFilter: color != null 
-          ? ColorFilter.mode(color!, BlendMode.srcIn)
-          : null,
+      color: color,
+      colorBlendMode: color != null ? BlendMode.srcIn : null,
+      errorBuilder: (context, error, stackTrace) {
+        // Fallback to a simple icon if image fails to load
+        return Container(
+          width: _logoSize,
+          height: _logoSize,
+          decoration: BoxDecoration(
+            color: color ?? const Color(0xFF0A3669),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.sports_golf,
+            size: _logoSize * 0.6,
+            color: Colors.white,
+          ),
+        );
+      },
     );
   }
 }
@@ -1726,8 +1741,8 @@ class SubscriptionTierCard extends StatelessWidget {
 // ENHANCED ANIMATED BOTTOM NAVIGATION BAR
 // ============================================================================
 
-/// Enhanced Animated Bottom Navigation Bar for FoCoCo
-/// Inspired by modern design with smooth animations
+/// Enhanced Glass Animated Bottom Navigation Bar for FoCoCo
+/// Modern glassmorphism design with 3D effects and smooth animations
 class FoCoCoAnimatedBottomNavBar extends StatefulWidget {
   final String currentRoute;
   final Function(String route)? onTap;

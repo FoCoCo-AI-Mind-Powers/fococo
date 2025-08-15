@@ -10,6 +10,7 @@ export 'gemini_ai_client.dart' hide GeminiException;
 
 // Gemini Configuration
 export 'config/gemini_config.dart';
+export 'config/gemini_voice_config.dart';
 
 // Gemini Models and Response Types
 export 'models/gemini_models.dart';
@@ -18,6 +19,7 @@ export 'models/gemini_models.dart';
 export 'services/mental_coach_system.dart';
 export 'services/conversation_manager.dart';
 export 'services/gemini_cost_tracker.dart';
+export 'services/gemini_voice_service.dart';
 
 // ============================================================================
 // LEGACY AI INTEGRATION (For Migration/Compatibility)
@@ -46,6 +48,9 @@ export 'utils/ai_utils.dart';
 
 // AI Widgets
 export 'widgets/ai_insight_widget.dart';
+export 'widgets/voice_chat_button.dart';
+export 'widgets/voice_chat_modal.dart';
+export 'widgets/enhanced_navigation_with_voice.dart';
 
 // ============================================================================
 // MAIN FACADE CLASS

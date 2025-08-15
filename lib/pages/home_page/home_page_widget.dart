@@ -180,12 +180,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         'Track Your Rounds',
                         'Log your golf rounds and track your progress with detailed statistics and insights.',
                         FontAwesomeIcons.golfBallTee,
-                        const Color(0xFF2E8B57),
+                        theme.golfPrimary,
                         () {
-                          // Navigate to golf rounds (when auth system is set up)
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Golf rounds tracking coming soon!')),
-                          );
+                          context.goNamed('golf_rounds');
                         },
                       ),
                       
@@ -193,11 +190,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         'Mental Training',
                         'Access personalized mental coaching modules to improve focus, confidence, and performance.',
                         Icons.psychology_outlined,
-                        const Color(0xFF6B46C1),
+                        theme.coachingPrimary,
                         () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Mental training modules coming soon!')),
-                          );
+                          context.goNamed('coaching_modules');
                         },
                       ),
                       
@@ -205,11 +200,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         'AI Insights',
                         'Get AI-powered analysis of your game with personalized recommendations for improvement.',
                         Icons.auto_awesome,
-                        const Color(0xFFFF6B35),
+                        theme.aiPrimary,
                         () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('AI insights coming soon!')),
-                          );
+                          context.goNamed('ai_insights');
                         },
                       ),
                       
@@ -217,11 +210,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         'Progress Analytics',
                         'View detailed analytics and track your improvement over time with comprehensive reports.',
                         Icons.trending_up_outlined,
-                        const Color(0xFF059669),
+                        theme.performanceExcellent,
                         () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Progress analytics coming soon!')),
-                          );
+                          context.goNamed('progress');
                         },
                       ),
                       
@@ -349,71 +340,86 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     Color color,
     VoidCallback onTap,
   ) {
+    final theme = FlutterFlowTheme.of(context);
+    
     return Container(
       margin: const EdgeInsetsDirectional.fromSTEB(0, 0, 0, 16),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsetsDirectional.fromSTEB(20, 20, 20, 20),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            color: theme.primaryBackground,
+            borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
             boxShadow: [
-              BoxShadow(
-                blurRadius: 8,
-                color: Colors.black.withValues(alpha: 0.1),
-                offset: const Offset(0, 2),
-              ),
+              theme.activityCardShadow,
             ],
+            border: Border.all(
+              color: color.withOpacity(0.1),
+              width: 1,
+            ),
           ),
           child: Row(
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: FlutterFlowTheme.iconSizeXL + 8,
+                height: FlutterFlowTheme.iconSizeXL + 8,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(28),
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusXL),
+                  border: Border.all(
+                    color: color.withOpacity(0.2),
+                    width: 1,
+                  ),
                 ),
                 child: Icon(
                   icon,
                   color: color,
-                  size: 28,
+                  size: FlutterFlowTheme.iconSizeL,
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: FlutterFlowTheme.spacingM),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: FlutterFlowTheme.of(context).bodyLarge.override(
-                        fontFamily: 'Inter',
+                      style: theme.titleMedium.override(
+                        fontFamily: 'Montserrat',
+                        color: theme.primaryText,
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        height: 1.0,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: FlutterFlowTheme.spacingS),
                     Text(
                       description,
-                      style: FlutterFlowTheme.of(context).bodyMedium.override(
+                      style: theme.bodyMedium.override(
                         fontFamily: 'Inter',
-                        color: Colors.grey[600],
-                        fontSize: 14, 
-                        height: 1.0,
+                        color: theme.secondaryText,
+                        fontSize: 14,
+                        height: 1.4,
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.grey[400],
-                size: 16,
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.arrow_forward_ios,
+                  color: color,
+                  size: 16,
+                ),
               ),
             ],
           ),

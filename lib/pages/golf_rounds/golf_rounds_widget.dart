@@ -1,6 +1,7 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/fococo_ui_components.dart';
+import '/ai_integration/widgets/enhanced_navigation_with_voice.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'golf_rounds_model.dart';
@@ -110,8 +111,10 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
         ),
         
         // Enhanced Bottom Navigation
-        bottomNavigationBar: FoCoCoAnimatedBottomNavBar(
+        bottomNavigationBar: FoCoCoNavBar(
           currentRoute: 'golf_rounds',
+          enableVoiceButton: false, // Only show voice button on Today tab
+          onTap: (route) => context.goNamed(route),
         ),
       ),
     );

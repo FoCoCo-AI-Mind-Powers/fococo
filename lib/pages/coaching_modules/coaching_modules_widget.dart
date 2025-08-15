@@ -1,6 +1,10 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/fococo_ui_components.dart';
+import '/ai_integration/widgets/enhanced_navigation_with_voice.dart';
+import '/ai_integration/services/ai_coaching_service.dart';
+
+import '/auth/firebase_auth/auth_util.dart';
 
 import 'package:flutter/material.dart';
 
@@ -25,6 +29,11 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
   late Animation<Offset> _slideAnimation;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  
+  // AI Coaching Services
+  final AICoachingService _aiCoachingService = AICoachingService.instance;
+  bool _isLoadingAIRecommendations = false;
+  String? _aiRecommendationError;
 
   @override
   void initState() {
@@ -55,6 +64,37 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
     ));
 
     _animationController.forward();
+    _loadAIRecommendations();
+  }
+
+  /// Load AI-powered coaching recommendations
+  Future<void> _loadAIRecommendations() async {
+    if (currentUser == null) return;
+    
+    setState(() {
+      _isLoadingAIRecommendations = true;
+      _aiRecommendationError = null;
+    });
+
+    try {
+              await _aiCoachingService.generateCoachingRecommendations(
+        userId: currentUser?.uid ?? '',
+        includeWeeklyPlan: true,
+      );
+      
+      if (mounted) {
+        setState(() {
+          _isLoadingAIRecommendations = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingAIRecommendations = false;
+          _aiRecommendationError = e.toString();
+        });
+      }
+    }
   }
 
   @override
@@ -107,9 +147,11 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
           ),
         ),
         
-        // Enhanced Bottom Navigation
-        bottomNavigationBar: FoCoCoAnimatedBottomNavBar(
+        // Enhanced Bottom Navigation with AI Coaching Integration
+        bottomNavigationBar: FoCoCoNavBar(
           currentRoute: 'coaching_modules',
+          enableVoiceButton: false, // Only show voice button on Today tab
+          onTap: (route) => context.goNamed(route),
         ),
       ),
     );
@@ -301,6 +343,11 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // AI-Powered Coaching Recommendations
+          _buildAICoachingRecommendations(theme),
+          
+          const SizedBox(height: FlutterFlowTheme.spacingXL),
+          
           // Featured Session
           _buildFeaturedSession(theme),
           
@@ -313,6 +360,286 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget> with Tick
           
           // Popular Sessions
           _buildPopularSessions(theme),
+        ],
+      ),
+    );
+  }
+
+  /// AI-Powered Coaching Recommendations - Integrated AI Services
+  Widget _buildAICoachingRecommendations(FlutterFlowTheme theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.auto_awesome,
+              size: FlutterFlowTheme.iconSizeM,
+              color: theme.aiPrimary,
+            ),
+            const SizedBox(width: FlutterFlowTheme.spacingS),
+            Text(
+              'AI Coaching Recommendations',
+              style: theme.headlineSmall.copyWith(
+                fontWeight: FontWeight.w600,
+                color: theme.primaryText,
+              ),
+            ),
+            const Spacer(),
+            if (_isLoadingAIRecommendations)
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(theme.aiPrimary),
+                ),
+              ),
+          ],
+        ),
+        
+        const SizedBox(height: FlutterFlowTheme.spacingM),
+        
+        if (_aiRecommendationError != null)
+          Container(
+            padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
+            decoration: BoxDecoration(
+              color: theme.error.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusM),
+              border: Border.all(color: theme.error.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_rounded, color: theme.error, size: 20),
+                const SizedBox(width: FlutterFlowTheme.spacingS),
+                Expanded(
+                  child: Text(
+                    'Unable to load AI recommendations. Please try again later.',
+                    style: theme.bodySmall.copyWith(color: theme.error),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _loadAIRecommendations,
+                  child: Text('Retry', style: TextStyle(color: theme.error)),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.all(FlutterFlowTheme.spacingL),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.aiPrimary.withValues(alpha: 0.1),
+                  theme.aiSecondary.withValues(alpha: 0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
+              border: Border.all(
+                color: theme.aiPrimary.withValues(alpha: 0.2),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: theme.aiPrimary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.psychology_rounded,
+                        color: Colors.white,
+                        size: FlutterFlowTheme.iconSizeM,
+                      ),
+                    ),
+                    const SizedBox(width: FlutterFlowTheme.spacingM),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Personalized Mental Training',
+                            style: theme.titleMedium.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: theme.primaryText,
+                            ),
+                          ),
+                          const SizedBox(height: FlutterFlowTheme.spacingXS),
+                          Text(
+                            'AI-powered recommendations based on your performance',
+                            style: theme.bodySmall.copyWith(
+                              color: theme.secondaryText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: FlutterFlowTheme.spacingM),
+                
+                // Sample AI recommendations (in a real app, these would come from the AI service)
+                _buildAIRecommendationCard(
+                  theme,
+                  'Focus Enhancement',
+                  'Based on your recent rounds, work on sustained attention during pressure situations',
+                  'High Priority',
+                  Icons.center_focus_strong,
+                  theme.mentalFocus,
+                ),
+                
+                const SizedBox(height: FlutterFlowTheme.spacingS),
+                
+                _buildAIRecommendationCard(
+                  theme,
+                  'Confidence Building',
+                  'Develop pre-shot visualization routines to boost confidence on the tee',
+                  'Medium Priority',
+                  Icons.self_improvement,
+                  theme.mentalStrength,
+                ),
+                
+                const SizedBox(height: FlutterFlowTheme.spacingM),
+                
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    // Generate personalized content
+                    if (currentUser != null) {
+                      try {
+                        await _aiCoachingService.generatePersonalizedContent(
+                          userId: currentUser?.uid ?? '',
+                          contentType: 'lesson',
+                          topic: 'mental_game_improvement',
+                        );
+                        
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('AI coaching content generated!'),
+                              backgroundColor: theme.success,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error generating content: ${e.toString()}'),
+                              backgroundColor: theme.error,
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.aiPrimary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusButton),
+                    ),
+                  ),
+                  icon: Icon(Icons.auto_awesome, size: 18),
+                  label: Text('Generate Personalized Plan'),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Build individual AI recommendation card
+  Widget _buildAIRecommendationCard(
+    FlutterFlowTheme theme,
+    String title,
+    String description,
+    String priority,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusM),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: FlutterFlowTheme.spacingM),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      title,
+                      style: theme.titleSmall.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.primaryText,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: priority.contains('High') 
+                            ? theme.error.withValues(alpha: 0.1)
+                            : theme.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        priority,
+                        style: theme.bodySmall.copyWith(
+                          color: priority.contains('High') ? theme.error : theme.warning,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: FlutterFlowTheme.spacingXS),
+                Text(
+                  description,
+                  style: theme.bodySmall.copyWith(
+                    color: theme.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

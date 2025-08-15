@@ -23,6 +23,14 @@ class GeminiConfig {
   
   /// Gemini model for session feedback
   static const String feedbackModel = 'gemini-2.5-flash';
+  
+  /// Voice AI models
+  static const String voiceFlashLiteModel = 'gemini-2.5-flash-lite';
+  static const String voiceLiveModel = 'models/gemini-live-2.5-flash-preview';
+  static const String voiceNativeAudioModel = 'models/gemini-2.5-flash-preview-native-audio-dialog';
+  static const String voiceThinkingModel = 'models/gemini-2.5-flash-exp-native-audio-thinking-dialog';
+  static const String voiceTTSFlashModel = 'models/gemini-2.5-flash-preview-tts';
+  static const String voiceTTSProModel = 'models/gemini-2.5-pro-preview-tts';
 
   // ============================================================================
   // MODEL CREATION

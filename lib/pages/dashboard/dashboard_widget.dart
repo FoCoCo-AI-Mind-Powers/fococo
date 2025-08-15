@@ -2,6 +2,7 @@ import '/auth/firebase_auth/auth_util.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/fococo_ui_components.dart';
+import '/ai_integration/widgets/enhanced_navigation_with_voice.dart';
 import 'package:flutter/material.dart';
 
 import 'dashboard_model.dart';
@@ -123,8 +124,10 @@ class _DashboardWidgetState extends State<DashboardWidget> with TickerProviderSt
             ),
           ),
         ),
-        bottomNavigationBar: FoCoCoAnimatedBottomNavBar(
+        bottomNavigationBar: FoCoCoNavBar(
           currentRoute: 'dashboard',
+          enableVoiceButton: true,
+          onTap: (route) => context.goNamed(route),
         ),
       ),
     );

@@ -15,7 +15,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-version: 1.0.0+1
+version: 1.0.0+4
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -110,7 +110,7 @@ dependencies:
   speech_to_text: ^7.1.1
   just_audio: ^0.9.42
   permission_handler: ^11.3.1
-  cloud_functions: ^5.1.7
+  # cloud_functions: ^5.5.2
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -153,20 +153,20 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/images/fococo logo.png"
+  image_path: "assets/images/logo.png"
   min_sdk_android: 21
   web:
     generate: true
-    image_path: "assets/images/Ffococo logo.png"
-    background_color: "#0a3669"
-    theme_color: "#0a3669"
+    image_path: "assets/images/logo.png"
+    background_color: "#ffffff"
+    theme_color: "#ffffff"
   windows:
     generate: true
-    image_path: "assets/images/fococo logo.png"
+    image_path: "assets/images/logo.png"
     icon_size: 48
   macos:
     generate: true
-    image_path: "assets/images/fococo logo.png"
+    image_path: "assets/images/logo.png"
 
 # Flutter Native Splash Configuration
 flutter_native_splash:
@@ -183,10 +183,10 @@ flutter_native_splash:
   
   # image is the path to the image used as the splash screen image.  If this parameter is
   # not provided, the package will use the image from flutter_launcher_icons.
-  image: assets/images/fococo logo.png
+  image: assets/images/logo.png
   
   # Sets the background color for the splash screen.
-  color: "#1A237E"
+  color: "#ffffff"
   
   # image_dark is an image which will be used in dark mode only. If specified, color_dark will be used as a background color
   # for dark mode. If image_dark is not specified but color_dark is specified, color_dark will be used for both normal mode and dark mode.

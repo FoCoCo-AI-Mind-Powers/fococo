@@ -12,6 +12,9 @@ import '/flutter_flow/fococo_ui_components.dart';
 
 import '/index.dart';
 
+import '/pages/vark_onboarding/vark_onboarding_widget.dart';
+import '/pages/foco_map/foco_map_conditional_widget.dart';
+
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
 
@@ -72,8 +75,8 @@ class AppStateNotifier extends ChangeNotifier {
   }
 }
 
-GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
-      initialLocation: '/',
+  GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
+    initialLocation: '/homePage',
       debugLogDiagnostics: true,
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
@@ -142,6 +145,17 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           name: RegisterWidget.routeName,
           path: RegisterWidget.routePath,
           builder: (context, params) => RegisterWidget(),
+        ),
+        FFRoute(
+          name: VarkOnboardingWidget.routeName,
+          path: VarkOnboardingWidget.routePath,
+          builder: (context, params) => const VarkOnboardingWidget(),
+        ),
+        FFRoute(
+          name: 'foco_map',
+          path: '/foco_map',
+          requireAuth: true,
+          builder: (context, params) => const FoCoMapConditionalWidget(),
         ),
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );

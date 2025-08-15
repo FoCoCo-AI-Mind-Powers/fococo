@@ -25,11 +25,22 @@ class BaseModal extends StatelessWidget {
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: BoxDecoration(
-        color: FlutterFlowTheme.of(context).professionalPrimary,
+        color: Colors.black.withOpacity(0.8), // Glass background effect
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(24),
           topRight: Radius.circular(24),
         ),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, -8),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -39,7 +50,7 @@ class BaseModal extends StatelessWidget {
             height: 4,
             margin: const EdgeInsets.only(top: 12),
             decoration: BoxDecoration(
-              color: Colors.white30,
+              color: Colors.white.withOpacity(0.5),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -69,9 +80,9 @@ class BaseModal extends StatelessWidget {
                             const SizedBox(height: 4),
                             Text(
                               subtitle!,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: 'Inter',
-                                color: Colors.white70,
+                                color: Colors.white.withOpacity(0.8),
                                 fontSize: 14,
                               ),
                             ),
@@ -79,9 +90,17 @@ class BaseModal extends StatelessWidget {
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
                     ),
                   ],
                 ),
@@ -99,8 +118,16 @@ class BaseModal extends StatelessWidget {
           
           // Actions
           if (actions != null)
-            Padding(
+            Container(
               padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.white.withOpacity(0.1),
+                    width: 1,
+                  ),
+                ),
+              ),
               child: Row(
                 children: actions!,
               ),
@@ -1024,8 +1051,23 @@ class _NotificationSettingsModalState extends State<NotificationSettingsModal> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FoCoCoCard(
-            style: FoCoCoCardStyle.standard,
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1), // Glass effect
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
             child: Column(
               children: [
                 _buildNotificationToggle(
@@ -1042,7 +1084,7 @@ class _NotificationSettingsModalState extends State<NotificationSettingsModal> {
                   }),
                 ),
                 
-                const Divider(color: Colors.white12),
+                Divider(color: Colors.white.withOpacity(0.1)),
                 _buildNotificationToggle(
                   'Insight Notifications',
                   'Get notified of new AI insights',
@@ -1057,7 +1099,7 @@ class _NotificationSettingsModalState extends State<NotificationSettingsModal> {
                   }),
                 ),
                 
-                const Divider(color: Colors.white12),
+                Divider(color: Colors.white.withOpacity(0.1)),
                 _buildNotificationToggle(
                   'Achievement Alerts',
                   'Get notified of new achievements',
@@ -1072,7 +1114,7 @@ class _NotificationSettingsModalState extends State<NotificationSettingsModal> {
                   }),
                 ),
                 
-                const Divider(color: Colors.white12),
+                Divider(color: Colors.white.withOpacity(0.1)),
                 _buildNotificationToggle(
                   'Weekly Progress',
                   'Weekly progress summary notifications',
@@ -1141,9 +1183,9 @@ class _NotificationSettingsModalState extends State<NotificationSettingsModal> {
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Inter',
-                    color: Colors.white70,
+                    color: Colors.white.withOpacity(0.7),
                     fontSize: 14,
                   ),
                 ),

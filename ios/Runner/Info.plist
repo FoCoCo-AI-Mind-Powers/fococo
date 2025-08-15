@@ -68,9 +68,21 @@
 		<false/>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
-		<key>UIApplicationSupportsIndirectInputEvents</key>
-		<true/>
-		<key>UIStatusBarHidden</key>
-		<false/>
-	</dict>
+			<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIStatusBarHidden</key>
+	<false/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>FoCoCo uses microphone access to enable voice-based coaching interactions, audio journaling features, and AI-powered speech analysis to enhance your mental performance training.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>FoCoCo uses speech recognition to provide voice-controlled navigation, transcribe your mental performance notes, and analyze speech patterns for personalized coaching insights.</string>
+	<key>FirebaseAppCheckProviderFactory</key>
+	<string>NO</string>
+	<key>FirebaseAppCheckTokenAutoRefreshEnabled</key>
+	<false/>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
+	<key>FirebaseMessagingAutoInitEnabled</key>
+	<true/>
+</dict>
 </plist>

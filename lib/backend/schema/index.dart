@@ -8,3 +8,5 @@ export 'golf_rounds_record.dart';
 export 'mental_sessions_record.dart';
 export 'ai_insights_record.dart';
 export 'user_subscriptions_record.dart';
+export 'round_logs_record.dart';
+export 'shot_logs_record.dart';

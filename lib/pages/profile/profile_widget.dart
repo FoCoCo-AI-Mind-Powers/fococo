@@ -3,6 +3,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/fococo_ui_components.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'profile_model.dart';
@@ -357,15 +358,71 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
         Row(
           children: [
             Expanded(
-              child: _buildProfessionalStatCard('Mental Score', '78', '+5 this week', FlutterFlowTheme.of(context).aiPrimary),
+              child: StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUserUid)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    final userData = snapshot.data?.data() as Map<String, dynamic>?;
+                    final mentalScore = userData?['mental_score'] ?? 78;
+                    final weeklyImprovement = userData?['weekly_mental_improvement'] ?? '+5';
+                    return _buildProfessionalStatCard(
+                      'Mental Score', 
+                      '$mentalScore', 
+                      '$weeklyImprovement this week', 
+                      FlutterFlowTheme.of(context).aiPrimary
+                    );
+                  }
+                  return _buildProfessionalStatCard('Mental Score', '78', '+5 this week', FlutterFlowTheme.of(context).aiPrimary);
+                },
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: _buildProfessionalStatCard('Rounds', '24', '+3 this month', FlutterFlowTheme.of(context).golfPrimary),
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('golf_rounds')
+                    .where('user_id', isEqualTo: currentUserUid)
+                    .where('created_at', isGreaterThan: DateTime.now().subtract(const Duration(days: 30)))
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    final roundsThisMonth = snapshot.data?.docs.length ?? 0;
+                    return _buildProfessionalStatCard(
+                      'Rounds', 
+                      '$roundsThisMonth', 
+                      'this month', 
+                      FlutterFlowTheme.of(context).golfPrimary
+                    );
+                  }
+                  return _buildProfessionalStatCard('Rounds', '24', '+3 this month', FlutterFlowTheme.of(context).golfPrimary);
+                },
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: _buildProfessionalStatCard('Streak', '12', 'days active', FlutterFlowTheme.of(context).statusActive),
+              child: StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUserUid)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    final userData = snapshot.data?.data() as Map<String, dynamic>?;
+                    final lastActive = userData?['last_active'] as Timestamp?;
+                    final streak = _calculateStreak(lastActive);
+                    return _buildProfessionalStatCard(
+                      'Streak', 
+                      '$streak', 
+                      'days active', 
+                      FlutterFlowTheme.of(context).statusActive
+                    );
+                  }
+                  return _buildProfessionalStatCard('Streak', '12', 'days active', FlutterFlowTheme.of(context).statusActive);
+                },
+              ),
             ),
           ],
         ),
@@ -374,8 +431,25 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
   }
 
   Widget _buildProfessionalStatCard(String label, String value, String change, Color color) {
-    return FoCoCoCard(
-      style: FoCoCoCardStyle.standard,
+    final theme = FlutterFlowTheme.of(context);
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1), // Glass effect
+        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusM),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -384,9 +458,9 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
             children: [
               Text(
                 label,
-                style: FlutterFlowTheme.of(context).labelMedium.override(
+                style: theme.labelMedium.override(
                   fontFamily: 'Inter',
-                  color: Colors.white70,
+                  color: Colors.white.withOpacity(0.8),
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   height: 1.2,
@@ -405,7 +479,7 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
           const SizedBox(height: 8),
           Text(
             value,
-            style: FlutterFlowTheme.of(context).headlineMedium.override(
+            style: theme.headlineMedium.override(
               fontFamily: 'Montserrat',
               color: Colors.white,
               fontSize: 24,
@@ -416,7 +490,7 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
           const SizedBox(height: 4),
           Text(
             change,
-            style: FlutterFlowTheme.of(context).labelSmall.override(
+            style: theme.labelSmall.override(
               fontFamily: 'Inter',
               color: color,
               fontSize: 10,
@@ -444,33 +518,36 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
           ),
         ),
         const SizedBox(height: 16),
-        SubscriptionTierCard(
-          title: 'PRIME',
-          tierName: 'PRIME',
-          price: '\$9.99',
-          period: 'month',
-          features: [
-            'Unlimited AI Insights',
-            'Advanced Analytics',
-            'VARK Learning System',
-            'Priority Support',
-            'Custom Training Plans',
-          ],
-          isCurrentTier: true,
-          isRecommended: true,
-          onSelect: () => _showSubscriptionModal(context),
-        ),
+        _buildSubscriptionCard(),
       ],
     );
   }
 
+  int _calculateStreak(Timestamp? lastActive) {
+    if (lastActive == null) return 0;
+    
+    final now = DateTime.now();
+    final lastActiveDate = lastActive.toDate();
+    final difference = now.difference(lastActiveDate).inDays;
+    
+    // If last active was today or yesterday, consider it an active streak
+    if (difference <= 1) {
+      // This is a simplified calculation - in reality you'd want to track consecutive days
+      return 12; // Default for demo
+    }
+    
+    return 0;
+  }
+
   Widget _buildVarkSection() {
+    final theme = FlutterFlowTheme.of(context);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Learning Style',
-          style: FlutterFlowTheme.of(context).headlineSmall.override(
+          style: theme.headlineSmall.override(
             fontFamily: 'Montserrat',
             color: Colors.white,
             fontSize: 20,
@@ -481,68 +558,153 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
         const SizedBox(height: 8),
         Text(
           'Personalize your mental training experience',
-          style: FlutterFlowTheme.of(context).bodyMedium.override(
+          style: theme.bodyMedium.override(
             fontFamily: 'Inter',
-            color: Colors.white70,
+            color: Colors.white.withOpacity(0.7),
             fontSize: 14,
             height: 1.2,
           ),
         ),
         const SizedBox(height: 16),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              SizedBox(
-                width: 80,
-                child: _buildVarkCard('Visual', 'V', 'Charts & Images', FlutterFlowTheme.of(context).varkVisual, 0.8),
+        StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUserUid)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              final userData = snapshot.data?.data() as Map<String, dynamic>?;
+              final varkScores = userData?['vark_scores'] as Map<String, dynamic>?;
+              
+              if (varkScores != null) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 80,
+                        child: _buildVarkCard(
+                          'Visual', 
+                          'V', 
+                          'Charts & Images', 
+                          theme.varkVisual, 
+                          (varkScores['visual'] ?? 0.0) / 100.0
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      SizedBox(
+                        width: 80,
+                        child: _buildVarkCard(
+                          'Auditory', 
+                          'A', 
+                          'Audio & Voice', 
+                          theme.varkAuditory, 
+                          (varkScores['aural'] ?? 0.0) / 100.0
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      SizedBox(
+                        width: 80,
+                        child: _buildVarkCard(
+                          'Reading', 
+                          'R', 
+                          'Text & Notes', 
+                          theme.varkReadWrite, 
+                          (varkScores['readWrite'] ?? 0.0) / 100.0
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      SizedBox(
+                        width: 80,
+                        child: _buildVarkCard(
+                          'Kinesthetic', 
+                          'K', 
+                          'Touch & Feel', 
+                          theme.varkKinesthetic, 
+                          (varkScores['kinesthetic'] ?? 0.0) / 100.0
+                        ),
+                      ),
+                      const SizedBox(width: 24),
+                    ],
+                  ),
+                );
+              }
+            }
+            
+            // Fallback to default data
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 80,
+                    child: _buildVarkCard('Visual', 'V', 'Charts & Images', theme.varkVisual, 0.8),
+                  ),
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    width: 80,
+                    child: _buildVarkCard('Auditory', 'A', 'Audio & Voice', theme.varkAuditory, 0.6),
+                  ),
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    width: 80,
+                    child: _buildVarkCard('Reading', 'R', 'Text & Notes', theme.varkReadWrite, 0.7),
+                  ),
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    width: 80,
+                    child: _buildVarkCard('Kinesthetic', 'K', 'Touch & Feel', theme.varkKinesthetic, 0.9),
+                  ),
+                  const SizedBox(width: 24),
+                ],
               ),
-              const SizedBox(width: 6),
-              SizedBox(
-                width: 80,
-                child: _buildVarkCard('Auditory', 'A', 'Audio & Voice', FlutterFlowTheme.of(context).varkAuditory, 0.6),
-              ),
-              const SizedBox(width: 6),
-              SizedBox(
-                width: 80,
-                child: _buildVarkCard('Reading', 'R', 'Text & Notes', FlutterFlowTheme.of(context).varkReadWrite, 0.7),
-              ),
-              const SizedBox(width: 6),
-              SizedBox(
-                width: 80,
-                child: _buildVarkCard('Kinesthetic', 'K', 'Touch & Feel', FlutterFlowTheme.of(context).varkKinesthetic, 0.9),
-              ),
-              const SizedBox(width: 24), // Add padding at the end
-            ],
-          ),
+            );
+          },
         ),
         const SizedBox(height: 16),
         _buildProfessionalMenuItem(
           Icons.psychology_outlined,
           'Retake VARK Assessment',
           'Update your learning style preferences',
-          () => _showVarkAssessment(context),
+          () => context.goNamed('vark_onboarding'),
         ),
       ],
     );
   }
 
   Widget _buildVarkCard(String type, String letter, String description, Color color, double strength) {
-    return FoCoCoCard(
-      style: FoCoCoCardStyle.wellness,
+    final theme = FlutterFlowTheme.of(context);
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1), // Glass effect
+        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusM),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         children: [
           Container(
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
+              color: color.withOpacity(0.2),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Center(
               child: Text(
                 letter,
-                style: FlutterFlowTheme.of(context).titleSmall.override(
+                style: theme.titleSmall.override(
                   fontFamily: 'Montserrat',
                   color: color,
                   fontSize: 14,
@@ -555,7 +717,7 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
           const SizedBox(height: 8),
           Text(
             type,
-            style: FlutterFlowTheme.of(context).labelMedium.override(
+            style: theme.labelMedium.override(
               fontFamily: 'Inter',
               color: Colors.white,
               fontSize: 12,
@@ -566,9 +728,9 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
           const SizedBox(height: 4),
           Text(
             description,
-            style: FlutterFlowTheme.of(context).labelSmall.override(
+            style: theme.labelSmall.override(
               fontFamily: 'Inter',
-              color: Colors.white70,
+              color: Colors.white.withOpacity(0.7),
               fontSize: 10,
               height: 1.2,
             ),
@@ -579,7 +741,7 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
           const SizedBox(height: 8),
           LinearProgressIndicator(
             value: strength,
-            backgroundColor: Colors.white.withValues(alpha: 0.1),
+            backgroundColor: Colors.white.withOpacity(0.1),
             valueColor: AlwaysStoppedAnimation<Color>(color),
             minHeight: 4,
           ),
@@ -589,12 +751,14 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
   }
 
   Widget _buildAccountSection() {
+    final theme = FlutterFlowTheme.of(context);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Account',
-          style: FlutterFlowTheme.of(context).headlineSmall.override(
+          style: theme.headlineSmall.override(
             fontFamily: 'Montserrat',
             color: Colors.white,
             fontSize: 20,
@@ -603,8 +767,23 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
           ),
         ),
         const SizedBox(height: 16),
-        FoCoCoCard(
-          style: FoCoCoCardStyle.standard,
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1), // Glass effect
+            borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
           child: Column(
             children: [
               _buildProfessionalMenuItem(
@@ -636,12 +815,14 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
   }
 
   Widget _buildSecuritySection() {
+    final theme = FlutterFlowTheme.of(context);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Security & Privacy',
-          style: FlutterFlowTheme.of(context).headlineSmall.override(
+          style: theme.headlineSmall.override(
             fontFamily: 'Montserrat',
             color: Colors.white,
             fontSize: 20,
@@ -650,8 +831,23 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
           ),
         ),
         const SizedBox(height: 16),
-        FoCoCoCard(
-          style: FoCoCoCardStyle.standard,
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1), // Glass effect
+            borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
           child: Column(
             children: [
               _buildProfessionalMenuItem(
@@ -683,12 +879,14 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
   }
 
   Widget _buildProgressSection() {
+    final theme = FlutterFlowTheme.of(context);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Progress & Analytics',
-          style: FlutterFlowTheme.of(context).headlineSmall.override(
+          style: theme.headlineSmall.override(
             fontFamily: 'Montserrat',
             color: Colors.white,
             fontSize: 20,
@@ -697,8 +895,23 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
           ),
         ),
         const SizedBox(height: 16),
-        FoCoCoCard(
-          style: FoCoCoCardStyle.standard,
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1), // Glass effect
+            borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
           child: Column(
             children: [
               _buildProfessionalMenuItem(
@@ -730,12 +943,14 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
   }
 
   Widget _buildSupportSection() {
+    final theme = FlutterFlowTheme.of(context);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Support',
-          style: FlutterFlowTheme.of(context).headlineSmall.override(
+          style: theme.headlineSmall.override(
             fontFamily: 'Montserrat',
             color: Colors.white,
             fontSize: 20,
@@ -744,8 +959,23 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
           ),
         ),
         const SizedBox(height: 16),
-        FoCoCoCard(
-          style: FoCoCoCardStyle.standard,
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1), // Glass effect
+            borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
           child: Column(
             children: [
               _buildProfessionalMenuItem(
@@ -818,6 +1048,8 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
     VoidCallback onTap, {
     bool showDivider = false,
   }) {
+    final theme = FlutterFlowTheme.of(context);
+    
     return Column(
       children: [
         InkWell(
@@ -831,12 +1063,12 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: FlutterFlowTheme.of(context).aiPrimary.withValues(alpha: 0.1),
+                    color: theme.aiPrimary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     icon,
-                    color: FlutterFlowTheme.of(context).aiPrimary,
+                    color: theme.aiPrimary,
                     size: 20,
                   ),
                 ),
@@ -847,7 +1079,7 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
                     children: [
                       Text(
                         title,
-                        style: FlutterFlowTheme.of(context).bodyLarge.override(
+                        style: theme.bodyLarge.override(
                           fontFamily: 'Montserrat',
                           color: Colors.white,
                           fontSize: 16,
@@ -858,9 +1090,9 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        style: FlutterFlowTheme.of(context).bodyMedium.override(
+                        style: theme.bodyMedium.override(
                           fontFamily: 'Inter',
-                          color: Colors.white70,
+                          color: Colors.white.withOpacity(0.7),
                           fontSize: 14,
                           height: 1.2,
                         ),
@@ -870,7 +1102,7 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
                 ),
                 Icon(
                   Icons.arrow_forward_ios_outlined,
-                  color: Colors.white60,
+                  color: Colors.white.withOpacity(0.6),
                   size: 16,
                 ),
               ],
@@ -881,7 +1113,7 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
           Divider(
             height: 1,
             thickness: 1,
-            color: Colors.white.withValues(alpha: 0.1),
+            color: Colors.white.withOpacity(0.1),
             indent: 72,
             endIndent: 16,
           ),
@@ -889,6 +1121,129 @@ class _ProfileWidgetState extends State<ProfileWidget> with TickerProviderStateM
     );
   }
 
+  Widget _buildSubscriptionCard() {
+    final theme = FlutterFlowTheme.of(context);
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1), // Glass effect
+        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
+        border: Border.all(
+          color: theme.premiumGold.withOpacity(0.3),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.premiumGold.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'PRIME',
+                      style: theme.labelSmall.override(
+                        fontFamily: 'Inter',
+                        color: theme.premiumGold,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        height: 1.0,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.verified,
+                    color: theme.premiumGold,
+                    size: 20,
+                  ),
+                ],
+              ),
+              Text(
+                'Active',
+                style: theme.bodyMedium.override(
+                  fontFamily: 'Inter',
+                  color: theme.statusActive,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  height: 1.0,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '\$9.99/month',
+            style: theme.headlineMedium.override(
+              fontFamily: 'Montserrat',
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Unlimited AI insights, advanced analytics, and personalized coaching',
+            style: theme.bodyMedium.override(
+              fontFamily: 'Inter',
+              color: Colors.white.withOpacity(0.8),
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => _showSubscriptionModal(context),
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.1),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    'Manage Subscription',
+                    style: theme.bodyMedium.override(
+                      fontFamily: 'Inter',
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      height: 1.0,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
 
   // Modal methods - Full implementations

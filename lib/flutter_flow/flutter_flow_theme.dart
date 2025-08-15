@@ -230,7 +230,7 @@ abstract class FlutterFlowTheme {
   static const double borderRadiusButton = 12.0;
   static const double borderRadiusInput = 8.0;
 
-  // Spacing (Calm-inspired breathing room)
+  // Spacing (Enhanced Calm-inspired breathing room with Strava energy)
   static const double spacingXS = 4.0;
   static const double spacingS = 8.0;
   static const double spacingM = 16.0;
@@ -238,7 +238,9 @@ abstract class FlutterFlowTheme {
   static const double spacingXL = 32.0;
   static const double spacingXXL = 48.0;
   static const double spacingContent = 20.0;
-  static const double spacingSection = 32.0;
+  static const double spacingSection = 40.0;  // More generous section spacing
+  static const double spacingPage = 24.0;    // Consistent page margins
+  static const double spacingCard = 16.0;    // Standard card padding
 
   // Elevation (Strava-inspired depth)
   static const double elevationNone = 0.0;
@@ -510,6 +512,125 @@ abstract class FlutterFlowTheme {
   );
 
   // ============================================================================
+  // GLASSMORPHISM DESIGN SYSTEM COLORS & EFFECTS
+  // ============================================================================
+
+  // Glass Material Colors
+  late Color glassBackground;
+  late Color glassTint;
+  late Color glassBorder;
+  late Color glassHighlight;
+  late Color glassShadow;
+  
+  // 3D Card Effects
+  late Color card3DLight;
+  late Color card3DShadow;
+  late Color card3DHighlight;
+  late Color cardHoverTint;
+  late Color cardPressTint;
+  
+  // Enhanced Glassmorphism Gradients
+  LinearGradient get glassGradient => LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      glassTint.withValues(alpha: 0.25),
+      glassTint.withValues(alpha: 0.10),
+      glassTint.withValues(alpha: 0.05),
+    ],
+    stops: const [0.0, 0.5, 1.0],
+  );
+  
+  LinearGradient get glass3DGradient => LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      card3DLight.withValues(alpha: 0.3),
+      glassTint.withValues(alpha: 0.15),
+      card3DShadow.withValues(alpha: 0.1),
+    ],
+    stops: const [0.0, 0.5, 1.0],
+  );
+  
+  LinearGradient get glassCardGradient => LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      glassTint.withValues(alpha: 0.2),
+      glassTint.withValues(alpha: 0.1),
+      glassTint.withValues(alpha: 0.05),
+    ],
+    stops: const [0.0, 0.6, 1.0],
+  );
+  
+  // Glass Navigation Gradient
+  LinearGradient get glassNavGradient => LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      primaryBackground.withValues(alpha: 0.9),
+      primaryBackground.withValues(alpha: 0.7),
+      primaryBackground.withValues(alpha: 0.95),
+    ],
+    stops: const [0.0, 0.5, 1.0],
+  );
+  
+  // Enhanced Glass Shadows for 3D Effect
+  List<BoxShadow> get glass3DShadows => [
+    // Main shadow
+    BoxShadow(
+      color: glassShadow.withValues(alpha: 0.2),
+      blurRadius: 20,
+      offset: const Offset(0, 8),
+      spreadRadius: 0,
+    ),
+    // Highlight shadow (top-left)
+    BoxShadow(
+      color: glassHighlight.withValues(alpha: 0.1),
+      blurRadius: 10,
+      offset: const Offset(-2, -2),
+      spreadRadius: 0,
+    ),
+    // Depth shadow (bottom-right)
+    BoxShadow(
+      color: glassShadow.withValues(alpha: 0.1),
+      blurRadius: 15,
+      offset: const Offset(4, 4),
+      spreadRadius: 0,
+    ),
+  ];
+  
+  List<BoxShadow> get glassCardShadows => [
+    BoxShadow(
+      color: glassShadow.withValues(alpha: 0.15),
+      blurRadius: 15,
+      offset: const Offset(0, 5),
+      spreadRadius: 0,
+    ),
+    BoxShadow(
+      color: glassHighlight.withValues(alpha: 0.08),
+      blurRadius: 8,
+      offset: const Offset(-1, -1),
+      spreadRadius: 0,
+    ),
+  ];
+  
+  List<BoxShadow> get glassHoverShadows => [
+    BoxShadow(
+      color: glassShadow.withValues(alpha: 0.25),
+      blurRadius: 25,
+      offset: const Offset(0, 12),
+      spreadRadius: 0,
+    ),
+    BoxShadow(
+      color: primary.withValues(alpha: 0.1),
+      blurRadius: 20,
+      offset: const Offset(0, 8),
+      spreadRadius: 0,
+    ),
+  ];
+
+  // ============================================================================
   // HELPER METHODS
   // ============================================================================
 
@@ -604,15 +725,15 @@ class LightModeTheme extends FlutterFlowTheme {
   @Deprecated('Use tertiary instead')
   Color get tertiaryColor => tertiary;
 
-  // Core Colors - FoCoCo Brand Colors (Light Mode)
+  // Core Colors - FoCoCo Brand Colors (Light Mode) - Enhanced for Calm × Strava
   late Color primary = const Color(0xFFFEA400);      // #fea400 - Orange/Gold
   late Color secondary = const Color(0xFF0A3669);    // #0a3669 - Navy Blue
   late Color tertiary = const Color(0xFF017B3D);     // #017b3d - Forest Green
-  late Color alternate = const Color(0xFFE5E7EB);
-  late Color primaryText = const Color(0xFF111827);  // Dark gray/black for contrast
-  late Color secondaryText = const Color(0xFF64748B); // Brand-tinted gray for better harmony
+  late Color alternate = const Color(0xFFF1F5F9);    // Softer neutral for calm aesthetic
+  late Color primaryText = const Color(0xFF0F172A);  // Deeper contrast for better readability
+  late Color secondaryText = const Color(0xFF475569); // Improved contrast while maintaining harmony
   late Color primaryBackground = const Color(0xFFFFFFFF);
-  late Color secondaryBackground = const Color(0xFFF9FAFB);
+  late Color secondaryBackground = const Color(0xFFFAFBFC); // Warmer, more inviting background
   late Color accent1 = const Color(0x4CFEA400);
   late Color accent2 = const Color(0x4C0A3669);
   late Color accent3 = const Color(0x4C017B3D);
@@ -777,6 +898,20 @@ class LightModeTheme extends FlutterFlowTheme {
   late Color feedbackNeutral = const Color(0xFF6B7280);
   late Color feedbackNegative = const Color(0xFFDC2626);     // Red
   late Color feedbackBackground = const Color(0xFFF9FAFB);
+
+  // Glassmorphism Colors (Light Mode)
+  late Color glassBackground = const Color(0xFFFFFFFF);      // Pure white base
+  late Color glassTint = const Color(0xFFFFFFFF);            // White tint
+  late Color glassBorder = const Color(0xFFE5E7EB);          // Light border
+  late Color glassHighlight = const Color(0xFFFFFFFF);       // White highlight
+  late Color glassShadow = const Color(0xFF000000);          // Black shadow
+  
+  // 3D Card Effects (Light Mode)
+  late Color card3DLight = const Color(0xFFFFFFFF);          // Highlight
+  late Color card3DShadow = const Color(0xFF64748B);         // Depth shadow
+  late Color card3DHighlight = const Color(0xFFFEA400);      // Brand highlight
+  late Color cardHoverTint = const Color(0xFFFEA400);        // Hover tint
+  late Color cardPressTint = const Color(0xFF0A3669);        // Press tint
 }
 
 /// Enhanced Dark Mode Theme - FoCoCo Brand Colors with Strava + Calm Inspiration
@@ -987,6 +1122,20 @@ class DarkModeTheme extends FlutterFlowTheme {
   late Color feedbackNeutral = const Color(0xFF9CA3AF);
   late Color feedbackNegative = const Color(0xFFEF4444);     // Red
   late Color feedbackBackground = const Color(0xFF1F2937);
+
+  // Glassmorphism Colors (Dark Mode)
+  late Color glassBackground = const Color(0xFF111827);      // Dark base
+  late Color glassTint = const Color(0xFF1F2937);            // Dark tint
+  late Color glassBorder = const Color(0xFF374151);          // Dark border
+  late Color glassHighlight = const Color(0xFF4B5563);       // Light highlight
+  late Color glassShadow = const Color(0xFF000000);          // Black shadow
+  
+  // 3D Card Effects (Dark Mode)
+  late Color card3DLight = const Color(0xFF4B5563);          // Light highlight
+  late Color card3DShadow = const Color(0xFF000000);         // Deep shadow
+  late Color card3DHighlight = const Color(0xFFFEA400);      // Brand highlight
+  late Color cardHoverTint = const Color(0xFFFEA400);        // Hover tint
+  late Color cardPressTint = const Color(0xFF1E40AF);        // Press tint
 }
 
 /// Enhanced Typography System

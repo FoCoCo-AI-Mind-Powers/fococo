@@ -1,228 +1,415 @@
-import '/flutter_flow/flutter_flow_model.dart';
 import 'package:flutter/material.dart';
+import 'package:fo_co_co/pages/vark_onboarding/vark_onboarding_widget.dart';
+import '/flutter_flow/flutter_flow_model.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 
-class VarkOnboardingModel extends FlutterFlowModel {
-  // Current question index
+class VarkOnboardingModel extends FlutterFlowModel<VarkOnboardingWidget> {
+  // Current step tracking
+  int currentStep = 0;
+  final int totalSteps = 6;
+
+  // Step 1: Welcome data
+  bool welcomeCompleted = false;
+
+  // Step 2: Personal Foundation
+  int age = 25;
+  String coachingName = '';
+  String golfExperience =
+      ''; // Beginner/Recreational/Intermediate/Advanced/Competitive
+  String golfDraws =
+      ''; // Relaxation/Competition/Social/Personal Challenge/Professional
+  double handicap = 18.0;
+
+  // Step 3: Golf & Mental Game Profile
+  List<String> mentalChallenges = [];
+  String mentalGoals = '';
+  String playingFrequency = '';
+
+  // Step 4: VARK Assessment
   int currentQuestionIndex = 0;
-  
-  // User answers (list of selected option indices)
-  List<int> answers = [];
-  
-  // Golf-specific VARK assessment questions
-  final List<Map<String, dynamic>> questions = [
+  List<int> varkAnswers = [];
+  final List<Map<String, dynamic>> varkQuestions = [
     {
-      'question': 'Before a crucial putt, how do you best prepare your mind?',
-      'context': 'You\'re standing over a 6-foot putt to save par on the 18th hole.',
+      'question': 'Before a crucial putt, how do you best prepare?',
+      'context':
+          'You\'re on the 18th green with a chance to break your personal best.',
       'options': [
         {
           'text': 'Visualize the ball\'s path to the hole',
-          'description': 'Create a mental image of the perfect line',
-          'type': 'visual',
+          'description': 'See the line and the ball rolling',
+          'type': 'visual'
         },
         {
           'text': 'Listen to your breathing rhythm',
-          'description': 'Focus on the sound and tempo of your breath',
-          'type': 'aural',
+          'description': 'Focus on calming sounds',
+          'type': 'aural'
         },
         {
           'text': 'Review your mental checklist',
-          'description': 'Go through written putting fundamentals',
-          'type': 'readWrite',
+          'description': 'Go through written steps',
+          'type': 'readWrite'
         },
         {
           'text': 'Feel the weight of the putter',
-          'description': 'Focus on grip pressure and balance',
-          'type': 'kinesthetic',
-        },
-      ],
+          'description': 'Focus on physical sensations',
+          'type': 'kinesthetic'
+        }
+      ]
     },
     {
-      'question': 'When learning a new swing technique, what helps you most?',
-      'context': 'Your coach is teaching you to improve your driver swing.',
+      'question': 'When learning a new golf technique, you prefer to:',
+      'context': 'Your coach is teaching you a new swing adjustment.',
       'options': [
         {
-          'text': 'Watching slow-motion video analysis',
-          'description': 'See the swing mechanics in detail',
-          'type': 'visual',
+          'text': 'Watch a detailed video demonstration',
+          'description': 'See the technique in action',
+          'type': 'visual'
         },
         {
-          'text': 'Hearing the coach explain the movement',
-          'description': 'Listen to verbal instruction and tempo cues',
-          'type': 'aural',
+          'text': 'Listen to verbal instructions',
+          'description': 'Hear the explanation step by step',
+          'type': 'aural'
         },
         {
-          'text': 'Reading about the technique',
-          'description': 'Study written instructions and diagrams',
-          'type': 'readWrite',
+          'text': 'Read detailed written instructions',
+          'description': 'Study the technique description',
+          'type': 'readWrite'
         },
         {
-          'text': 'Practice the motion repeatedly',
-          'description': 'Feel the muscle memory through repetition',
-          'type': 'kinesthetic',
-        },
-      ],
+          'text': 'Practice the movement immediately',
+          'description': 'Feel it in your body',
+          'type': 'kinesthetic'
+        }
+      ]
     },
     {
-      'question': 'After a bad shot, how do you reset mentally?',
-      'context': 'You just hit your tee shot into the water hazard.',
+      'question': 'Your ideal pre-round preparation includes:',
+      'context': 'You have 30 minutes before your tee time.',
       'options': [
         {
-          'text': 'Picture yourself hitting the next shot perfectly',
-          'description': 'Create positive mental imagery',
-          'type': 'visual',
+          'text': 'Visualizing successful shots on each hole',
+          'description': 'Mental imagery of your round',
+          'type': 'visual'
         },
         {
-          'text': 'Talk yourself through positive self-talk',
-          'description': 'Use verbal affirmations and mantras',
-          'type': 'aural',
+          'text': 'Listening to music or guided meditation',
+          'description': 'Audio to get in the zone',
+          'type': 'aural'
         },
         {
-          'text': 'Write down what went wrong and how to fix it',
-          'description': 'Make notes for future reference',
-          'type': 'readWrite',
+          'text': 'Writing down goals and intentions',
+          'description': 'Document your game plan',
+          'type': 'readWrite'
         },
         {
-          'text': 'Take deep breaths and feel your muscles relax',
-          'description': 'Use physical relaxation techniques',
-          'type': 'kinesthetic',
-        },
-      ],
+          'text': 'Physical warm-up and practice swings',
+          'description': 'Get your body ready',
+          'type': 'kinesthetic'
+        }
+      ]
     },
     {
-      'question': 'How do you best remember course management strategies?',
-      'context': 'Planning your approach to a challenging par 4 with water.',
+      'question': 'After a round, you best process your experience by:',
+      'context': 'You just finished an important round.',
       'options': [
         {
-          'text': 'Draw the hole layout and yardages',
-          'description': 'Sketch the strategy visually',
-          'type': 'visual',
+          'text': 'Replaying key shots in your mind',
+          'description': 'Visualize what happened',
+          'type': 'visual'
         },
         {
-          'text': 'Talk through the strategy out loud',
-          'description': 'Verbalize your game plan',
-          'type': 'aural',
+          'text': 'Talking through the round with others',
+          'description': 'Verbally process the experience',
+          'type': 'aural'
         },
         {
-          'text': 'Write detailed notes in your yardage book',
-          'description': 'Document specific strategies',
-          'type': 'readWrite',
+          'text': 'Writing detailed notes about each hole',
+          'description': 'Document your performance',
+          'type': 'readWrite'
         },
         {
-          'text': 'Practice the shot selection on the range',
-          'description': 'Feel the shots before playing them',
-          'type': 'kinesthetic',
-        },
-      ],
+          'text': 'Going to the range to work on feels',
+          'description': 'Physical practice and adjustment',
+          'type': 'kinesthetic'
+        }
+      ]
     },
     {
-      'question': 'What type of pre-round preparation works best for you?',
-      'context': 'Getting ready for an important tournament round.',
+      'question': 'When dealing with pressure on the course:',
+      'context': 'You\'re facing a challenging shot with water in play.',
       'options': [
         {
-          'text': 'Watch highlight videos of great rounds',
-          'description': 'Visual inspiration and imagery',
-          'type': 'visual',
+          'text': 'Picture a successful outcome',
+          'description': 'See the ball landing safely',
+          'type': 'visual'
         },
         {
-          'text': 'Listen to motivational music or podcasts',
-          'description': 'Audio preparation and mood setting',
-          'type': 'aural',
+          'text': 'Use positive self-talk',
+          'description': 'Tell yourself you can do it',
+          'type': 'aural'
         },
         {
-          'text': 'Review your written game plan and goals',
-          'description': 'Study your preparation notes',
-          'type': 'readWrite',
+          'text': 'Remember your written game plan',
+          'description': 'Recall your strategy notes',
+          'type': 'readWrite'
         },
         {
-          'text': 'Do stretching and feel-good swings',
-          'description': 'Physical preparation and muscle activation',
-          'type': 'kinesthetic',
-        },
-      ],
+          'text': 'Focus on your grip and stance',
+          'description': 'Feel physically grounded',
+          'type': 'kinesthetic'
+        }
+      ]
     },
     {
-      'question': 'When facing course pressure, how do you stay focused?',
-      'context': 'Playing in front of a large gallery on the final holes.',
+      'question': 'You learn new mental techniques best when you:',
+      'context': 'Your mental performance coach introduces a new strategy.',
       'options': [
         {
-          'text': 'Focus on a specific target spot',
-          'description': 'Use visual concentration techniques',
-          'type': 'visual',
+          'text': 'See diagrams and visual examples',
+          'description': 'Visual representations help',
+          'type': 'visual'
         },
         {
-          'text': 'Repeat a calming phrase or mantra',
-          'description': 'Use verbal anchoring',
-          'type': 'aural',
+          'text': 'Hear explanations and examples',
+          'description': 'Verbal instruction works best',
+          'type': 'aural'
         },
         {
-          'text': 'Go through your written routine checklist',
-          'description': 'Follow documented processes',
-          'type': 'readWrite',
+          'text': 'Read case studies and research',
+          'description': 'Written material helps understanding',
+          'type': 'readWrite'
         },
         {
-          'text': 'Feel your feet grounded and center yourself',
-          'description': 'Use physical grounding techniques',
-          'type': 'kinesthetic',
-        },
-      ],
+          'text': 'Try techniques immediately on course',
+          'description': 'Experience it firsthand',
+          'type': 'kinesthetic'
+        }
+      ]
     },
     {
-      'question': 'How do you best track your mental game progress?',
-      'context': 'Wanting to improve your mental performance over time.',
+      'question': 'Your confidence is boosted most by:',
+      'context': 'You need a confidence boost before a tournament.',
       'options': [
         {
-          'text': 'Create charts and graphs of your performance',
-          'description': 'Visual progress tracking',
-          'type': 'visual',
+          'text': 'Watching videos of your best shots',
+          'description': 'Visual evidence of success',
+          'type': 'visual'
         },
         {
-          'text': 'Record voice memos about your rounds',
-          'description': 'Audio reflection and analysis',
-          'type': 'aural',
+          'text': 'Hearing encouraging words',
+          'description': 'Verbal affirmations and support',
+          'type': 'aural'
         },
         {
-          'text': 'Keep detailed written journals',
-          'description': 'Document thoughts and patterns',
-          'type': 'readWrite',
+          'text': 'Reading your achievement journal',
+          'description': 'Written record of successes',
+          'type': 'readWrite'
         },
         {
-          'text': 'Notice how you feel during different situations',
-          'description': 'Track physical and emotional sensations',
-          'type': 'kinesthetic',
-        },
-      ],
+          'text': 'Feeling a solid practice session',
+          'description': 'Physical confirmation of skill',
+          'type': 'kinesthetic'
+        }
+      ]
     },
     {
-      'question': 'What helps you learn from watching professional golfers?',
-      'context': 'Studying tour players to improve your mental game.',
+      'question': 'When stuck in a mental rut, you prefer to:',
+      'context': 'Your mental game feels off lately.',
       'options': [
         {
-          'text': 'Watch their body language and expressions',
-          'description': 'Observe visual cues and behaviors',
-          'type': 'visual',
+          'text': 'Watch inspirational golf content',
+          'description': 'Visual motivation and examples',
+          'type': 'visual'
         },
         {
-          'text': 'Listen to their interviews and commentary',
-          'description': 'Hear their thought processes',
-          'type': 'aural',
+          'text': 'Listen to a motivational podcast',
+          'description': 'Audio inspiration and advice',
+          'type': 'aural'
         },
         {
-          'text': 'Read their tips and strategy articles',
-          'description': 'Study written insights',
-          'type': 'readWrite',
+          'text': 'Journal about your feelings',
+          'description': 'Write through the challenge',
+          'type': 'readWrite'
         },
         {
-          'text': 'Try to mimic their tempo and feel',
-          'description': 'Copy their physical approach',
-          'type': 'kinesthetic',
-        },
-      ],
+          'text': 'Change your practice routine',
+          'description': 'Physical variety and new feels',
+          'type': 'kinesthetic'
+        }
+      ]
+    }
+  ];
+
+  // Step 5: Mental Performance History
+  String pastCoachingExperience = '';
+  List<String> currentMentalPractices = [];
+  String biggestBreakthrough = '';
+  String frustrationPoint = '';
+
+  // Step 6: Results
+  Map<String, double> varkScores = {};
+  String dominantLearningStyle = '';
+  String secondaryLearningStyle = '';
+
+  // Mental challenge options
+  final List<Map<String, dynamic>> mentalChallengeOptions = [
+    {
+      'id': 'focus_pressure',
+      'label': 'Maintaining focus under pressure',
+      'icon': Icons.center_focus_strong
+    },
+    {
+      'id': 'confidence_bad_shots',
+      'label': 'Bouncing back from bad shots',
+      'icon': Icons.refresh
+    },
+    {
+      'id': 'composure',
+      'label': 'Keeping composure throughout the round',
+      'icon': Icons.self_improvement
+    },
+    {
+      'id': 'pre_round_nerves',
+      'label': 'Managing pre-round nerves',
+      'icon': Icons.psychology
+    },
+    {
+      'id': 'consistency',
+      'label': 'Consistent mental approach',
+      'icon': Icons.timeline
+    },
+    {
+      'id': 'negative_thoughts',
+      'label': 'Overcoming negative self-talk',
+      'icon': Icons.block
+    },
+    {
+      'id': 'visualization',
+      'label': 'Effective visualization',
+      'icon': Icons.visibility
+    },
+    {
+      'id': 'pressure_putts',
+      'label': 'Making pressure putts',
+      'icon': Icons.golf_course
+    },
+    {
+      'id': 'competition_anxiety',
+      'label': 'Competition anxiety',
+      'icon': Icons.emoji_events
+    },
+    {
+      'id': 'course_management',
+      'label': 'Smart course management',
+      'icon': Icons.map
     },
   ];
+
+  // Mental practice options
+  final List<Map<String, dynamic>> mentalPracticeOptions = [
+    {'id': 'breathing', 'label': 'Breathing exercises', 'icon': Icons.air},
+    {
+      'id': 'visualization',
+      'label': 'Visualization techniques',
+      'icon': Icons.remove_red_eye
+    },
+    {
+      'id': 'meditation',
+      'label': 'Meditation or mindfulness',
+      'icon': Icons.self_improvement
+    },
+    {
+      'id': 'positive_self_talk',
+      'label': 'Positive self-talk',
+      'icon': Icons.chat_bubble
+    },
+    {
+      'id': 'pre_shot_routine',
+      'label': 'Pre-shot routines',
+      'icon': Icons.repeat
+    },
+    {'id': 'journaling', 'label': 'Performance journaling', 'icon': Icons.book},
+    {'id': 'goal_setting', 'label': 'Goal setting', 'icon': Icons.flag},
+    {'id': 'none', 'label': 'None currently', 'icon': Icons.not_interested},
+  ];
+
+  // Form controllers
+  final coachingNameController = TextEditingController();
+  final mentalGoalsController = TextEditingController();
+  final biggestBreakthroughController = TextEditingController();
+  final frustrationPointController = TextEditingController();
 
   @override
   void initState(BuildContext context) {}
 
   @override
-  void dispose() {}
-} 
+  void dispose() {
+    coachingNameController.dispose();
+    mentalGoalsController.dispose();
+    biggestBreakthroughController.dispose();
+    frustrationPointController.dispose();
+  }
+
+  // Helper methods
+  bool canProceedToNextStep() {
+    switch (currentStep) {
+      case 0: // Welcome
+        return true;
+      case 1: // Personal Foundation
+        return coachingName.isNotEmpty &&
+            golfExperience.isNotEmpty &&
+            golfDraws.isNotEmpty;
+      case 2: // Golf & Mental Game Profile
+        return mentalChallenges.isNotEmpty &&
+            mentalGoals.isNotEmpty &&
+            playingFrequency.isNotEmpty;
+      case 3: // VARK Assessment
+        return varkAnswers.length == varkQuestions.length;
+      case 4: // Mental Performance History
+        return pastCoachingExperience.isNotEmpty &&
+            currentMentalPractices.isNotEmpty;
+      case 5: // Results
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  String getStepTitle() {
+    switch (currentStep) {
+      case 0:
+        return 'Welcome to Your Journey';
+      case 1:
+        return 'Personal Foundation';
+      case 2:
+        return 'Your Mental Game';
+      case 3:
+        return 'Learning Style Assessment';
+      case 4:
+        return 'Mental Performance History';
+      case 5:
+        return 'Your Personalized Profile';
+      default:
+        return '';
+    }
+  }
+
+  String getStepSubtitle() {
+    switch (currentStep) {
+      case 0:
+        return 'Let\'s build your personalized mental performance blueprint';
+      case 1:
+        return 'Tell us about yourself and your golf journey';
+      case 2:
+        return 'Identify your challenges and set your goals';
+      case 3:
+        return 'Discover how your mind best absorbs new strategies';
+      case 4:
+        return 'Share your experience with mental training';
+      case 5:
+        return 'Review your coaching profile';
+      default:
+        return '';
+    }
+  }
+}

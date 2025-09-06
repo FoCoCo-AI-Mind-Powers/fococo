@@ -8,7 +8,6 @@ import '/backend/schema/structs/index.dart';
 import '/auth/base_auth_user_provider.dart';
 
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/fococo_ui_components.dart';
 
 import '/index.dart';
 
@@ -18,6 +17,7 @@ import '/pages/onboarding/comprehensive_onboarding_widget.dart';
 import '/pages/subscription/subscription_management_widget.dart';
 import '/pages/foco_map/foco_map_conditional_widget.dart';
 import '/pages/splash/splash_widget.dart';
+import '/pages/splash/enhanced_splash_widget.dart';
 import '/pages/security/face_id_settings_widget.dart';
 import '/pages/edit_profile/edit_profile_widget.dart';
 import '/pages/settings/settings_widget.dart';
@@ -95,7 +95,7 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
         FFRoute(
           name: '_initialize',
           path: '/',
-          builder: (context, _) => const SplashWidget(),
+          builder: (context, _) => const EnhancedSplashWidget(),
         ),
         FFRoute(
           name: SplashWidget.routeName,
@@ -395,14 +395,8 @@ class FFRoute {
                   builder: (context, _) => builder(context, ffParams),
                 )
               : builder(context, ffParams);
-          final child = appStateNotifier.loading
-              ? FoCoCoAnimatedSplash(
-                  onAnimationComplete: () {
-                    // This will be handled by the main app timeout
-                  },
-                  duration: const Duration(milliseconds: 2000),
-                )
-              : page;
+          final child =
+              appStateNotifier.loading ? const EnhancedSplashWidget() : page;
 
           final transitionInfo = state.transitionInfo;
           return transitionInfo.hasTransition

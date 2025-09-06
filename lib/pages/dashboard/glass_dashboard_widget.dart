@@ -10,6 +10,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_design_system.dart';
 import '/flutter_flow/glass_components.dart';
 import '/flutter_flow/fococo_ui_components.dart';
+import '/services/app_tutorial_service.dart';
 
 /// Enhanced Glass Dashboard Widget with AI Integration
 class GlassDashboardWidget extends StatefulWidget {
@@ -29,7 +30,16 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
+  final AppTutorialService _tutorialService = AppTutorialService();
+
   final scaffoldKey = GlobalKey<ScaffoldState>();
+
+  // Tutorial target keys
+  final GlobalKey _pillarCardsKey = GlobalKey();
+  final GlobalKey _quickActionsKey = GlobalKey();
+  final GlobalKey _statsKey = GlobalKey();
+  final GlobalKey _aiCoachKey = GlobalKey();
+  final GlobalKey _recentActivityKey = GlobalKey();
 
   @override
   void initState() {
@@ -65,6 +75,24 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
     // Start animations
     _fadeController.forward();
     _slideController.forward();
+
+    // Check and show tutorial
+    _checkAndShowTutorial();
+  }
+
+  Future<void> _checkAndShowTutorial() async {
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    if (!mounted) return;
+
+    _tutorialService.startDashboardTutorial(
+      context,
+      pillarCardsKey: _pillarCardsKey,
+      quickActionsKey: _quickActionsKey,
+      statsKey: _statsKey,
+      aiCoachKey: _aiCoachKey,
+      recentActivityKey: _recentActivityKey,
+    );
   }
 
   @override
@@ -108,7 +136,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
                   slivers: [
                     // Glass App Bar
                     _buildGlassAppBar(theme),
-                    
+
                     // Dashboard Content
                     SliverToBoxAdapter(
                       child: Padding(
@@ -118,33 +146,34 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
                           children: [
                             // Welcome Section with AI Badge
                             _buildWelcomeSection(theme),
-                            
+
                             const SizedBox(height: 24),
-                            
+
                             // Quick Stats Row
                             _buildQuickStatsRow(theme),
-                            
+
                             const SizedBox(height: 24),
-                            
+
                             // AI Insights Section
                             _buildAIInsightsSection(theme),
-                            
+
                             const SizedBox(height: 24),
-                            
+
                             // Performance Overview
                             _buildPerformanceOverview(theme),
-                            
+
                             const SizedBox(height: 24),
-                            
+
                             // Recent Activity
                             _buildRecentActivity(theme),
-                            
+
                             const SizedBox(height: 24),
-                            
+
                             // Quick Actions
                             _buildQuickActions(theme),
-                            
-                            const SizedBox(height: 100), // Bottom padding for nav
+
+                            const SizedBox(
+                                height: 100), // Bottom padding for nav
                           ],
                         ),
                       ),
@@ -187,7 +216,8 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -206,9 +236,9 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
                             color: Colors.white,
                           ),
                         ),
-                        
+
                         const SizedBox(width: 16),
-                        
+
                         // User Info
                         Expanded(
                           child: Column(
@@ -223,7 +253,9 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                currentUserDisplayName ?? 'Golfer',
+                                currentUserDisplayName.isNotEmpty
+                                    ? currentUserDisplayName
+                                    : 'Golfer',
                                 style: theme.headlineSmall.override(
                                   color: theme.primaryText,
                                   fontWeight: FontWeight.w700,
@@ -233,7 +265,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
                             ],
                           ),
                         ),
-                        
+
                         // Notifications
                         GlassDesignSystem.glass3DCard(
                           width: 48,
@@ -266,7 +298,8 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
       title: 'Your Mental Game Today',
       subtitle: 'AI-powered insights to enhance your performance',
       showAIBadge: true,
-      aiInsight: 'Your focus score has improved 15% this week. Try the new pre-shot routine to maintain consistency.',
+      aiInsight:
+          'Your focus score has improved 15% this week. Try the new pre-shot routine to maintain consistency.',
       icon: Icon(
         FontAwesomeIcons.brain,
         color: Colors.white,
@@ -281,6 +314,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
   /// Quick Stats Row
   Widget _buildQuickStatsRow(FlutterFlowTheme theme) {
     return Row(
+      key: _pillarCardsKey,
       children: [
         Expanded(
           child: GlassPerformanceCard(
@@ -295,9 +329,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
             },
           ),
         ),
-        
         const SizedBox(width: 16),
-        
         Expanded(
           child: GlassPerformanceCard(
             title: 'Focus Level',
@@ -311,9 +343,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
             },
           ),
         ),
-        
         const SizedBox(width: 16),
-        
         Expanded(
           child: GlassPerformanceCard(
             title: 'Streak',
@@ -334,12 +364,13 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
   /// AI Insights Section
   Widget _buildAIInsightsSection(FlutterFlowTheme theme) {
     return Column(
+      key: _aiCoachKey,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Icon(
-                              FontAwesomeIcons.star,
+              FontAwesomeIcons.star,
               color: theme.aiPrimary,
               size: 20,
             ),
@@ -368,9 +399,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
             ),
           ],
         ),
-        
         const SizedBox(height: 16),
-        
         GlassDesignSystem.glass3DCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -415,9 +444,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
                   ),
                 ],
               ),
-              
               const SizedBox(height: 16),
-              
               Row(
                 children: [
                   Expanded(
@@ -465,9 +492,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
             height: 1.2,
           ),
         ),
-        
         const SizedBox(height: 16),
-        
         GlassDesignSystem.glass3DCard(
           child: Row(
             children: [
@@ -478,9 +503,9 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
                 color: theme.primary,
                 centerText: '75%',
               ),
-              
+
               const SizedBox(width: 20),
-              
+
               // Details
               Expanded(
                 child: Column(
@@ -562,9 +587,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
             ),
           ],
         ),
-        
         const SizedBox(height: 16),
-        
         GlassActivityItem(
           title: 'Morning Practice Round',
           subtitle: 'Worked on focus and pre-shot routine',
@@ -590,9 +613,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
             context.pushNamed('golf_rounds');
           },
         ),
-        
         const SizedBox(height: 12),
-        
         GlassActivityItem(
           title: 'Mindfulness Session',
           subtitle: 'Completed breathing exercises',
@@ -625,6 +646,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
   /// Quick Actions
   Widget _buildQuickActions(FlutterFlowTheme theme) {
     return Column(
+      key: _quickActionsKey,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -635,9 +657,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
             height: 1.2,
           ),
         ),
-        
         const SizedBox(height: 16),
-        
         Row(
           children: [
             Expanded(
@@ -651,9 +671,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
                 theme: theme,
               ),
             ),
-            
             const SizedBox(width: 16),
-            
             Expanded(
               child: GlassDesignSystem.glassButton(
                 text: 'Train Mind',
@@ -667,9 +685,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
             ),
           ],
         ),
-        
         const SizedBox(height: 12),
-        
         Row(
           children: [
             Expanded(
@@ -683,9 +699,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
                 theme: theme,
               ),
             ),
-            
             const SizedBox(width: 16),
-            
             Expanded(
               child: GlassDesignSystem.glassButton(
                 text: 'Progress',

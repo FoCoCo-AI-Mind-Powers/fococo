@@ -10,6 +10,7 @@ class CartesiaMCPConfig {
   // Voice model configurations
   static const String defaultVoiceModel = 'sonic-2';
   static const String defaultLanguage = 'en';
+  static const String apiVersion = '2024-06-10';
 
   // MCP Server settings
   static const Map<String, dynamic> mcpServerConfig = {
@@ -20,26 +21,29 @@ class CartesiaMCPConfig {
     },
   };
 
-  // Voice configurations optimized for golf coaching
+  // Voice configurations optimized for golf coaching with specified voice
   static const Map<String, Map<String, dynamic>> voiceProfiles = {
     'coach_confident': {
-      'voice_id': 'a0e99841-438c-4a64-b679-ae501e7d6091',
+      'voice_id':
+          '7442d6b8-ff51-4477-bd30-0c0d16df84eb', // Your specified voice ID
       'model': 'sonic-2',
-      'speed': 1.0,
+      'speed': 'normal',
       'emotion': 'confident',
       'style': 'coaching',
     },
     'coach_encouraging': {
-      'voice_id': 'b7d03a83-c0a4-4b8e-9c7f-d8e2f1a3b5c6',
+      'voice_id':
+          '7442d6b8-ff51-4477-bd30-0c0d16df84eb', // Using same voice with different settings
       'model': 'sonic-2',
-      'speed': 0.9,
+      'speed': 'slow',
       'emotion': 'encouraging',
       'style': 'supportive',
     },
     'mentor_calm': {
-      'voice_id': 'c8e14b94-d1b5-5c9f-ae8g-f9g3h2b4c6d7',
+      'voice_id':
+          '7442d6b8-ff51-4477-bd30-0c0d16df84eb', // Using same voice with calm settings
       'model': 'sonic-2',
-      'speed': 0.8,
+      'speed': 'slow',
       'emotion': 'calm',
       'style': 'meditative',
     },
@@ -72,9 +76,9 @@ class CartesiaMCPConfig {
 
   /// Get API headers for Cartesia requests
   static Map<String, String> get apiHeaders => {
-        'Authorization': 'Bearer $apiKey',
-        'Content-Type': 'application/json',
+        'Cartesia-Version': apiVersion,
         'X-API-Key': apiKey,
+        'Content-Type': 'application/json',
       };
 
   /// Get voice profile by ID
@@ -92,7 +96,7 @@ class CartesiaMCPConfig {
     required String text,
     required String voiceId,
     String model = 'sonic-2',
-    double speed = 1.0,
+    String speed = 'normal',
     String format = 'wav',
     Map<String, dynamic>? varkSettings,
   }) {
@@ -104,11 +108,11 @@ class CartesiaMCPConfig {
 
     return {
       'model_id': model,
+      'transcript': adaptedText,
       'voice': {
         'mode': 'id',
         'id': voiceId,
       },
-      'transcript': adaptedText,
       'output_format': {
         'container': format,
         'encoding': 'pcm_f32le',

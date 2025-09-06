@@ -110,6 +110,69 @@ class GeminiInsightResponse {
   }
 }
 
+/// Response wrapper for coaching recommendations
+class GeminiRecommendationResponse {
+  final String recommendationType;
+  final List<GeminiModuleRecommendation> recommendations;
+  final String primaryFocus;
+  final GeminiWeeklyPlan weeklyPlan;
+  final String motivationalMessage;
+  final DateTime timestamp;
+  final String model;
+  final int? tokensUsed;
+  final double? estimatedCost;
+
+  GeminiRecommendationResponse({
+    required this.recommendationType,
+    required this.recommendations,
+    required this.primaryFocus,
+    required this.weeklyPlan,
+    required this.motivationalMessage,
+    required this.timestamp,
+    required this.model,
+    this.tokensUsed,
+    this.estimatedCost,
+  });
+
+  factory GeminiRecommendationResponse.fromJson(Map<String, dynamic> json) {
+    return GeminiRecommendationResponse(
+      recommendationType: json['recommendationType'] ?? 'general',
+      recommendations: (json['recommendations'] as List? ?? [])
+          .map((r) => GeminiModuleRecommendation.fromMap(r))
+          .toList(),
+      primaryFocus: json['primaryFocus'] ?? 'focus',
+      weeklyPlan: json['weeklyPlan'] != null
+          ? GeminiWeeklyPlan.fromMap(json['weeklyPlan'])
+          : GeminiWeeklyPlan(
+              sessionsPerWeek: 3,
+              totalDuration: 45,
+              focusAreas: ['Focus', 'Confidence', 'Control'],
+              progressMilestones: [],
+            ),
+      motivationalMessage:
+          json['motivationalMessage'] ?? 'Keep up the great work!',
+      timestamp: DateTime.now(),
+      model: 'gemini-2.5-flash',
+      tokensUsed: json['tokensUsed'] ?? 0,
+      estimatedCost: json['estimatedCost']?.toDouble() ?? 0.0,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'recommendationType': recommendationType,
+      'recommendations': recommendations.map((r) => r.toMap()).toList(),
+      'primaryFocus': primaryFocus,
+      'weeklyPlan': weeklyPlan.toMap(),
+      'motivationalMessage': motivationalMessage,
+      'timestamp': timestamp.toIso8601String(),
+      'model': model,
+      'tokensUsed': tokensUsed,
+      'estimatedCost': estimatedCost,
+    };
+  }
+}
+
 /// Response wrapper for GeminiAIClient.generateMentalCoachingRecommendations()
 class GeminiCoachingResponse {
   final String recommendationType;
@@ -161,7 +224,7 @@ class GeminiCoachingResponse {
       recommendations: [],
       weeklyPlan: GeminiWeeklyPlan(
         sessionsPerWeek: 3,
-        totalWeeklyMinutes: 90,
+        totalDuration: 90,
         focusAreas: ['Focus', 'Control'],
         progressMilestones: [],
       ),
@@ -244,6 +307,24 @@ class GeminiContentResponse {
     );
   }
 
+  factory GeminiContentResponse.fromJson(Map<String, dynamic> json) {
+    return GeminiContentResponse(
+      contentType: json['contentType'] ?? 'module',
+      title: json['title'] ?? 'Generated Content',
+      adaptedFor: List<String>.from(json['adaptedFor'] ?? ['visual']),
+      duration: json['duration'] ?? 15,
+      difficulty: json['difficulty'] ?? 'intermediate',
+      sections: (json['sections'] as List? ?? [])
+          .map((s) => GeminiContentSection.fromMap(s))
+          .toList(),
+      takeaways: List<String>.from(json['takeaways'] ?? ['Generated takeaway']),
+      timestamp: DateTime.now(),
+      model: 'gemini-2.5-flash',
+      userId: '',
+      tokensUsed: json['tokensUsed'] ?? 0,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'contentType': contentType,
@@ -257,6 +338,67 @@ class GeminiContentResponse {
       'model': model,
       'userId': userId,
       'tokensUsed': tokensUsed,
+    };
+  }
+}
+
+/// Response wrapper for session feedback
+class GeminiFeedbackResponse {
+  final String feedbackType;
+  final String overallAssessment;
+  final List<String> strengths;
+  final List<String> improvements;
+  final String motivationalMessage;
+  final DateTime timestamp;
+  final String model;
+  final String userId;
+  final int? tokensUsed;
+  final double? estimatedCost;
+
+  GeminiFeedbackResponse({
+    required this.feedbackType,
+    required this.overallAssessment,
+    required this.strengths,
+    required this.improvements,
+    required this.motivationalMessage,
+    required this.timestamp,
+    required this.model,
+    required this.userId,
+    this.tokensUsed,
+    this.estimatedCost,
+  });
+
+  factory GeminiFeedbackResponse.fromJson(Map<String, dynamic> json) {
+    return GeminiFeedbackResponse(
+      feedbackType: json['feedbackType'] ?? 'progress',
+      overallAssessment:
+          json['overallAssessment'] ?? 'Good progress in your mental training.',
+      strengths:
+          List<String>.from(json['strengths'] ?? ['Consistent practice']),
+      improvements: List<String>.from(
+          json['improvements'] ?? ['Continue building focus']),
+      motivationalMessage:
+          json['motivationalMessage'] ?? 'Keep up the excellent work!',
+      timestamp: DateTime.now(),
+      model: 'gemini-2.5-flash',
+      userId: '',
+      tokensUsed: json['tokensUsed'] ?? 0,
+      estimatedCost: json['estimatedCost']?.toDouble() ?? 0.0,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'feedbackType': feedbackType,
+      'overallAssessment': overallAssessment,
+      'strengths': strengths,
+      'improvements': improvements,
+      'motivationalMessage': motivationalMessage,
+      'timestamp': timestamp.toIso8601String(),
+      'model': model,
+      'userId': userId,
+      'tokensUsed': tokensUsed,
+      'estimatedCost': estimatedCost,
     };
   }
 }
@@ -426,7 +568,8 @@ class GeminiSentimentAnalysis {
     return GeminiSentimentAnalysis(
       overallSentiment: map['overallSentiment'] as String,
       confidenceLevel: (map['confidenceLevel'] as num).toDouble(),
-      emotionalIndicators: List<String>.from(map['emotionalIndicators'] as List),
+      emotionalIndicators:
+          List<String>.from(map['emotionalIndicators'] as List),
       moodProgression: map['moodProgression'] as String,
     );
   }
@@ -457,7 +600,8 @@ class GeminiVarkAdaptation {
     return GeminiVarkAdaptation(
       primaryStyle: map['primaryStyle'] as String,
       secondaryStyle: map['secondaryStyle'] as String?,
-      adaptationStrategies: List<String>.from(map['adaptationStrategies'] as List),
+      adaptationStrategies:
+          List<String>.from(map['adaptationStrategies'] as List),
     );
   }
 
@@ -526,34 +670,40 @@ class GeminiModuleRecommendation {
 /// Enhanced weekly plan with progress milestones
 class GeminiWeeklyPlan {
   final int sessionsPerWeek;
-  final int totalWeeklyMinutes;
+  final int totalDuration;
   final List<String> focusAreas;
-  final List<GeminiProgressMilestone> progressMilestones;
+  final List<String> progressMilestones;
+
+  // Backwards compatibility
+  int get totalWeeklyMinutes => totalDuration;
 
   const GeminiWeeklyPlan({
     required this.sessionsPerWeek,
-    required this.totalWeeklyMinutes,
+    required this.totalDuration,
     required this.focusAreas,
     required this.progressMilestones,
   });
 
   factory GeminiWeeklyPlan.fromMap(Map<String, dynamic> map) {
     return GeminiWeeklyPlan(
-      sessionsPerWeek: map['sessionsPerWeek'] as int,
-      totalWeeklyMinutes: map['totalWeeklyMinutes'] as int,
-      focusAreas: List<String>.from(map['focusAreas'] as List),
-      progressMilestones: (map['progressMilestones'] as List)
-          .map((m) => GeminiProgressMilestone.fromMap(m as Map<String, dynamic>))
-          .toList(),
+      sessionsPerWeek: map['sessionsPerWeek'] as int? ?? 3,
+      totalDuration: map['totalDuration'] as int? ??
+          map['totalWeeklyMinutes'] as int? ??
+          45,
+      focusAreas: List<String>.from(
+          map['focusAreas'] as List? ?? ['Focus', 'Confidence', 'Control']),
+      progressMilestones:
+          List<String>.from(map['progressMilestones'] as List? ?? []),
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'sessionsPerWeek': sessionsPerWeek,
-      'totalWeeklyMinutes': totalWeeklyMinutes,
+      'totalDuration': totalDuration,
+      'totalWeeklyMinutes': totalDuration, // Backwards compatibility
       'focusAreas': focusAreas,
-      'progressMilestones': progressMilestones.map((m) => m.toMap()).toList(),
+      'progressMilestones': progressMilestones,
     };
   }
 }
@@ -602,7 +752,8 @@ class GeminiAdaptiveStrategy {
   factory GeminiAdaptiveStrategy.fromMap(Map<String, dynamic> map) {
     return GeminiAdaptiveStrategy(
       strategy: map['strategy'] as String,
-      applicableScenarios: List<String>.from(map['applicableScenarios'] as List),
+      applicableScenarios:
+          List<String>.from(map['applicableScenarios'] as List),
       varkAlignment: map['varkAlignment'] as String,
     );
   }
@@ -639,7 +790,8 @@ class GeminiContentSection {
       content: map['content'] as String,
       varkAdaptations: Map<String, String>.from(map['varkAdaptations'] as Map),
       interactiveElements: (map['interactiveElements'] as List? ?? [])
-          .map((e) => GeminiInteractiveElement.fromMap(e as Map<String, dynamic>))
+          .map((e) =>
+              GeminiInteractiveElement.fromMap(e as Map<String, dynamic>))
           .toList(),
     );
   }
@@ -861,4 +1013,4 @@ class ConversationSession {
       'sessionContext': sessionContext,
     };
   }
-} 
+}

@@ -42,6 +42,22 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
     }
     
+    // AI Memory Service - Enhanced conversation memory and NLP analysis
+    match /ai_memory/{document} {
+      allow create: if request.auth != null && request.auth.uid == document;
+      allow read: if request.auth != null && request.auth.uid == document;
+      allow write: if request.auth != null && request.auth.uid == document;
+      allow delete: if request.auth != null && request.auth.uid == document;
+    }
+    
+    // Conversation Sessions - For AI memory management
+    match /conversation_sessions/{document} {
+      allow create: if request.auth != null && request.auth.token.email_verified;
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+    }
+    
     // FoCoMap Collections - Enhanced security for golf data
     match /round_logs/{document} {
       allow create: if request.auth != null && request.auth.token.email_verified;

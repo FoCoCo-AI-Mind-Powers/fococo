@@ -99,68 +99,17 @@ class _MyAppState extends State<MyApp> {
     // Initialize the user stream and handle authentication state
     _initializeUserStream();
 
-    // Reduced timeout to prevent long loading times
+    // Enhanced splash screen will handle its own timing and navigation
+    // Reduced timeout as backup safety measure
     Future.delayed(
-      Duration(milliseconds: 800), // Reduced from 2000ms to 800ms
+      Duration(
+          milliseconds: 4000), // Longer timeout to let enhanced splash complete
       () {
         if (_appStateNotifier.showSplashImage) {
           if (kDebugMode) {
-            print('⏱️ Splash screen timeout - forcing stop');
+            print('⏱️ Backup splash screen timeout - forcing stop');
           }
           _appStateNotifier.stopShowingSplashImage();
-
-          // Force navigation on timeout
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              final currentLocation = _router.getCurrentLocation();
-              if (currentLocation == '/' || currentLocation == '/splash') {
-                if (_appStateNotifier.loggedIn) {
-                  if (kDebugMode) {
-                    print('⏱️ Timeout: Navigating to dashboard');
-                  }
-                  _router.go('/dashboard');
-                } else {
-                  if (kDebugMode) {
-                    print('⏱️ Timeout: Navigating to home page');
-                  }
-                  _router.go('/home');
-                }
-              }
-            }
-          });
-        }
-      },
-    );
-
-    // Additional safety timeout for extreme cases
-    Future.delayed(
-      Duration(milliseconds: 1500),
-      () {
-        if (_appStateNotifier.showSplashImage) {
-          if (kDebugMode) {
-            print('🚨 Emergency splash screen timeout - forcing stop');
-          }
-          _appStateNotifier.stopShowingSplashImage();
-
-          // Emergency navigation
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              final currentLocation = _router.getCurrentLocation();
-              if (currentLocation == '/' || currentLocation == '/splash') {
-                if (_appStateNotifier.loggedIn) {
-                  if (kDebugMode) {
-                    print('🚨 Emergency: Navigating to dashboard');
-                  }
-                  _router.go('/dashboard');
-                } else {
-                  if (kDebugMode) {
-                    print('🚨 Emergency: Navigating to home page');
-                  }
-                  _router.go('/home');
-                }
-              }
-            }
-          });
         }
       },
     );
@@ -181,32 +130,10 @@ class _MyAppState extends State<MyApp> {
           if (mounted) {
             _appStateNotifier.update(user);
 
-            // Stop showing splash screen immediately when user state is determined
-            if (_appStateNotifier.showSplashImage) {
-              if (kDebugMode) {
-                print('🛑 Stopping splash screen');
-              }
-              _appStateNotifier.stopShowingSplashImage();
-
-              // Force navigation to appropriate page after splash screen stops
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  final currentLocation = _router.getCurrentLocation();
-                  if (currentLocation == '/' || currentLocation == '/splash') {
-                    if (user.loggedIn) {
-                      if (kDebugMode) {
-                        print('🔄 Navigating to dashboard for logged in user');
-                      }
-                      _router.go('/dashboard');
-                    } else {
-                      if (kDebugMode) {
-                        print('🔄 Navigating to home page for logged out user');
-                      }
-                      _router.go('/home');
-                    }
-                  }
-                }
-              });
+            // Let the enhanced splash screen handle navigation timing
+            if (kDebugMode) {
+              print(
+                  '🔄 User state updated, enhanced splash will handle navigation');
             }
           }
 
@@ -226,12 +153,9 @@ class _MyAppState extends State<MyApp> {
           if (kDebugMode) {
             print('❌ Error in user stream: $error');
           }
-          // Stop splash screen immediately on error to prevent infinite loading
-          if (mounted && _appStateNotifier.showSplashImage) {
-            if (kDebugMode) {
-              print('🛑 Stopping splash screen due to error');
-            }
-            _appStateNotifier.stopShowingSplashImage();
+          // Enhanced splash screen will handle error cases
+          if (kDebugMode) {
+            print('🛑 Error handled by enhanced splash screen');
           }
         },
       );
@@ -244,69 +168,17 @@ class _MyAppState extends State<MyApp> {
         }
       });
 
-      // Reduced delay for initial user check
-      Future.delayed(Duration(milliseconds: 200), () {
-        // Reduced from 500ms to 200ms
-        if (_appStateNotifier.showSplashImage) {
-          if (kDebugMode) {
-            print('🔄 Forcing initial user check');
-          }
-          // This will trigger the user stream if it hasn't already
-          foCoCoFirebaseUserStream().take(1).listen(
-            (user) {
-              if (kDebugMode) {
-                print(
-                    '🔄 Initial user check: ${user.loggedIn ? 'logged in' : 'logged out'}');
-              }
-              if (mounted) {
-                _appStateNotifier.update(user);
-                if (_appStateNotifier.showSplashImage) {
-                  _appStateNotifier.stopShowingSplashImage();
-
-                  // Force navigation after initial user check
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      final currentLocation = _router.getCurrentLocation();
-                      if (currentLocation == '/' ||
-                          currentLocation == '/splash') {
-                        if (user.loggedIn) {
-                          if (kDebugMode) {
-                            print('🔄 Initial check: Navigating to dashboard');
-                          }
-                          _router.go('/dashboard');
-                        } else {
-                          if (kDebugMode) {
-                            print('🔄 Initial check: Navigating to home page');
-                          }
-                          _router.go('/home');
-                        }
-                      }
-                    }
-                  });
-                }
-              }
-            },
-            onError: (error) {
-              if (kDebugMode) {
-                print('❌ Error in initial user check: $error');
-              }
-              if (mounted && _appStateNotifier.showSplashImage) {
-                _appStateNotifier.stopShowingSplashImage();
-              }
-            },
-          );
-        }
-      });
+      // Let enhanced splash screen handle initial user check timing
+      if (kDebugMode) {
+        print('🔄 Enhanced splash screen will handle initial user check');
+      }
     } catch (e) {
       if (kDebugMode) {
         print('❌ Error initializing user stream: $e');
       }
-      // Ensure splash screen is stopped immediately even if user stream fails
-      if (mounted && _appStateNotifier.showSplashImage) {
-        if (kDebugMode) {
-          print('🛑 Stopping splash screen due to initialization error');
-        }
-        _appStateNotifier.stopShowingSplashImage();
+      // Enhanced splash screen will handle initialization errors
+      if (kDebugMode) {
+        print('🛑 Enhanced splash screen will handle initialization error');
       }
     }
   }

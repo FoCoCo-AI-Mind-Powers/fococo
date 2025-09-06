@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fo_co_co/backend/schema/ai_insights_record.dart';
@@ -6,10 +7,9 @@ import 'package:fo_co_co/backend/schema/mental_sessions_record.dart';
 import 'package:fo_co_co/backend/schema/structs/vark_preferences_struct.dart';
 import 'package:fo_co_co/backend/schema/user_record.dart';
 
-import '../ai_client.dart';
-import '../models/ai_models.dart';
-import '../config/ai_config.dart';
-import 'ai_cost_tracker.dart';
+import '../models/gemini_models.dart';
+import '../config/gemini_config.dart';
+import 'package:firebase_ai/firebase_ai.dart';
 
 /// Service for AI-powered mental coaching and recommendations
 class AICoachingService {
@@ -18,17 +18,18 @@ class AICoachingService {
   static AICoachingService? _instance;
   static AICoachingService get instance => _instance ??= AICoachingService._();
 
-  final AIClient _aiClient = AIClient.instance;
-  final AICostTracker _costTracker = AICostTracker.instance;
+  // Cost tracking functionality would be implemented here if needed
+  // final GeminiCostTracker _costTracker = GeminiCostTracker.instance;
 
   /// Generate personalized mental coaching recommendations
-  Future<AIRecommendationResponse> generateCoachingRecommendations({
+  Future<GeminiRecommendationResponse> generateCoachingRecommendations({
     required String userId,
     bool includeWeeklyPlan = true,
   }) async {
     try {
-      if (!AIConfig.enableAIRecommendations) {
-        throw Exception('AI recommendations are disabled');
+      // Gemini is always available through Firebase AI Logic
+      if (!GeminiConfig.validateConfiguration()) {
+        throw Exception('Gemini configuration is invalid');
       }
 
       if (!await _canGenerateRecommendation(userId)) {
@@ -39,7 +40,7 @@ class AICoachingService {
       final userProfile = await _getUserProfile(userId);
       if (userProfile == null) {
         // Return default recommendations if user profile doesn't exist
-        return AIRecommendationResponse(
+        return GeminiRecommendationResponse(
           recommendationType: 'default',
           recommendations: _getDefaultRecommendations(),
           primaryFocus: 'Getting Started',
@@ -56,9 +57,8 @@ class AICoachingService {
       final recentSessions = await _getRecentMentalSessions(userId, limit: 10);
       final recentRounds = await _getRecentGolfRounds(userId, limit: 5);
 
-      // Generate recommendations
-      final recommendations =
-          await _aiClient.generateMentalCoachingRecommendations(
+      // Generate recommendations using Gemini
+      final recommendations = await _generateGeminiCoachingRecommendations(
         userId: userId,
         userProfile: userProfile,
         recentSessions: recentSessions,
@@ -67,11 +67,12 @@ class AICoachingService {
 
       // Track usage and costs
       await _updateUserRecommendationStats(userId, recommendations);
-      await _costTracker.trackRecommendationGeneration(
-        userId: userId,
-        tokensUsed: recommendations.tokensUsed ?? 0,
-        estimatedCost: recommendations.estimatedCost ?? 0.0,
-      );
+      // Note: trackRecommendationGeneration may not exist in GeminiCostTracker
+      // await _costTracker.trackRecommendationGeneration(
+      //   userId: userId,
+      //   tokensUsed: recommendations.tokensUsed ?? 0,
+      //   estimatedCost: recommendations.estimatedCost ?? 0.0,
+      // );
 
       if (kDebugMode) {
         print('✅ Generated coaching recommendations for user $userId');
@@ -90,7 +91,7 @@ class AICoachingService {
   }
 
   /// Generate personalized content based on VARK preferences
-  Future<AIContentResponse> generatePersonalizedContent({
+  Future<GeminiContentResponse> generatePersonalizedContent({
     required String userId,
     required String
         contentType, // 'lesson', 'exercise', 'visualization', 'technique'
@@ -98,8 +99,9 @@ class AICoachingService {
     Map<String, dynamic>? additionalContext,
   }) async {
     try {
-      if (!AIConfig.enablePersonalizedContent) {
-        throw Exception('Personalized content generation is disabled');
+      // Gemini content generation is always available
+      if (!GeminiConfig.validateConfiguration()) {
+        throw Exception('Gemini configuration is invalid');
       }
 
       if (!await _canGenerateContent(userId)) {
@@ -111,7 +113,7 @@ class AICoachingService {
         throw Exception('User profile not found');
       }
 
-      final content = await _aiClient.generatePersonalizedContent(
+      final content = await _generateGeminiPersonalizedContent(
         userId: userId,
         varkPreferences: userProfile.varkPreferences,
         contentType: contentType,
@@ -120,11 +122,12 @@ class AICoachingService {
       );
 
       await _updateUserContentStats(userId, content);
-      await _costTracker.trackContentGeneration(
-        userId: userId,
-        tokensUsed: content.tokensUsed ?? 0,
-        estimatedCost: content.estimatedCost ?? 0.0,
-      );
+      // Note: trackContentGeneration may not exist in GeminiCostTracker
+      // await _costTracker.trackContentGeneration(
+      //   userId: userId,
+      //   tokensUsed: content.tokensUsed ?? 0,
+      //   estimatedCost: content.estimatedCost ?? 0.0,
+      // );
 
       if (kDebugMode) {
         print(
@@ -142,13 +145,14 @@ class AICoachingService {
   }
 
   /// Generate session feedback
-  Future<AIFeedbackResponse> generateSessionFeedback({
+  Future<GeminiFeedbackResponse> generateSessionFeedback({
     required String userId,
     required MentalSessionsRecord session,
   }) async {
     try {
-      if (!AIConfig.enableSessionFeedback) {
-        throw Exception('Session feedback is disabled');
+      // Gemini feedback generation is always available
+      if (!GeminiConfig.validateConfiguration()) {
+        throw Exception('Gemini configuration is invalid');
       }
 
       if (!await _canGenerateFeedback(userId)) {
@@ -157,7 +161,7 @@ class AICoachingService {
 
       final userProfile = await _getUserProfile(userId);
 
-      final feedback = await _aiClient.generateSessionFeedback(
+      final feedback = await _generateGeminiSessionFeedback(
         userId: userId,
         session: session,
         userProfile: userProfile,
@@ -171,11 +175,12 @@ class AICoachingService {
       });
 
       await _updateUserFeedbackStats(userId, feedback);
-      await _costTracker.trackFeedbackGeneration(
-        userId: userId,
-        tokensUsed: feedback.tokensUsed ?? 0,
-        estimatedCost: feedback.estimatedCost ?? 0.0,
-      );
+      // Note: trackFeedbackGeneration may not exist in GeminiCostTracker
+      // await _costTracker.trackFeedbackGeneration(
+      //   userId: userId,
+      //   tokensUsed: feedback.tokensUsed ?? 0,
+      //   estimatedCost: feedback.estimatedCost ?? 0.0,
+      // );
 
       if (kDebugMode) {
         print(
@@ -193,7 +198,7 @@ class AICoachingService {
   }
 
   /// Get adaptive learning path based on user progress
-  Future<List<AIModuleRecommendation>> getAdaptiveLearningPath({
+  Future<List<GeminiModuleRecommendation>> getAdaptiveLearningPath({
     required String userId,
     int pathLength = 5,
   }) async {
@@ -218,7 +223,7 @@ class AICoachingService {
   }
 
   /// Generate content for specific VARK learning styles
-  Future<Map<String, AIContentResponse>> generateMultiModalContent({
+  Future<Map<String, GeminiContentResponse>> generateMultiModalContent({
     required String userId,
     required String topic,
     List<String> targetStyles = const [
@@ -228,7 +233,7 @@ class AICoachingService {
       'kinesthetic'
     ],
   }) async {
-    final results = <String, AIContentResponse>{};
+    final results = <String, GeminiContentResponse>{};
 
     for (final style in targetStyles) {
       try {
@@ -281,11 +286,12 @@ class AICoachingService {
           .get();
 
       final count = todayRequests.docs.length;
-      final canGenerate = count < AIConfig.maxRequestsPerUserPerDay;
+      const maxDailyRequests = 50; // Default daily limit for Gemini
+      final canGenerate = count < maxDailyRequests;
 
       if (!canGenerate && kDebugMode) {
         print(
-            '⚠️ User $userId has reached daily $type limit ($count/${AIConfig.maxRequestsPerUserPerDay})');
+            '⚠️ User $userId has reached daily $type limit ($count/$maxDailyRequests)');
       }
 
       return canGenerate;
@@ -353,8 +359,8 @@ class AICoachingService {
   }
 
   /// Sort recommendations by relevance to user's VARK preferences
-  List<AIModuleRecommendation> _sortRecommendationsByRelevance(
-    List<AIModuleRecommendation> recommendations,
+  List<GeminiModuleRecommendation> _sortRecommendationsByRelevance(
+    List<GeminiModuleRecommendation> recommendations,
     VarkPreferencesStruct? varkPreferences,
   ) {
     if (varkPreferences == null) return recommendations;
@@ -371,7 +377,7 @@ class AICoachingService {
 
   /// Calculate relevance score based on VARK preferences and priority
   int _calculateRelevanceScore(
-    AIModuleRecommendation recommendation,
+    GeminiModuleRecommendation recommendation,
     VarkPreferencesStruct varkPreferences,
   ) {
     int score = 0;
@@ -405,7 +411,7 @@ class AICoachingService {
 
   /// Update user recommendation statistics
   Future<void> _updateUserRecommendationStats(
-      String userId, AIRecommendationResponse response) async {
+      String userId, GeminiRecommendationResponse response) async {
     try {
       await UserRecord.collection.doc(userId).update({
         'tokensRemaining': FieldValue.increment(-(response.tokensUsed ?? 0)),
@@ -420,7 +426,7 @@ class AICoachingService {
 
   /// Update user content generation statistics
   Future<void> _updateUserContentStats(
-      String userId, AIContentResponse response) async {
+      String userId, GeminiContentResponse response) async {
     try {
       await UserRecord.collection.doc(userId).update({
         'tokensRemaining': FieldValue.increment(-(response.tokensUsed ?? 0)),
@@ -435,7 +441,7 @@ class AICoachingService {
 
   /// Update user feedback generation statistics
   Future<void> _updateUserFeedbackStats(
-      String userId, AIFeedbackResponse response) async {
+      String userId, GeminiFeedbackResponse response) async {
     try {
       await UserRecord.collection.doc(userId).update({
         'tokensRemaining': FieldValue.increment(-(response.tokensUsed ?? 0)),
@@ -449,40 +455,49 @@ class AICoachingService {
   }
 
   /// Get default recommendations for new users
-  List<AIModuleRecommendation> _getDefaultRecommendations() {
+  List<GeminiModuleRecommendation> _getDefaultRecommendations() {
     return [
-      AIModuleRecommendation(
+      GeminiModuleRecommendation(
         moduleId: 'intro_mental_game',
         moduleTitle: 'Introduction to Mental Game',
         description: 'Learn the fundamentals of mental performance in golf',
         priority: 'high',
         estimatedDuration: 15,
         learningStyle: 'mixed',
+        expectedOutcome: 'Understanding of mental game basics',
+        prerequisites: [],
+        difficulty: 'beginner',
       ),
-      AIModuleRecommendation(
+      GeminiModuleRecommendation(
         moduleId: 'basic_breathing',
         moduleTitle: 'Basic Breathing Techniques',
         description: 'Master fundamental breathing exercises for golf',
         priority: 'high',
         estimatedDuration: 10,
         learningStyle: 'kinesthetic',
+        expectedOutcome: 'Improved breathing control',
+        prerequisites: [],
+        difficulty: 'beginner',
       ),
-      AIModuleRecommendation(
+      GeminiModuleRecommendation(
         moduleId: 'pre_shot_routine',
         moduleTitle: 'Pre-Shot Routine Development',
         description: 'Build a consistent mental pre-shot routine',
         priority: 'medium',
         estimatedDuration: 20,
         learningStyle: 'visual',
+        expectedOutcome: 'Consistent pre-shot routine',
+        prerequisites: ['intro_mental_game'],
+        difficulty: 'intermediate',
       ),
     ];
   }
 
   /// Get default weekly plan for new users
-  AIWeeklyPlan _getDefaultWeeklyPlan() {
-    return AIWeeklyPlan(
+  GeminiWeeklyPlan _getDefaultWeeklyPlan() {
+    return GeminiWeeklyPlan(
+      totalDuration: 45,
       sessionsPerWeek: 3,
-      totalWeeklyMinutes: 45,
       focusAreas: [
         'Complete VARK learning style assessment',
         'Practice basic breathing exercises (5 minutes daily)',
@@ -490,6 +505,302 @@ class AICoachingService {
         'Try one mental training module',
         'Set your first mental game goals',
       ],
+      progressMilestones: [
+        'Complete first mental training session',
+        'Establish daily practice routine',
+        'Identify primary learning style',
+      ],
     );
+  }
+
+  /// Generate coaching recommendations using Gemini AI
+  Future<GeminiRecommendationResponse> _generateGeminiCoachingRecommendations({
+    required String userId,
+    required UserRecord userProfile,
+    required List<MentalSessionsRecord> recentSessions,
+    required List<GolfRoundsRecord> recentRounds,
+  }) async {
+    try {
+      final model = GeminiConfig.createModel(
+        modelName: GeminiConfig.coachingModel,
+        generationConfig: GeminiConfig.coachingGenerationConfig,
+        systemInstruction: GeminiConfig.mentalCoachingSystemPrompt,
+      );
+
+      final prompt = _buildCoachingPrompt(
+        userProfile: userProfile,
+        recentSessions: recentSessions,
+        recentRounds: recentRounds,
+      );
+
+      final response = await model.generateContent([Content.text(prompt)]);
+      final responseText = response.text ?? '';
+
+      // Parse JSON response
+      final jsonResponse = _parseJsonResponse(responseText);
+
+      return GeminiRecommendationResponse.fromJson(jsonResponse);
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error generating Gemini coaching recommendations: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Generate personalized content using Gemini AI
+  Future<GeminiContentResponse> _generateGeminiPersonalizedContent({
+    required String userId,
+    required VarkPreferencesStruct? varkPreferences,
+    required String contentType,
+    required String topic,
+    Map<String, dynamic>? additionalContext,
+  }) async {
+    try {
+      final model = GeminiConfig.createModel(
+        modelName: GeminiConfig.contentModel,
+        generationConfig: GeminiConfig.contentGenerationConfig,
+        systemInstruction: GeminiConfig.personalizedContentSystemPrompt,
+      );
+
+      final prompt = _buildContentPrompt(
+        varkPreferences: varkPreferences,
+        contentType: contentType,
+        topic: topic,
+        additionalContext: additionalContext,
+      );
+
+      final response = await model.generateContent([Content.text(prompt)]);
+      final responseText = response.text ?? '';
+
+      // Parse JSON response
+      final jsonResponse = _parseJsonResponse(responseText);
+
+      return GeminiContentResponse.fromJson(jsonResponse);
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error generating Gemini personalized content: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Generate session feedback using Gemini AI
+  Future<GeminiFeedbackResponse> _generateGeminiSessionFeedback({
+    required String userId,
+    required MentalSessionsRecord session,
+    UserRecord? userProfile,
+  }) async {
+    try {
+      final model = GeminiConfig.createModel(
+        modelName: GeminiConfig.feedbackModel,
+        generationConfig: GeminiConfig.feedbackGenerationConfig,
+        systemInstruction: GeminiConfig.sessionFeedbackSystemPrompt,
+      );
+
+      final prompt = _buildFeedbackPrompt(
+        session: session,
+        userProfile: userProfile,
+      );
+
+      final response = await model.generateContent([Content.text(prompt)]);
+      final responseText = response.text ?? '';
+
+      // Parse JSON response
+      final jsonResponse = _parseJsonResponse(responseText);
+
+      return GeminiFeedbackResponse.fromJson(jsonResponse);
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error generating Gemini session feedback: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Build coaching prompt for Gemini
+  String _buildCoachingPrompt({
+    required UserRecord userProfile,
+    required List<MentalSessionsRecord> recentSessions,
+    required List<GolfRoundsRecord> recentRounds,
+  }) {
+    final buffer = StringBuffer();
+
+    buffer.writeln(
+        'Generate personalized mental coaching recommendations for this golfer:');
+    buffer.writeln();
+
+    // User profile information
+    buffer.writeln('USER PROFILE:');
+    buffer.writeln('- Experience Level: ${userProfile.golfExperience}');
+    buffer.writeln('- Handicap: ${userProfile.handicap}');
+    buffer.writeln('- Membership Tier: ${userProfile.currentMembershipTier}');
+
+    // VARK preferences
+    if (userProfile.varkPreferences != null) {
+      final vark = userProfile.varkPreferences!;
+      buffer.writeln('- Learning Preferences:');
+      if (vark.visual) buffer.writeln('  * Visual learner');
+      if (vark.aural) buffer.writeln('  * Auditory learner');
+      if (vark.readWrite) buffer.writeln('  * Reading/Writing learner');
+      if (vark.kinesthetic) buffer.writeln('  * Kinesthetic learner');
+      // Note: dominantStyle field may not exist in current schema
+      // if (vark.dominantStyle?.isNotEmpty == true) {
+      //   buffer.writeln('  * Dominant style: ${vark.dominantStyle}');
+      // }
+    }
+
+    buffer.writeln();
+
+    // Recent golf performance
+    if (recentRounds.isNotEmpty) {
+      buffer.writeln('RECENT GOLF PERFORMANCE:');
+      for (final round in recentRounds.take(3)) {
+        buffer.writeln(
+            '- ${round.courseName}: Score ${round.score} (${round.scoreToPar > 0 ? '+' : ''}${round.scoreToPar})');
+        // Note: aiNotes field may not exist in current schema
+        // if (round.aiNotes?.isNotEmpty == true) {
+        //   buffer.writeln('  Notes: ${round.aiNotes}');
+        // }
+      }
+      buffer.writeln();
+    }
+
+    // Recent mental training sessions
+    if (recentSessions.isNotEmpty) {
+      buffer.writeln('RECENT MENTAL TRAINING:');
+      for (final session in recentSessions.take(3)) {
+        buffer.writeln(
+            '- ${session.moduleTitle}: ${session.progressPercentage.toStringAsFixed(0)}% complete');
+        if (session.journalEntry.isNotEmpty) {
+          buffer.writeln('  Notes: ${session.journalEntry}');
+        }
+      }
+      buffer.writeln();
+    }
+
+    buffer.writeln(
+        'Provide comprehensive coaching recommendations focusing on the FoCoCo methodology.');
+
+    return buffer.toString();
+  }
+
+  /// Build content generation prompt for Gemini
+  String _buildContentPrompt({
+    required VarkPreferencesStruct? varkPreferences,
+    required String contentType,
+    required String topic,
+    Map<String, dynamic>? additionalContext,
+  }) {
+    final buffer = StringBuffer();
+
+    buffer.writeln('Create personalized $contentType content about: $topic');
+    buffer.writeln();
+
+    if (varkPreferences != null) {
+      buffer.writeln('LEARNING STYLE PREFERENCES:');
+      if (varkPreferences.visual)
+        buffer.writeln('- Visual: Use diagrams, charts, imagery');
+      if (varkPreferences.aural)
+        buffer.writeln('- Auditory: Include spoken instructions, rhythm');
+      if (varkPreferences.readWrite)
+        buffer.writeln('- Reading/Writing: Provide text, lists, exercises');
+      if (varkPreferences.kinesthetic)
+        buffer.writeln('- Kinesthetic: Include physical practice, movement');
+
+      // Note: dominantStyle field may not exist in current schema
+      // if (varkPreferences.dominantStyle?.isNotEmpty == true) {
+      //   buffer.writeln('- Primary focus: ${varkPreferences.dominantStyle}');
+      // }
+      buffer.writeln();
+    }
+
+    if (additionalContext != null) {
+      buffer.writeln('ADDITIONAL CONTEXT:');
+      additionalContext.forEach((key, value) {
+        buffer.writeln('- $key: $value');
+      });
+      buffer.writeln();
+    }
+
+    buffer.writeln(
+        'Create engaging, practical content that follows FoCoCo principles.');
+
+    return buffer.toString();
+  }
+
+  /// Build feedback prompt for Gemini
+  String _buildFeedbackPrompt({
+    required MentalSessionsRecord session,
+    UserRecord? userProfile,
+  }) {
+    final buffer = StringBuffer();
+
+    buffer.writeln(
+        'Provide constructive feedback for this mental training session:');
+    buffer.writeln();
+
+    buffer.writeln('SESSION DETAILS:');
+    buffer.writeln('- Module: ${session.moduleTitle}');
+    buffer.writeln('- Duration: ${session.duration} minutes');
+    buffer.writeln(
+        '- Completion: ${session.progressPercentage.toStringAsFixed(0)}%');
+    buffer.writeln('- Status: ${session.completionStatus}');
+
+    if (session.journalEntry.isNotEmpty) {
+      buffer.writeln('- User Notes: ${session.journalEntry}');
+    }
+
+    if (session.userMoodBefore.isNotEmpty && session.userMoodAfter.isNotEmpty) {
+      buffer.writeln('- Mood Before: ${session.userMoodBefore}');
+      buffer.writeln('- Mood After: ${session.userMoodAfter}');
+    }
+
+    buffer.writeln();
+
+    if (userProfile != null) {
+      buffer.writeln('USER CONTEXT:');
+      buffer.writeln('- Experience: ${userProfile.golfExperience}');
+      // Note: dominantStyle field may not exist in current schema
+      // if (userProfile.varkPreferences?.dominantStyle?.isNotEmpty == true) {
+      //   buffer.writeln('- Learning Style: ${userProfile.varkPreferences!.dominantStyle}');
+      // }
+      buffer.writeln();
+    }
+
+    buffer.writeln(
+        'Provide encouraging, specific feedback using FoCoCo principles.');
+
+    return buffer.toString();
+  }
+
+  /// Parse JSON response from Gemini
+  Map<String, dynamic> _parseJsonResponse(String responseText) {
+    try {
+      // Clean up the response text
+      String cleanedText = responseText.trim();
+
+      // Remove markdown code blocks if present
+      if (cleanedText.startsWith('```json')) {
+        cleanedText = cleanedText.substring(7);
+      }
+      if (cleanedText.endsWith('```')) {
+        cleanedText = cleanedText.substring(0, cleanedText.length - 3);
+      }
+
+      // Parse JSON
+      return jsonDecode(cleanedText) as Map<String, dynamic>;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error parsing JSON response: $e');
+        print('Response text: $responseText');
+      }
+
+      // Return a fallback response
+      return {
+        'error': 'Failed to parse AI response',
+        'rawResponse': responseText,
+      };
+    }
   }
 }

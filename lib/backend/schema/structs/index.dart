@@ -12,3 +12,5 @@ export 'weather_struct.dart';
 export 'module_content_struct.dart';
 export 'module_content_versions_struct.dart';
 export 'achievement_criteria_struct.dart';
+export 'ai_memory_struct.dart';
+export 'conversation_turn_struct.dart';

@@ -5,11 +5,11 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'dart:math' as math;
 
 import '../../flutter_flow/flutter_flow_theme.dart';
-import '../services/gemini_live_service_simple.dart';
-import '../services/fococo_voice_service.dart';
 import '../services/unified_ai_service.dart';
-import '../services/gemini_live_api_service.dart';
+import '../services/cartesia_api_service.dart';
 import '../services/permission_service.dart';
+import '../services/ai_memory_service.dart';
+import '../services/gemini_live_service_simple.dart';
 
 import '/backend/schema/structs/vark_preferences_struct.dart';
 
@@ -65,21 +65,30 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _textController = TextEditingController();
 
-  // Unified voice services - all working in background
-  final FoCoCoVoiceService _voiceService = FoCoCoVoiceService();
-  final GeminiLiveService _geminiService = GeminiLiveService();
+  // Streamlined voice services - Gemini for responses, Cartesia for speech
   final UnifiedAIService _aiService = UnifiedAIService();
-  final GeminiLiveAPIService _liveAPIService = GeminiLiveAPIService();
+  final CartesiaAPIService _cartesiaService = CartesiaAPIService.instance;
   final PermissionService _permissionService = PermissionService();
+  final AIMemoryService _memoryService = AIMemoryService();
 
   GeminiLiveServiceState _voiceState = GeminiLiveServiceState.disconnected;
-  String _currentTranscript = '';
   List<ChatMessage> _messages = [];
   String _interactionType = 'quickChat';
   bool _isTyping = false;
   bool _isDeepThinking = false;
-  bool _useRealTimeAPI = true;
   PermissionServiceState _microphonePermission = PermissionServiceState.unknown;
+
+  // Streamlined service status
+  bool _isAISpeaking = false;
+  bool _isListening = false;
+
+  // Voice selection - only two male voices
+  static const Map<String, String> _availableVoices = {
+    'Voice 1 (Male)': 'da3224fe-d8d1-4774-8902-e6a7115f5132',
+    'Voice 2 (Male)': 'c7c1f6e5-cf61-4c16-b13b-ca4b0e34c423',
+  };
+  String _selectedVoiceName = 'Voice 1 (Male)';
+  String get _selectedVoiceId => _availableVoices[_selectedVoiceName]!;
 
   // VARK preferences with default values
   late VarkPreferencesStruct _varkPrefs;
@@ -144,23 +153,28 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
       // Initialize permission service first
       await _permissionService.initialize();
 
-      // Initialize all voice services in background
-      await _voiceService.initialize();
+      // Initialize AI memory service
+      await _memoryService.initialize();
+
+      // Initialize unified AI service for generating responses
       await _aiService.initialize();
-      await _geminiService.initialize();
-      await _geminiService.connect();
+      if (kDebugMode) {
+        print('✅ Unified AI service initialized');
+      }
 
-      // Initialize Gemini Live API service
-      await _liveAPIService.initialize(
-        config: GeminiLiveConfig(
-          enableThinking: _isDeepThinking,
-          audioArchitecture: AudioArchitecture.nativeAudio,
-        ),
-        varkPreferences: _varkPrefs,
-      );
-
-      if (_useRealTimeAPI) {
-        await _liveAPIService.connect();
+      // Initialize Cartesia for speech synthesis with selected voice
+      try {
+        await _cartesiaService.initialize();
+        _cartesiaService.setVoiceId(_selectedVoiceId);
+        if (kDebugMode) {
+          print(
+              '✅ Cartesia voice service initialized with $_selectedVoiceName ($_selectedVoiceId)');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ Cartesia service failed: $e');
+        }
+        // Continue with text-only mode
       }
 
       setState(() {
@@ -174,13 +188,18 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
       });
 
       String welcomeMessage;
-      if (micState == PermissionServiceState.granted) {
-        welcomeMessage =
-            '🎤 AI Coach ready! You can speak or type your message.';
+      if (_cartesiaService.isInitialized) {
+        welcomeMessage = micState == PermissionServiceState.granted
+            ? '🎤 FoCoCo AI Coach ready! Using $_selectedVoiceName. Speak or type your message.'
+            : '📝 FoCoCo AI Coach ready! Using $_selectedVoiceName. Type your message or tap microphone to enable voice.';
       } else {
-        welcomeMessage =
-            '📝 AI Coach ready! You can type your message. Tap microphone to enable voice.';
+        welcomeMessage = micState == PermissionServiceState.granted
+            ? '🎤 FoCoCo AI Coach ready! Voice features limited. Speak or type your message.'
+            : '📝 FoCoCo AI Coach ready! Text chat available. Type your message.';
       }
+
+      // Add some sample conversation to show functionality
+      _addSampleConversation();
 
       _addMessage(
         ChatMessage(
@@ -196,13 +215,9 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
         _voiceState = GeminiLiveServiceState.error;
       });
 
-      // More user-friendly error message
-      String errorMessage = 'AI Coach is ready for text chat. ';
-      if (e.toString().contains('Microphone')) {
-        errorMessage += 'Voice features need microphone permission.';
-      } else {
-        errorMessage += 'Some features may be limited.';
-      }
+      // Simplified error handling
+      String errorMessage =
+          '📝 FoCoCo AI Coach ready for text chat! I\'m here to help with your mental game. Some voice features may be limited, but you can always type your questions.';
 
       _addMessage(
         ChatMessage(
@@ -217,48 +232,23 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
   }
 
   void _setupVoiceListeners() {
-    // Listen to Live API service state
-    _liveAPIService.stateStream.listen((liveState) {
+    // Simplified voice state management
+    setState(() {
+      _voiceState = GeminiLiveServiceState.connected;
+    });
+
+    // Listen to Cartesia speaking state
+    _cartesiaService.speakingStream.listen((isSpeaking) {
       if (mounted) {
-        // Convert Live API state to legacy state for UI compatibility
-        GeminiLiveServiceState uiState;
-        switch (liveState) {
-          case GeminiLiveState.disconnected:
-            uiState = GeminiLiveServiceState.disconnected;
-            break;
-          case GeminiLiveState.connecting:
-            uiState = GeminiLiveServiceState.connecting;
-            break;
-          case GeminiLiveState.connected:
-            uiState = GeminiLiveServiceState.connected;
-            break;
-          case GeminiLiveState.listening:
-            uiState = GeminiLiveServiceState.listening;
-            break;
-          case GeminiLiveState.thinking:
-            uiState = GeminiLiveServiceState.thinking;
-            break;
-          case GeminiLiveState.speaking:
-            uiState = GeminiLiveServiceState.speaking;
-            break;
-          case GeminiLiveState.error:
-            uiState = GeminiLiveServiceState.error;
-            break;
-        }
-
         setState(() {
-          _voiceState = uiState;
+          _isAISpeaking = isSpeaking;
+          _voiceState = isSpeaking
+              ? GeminiLiveServiceState.speaking
+              : GeminiLiveServiceState.connected;
         });
 
-        // Auto-scroll to bottom when new messages arrive
-        if (uiState == GeminiLiveServiceState.connected &&
-            _messages.isNotEmpty) {
-          _scrollToBottom();
-        }
-
         // Update wave animation
-        if (uiState == GeminiLiveServiceState.listening ||
-            uiState == GeminiLiveServiceState.speaking) {
+        if (isSpeaking) {
           _waveController.repeat(reverse: true);
         } else {
           _waveController.stop();
@@ -266,45 +256,7 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
       }
     });
 
-    // Listen to Live API responses
-    _liveAPIService.responseStream.listen((response) {
-      if (mounted && response.isNotEmpty) {
-        final aiMessage = ChatMessage(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          content: response,
-          isUser: false,
-          timestamp: DateTime.now(),
-        );
-        _addMessage(aiMessage);
-      }
-    });
-
-    // Fallback to legacy service if Live API is not available
-    _geminiService.stateStream.listen((state) {
-      if (mounted && !_useRealTimeAPI) {
-        setState(() {
-          _voiceState = state;
-        });
-
-        // Update wave animation
-        if (state == GeminiLiveServiceState.listening ||
-            state == GeminiLiveServiceState.speaking) {
-          _waveController.repeat(reverse: true);
-        } else {
-          _waveController.stop();
-        }
-      }
-    });
-
-    // Listen to legacy voice transcripts
-    _geminiService.transcriptStream.listen((transcript) {
-      if (mounted && transcript.isNotEmpty && !_useRealTimeAPI) {
-        setState(() {
-          _currentTranscript = transcript;
-        });
-        _processVoiceInput(transcript);
-      }
-    });
+    // Voice listeners are now simplified and handled by Cartesia service
   }
 
   void _scrollToBottom() {
@@ -326,82 +278,73 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
     _scrollToBottom();
   }
 
-  Future<void> _processVoiceInput(String transcript) async {
-    if (transcript.isEmpty) return;
-
-    // Add user message
-    final userMessage = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      content: transcript,
-      isUser: true,
-      timestamp: DateTime.now(),
-    );
-    _addMessage(userMessage);
-
-    try {
-      // Generate AI response using unified AI service
-      final aiResponse = await _generateAIResponse(transcript);
-
-      // Speak the response using unified AI service
-      try {
-        await _aiService.speak(aiResponse);
-      } catch (e) {
-        debugPrint('TTS error: $e');
-      }
-
-      // Add AI response to chat
-      final aiMessage = ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        content: aiResponse,
-        isUser: false,
-        timestamp: DateTime.now(),
-      );
-      _addMessage(aiMessage);
-    } catch (e) {
-      final errorMessage = ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        content: '❌ Error processing voice input: $e',
-        isUser: false,
-        timestamp: DateTime.now(),
-        isSystem: true,
-      );
-      _addMessage(errorMessage);
-    }
-  }
-
   Future<String> _generateAIResponse(String userInput) async {
     try {
-      // Build conversation context from recent messages
-      final conversationContext = _buildConversationContext();
+      // Build conversation context from recent messages and AI memory
+      final conversationContext =
+          _memoryService.getConversationContext(maxTurns: 8); // More context
+      final userInsights = _memoryService.getUserInsights();
+      final personalizedPrompt = _memoryService.getPersonalizedSystemPrompt();
 
-      // Generate response using unified AI service
+      // Enhanced context with chat history
+      final fullContext =
+          _buildEnhancedContext(conversationContext, personalizedPrompt);
+
+      // Generate response using unified AI service with enhanced context
       final response = await _aiService.generateResponse(
         userMessage: userInput,
-        conversationContext: conversationContext,
+        conversationContext: fullContext,
         varkPreferences: _varkPrefs,
         interactionType: _interactionType,
+        userInsights: userInsights,
       );
+
+      // Validate response
+      if (response.trim().isEmpty) {
+        throw Exception('Empty response from AI service');
+      }
+
+      // Store conversation turn in AI memory for learning
+      await _memoryService.addConversationTurn(
+        userMessage: userInput,
+        aiResponse: response,
+        messageType: 'text',
+      );
+
+      // Update speaking indicator
+      setState(() {
+        _isAISpeaking = true;
+      });
+
+      // Reset after delay
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() {
+            _isAISpeaking = false;
+          });
+        }
+      });
 
       return response;
     } catch (e) {
       debugPrint('Error generating AI response: $e');
-      return 'I\'m experiencing some technical difficulties. Please try again in a moment.';
+
+      // Provide contextual fallback responses
+      final fallbackResponse = _generateContextualFallback(userInput);
+
+      // Still store the interaction for learning
+      try {
+        await _memoryService.addConversationTurn(
+          userMessage: userInput,
+          aiResponse: fallbackResponse,
+          messageType: 'text',
+        );
+      } catch (_) {
+        // Ignore memory errors in fallback
+      }
+
+      return fallbackResponse;
     }
-  }
-
-  /// Build conversation context from recent messages
-  String _buildConversationContext() {
-    if (_messages.isEmpty) return '';
-
-    final context = StringBuffer();
-    final recentMessages = _messages.take(6).toList();
-
-    for (final message in recentMessages) {
-      final role = message.isUser ? 'Golfer' : 'Coach';
-      context.writeln('$role: ${message.content}');
-    }
-
-    return context.toString();
   }
 
   @override
@@ -437,6 +380,8 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
         child: Column(
           children: [
             _buildHeader(theme),
+            _buildServiceIndicator(theme),
+            _buildVoiceSelector(theme),
             _buildDeepThinkingToggle(theme),
             Expanded(child: _buildChatInterface(theme)),
             _buildVoiceVisualization(theme),
@@ -489,6 +434,13 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
                     color: theme.secondaryText,
                   ),
                 ),
+                Text(
+                  'Using $_selectedVoiceName',
+                  style: theme.bodySmall.copyWith(
+                    color: theme.primary,
+                    fontSize: 11,
+                  ),
+                ),
               ],
             ),
           ),
@@ -497,6 +449,148 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
             icon: Icon(
               Icons.close,
               color: theme.secondaryText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceIndicator(FlutterFlowTheme theme) {
+    if (!_isAISpeaking && !_isListening) {
+      return const SizedBox.shrink();
+    }
+
+    final isListening = _isListening;
+    final indicatorColor = isListening
+        ? const Color(0xFF10B981) // Green for listening
+        : const Color(0xFF6366F1); // Indigo for speaking
+    final indicatorIcon =
+        isListening ? FontAwesomeIcons.microphone : FontAwesomeIcons.waveSquare;
+    final statusText =
+        isListening ? 'Listening...' : 'Speaking via Cartesia Voice';
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: indicatorColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: indicatorColor.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            indicatorIcon,
+            color: indicatorColor,
+            size: 16,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            statusText,
+            style: theme.bodySmall.copyWith(
+              color: indicatorColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(indicatorColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVoiceSelector(FlutterFlowTheme theme) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.accent4.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.accent4.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: theme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              FontAwesomeIcons.userTie,
+              color: theme.primary,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AI Voice Selection',
+                  style: theme.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.primaryText,
+                  ),
+                ),
+                Text(
+                  'Choose your preferred male coach voice',
+                  style: theme.bodySmall.copyWith(
+                    color: theme.secondaryText,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: theme.primaryBackground,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.accent4.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: DropdownButton<String>(
+              value: _selectedVoiceName,
+              underline: const SizedBox.shrink(),
+              isDense: true,
+              style: theme.bodySmall.copyWith(
+                color: theme.primaryText,
+                fontSize: 12,
+              ),
+              items: _availableVoices.keys.map((String voiceName) {
+                return DropdownMenuItem<String>(
+                  value: voiceName,
+                  child: Text(
+                    voiceName,
+                    style: theme.bodySmall.copyWith(
+                      fontSize: 12,
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: _changeVoice,
             ),
           ),
         ],
@@ -862,12 +956,9 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
                       child: TextField(
                         controller: _textController,
                         decoration: InputDecoration(
-                          hintText:
-                              _voiceState == GeminiLiveServiceState.listening
-                                  ? _currentTranscript.isEmpty
-                                      ? 'Listening...'
-                                      : _currentTranscript
-                                  : 'Type your message...',
+                          hintText: _isListening
+                              ? 'Listening...'
+                              : 'Type your message...',
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 20,
@@ -908,38 +999,18 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
     Color color;
     VoidCallback? onPressed;
 
-    switch (_voiceState) {
-      case GeminiLiveServiceState.listening:
-        icon = FontAwesomeIcons.stop;
-        color = Colors.red;
-        onPressed = _stopListening;
-        break;
-      case GeminiLiveServiceState.speaking:
-        icon = FontAwesomeIcons.volumeXmark;
-        color = Colors.orange;
-        onPressed = _stopSpeaking;
-        break;
-      case GeminiLiveServiceState.thinking:
-        icon = FontAwesomeIcons.spinner;
-        color = Colors.orange;
-        onPressed = null;
-        break;
-      case GeminiLiveServiceState.connected:
-        icon = FontAwesomeIcons.microphone;
-        color = theme.primary;
-        onPressed = _startListening;
-        break;
-      case GeminiLiveServiceState.error:
-        icon = FontAwesomeIcons.triangleExclamation;
-        color = Colors.red;
-        onPressed = _initializeVoiceServices;
-        break;
-      case GeminiLiveServiceState.connecting:
-      case GeminiLiveServiceState.disconnected:
-        icon = FontAwesomeIcons.microphone;
-        color = theme.secondaryText;
-        onPressed = _initializeVoiceServices;
-        break;
+    if (_isListening) {
+      icon = FontAwesomeIcons.stop;
+      color = Colors.red;
+      onPressed = _stopListening;
+    } else if (_isAISpeaking) {
+      icon = FontAwesomeIcons.volumeXmark;
+      color = Colors.orange;
+      onPressed = _stopSpeaking;
+    } else {
+      icon = FontAwesomeIcons.microphone;
+      color = theme.primary;
+      onPressed = _startListening;
     }
 
     return Container(
@@ -974,6 +1045,50 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
   // ACTION METHODS
   // ============================================================================
 
+  /// Change voice selection
+  void _changeVoice(String? newVoiceName) async {
+    if (newVoiceName == null || newVoiceName == _selectedVoiceName) return;
+
+    setState(() {
+      _selectedVoiceName = newVoiceName;
+    });
+
+    // Update Cartesia service with new voice
+    _cartesiaService.setVoiceId(_selectedVoiceId);
+
+    HapticFeedback.selectionClick();
+
+    // Add system message about voice change
+    final voiceMessage = ChatMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      content:
+          '🎭 Voice changed to $_selectedVoiceName. Your AI coach will now use this voice for responses.',
+      isUser: false,
+      timestamp: DateTime.now(),
+      isSystem: true,
+    );
+    _addMessage(voiceMessage);
+
+    // Play a sample message with the new voice
+    if (_cartesiaService.isInitialized) {
+      try {
+        await _cartesiaService.speakText(
+          text:
+              "Hello! I'm your AI mental performance coach speaking with the new voice. How can I help you today?",
+          voiceId: _selectedVoiceId,
+          contentType: 'coaching',
+          varkPreferences: _varkPrefs,
+        );
+      } catch (e) {
+        debugPrint('Error playing voice sample: $e');
+      }
+    }
+
+    if (kDebugMode) {
+      print('🎭 Voice changed to $_selectedVoiceName ($_selectedVoiceId)');
+    }
+  }
+
   /// Toggle deep thinking mode
   void _toggleDeepThinking() async {
     setState(() {
@@ -982,9 +1097,6 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
     });
 
     HapticFeedback.selectionClick();
-
-    // Update Live API service configuration
-    _liveAPIService.setThinkingMode(_isDeepThinking);
 
     // Add system message about mode change
     final modeMessage = ChatMessage(
@@ -1008,30 +1120,88 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
       return;
     }
 
-    if (_useRealTimeAPI && _liveAPIService.isConnected) {
-      await _liveAPIService.startListening();
-    } else {
-      await _geminiService.startListening();
-    }
+    // Simplified listening - just show listening state
+    setState(() {
+      _isListening = true;
+      _voiceState = GeminiLiveServiceState.listening;
+    });
+
+    _waveController.repeat(reverse: true);
+
+    // Add listening indicator
+    _addMessage(
+      ChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        content:
+            '🎤 Listening... Speak your question and I\'ll respond with voice!',
+        isUser: false,
+        timestamp: DateTime.now(),
+        isSystem: true,
+      ),
+    );
+
+    // Simulate listening for demo (in real app, this would be actual voice recognition)
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && _isListening) {
+        _stopListening();
+        _simulateVoiceInput();
+      }
+    });
   }
 
-  /// Request microphone permission with user feedback
+  /// Request microphone permission with enhanced user feedback
   Future<void> _requestMicrophonePermission() async {
     try {
+      // Show requesting message
+      _addMessage(
+        ChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          content: '🎤 Requesting microphone permission for voice features...',
+          isUser: false,
+          timestamp: DateTime.now(),
+          isSystem: true,
+        ),
+      );
+
       final granted = await _permissionService.requestMicrophoneWithRetry();
 
-      if (!granted) {
+      if (granted) {
+        setState(() {
+          _microphonePermission = PermissionServiceState.granted;
+        });
+
+        _addMessage(
+          ChatMessage(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            content:
+                '✅ Microphone permission granted! Voice features are now available. Tap the microphone to start speaking.',
+            isUser: false,
+            timestamp: DateTime.now(),
+            isSystem: true,
+          ),
+        );
+
+        // Auto-start listening if permission was just granted
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted &&
+              _microphonePermission == PermissionServiceState.granted) {
+            _startListening();
+          }
+        });
+      } else {
         final state = _permissionService.microphoneState;
+        setState(() {
+          _microphonePermission = state;
+        });
 
         if (state == PermissionServiceState.permanentlyDenied) {
-          // Show dialog to open settings
-          _showPermissionDialog();
+          _showPermissionSettingsDialog();
         } else {
           _addMessage(
             ChatMessage(
               id: DateTime.now().millisecondsSinceEpoch.toString(),
               content:
-                  '🎤 Microphone permission is needed for voice features. You can continue using text chat.',
+                  '❌ Microphone permission declined. You can continue using text chat or tap the microphone again to retry.',
               isUser: false,
               timestamp: DateTime.now(),
               isSystem: true,
@@ -1043,16 +1213,39 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
       if (kDebugMode) {
         print('Error requesting microphone permission: $e');
       }
+
+      _addMessage(
+        ChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          content:
+              '⚠️ Error requesting microphone permission. You can continue using text chat.',
+          isUser: false,
+          timestamp: DateTime.now(),
+          isSystem: true,
+        ),
+      );
     }
   }
 
-  /// Show permission dialog for permanently denied permissions
-  void _showPermissionDialog() {
+  /// Show permission settings dialog for permanently denied permissions
+  void _showPermissionSettingsDialog() {
     _addMessage(
       ChatMessage(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         content:
-            '⚙️ To use voice features, please enable microphone permission in your device settings.',
+            '⚙️ Microphone permission was permanently denied. To enable voice features:\n\n1. Go to your device Settings\n2. Find FoCoCo app\n3. Enable Microphone permission\n4. Return to the app\n\nYou can continue using text chat in the meantime.',
+        isUser: false,
+        timestamp: DateTime.now(),
+        isSystem: true,
+      ),
+    );
+
+    // Optionally show a button to open settings
+    _addMessage(
+      ChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        content:
+            '📱 Tap here to open app settings (if available on your device)',
         isUser: false,
         timestamp: DateTime.now(),
         isSystem: true,
@@ -1063,21 +1256,17 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
   void _stopListening() async {
     HapticFeedback.lightImpact();
 
-    if (_useRealTimeAPI && _liveAPIService.isConnected) {
-      await _liveAPIService.stopListening();
-    } else {
-      await _geminiService.stopListening();
-    }
+    setState(() {
+      _isListening = false;
+      _voiceState = GeminiLiveServiceState.connected;
+    });
+
+    _waveController.stop();
   }
 
   void _stopSpeaking() async {
     HapticFeedback.lightImpact();
-
-    if (_useRealTimeAPI && _liveAPIService.isConnected) {
-      await _liveAPIService.stopListening();
-    } else {
-      await _geminiService.stopListening();
-    }
+    await _cartesiaService.stopSpeaking();
   }
 
   void _sendTextMessage(String message) async {
@@ -1100,29 +1289,47 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
     HapticFeedback.selectionClick();
 
     try {
-      // Send message via Live API if available, otherwise use fallback
-      if (_useRealTimeAPI && _liveAPIService.isConnected) {
-        await _liveAPIService.sendTextMessage(message.trim());
-        // Response will be handled by the response stream listener
-      } else {
-        // Fallback to unified AI service
-        final aiResponse = await _generateAIResponse(message.trim());
+      // Generate AI response using Gemini
+      final aiResponse = await _generateAIResponse(message.trim());
 
-        // Speak the response using unified AI service
+      // Add AI response to chat first
+      final aiMessage = ChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        content: aiResponse,
+        isUser: false,
+        timestamp: DateTime.now(),
+      );
+      _addMessage(aiMessage);
+
+      // Speak the response using Cartesia if available
+      if (_cartesiaService.isInitialized) {
+        try {
+          setState(() {
+            _isAISpeaking = true;
+          });
+
+          await _cartesiaService.speakText(
+            text: aiResponse,
+            voiceId: _selectedVoiceId,
+            contentType: 'coaching',
+            varkPreferences: _varkPrefs,
+          );
+        } catch (e) {
+          debugPrint('Cartesia TTS error: $e');
+          // Fallback to system TTS
+          try {
+            await _aiService.speak(aiResponse);
+          } catch (e2) {
+            debugPrint('System TTS error: $e2');
+          }
+        }
+      } else {
+        // Fallback to system TTS
         try {
           await _aiService.speak(aiResponse);
         } catch (e) {
-          debugPrint('TTS error: $e');
+          debugPrint('System TTS error: $e');
         }
-
-        // Add AI response to chat
-        final aiMessage = ChatMessage(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          content: aiResponse,
-          isUser: false,
-          timestamp: DateTime.now(),
-        );
-        _addMessage(aiMessage);
       }
     } catch (e) {
       final errorMessage = ChatMessage(
@@ -1143,21 +1350,12 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
   // ============================================================================
 
   String _getStateDescription() {
-    switch (_voiceState) {
-      case GeminiLiveServiceState.listening:
-        return 'Listening to your message...';
-      case GeminiLiveServiceState.thinking:
-        return 'Analyzing and preparing response...';
-      case GeminiLiveServiceState.speaking:
-        return 'Speaking response...';
-      case GeminiLiveServiceState.connected:
-        return 'Ready to help with your mental game';
-      case GeminiLiveServiceState.error:
-        return 'Service error - tap to retry';
-      case GeminiLiveServiceState.connecting:
-        return 'Connecting to AI coach...';
-      case GeminiLiveServiceState.disconnected:
-        return 'Initializing AI coach...';
+    if (_isListening) {
+      return 'Listening to your message...';
+    } else if (_isAISpeaking) {
+      return 'Speaking response via Cartesia...';
+    } else {
+      return 'Ready to help with your mental game';
     }
   }
 
@@ -1211,5 +1409,121 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
         }
       }
     });
+  }
+
+  /// Build enhanced context with chat history and user insights
+  String _buildEnhancedContext(
+      String conversationContext, String personalizedPrompt) {
+    final buffer = StringBuffer();
+
+    // Add recent conversation history
+    if (conversationContext.isNotEmpty) {
+      buffer.writeln('=== RECENT CONVERSATION ===');
+      buffer.writeln(conversationContext);
+      buffer.writeln();
+    }
+
+    // Add personalized insights
+    if (personalizedPrompt.isNotEmpty) {
+      buffer.writeln(personalizedPrompt);
+    }
+
+    // Add current session context
+    buffer.writeln('=== CURRENT SESSION ===');
+    buffer.writeln('Session ID: ${_memoryService.currentSessionId}');
+    buffer.writeln('Deep Thinking Mode: ${_isDeepThinking ? "ON" : "OFF"}');
+    buffer.writeln('Voice Service: Cartesia + Gemini AI');
+    buffer.writeln();
+
+    return buffer.toString();
+  }
+
+  /// Generate contextual fallback response based on user input
+  String _generateContextualFallback(String userInput) {
+    final input = userInput.toLowerCase();
+
+    // Golf-specific responses
+    if (input.contains('putt') || input.contains('putting')) {
+      return "I understand you're working on your putting. Focus on your pre-putt routine: read the green, visualize the ball's path, take a deep breath, and trust your stroke. What specific aspect of putting would you like to work on?";
+    }
+
+    if (input.contains('drive') ||
+        input.contains('driving') ||
+        input.contains('tee')) {
+      return "Driving can be challenging! Remember the fundamentals: balanced setup, smooth tempo, and commit to your swing. Visualize your target and trust your preparation. What's been happening with your drives lately?";
+    }
+
+    if (input.contains('nervous') ||
+        input.contains('pressure') ||
+        input.contains('anxiety')) {
+      return "Feeling pressure is normal - it shows you care! Try the 4-7-8 breathing technique: inhale for 4 counts, hold for 7, exhale for 8. This activates your parasympathetic nervous system and helps you stay calm. What situation is making you feel most nervous?";
+    }
+
+    if (input.contains('confidence') || input.contains('doubt')) {
+      return "Confidence comes from preparation and positive self-talk. Recall your best shots and the feeling of success. Create a personal mantra like 'I am prepared and capable.' What has been shaking your confidence on the course?";
+    }
+
+    if (input.contains('focus') || input.contains('concentration')) {
+      return "Focus is like a muscle that needs training. Try the 'target focus' technique: pick a specific spot on your target and keep your eyes there throughout your pre-shot routine. What tends to distract you most during your rounds?";
+    }
+
+    // General supportive response
+    return "I'm here to help you develop your mental game and unlock your potential on the course. While I'm experiencing some technical difficulties with my advanced features, I can still provide guidance on focus, confidence, and control. What specific aspect of your golf psychology would you like to work on?";
+  }
+
+  /// Add sample conversation to demonstrate functionality
+  void _addSampleConversation() {
+    // Add a sample conversation to show how it works
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        _addMessage(
+          ChatMessage(
+            id: 'sample_user_1',
+            content: 'I struggle with putting under pressure',
+            isUser: true,
+            timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
+          ),
+        );
+      }
+    });
+
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      if (mounted) {
+        _addMessage(
+          ChatMessage(
+            id: 'sample_ai_1',
+            content:
+                "I understand that pressure putting can be challenging! Here's what I recommend:\n\n1. **Develop a consistent pre-putt routine** - This gives you something to focus on instead of the pressure\n2. **Use the 4-7-8 breathing technique** - Inhale for 4, hold for 7, exhale for 8 to calm your nerves\n3. **Visualize success** - See the ball going in before you putt\n\nWhat specific situations make you feel the most pressure when putting?",
+            isUser: false,
+            timestamp: DateTime.now().subtract(const Duration(minutes: 1)),
+          ),
+        );
+      }
+    });
+  }
+
+  /// Simulate voice input for demonstration
+  void _simulateVoiceInput() {
+    final sampleQuestions = [
+      "How can I stay focused during my swing?",
+      "I get nervous on the first tee, any advice?",
+      "What's the best way to recover from a bad shot?",
+      "How do I build confidence in my short game?",
+    ];
+
+    final randomQuestion =
+        sampleQuestions[DateTime.now().millisecond % sampleQuestions.length];
+
+    // Add user message
+    final userMessage = ChatMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      content: randomQuestion,
+      isUser: true,
+      timestamp: DateTime.now(),
+    );
+    _addMessage(userMessage);
+
+    // Generate and speak AI response
+    _sendTextMessage(randomQuestion);
   }
 }

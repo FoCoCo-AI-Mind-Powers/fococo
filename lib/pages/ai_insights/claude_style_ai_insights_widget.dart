@@ -2,6 +2,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'claude_style_ai_insights_model.dart';
 export 'claude_style_ai_insights_model.dart';
+import '/services/app_tutorial_service.dart';
 
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -21,11 +22,18 @@ class ClaudeStyleAiInsightsWidget extends StatefulWidget {
 class _ClaudeStyleAiInsightsWidgetState
     extends State<ClaudeStyleAiInsightsWidget> with TickerProviderStateMixin {
   late ClaudeStyleAiInsightsModel _model;
+  final AppTutorialService _tutorialService = AppTutorialService();
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocusNode = FocusNode();
+
+  // Tutorial keys
+  final GlobalKey _chatAreaKey = GlobalKey();
+  final GlobalKey _suggestionsKey = GlobalKey();
+  final GlobalKey _voiceInputKey = GlobalKey();
+  final GlobalKey _insightTypesKey = GlobalKey();
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -76,6 +84,23 @@ class _ClaudeStyleAiInsightsWidgetState
 
     // Add welcome message
     _addWelcomeMessage();
+
+    // Check and show tutorial
+    _checkAndShowTutorial();
+  }
+
+  Future<void> _checkAndShowTutorial() async {
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    if (!mounted) return;
+
+    _tutorialService.startAIInsightsTutorial(
+      context,
+      chatAreaKey: _chatAreaKey,
+      suggestionsKey: _suggestionsKey,
+      voiceInputKey: _voiceInputKey,
+      insightTypesKey: _insightTypesKey,
+    );
   }
 
   @override
@@ -351,6 +376,7 @@ class _ClaudeStyleAiInsightsWidgetState
 
   Widget _buildChatArea(FlutterFlowTheme theme) {
     return Container(
+      key: _chatAreaKey,
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),

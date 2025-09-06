@@ -9,12 +9,15 @@ import '/flutter_flow/glass_design_system.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/services/focomap_voice_service.dart';
 import '/services/foco_map_live_service.dart';
+import '/services/live_location_service.dart';
+import '/services/focomap_tutorial_service.dart';
 import 'platform_map_widget.dart';
 import 'foco_map_model.dart';
 export 'foco_map_model.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 
 class FoCoMapWidget extends StatefulWidget {
@@ -39,18 +42,35 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
   // Services
   final FoCoMapVoiceService _voiceService = FoCoMapVoiceService();
   final FoCoMapLiveService _liveService = FoCoMapLiveService();
+  final LiveLocationService _locationService = LiveLocationService();
+  final FoCoMapTutorialService _tutorialService = FoCoMapTutorialService();
+
+  // Tutorial target keys
+  final GlobalKey _backButtonKey = GlobalKey();
+  final GlobalKey _titleKey = GlobalKey();
+  final GlobalKey _mapTypeKey = GlobalKey();
+  final GlobalKey _liveToggleKey = GlobalKey();
+  final GlobalKey _filtersKey = GlobalKey();
+  final GlobalKey _layerMindMapKey = GlobalKey();
+  final GlobalKey _layerShotMapKey = GlobalKey();
+  final GlobalKey _layerSyncMapKey = GlobalKey();
+  final GlobalKey _voiceButtonKey = GlobalKey();
+  final GlobalKey _addDataKey = GlobalKey();
+  final GlobalKey _liveIndicatorKey = GlobalKey();
+  final GlobalKey _locationPanelKey = GlobalKey();
+  final GlobalKey _scorePanelKey = GlobalKey();
 
   // Stream subscriptions for proper cleanup
   StreamSubscription? _roundLogsSubscription;
   StreamSubscription? _shotLogsSubscription;
   StreamSubscription? _liveUpdateSubscription;
   StreamSubscription? _voiceUpdateSubscription;
+  StreamSubscription? _locationSubscription;
+  StreamSubscription? _courseContextSubscription;
 
   // Animation controllers for real-time effects
   late AnimationController _pulseController;
-  late AnimationController _slideController;
   late Animation<double> _pulseAnimation;
-  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
@@ -63,11 +83,6 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
       vsync: this,
     )..repeat(reverse: true);
 
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-
     _pulseAnimation = Tween<double>(
       begin: 0.8,
       end: 1.2,
@@ -76,17 +91,10 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
       curve: Curves.easeInOut,
     ));
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
-
     _getCurrentLocation();
     _initializeServices();
     _loadMapData();
+    _checkAndShowTutorial();
   }
 
   @override
@@ -96,16 +104,20 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
     _shotLogsSubscription?.cancel();
     _liveUpdateSubscription?.cancel();
     _voiceUpdateSubscription?.cancel();
+    _locationSubscription?.cancel();
+    _courseContextSubscription?.cancel();
 
     // Dispose animation controllers
     _pulseController.dispose();
-    _slideController.dispose();
 
     // Dispose services
     _model.dispose();
     _liveService.stopLiveMode();
     _voiceService.stopListening();
     _voiceService.dispose();
+    _locationService.stopTracking();
+    _locationService.dispose();
+    _tutorialService.dispose();
 
     super.dispose();
   }
@@ -115,6 +127,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
       // Initialize services
       await _voiceService.initialize();
       await _liveService.initialize();
+      await _locationService.initialize();
 
       // Set up live service listeners with proper subscription management
       _roundLogsSubscription = _liveService.roundLogsStream.listen((roundLogs) {
@@ -151,6 +164,25 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
         _handleVoiceUpdate(update);
       }, onError: (error) {
         debugPrint('Voice update stream error: $error');
+      });
+
+      // Set up location service listeners
+      _locationSubscription =
+          _locationService.locationStream.listen((location) {
+        if (mounted) {
+          setState(() {
+            currentLocation = location;
+          });
+        }
+      }, onError: (error) {
+        debugPrint('Location stream error: $error');
+      });
+
+      _courseContextSubscription =
+          _locationService.courseContextStream.listen((context) {
+        _handleCourseContextChange(context);
+      }, onError: (error) {
+        debugPrint('Course context stream error: $error');
       });
     } catch (e) {
       debugPrint('Error initializing services: $e');
@@ -198,6 +230,68 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
             'Voice error: ${update['message']}', Colors.red);
         break;
     }
+  }
+
+  void _handleCourseContextChange(CourseContext context) {
+    if (!mounted) return;
+
+    switch (context) {
+      case CourseContext.onCourse:
+        _showLiveUpdateNotification(
+            'On course: ${_locationService.activeGolfCourse?.name ?? "Unknown"}',
+            Colors.green);
+        break;
+      case CourseContext.nearCourse:
+        _showLiveUpdateNotification(
+            'Near: ${_locationService.activeGolfCourse?.name ?? "Unknown"}',
+            Colors.blue);
+        break;
+      case CourseContext.approachingCourse:
+        _showLiveUpdateNotification(
+            'Approaching: ${_locationService.activeGolfCourse?.name ?? "Unknown"}',
+            Colors.orange);
+        break;
+      default:
+        break;
+    }
+  }
+
+  Future<void> _checkAndShowTutorial() async {
+    // Wait a bit for the UI to settle
+    await Future.delayed(const Duration(milliseconds: 1000));
+
+    if (!mounted) return;
+
+    final hasCompletedTutorial =
+        await _tutorialService.hasCompletedMainTutorial();
+    if (!hasCompletedTutorial) {
+      _startMainTutorial();
+    }
+  }
+
+  void _startMainTutorial() {
+    _tutorialService.startMainTutorial(
+      context,
+      backButtonKey: _backButtonKey,
+      titleKey: _titleKey,
+      mapTypeKey: _mapTypeKey,
+      liveToggleKey: _liveToggleKey,
+      filtersKey: _filtersKey,
+      layerMindMapKey: _layerMindMapKey,
+      layerShotMapKey: _layerShotMapKey,
+      layerSyncMapKey: _layerSyncMapKey,
+      voiceButtonKey: _voiceButtonKey,
+      addDataKey: _addDataKey,
+    );
+  }
+
+  void _startLiveModeTutorial() {
+    _tutorialService.startLiveModeTutorial(
+      context,
+      liveIndicatorKey: _liveIndicatorKey,
+      locationPanelKey: _locationPanelKey,
+      scorePanelKey: _scorePanelKey,
+    );
   }
 
   void _showLiveUpdateNotification(String message, Color color) {
@@ -463,7 +557,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
         'date': DateTime.now(),
         'courseName': 'Sample Golf Course',
         'courseType': 'championship',
-        'coordinates': LatLng(40.7128, -74.0060),
+        'coordinates': GeoPoint(40.7128, -74.0060),
         'mindsetFocus': 8,
         'mindsetConfidence': 7,
         'mindsetControl': 9,
@@ -499,7 +593,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
         'cueUsed': 'smooth tempo',
         'confidenceLevel': 8,
         'windCondition': 'light breeze',
-        'coordinates': LatLng(40.7130, -74.0058),
+        'coordinates': GeoPoint(40.7130, -74.0058),
         'aiShotInsight': 'Great tempo today, try maintaining this rhythm',
         'voiceTranscription': 'Perfect drive on 5, used my tempo cue',
         'nlpProcessed': true,
@@ -737,6 +831,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
                         children: [
                           // Back Button
                           GestureDetector(
+                            key: _backButtonKey,
                             onTap: () {
                               if (context.canPop()) {
                                 context.pop();
@@ -763,6 +858,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
                           // Title with Live Indicator
                           Expanded(
                             child: Row(
+                              key: _titleKey,
                               children: [
                                 Text(
                                   'FoCoMap',
@@ -799,6 +895,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
 
                           // Map Toggle Button
                           GestureDetector(
+                            key: _mapTypeKey,
                             onTap: () => _showMapTypeSelector(),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -835,6 +932,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
 
                           // Live Mode Toggle
                           GestureDetector(
+                            key: _liveToggleKey,
                             onTap: () => _toggleLiveMode(),
                             child: Container(
                               padding: const EdgeInsets.all(8),
@@ -858,6 +956,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
 
                           // Filters Button
                           GestureDetector(
+                            key: _filtersKey,
                             onTap: () => _showFiltersBottomSheet(),
                             child: Container(
                               padding: const EdgeInsets.all(8),
@@ -885,62 +984,67 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
               top: 100,
               left: 16,
               child: SafeArea(
-                child: GlassDesignSystem.glass3DCard(
-                  width: 200,
-                  padding: const EdgeInsets.all(16),
-                  tintColor: Colors.white,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 16,
-                            backgroundColor:
-                                FlutterFlowTheme.of(context).primary,
-                            child: const Icon(
-                              Icons.person,
-                              color: Colors.white,
-                              size: 18,
+                child: Container(
+                  key: _locationPanelKey,
+                  child: GlassDesignSystem.glass3DCard(
+                    width: 200,
+                    padding: const EdgeInsets.all(16),
+                    tintColor: Colors.white,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundColor:
+                                  FlutterFlowTheme.of(context).primary,
+                              child: const Icon(
+                                Icons.person,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              currentUser?.displayName ?? 'Player',
-                              style: FlutterFlowTheme.of(context)
-                                  .bodyMedium
-                                  .override(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                currentUser?.displayName ?? 'Player',
+                                style: FlutterFlowTheme.of(context)
+                                    .bodyMedium
+                                    .override(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.0,
+                                    ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Tier: ${_liveService.userTier.name.toUpperCase()}',
+                          style:
+                              FlutterFlowTheme.of(context).bodySmall.override(
+                                    color: Colors.white.withValues(alpha: 0.7),
                                     height: 1.0,
                                   ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Tier: ${_liveService.userTier.name.toUpperCase()}',
-                        style: FlutterFlowTheme.of(context).bodySmall.override(
-                              color: Colors.white.withValues(alpha: 0.7),
-                              height: 1.0,
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _model.isLiveMode ? 'LIVE' : 'OFFLINE',
-                        style: FlutterFlowTheme.of(context).bodyLarge.override(
-                              color: _model.isLiveMode
-                                  ? Colors.green
-                                  : Colors.orange,
-                              fontWeight: FontWeight.bold,
-                              height: 1.0,
-                            ),
-                      ),
-                    ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _model.isLiveMode ? 'LIVE' : 'OFFLINE',
+                          style:
+                              FlutterFlowTheme.of(context).bodyLarge.override(
+                                    color: _model.isLiveMode
+                                        ? Colors.green
+                                        : Colors.orange,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.0,
+                                  ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -952,45 +1056,50 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
                 top: 100,
                 right: 16,
                 child: SafeArea(
-                  child: GlassDesignSystem.glass3DCard(
-                    width: 160,
-                    padding: const EdgeInsets.all(16),
-                    tintColor: Colors.white,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Mental Score',
-                          style:
-                              FlutterFlowTheme.of(context).bodySmall.override(
-                                    color: Colors.white.withValues(alpha: 0.7),
-                                    height: 1.0,
-                                  ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${_model.roundLogs.last.mindsetFocus + _model.roundLogs.last.mindsetConfidence + _model.roundLogs.last.mindsetControl}',
-                          style: FlutterFlowTheme.of(context)
-                              .headlineLarge
-                              .override(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                height: 1.0,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _model.roundLogs.last.courseName,
-                          style:
-                              FlutterFlowTheme.of(context).bodySmall.override(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                    height: 1.0,
-                                  ),
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                  child: Container(
+                    key: _scorePanelKey,
+                    child: GlassDesignSystem.glass3DCard(
+                      width: 160,
+                      padding: const EdgeInsets.all(16),
+                      tintColor: Colors.white,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Mental Score',
+                            style: FlutterFlowTheme.of(context)
+                                .bodySmall
+                                .override(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  height: 1.0,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${_model.roundLogs.last.mindsetFocus + _model.roundLogs.last.mindsetConfidence + _model.roundLogs.last.mindsetControl}',
+                            style: FlutterFlowTheme.of(context)
+                                .headlineLarge
+                                .override(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.0,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _model.roundLogs.last.courseName,
+                            style: FlutterFlowTheme.of(context)
+                                .bodySmall
+                                .override(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  height: 1.0,
+                                ),
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -1011,18 +1120,18 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
                   child: Row(
                     children: [
                       Expanded(
-                        child: _buildGlassLayerButton(
-                            'MindMap', 'Mental', Icons.psychology),
+                        child: _buildGlassLayerButton('MindMap', 'Mental',
+                            Icons.psychology, _layerMindMapKey),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _buildGlassLayerButton(
-                            'ShotMap', 'Technical', Icons.golf_course),
+                        child: _buildGlassLayerButton('ShotMap', 'Technical',
+                            Icons.golf_course, _layerShotMapKey),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _buildGlassLayerButton(
-                            'SyncMap', 'Combined', Icons.sync),
+                        child: _buildGlassLayerButton('SyncMap', 'Combined',
+                            Icons.sync, _layerSyncMapKey),
                       ),
                     ],
                   ),
@@ -1038,16 +1147,19 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Add Sample Data Button
-                  GlassDesignSystem.glass3DCard(
-                    width: 60,
-                    height: 60,
-                    padding: EdgeInsets.zero,
-                    tintColor: Colors.orange,
-                    onTap: _addSampleData,
-                    child: const Icon(
-                      Icons.add_location,
-                      color: Colors.white,
-                      size: 24,
+                  Container(
+                    key: _addDataKey,
+                    child: GlassDesignSystem.glass3DCard(
+                      width: 60,
+                      height: 60,
+                      padding: EdgeInsets.zero,
+                      tintColor: Colors.orange,
+                      onTap: _addSampleData,
+                      child: const Icon(
+                        Icons.add_location,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1055,84 +1167,8 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Voice Processing Indicator
-                      StreamBuilder<bool>(
-                        stream: _voiceService.processingStream,
-                        builder: (context, processingSnapshot) {
-                          final isProcessing = processingSnapshot.data ?? false;
-
-                          if (!isProcessing) return const SizedBox.shrink();
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SizedBox(
-                                  width: 12,
-                                  height: 12,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Processing...',
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodySmall
-                                      .override(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        height: 1.0,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-
-                      // Voice Transcription Preview
-                      StreamBuilder<String>(
-                        stream: _voiceService.transcriptionStream,
-                        builder: (context, transcriptionSnapshot) {
-                          final transcription =
-                              transcriptionSnapshot.data ?? '';
-
-                          if (transcription.isEmpty)
-                            return const SizedBox.shrink();
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.all(8),
-                            constraints: const BoxConstraints(maxWidth: 200),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              transcription,
-                              style: FlutterFlowTheme.of(context)
-                                  .bodySmall
-                                  .override(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    height: 1.0,
-                                  ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        },
-                      ),
+                      // Enhanced Voice Interaction Panel
+                      _buildVoiceInteractionPanel(),
 
                       // Main Voice Button
                       StreamBuilder<bool>(
@@ -1146,18 +1182,21 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
                               return Transform.scale(
                                 scale:
                                     isListening ? _pulseAnimation.value : 1.0,
-                                child: GlassDesignSystem.glass3DCard(
-                                  width: 60,
-                                  height: 60,
-                                  padding: EdgeInsets.zero,
-                                  tintColor: isListening
-                                      ? Colors.red
-                                      : FlutterFlowTheme.of(context).primary,
-                                  onTap: _handleVoiceButtonTap,
-                                  child: Icon(
-                                    isListening ? Icons.stop : Icons.mic,
-                                    color: Colors.white,
-                                    size: 24,
+                                child: Container(
+                                  key: _voiceButtonKey,
+                                  child: GlassDesignSystem.glass3DCard(
+                                    width: 60,
+                                    height: 60,
+                                    padding: EdgeInsets.zero,
+                                    tintColor: isListening
+                                        ? Colors.red
+                                        : FlutterFlowTheme.of(context).primary,
+                                    onTap: _handleVoiceButtonTap,
+                                    child: Icon(
+                                      isListening ? Icons.stop : Icons.mic,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
                                   ),
                                 ),
                               );
@@ -1186,6 +1225,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
                         tintColor: Colors.green,
                         opacity: 0.2,
                         child: Container(
+                          key: _liveIndicatorKey,
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 8),
                           child: Row(
@@ -1236,10 +1276,23 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
     try {
       if (_model.isLiveMode) {
         await _liveService.stopLiveMode();
+        await _locationService.stopTracking();
         _model.setLiveMode(false);
+        _showLiveUpdateNotification('Live mode stopped', Colors.orange);
       } else {
         await _liveService.startLiveMode();
+        await _locationService.startTracking();
         _model.setLiveMode(true);
+        _showLiveUpdateNotification('Live mode activated', Colors.green);
+
+        // Show live mode tutorial if first time
+        final hasSeenIntro = await _tutorialService.hasSeenLiveModeIntro();
+        if (!hasSeenIntro) {
+          // Delay to let live mode UI appear
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) _startLiveModeTutorial();
+          });
+        }
       }
     } catch (e) {
       _showLiveUpdateNotification('Error toggling live mode: $e', Colors.red);
@@ -1313,9 +1366,11 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
     }
   }
 
-  Widget _buildGlassLayerButton(String layerKey, String label, IconData icon) {
+  Widget _buildGlassLayerButton(
+      String layerKey, String label, IconData icon, GlobalKey key) {
     final isSelected = _model.selectedLayer == layerKey;
     return GestureDetector(
+      key: key,
       onTap: () {
         _model.selectLayer(layerKey);
         _updateMarkers();
@@ -1442,53 +1497,133 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
+      builder: (context) => GlassDesignSystem.glassBackground(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        tintColor: Colors.white,
+        opacity: 0.95,
         child: Container(
           padding: const EdgeInsets.all(24),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Map Filters',
-                style: FlutterFlowTheme.of(context).headlineSmall,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Map Filters',
+                    style: FlutterFlowTheme.of(context).headlineSmall.override(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          height: 1.0,
+                        ),
+                  ),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          _model.clearAllFilters();
+                          _updateMarkers();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.8),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Clear All',
+                            style:
+                                FlutterFlowTheme.of(context).bodySmall.override(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.0,
+                                    ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () => context.pop(),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Club Filters
+                      _buildFilterSection(
+                        'Club Types',
+                        Icons.golf_course,
+                        _model.clubFilters,
+                        (club) => _model.toggleClubFilter(club),
+                      ),
 
-              // Club Filters
-              const Text('Club Types:',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: _model.clubFilters.keys.map((club) {
-                  return FilterChip(
-                    label: Text(club.toUpperCase()),
-                    selected: _model.clubFilters[club] ?? false,
-                    onSelected: (selected) {
-                      setState(() {
-                        _model.toggleClubFilter(club);
-                        _updateMarkers();
-                      });
-                    },
-                  );
-                }).toList(),
+                      const SizedBox(height: 20),
+
+                      // Mental Cue Filters
+                      _buildFilterSection(
+                        'Mental Cues',
+                        Icons.psychology,
+                        _model.cueFilters,
+                        (cue) => _model.toggleCueFilter(cue),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Course Type Filters
+                      _buildFilterSection(
+                        'Course Types',
+                        Icons.landscape,
+                        _model.courseFilters,
+                        (courseType) => _model.toggleCourseFilter(courseType),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Mindset Level Filters
+                      _buildFilterSection(
+                        'Mindset Levels',
+                        Icons.mood,
+                        _model.mindsetFilters,
+                        (mindset) => _model.toggleMindsetFilter(mindset),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Performance Filters
+                      _buildFilterSection(
+                        'Performance Levels',
+                        Icons.trending_up,
+                        _model.performanceFilters,
+                        (performance) =>
+                            _model.togglePerformanceFilter(performance),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Performance Metrics Summary
+                      _buildPerformanceMetrics(),
+                    ],
+                  ),
+                ),
               ),
-
               const SizedBox(height: 16),
               FFButtonWidget(
-                onPressed: () => context.pop(),
+                onPressed: () {
+                  _updateMarkers();
+                  context.pop();
+                },
                 text: 'Apply Filters',
                 options: FFButtonOptions(
                   width: double.infinity,
@@ -1509,6 +1644,430 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
         ),
       ),
     );
+  }
+
+  Widget _buildFilterSection(
+    String title,
+    IconData icon,
+    Map<String, bool> filters,
+    Function(String) onToggle,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: FlutterFlowTheme.of(context).bodyLarge.override(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    height: 1.0,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: filters.keys.map((key) {
+            final isSelected = filters[key] ?? false;
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  onToggle(key);
+                });
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? FlutterFlowTheme.of(context)
+                          .primary
+                          .withValues(alpha: 0.8)
+                      : Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSelected
+                        ? FlutterFlowTheme.of(context).primary
+                        : Colors.white.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  key.replaceAll('_', ' ').toUpperCase(),
+                  style: FlutterFlowTheme.of(context).bodySmall.override(
+                        color: Colors.white,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.w500,
+                        height: 1.0,
+                      ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPerformanceMetrics() {
+    final metrics = _model.getPerformanceMetrics();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.analytics, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Performance Summary',
+                style: FlutterFlowTheme.of(context).bodyLarge.override(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      height: 1.0,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricItem(
+                  'Rounds',
+                  '${metrics['totalRounds'] ?? 0}',
+                  Icons.golf_course,
+                ),
+              ),
+              Expanded(
+                child: _buildMetricItem(
+                  'Shots',
+                  '${metrics['totalShots'] ?? 0}',
+                  Icons.sports_golf,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricItem(
+                  'Avg Mindset',
+                  '${(metrics['avgMindsetScore'] ?? 0.0).toStringAsFixed(1)}',
+                  Icons.psychology,
+                ),
+              ),
+              Expanded(
+                child: _buildMetricItem(
+                  'Recovery Rate',
+                  '${(metrics['recoveryRate'] ?? 0.0).toStringAsFixed(1)}%',
+                  Icons.trending_up,
+                ),
+              ),
+            ],
+          ),
+          if (metrics['mostUsedCue'] != null &&
+              metrics['mostUsedCue'].toString().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Most Used Cue: ${metrics['mostUsedCue']}',
+              style: FlutterFlowTheme.of(context).bodySmall.override(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    height: 1.0,
+                  ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricItem(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        children: [
+          Icon(icon, color: Colors.white.withValues(alpha: 0.7), size: 16),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: FlutterFlowTheme.of(context).bodyLarge.override(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  height: 1.0,
+                ),
+          ),
+          Text(
+            label,
+            style: FlutterFlowTheme.of(context).bodySmall.override(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  height: 1.0,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVoiceInteractionPanel() {
+    return StreamBuilder<bool>(
+      stream: _voiceService.listeningStream,
+      builder: (context, listeningSnapshot) {
+        final isListening = listeningSnapshot.data ?? false;
+
+        return StreamBuilder<bool>(
+          stream: _voiceService.processingStream,
+          builder: (context, processingSnapshot) {
+            final isProcessing = processingSnapshot.data ?? false;
+
+            return StreamBuilder<String>(
+              stream: _voiceService.transcriptionStream,
+              builder: (context, transcriptionSnapshot) {
+                final transcription = transcriptionSnapshot.data ?? '';
+
+                // Show nothing if not active
+                if (!isListening && !isProcessing && transcription.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  constraints: const BoxConstraints(maxWidth: 280),
+                  child: GlassDesignSystem.glassBackground(
+                    borderRadius: BorderRadius.circular(16),
+                    tintColor: isListening ? Colors.red : Colors.blue,
+                    opacity: 0.9,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Status Header
+                          Row(
+                            children: [
+                              if (isListening) ...[
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Listening...',
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodyMedium
+                                      .override(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        height: 1.0,
+                                      ),
+                                ),
+                              ] else if (isProcessing) ...[
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Processing...',
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodyMedium
+                                      .override(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        height: 1.0,
+                                      ),
+                                ),
+                              ],
+                              const Spacer(),
+                              // Context indicator
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _model.isLiveMode
+                                          ? Icons.golf_course
+                                          : Icons.home,
+                                      size: 12,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _model.isLiveMode
+                                          ? 'On Course'
+                                          : 'Off Course',
+                                      style: FlutterFlowTheme.of(context)
+                                          .bodySmall
+                                          .override(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            height: 1.0,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // Transcription Display
+                          if (transcription.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '"$transcription"',
+                                    style: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          color: Colors.white,
+                                          fontStyle: FontStyle.italic,
+                                          height: 1.4,
+                                        ),
+                                  ),
+                                  if (!isListening && !isProcessing) ...[
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.check_circle,
+                                          size: 14,
+                                          color: Colors.green,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Saved to map',
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodySmall
+                                              .override(
+                                                color: Colors.green,
+                                                fontSize: 10,
+                                                height: 1.0,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+
+                          // Voice Tips
+                          if (isListening && transcription.isEmpty) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              _getVoiceTip(),
+                              style: FlutterFlowTheme.of(context)
+                                  .bodySmall
+                                  .override(
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                    fontSize: 11,
+                                    height: 1.3,
+                                  ),
+                            ),
+                          ],
+
+                          // Location Context (if available)
+                          if (_locationService.activeGolfCourse != null) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.location_on,
+                                    size: 12,
+                                    color: Colors.green,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _locationService.activeGolfCourse!.name,
+                                    style: FlutterFlowTheme.of(context)
+                                        .bodySmall
+                                        .override(
+                                          color: Colors.green,
+                                          fontSize: 10,
+                                          height: 1.0,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _getVoiceTip() {
+    final tips = [
+      'Try: "Felt confident on that drive"',
+      'Say: "7 iron from 150, pushed it right"',
+      'Example: "Used breathing cue, great recovery"',
+      'Tip: Mention club, distance, and outcome',
+      'Include: Mental state and cues used',
+    ];
+
+    // Rotate through tips based on time
+    final index = (DateTime.now().second ~/ 12) % tips.length;
+    return tips[index];
   }
 
   // Note: Method available for future use when voice integration is enabled

@@ -18,11 +18,10 @@ class FoCoMapVoiceService {
   final SpeechToText _speechToText = SpeechToText();
 
   // Stream controllers for real-time updates
-  final _listeningController = StreamController<bool>.broadcast();
-  final _transcriptionController = StreamController<String>.broadcast();
-  final _processingController = StreamController<bool>.broadcast();
-  final _liveUpdateController =
-      StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<bool>? _listeningController;
+  StreamController<String>? _transcriptionController;
+  StreamController<bool>? _processingController;
+  StreamController<Map<String, dynamic>>? _liveUpdateController;
 
   // State management
   bool _isListening = false;
@@ -35,11 +34,14 @@ class FoCoMapVoiceService {
   VoiceContext _currentContext = VoiceContext.offCourse;
 
   // Streams
-  Stream<bool> get listeningStream => _listeningController.stream;
-  Stream<String> get transcriptionStream => _transcriptionController.stream;
-  Stream<bool> get processingStream => _processingController.stream;
+  Stream<bool> get listeningStream =>
+      _listeningController?.stream ?? const Stream.empty();
+  Stream<String> get transcriptionStream =>
+      _transcriptionController?.stream ?? const Stream.empty();
+  Stream<bool> get processingStream =>
+      _processingController?.stream ?? const Stream.empty();
   Stream<Map<String, dynamic>> get liveUpdateStream =>
-      _liveUpdateController.stream;
+      _liveUpdateController?.stream ?? const Stream.empty();
 
   // Getters
   bool get isListening => _isListening;
@@ -49,6 +51,13 @@ class FoCoMapVoiceService {
   /// Initialize the voice service
   Future<void> initialize() async {
     try {
+      // Initialize stream controllers if not already done
+      _listeningController ??= StreamController<bool>.broadcast();
+      _transcriptionController ??= StreamController<String>.broadcast();
+      _processingController ??= StreamController<bool>.broadcast();
+      _liveUpdateController ??=
+          StreamController<Map<String, dynamic>>.broadcast();
+
       final available = await _speechToText.initialize(
         onStatus: _onSpeechStatus,
         onError: _onSpeechError,
@@ -82,7 +91,7 @@ class FoCoMapVoiceService {
       await _updateLocation();
 
       _isListening = true;
-      _listeningController.add(true);
+      _listeningController?.add(true);
 
       await _speechToText.listen(
         onResult: _onSpeechResult,
@@ -99,7 +108,7 @@ class FoCoMapVoiceService {
     } catch (e) {
       debugPrint('Error starting voice recognition: $e');
       _isListening = false;
-      _listeningController.add(false);
+      _listeningController?.add(false);
     }
   }
 
@@ -110,7 +119,7 @@ class FoCoMapVoiceService {
     try {
       await _speechToText.stop();
       _isListening = false;
-      _listeningController.add(false);
+      _listeningController?.add(false);
 
       // Process the final transcription if available
       if (_currentTranscription.isNotEmpty) {
@@ -136,7 +145,7 @@ class FoCoMapVoiceService {
 
     try {
       _isProcessing = true;
-      _processingController.add(true);
+      _processingController?.add(true);
 
       debugPrint('Processing voice input: $transcription');
 
@@ -150,7 +159,7 @@ class FoCoMapVoiceService {
       }
 
       // Emit live update
-      _liveUpdateController.add({
+      _liveUpdateController?.add({
         'type': 'voice_processed',
         'transcription': transcription,
         'analysis': analysis.toJson(),
@@ -158,13 +167,13 @@ class FoCoMapVoiceService {
       });
     } catch (e) {
       debugPrint('Error processing voice input: $e');
-      _liveUpdateController.add({
+      _liveUpdateController?.add({
         'type': 'error',
         'message': 'Failed to process voice input: $e',
       });
     } finally {
       _isProcessing = false;
-      _processingController.add(false);
+      _processingController?.add(false);
     }
   }
 
@@ -188,6 +197,8 @@ class FoCoMapVoiceService {
   }
 
   /// Get context-specific prompt for better NLP accuracy
+  // TODO: Uncomment when AI integration is ready
+  // ignore: unused_element
   String _getContextPrompt() {
     switch (_currentContext) {
       case VoiceContext.preRound:
@@ -427,7 +438,7 @@ Focus on: General reflection, goal setting, mental training, course preparation.
     await FirebaseFirestore.instance.collection('round_logs').add(roundLogData);
 
     // Emit live update
-    _liveUpdateController.add({
+    _liveUpdateController?.add({
       'type': 'round_log_added',
       'data': roundLogData,
       'coordinates': coordinates,
@@ -476,7 +487,7 @@ Focus on: General reflection, goal setting, mental training, course preparation.
     await FirebaseFirestore.instance.collection('shot_logs').add(shotLogData);
 
     // Emit live update
-    _liveUpdateController.add({
+    _liveUpdateController?.add({
       'type': 'shot_log_added',
       'data': shotLogData,
       'coordinates': coordinates,
@@ -604,27 +615,32 @@ Focus on: General reflection, goal setting, mental training, course preparation.
     debugPrint('Speech status: $status');
     if (status == 'done' || status == 'notListening') {
       _isListening = false;
-      _listeningController.add(false);
+      _listeningController?.add(false);
     }
   }
 
   void _onSpeechError(dynamic error) {
     debugPrint('Speech error: $error');
     _isListening = false;
-    _listeningController.add(false);
+    _listeningController?.add(false);
   }
 
   void _onSpeechResult(dynamic result) {
     _currentTranscription = result.recognizedWords;
-    _transcriptionController.add(_currentTranscription);
+    _transcriptionController?.add(_currentTranscription);
   }
 
   /// Dispose resources
   void dispose() {
-    _listeningController.close();
-    _transcriptionController.close();
-    _processingController.close();
-    _liveUpdateController.close();
+    _listeningController?.close();
+    _transcriptionController?.close();
+    _processingController?.close();
+    _liveUpdateController?.close();
+
+    _listeningController = null;
+    _transcriptionController = null;
+    _processingController = null;
+    _liveUpdateController = null;
   }
 }
 

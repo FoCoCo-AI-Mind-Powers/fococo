@@ -5,25 +5,37 @@ import 'package:google_maps_flutter/google_maps_flutter.dart' as google_maps;
 import 'package:geolocator/geolocator.dart';
 import '/flutter_flow/lat_lng.dart';
 
-/// Platform-aware map widget that uses Apple Maps on iOS and Google Maps on Android
-/// iOS: Native Apple Maps integration
-/// Android: Google Maps with API key required
+/// Enhanced Platform-aware map widget with clustering and performance optimization
+/// iOS: Native Apple Maps integration with clustering
+/// Android: Google Maps with clustering support
 class PlatformMapWidget extends StatefulWidget {
   final Set<MapMarker> markers;
   final Function(MapMarker)? onMarkerTap;
   final Function(LatLng)? onMapTap;
+  final Function(double)? onZoomChanged;
   final LatLng? initialLocation;
   final double initialZoom;
   final MapType mapType;
+  final bool enableClustering;
+  final int maxMarkersBeforeClustering;
+  final bool showUserLocation;
+  final bool enableScrollGestures;
+  final bool enableZoomGestures;
 
   const PlatformMapWidget({
     super.key,
     this.markers = const {},
     this.onMarkerTap,
     this.onMapTap,
+    this.onZoomChanged,
     this.initialLocation,
     this.initialZoom = 14.0,
     this.mapType = MapType.normal,
+    this.enableClustering = true,
+    this.maxMarkersBeforeClustering = 100,
+    this.showUserLocation = true,
+    this.enableScrollGestures = true,
+    this.enableZoomGestures = true,
   });
 
   @override
@@ -37,10 +49,32 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
   bool _isLoading = true;
   bool _platformViewFailed = false;
 
+  // Enhanced state management for clustering and performance
+  double _currentZoom = 14.0;
+  Set<MapMarker> _visibleMarkers = {};
+  Set<MapCluster> _clusters = {};
+  bool _needsClusterUpdate = true;
+
+  // Performance optimization
+  DateTime? _lastClusterUpdate;
+  static const Duration _clusterUpdateThrottle = Duration(milliseconds: 500);
+
   @override
   void initState() {
     super.initState();
+    _currentZoom = widget.initialZoom;
     _initializeLocation();
+  }
+
+  @override
+  void didUpdateWidget(PlatformMapWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Check if markers changed and need clustering update
+    if (widget.markers != oldWidget.markers) {
+      _needsClusterUpdate = true;
+      _updateClustering();
+    }
   }
 
   Future<void> _initializeLocation() async {
@@ -85,6 +119,95 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
     }
 
     return await Geolocator.getCurrentPosition();
+  }
+
+  /// Enhanced clustering algorithm for performance optimization
+  void _updateClustering() {
+    if (!widget.enableClustering ||
+        widget.markers.length <= widget.maxMarkersBeforeClustering) {
+      _visibleMarkers = widget.markers;
+      _clusters.clear();
+      return;
+    }
+
+    // Throttle clustering updates for performance
+    final now = DateTime.now();
+    if (_lastClusterUpdate != null &&
+        now.difference(_lastClusterUpdate!) < _clusterUpdateThrottle) {
+      return;
+    }
+
+    _lastClusterUpdate = now;
+    _clusters.clear();
+    _visibleMarkers.clear();
+
+    // Group markers by proximity based on zoom level
+    final clusterDistance = _getClusterDistance(_currentZoom);
+    final processed = <String>{};
+
+    for (final marker in widget.markers) {
+      if (processed.contains(marker.markerId)) continue;
+
+      final cluster = MapCluster(
+        clusterId: 'cluster_${marker.markerId}',
+        center: marker.position,
+        markers: [marker],
+      );
+
+      processed.add(marker.markerId);
+
+      // Find nearby markers to cluster
+      for (final otherMarker in widget.markers) {
+        if (processed.contains(otherMarker.markerId)) continue;
+
+        final distance =
+            _calculateDistance(marker.position, otherMarker.position);
+        if (distance <= clusterDistance) {
+          cluster.markers.add(otherMarker);
+          processed.add(otherMarker.markerId);
+        }
+      }
+
+      if (cluster.markers.length > 1) {
+        _clusters.add(cluster);
+      } else {
+        _visibleMarkers.add(marker);
+      }
+    }
+
+    _needsClusterUpdate = false;
+  }
+
+  double _getClusterDistance(double zoom) {
+    // Adjust clustering distance based on zoom level
+    if (zoom >= 16) return 0.0001; // Very close clustering at high zoom
+    if (zoom >= 14) return 0.0005; // Medium clustering
+    if (zoom >= 12) return 0.001; // Wider clustering
+    return 0.002; // Very wide clustering at low zoom
+  }
+
+  double _calculateDistance(LatLng pos1, LatLng pos2) {
+    return Geolocator.distanceBetween(
+          pos1.latitude,
+          pos1.longitude,
+          pos2.latitude,
+          pos2.longitude,
+        ) /
+        1000; // Convert to kilometers
+  }
+
+  void _onCameraMove(double zoom) {
+    if ((_currentZoom - zoom).abs() > 0.5) {
+      // Significant zoom change
+      _currentZoom = zoom;
+      _needsClusterUpdate = true;
+      _updateClustering();
+      widget.onZoomChanged?.call(zoom);
+
+      if (mounted) {
+        setState(() {});
+      }
+    }
   }
 
   @override
@@ -133,6 +256,11 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
   }
 
   Widget _buildAppleMap() {
+    // Update clustering if needed
+    if (_needsClusterUpdate) {
+      _updateClustering();
+    }
+
     return apple_maps.AppleMap(
       initialCameraPosition: apple_maps.CameraPosition(
         target: apple_maps.LatLng(
@@ -144,8 +272,13 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
       },
       annotations: _convertToAppleAnnotations(),
       mapType: _convertToAppleMapType(widget.mapType),
-      myLocationEnabled: true,
+      myLocationEnabled: widget.showUserLocation,
       myLocationButtonEnabled: false,
+      scrollGesturesEnabled: widget.enableScrollGestures,
+      zoomGesturesEnabled: widget.enableZoomGestures,
+      onCameraMove: (apple_maps.CameraPosition position) {
+        _onCameraMove(position.zoom);
+      },
       onTap: (apple_maps.LatLng position) {
         widget.onMapTap?.call(LatLng(position.latitude, position.longitude));
       },
@@ -153,6 +286,11 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
   }
 
   Widget _buildGoogleMap() {
+    // Update clustering if needed
+    if (_needsClusterUpdate) {
+      _updateClustering();
+    }
+
     return google_maps.GoogleMap(
       initialCameraPosition: google_maps.CameraPosition(
         target: google_maps.LatLng(
@@ -164,8 +302,13 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
       },
       markers: _convertToGoogleMarkers(),
       mapType: _convertToGoogleMapType(widget.mapType),
-      myLocationEnabled: true,
+      myLocationEnabled: widget.showUserLocation,
       myLocationButtonEnabled: false,
+      scrollGesturesEnabled: widget.enableScrollGestures,
+      zoomGesturesEnabled: widget.enableZoomGestures,
+      onCameraMove: (google_maps.CameraPosition position) {
+        _onCameraMove(position.zoom);
+      },
       onTap: (google_maps.LatLng position) {
         widget.onMapTap?.call(LatLng(position.latitude, position.longitude));
       },
@@ -328,37 +471,169 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
   }
 
   Set<apple_maps.Annotation> _convertToAppleAnnotations() {
-    return widget.markers.map((marker) {
-      return apple_maps.Annotation(
-        annotationId: apple_maps.AnnotationId(marker.markerId),
-        position: apple_maps.LatLng(
-            marker.position.latitude, marker.position.longitude),
-        infoWindow: apple_maps.InfoWindow(
-          title: marker.infoWindow.title,
-          snippet: marker.infoWindow.snippet,
+    final annotations = <apple_maps.Annotation>{};
+
+    // Add individual markers
+    for (final marker in _visibleMarkers) {
+      annotations.add(
+        apple_maps.Annotation(
+          annotationId: apple_maps.AnnotationId(marker.markerId),
+          position: apple_maps.LatLng(
+              marker.position.latitude, marker.position.longitude),
+          infoWindow: apple_maps.InfoWindow(
+            title: marker.infoWindow.title,
+            snippet: marker.infoWindow.snippet,
+          ),
+          onTap: () {
+            widget.onMarkerTap?.call(marker);
+          },
         ),
-        onTap: () {
-          widget.onMarkerTap?.call(marker);
-        },
       );
-    }).toSet();
+    }
+
+    // Add cluster markers
+    for (final cluster in _clusters) {
+      annotations.add(
+        apple_maps.Annotation(
+          annotationId: apple_maps.AnnotationId(cluster.clusterId),
+          position: apple_maps.LatLng(
+              cluster.center.latitude, cluster.center.longitude),
+          infoWindow: apple_maps.InfoWindow(
+            title: '${cluster.markers.length} locations',
+            snippet: 'Tap to expand cluster',
+          ),
+          onTap: () {
+            _handleClusterTap(cluster);
+          },
+        ),
+      );
+    }
+
+    return annotations;
   }
 
   Set<google_maps.Marker> _convertToGoogleMarkers() {
-    return widget.markers.map((marker) {
-      return google_maps.Marker(
-        markerId: google_maps.MarkerId(marker.markerId),
-        position: google_maps.LatLng(
-            marker.position.latitude, marker.position.longitude),
-        infoWindow: google_maps.InfoWindow(
-          title: marker.infoWindow.title,
-          snippet: marker.infoWindow.snippet,
+    final markers = <google_maps.Marker>{};
+
+    // Add individual markers
+    for (final marker in _visibleMarkers) {
+      markers.add(
+        google_maps.Marker(
+          markerId: google_maps.MarkerId(marker.markerId),
+          position: google_maps.LatLng(
+              marker.position.latitude, marker.position.longitude),
+          infoWindow: google_maps.InfoWindow(
+            title: marker.infoWindow.title,
+            snippet: marker.infoWindow.snippet,
+          ),
+          onTap: () {
+            widget.onMarkerTap?.call(marker);
+          },
         ),
-        onTap: () {
-          widget.onMarkerTap?.call(marker);
-        },
       );
-    }).toSet();
+    }
+
+    // Add cluster markers
+    for (final cluster in _clusters) {
+      markers.add(
+        google_maps.Marker(
+          markerId: google_maps.MarkerId(cluster.clusterId),
+          position: google_maps.LatLng(
+              cluster.center.latitude, cluster.center.longitude),
+          infoWindow: google_maps.InfoWindow(
+            title: '${cluster.markers.length} locations',
+            snippet: 'Tap to expand cluster',
+          ),
+          onTap: () {
+            _handleClusterTap(cluster);
+          },
+        ),
+      );
+    }
+
+    return markers;
+  }
+
+  void _handleClusterTap(MapCluster cluster) {
+    // Zoom in to expand cluster or show cluster details
+    if (_currentZoom < 16) {
+      // Zoom in to expand cluster
+      animateToLocation(cluster.center, zoom: _currentZoom + 2);
+    } else {
+      // Show cluster details in a bottom sheet or dialog
+      _showClusterDetails(cluster);
+    }
+  }
+
+  void _showClusterDetails(MapCluster cluster) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Cluster Details (${cluster.markers.length} items)',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: cluster.markers.length,
+                  itemBuilder: (context, index) {
+                    final marker = cluster.markers[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: marker.color ?? Colors.blue,
+                        child: const Icon(Icons.place, color: Colors.white),
+                      ),
+                      title: Text(marker.infoWindow.title ?? 'Location'),
+                      subtitle: Text(marker.infoWindow.snippet ?? ''),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        widget.onMarkerTap?.call(marker);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   apple_maps.MapType _convertToAppleMapType(MapType mapType) {
@@ -437,6 +712,50 @@ enum MapType {
   normal,
   satellite,
   hybrid,
+}
+
+/// Map Cluster class for grouping nearby markers
+class MapCluster {
+  final String clusterId;
+  final LatLng center;
+  final List<MapMarker> markers;
+
+  MapCluster({
+    required this.clusterId,
+    required this.center,
+    required this.markers,
+  });
+
+  /// Calculate the center point of all markers in the cluster
+  LatLng calculateCenter() {
+    if (markers.isEmpty) return center;
+
+    double totalLat = 0;
+    double totalLng = 0;
+
+    for (final marker in markers) {
+      totalLat += marker.position.latitude;
+      totalLng += marker.position.longitude;
+    }
+
+    return LatLng(
+      totalLat / markers.length,
+      totalLng / markers.length,
+    );
+  }
+
+  /// Get the dominant color of markers in this cluster
+  Color getDominantColor() {
+    if (markers.isEmpty) return Colors.blue;
+
+    final colorCounts = <Color, int>{};
+    for (final marker in markers) {
+      final color = marker.color ?? Colors.blue;
+      colorCounts[color] = (colorCounts[color] ?? 0) + 1;
+    }
+
+    return colorCounts.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+  }
 }
 
 /// Custom painter for fallback map when platform views fail

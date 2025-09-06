@@ -1,8 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:fo_co_co/backend/schema/structs/notification_settings_struct.dart';
 
 import '/auth/firebase_auth/auth_util.dart';
-import '/backend/schema/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'push_notifications_util.dart';
@@ -11,10 +12,12 @@ class NotificationSettingsWidget extends StatefulWidget {
   const NotificationSettingsWidget({super.key});
 
   @override
-  State<NotificationSettingsWidget> createState() => _NotificationSettingsWidgetState();
+  State<NotificationSettingsWidget> createState() =>
+      _NotificationSettingsWidgetState();
 }
 
-class _NotificationSettingsWidgetState extends State<NotificationSettingsWidget> {
+class _NotificationSettingsWidgetState
+    extends State<NotificationSettingsWidget> {
   NotificationSettingsStruct? _currentSettings;
   bool _isLoading = true;
   bool _isSaving = false;
@@ -30,7 +33,7 @@ class _NotificationSettingsWidgetState extends State<NotificationSettingsWidget>
       if (currentUserUid.isEmpty) return;
 
       final userDoc = await FirebaseFirestore.instance
-          .collection('users')
+          .collection('user')
           .doc(currentUserUid)
           .get();
 
@@ -69,8 +72,9 @@ class _NotificationSettingsWidgetState extends State<NotificationSettingsWidget>
     });
 
     try {
-      await PushNotificationsUtil.updateNotificationPreferences(_currentSettings!);
-      
+      await PushNotificationsUtil.updateNotificationPreferences(
+          _currentSettings!);
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('✅ Notification preferences updated successfully!'),
@@ -81,10 +85,11 @@ class _NotificationSettingsWidgetState extends State<NotificationSettingsWidget>
       if (kDebugMode) {
         print('❌ Error saving notification settings: $e');
       }
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Failed to update notification preferences. Please try again.'),
+          content: Text(
+              '❌ Failed to update notification preferences. Please try again.'),
           backgroundColor: FlutterFlowTheme.of(context).error,
         ),
       );
@@ -188,66 +193,71 @@ class _NotificationSettingsWidgetState extends State<NotificationSettingsWidget>
             Text(
               '🔔 Manage Your Notifications',
               style: FlutterFlowTheme.of(context).headlineSmall.override(
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.bold,
-                height: 1.0,
-              ),
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.bold,
+                    height: 1.0,
+                  ),
             ),
             SizedBox(height: 8),
             Text(
               'Choose which notifications you\'d like to receive to optimize your golf mental training journey.',
               style: FlutterFlowTheme.of(context).bodyMedium.override(
-                fontFamily: 'Inter',
-                color: FlutterFlowTheme.of(context).secondaryText,
-                height: 1.0,
-              ),
+                    fontFamily: 'Inter',
+                    color: FlutterFlowTheme.of(context).secondaryText,
+                    height: 1.0,
+                  ),
             ),
             SizedBox(height: 24),
-            
+
             // Daily Reminders
             _buildNotificationTile(
               icon: Icons.schedule,
               title: 'Daily Practice Reminders',
-              subtitle: 'Get reminded to complete your daily mental coaching sessions',
+              subtitle:
+                  'Get reminded to complete your daily mental coaching sessions',
               value: _currentSettings?.dailyReminders ?? false,
               onChanged: (value) => _updateSetting('dailyReminders', value),
             ),
-            
+
             SizedBox(height: 16),
-            
+
             // AI Insights
             _buildNotificationTile(
               icon: Icons.psychology,
               title: 'AI Insights Ready',
-              subtitle: 'Be notified when your personalized golf insights are ready',
+              subtitle:
+                  'Be notified when your personalized golf insights are ready',
               value: _currentSettings?.insightNotifications ?? false,
-              onChanged: (value) => _updateSetting('insightNotifications', value),
+              onChanged: (value) =>
+                  _updateSetting('insightNotifications', value),
             ),
-            
+
             SizedBox(height: 16),
-            
+
             // Achievement Alerts
             _buildNotificationTile(
               icon: Icons.emoji_events,
               title: 'Achievement Alerts',
-              subtitle: 'Celebrate your progress with achievement notifications',
+              subtitle:
+                  'Celebrate your progress with achievement notifications',
               value: _currentSettings?.achievementAlerts ?? false,
               onChanged: (value) => _updateSetting('achievementAlerts', value),
             ),
-            
+
             SizedBox(height: 16),
-            
+
             // Weekly Progress
             _buildNotificationTile(
               icon: Icons.trending_up,
               title: 'Weekly Progress Summary',
-              subtitle: 'Get a weekly overview of your golf improvement journey',
+              subtitle:
+                  'Get a weekly overview of your golf improvement journey',
               value: _currentSettings?.weeklyProgress ?? false,
               onChanged: (value) => _updateSetting('weeklyProgress', value),
             ),
-            
+
             SizedBox(height: 32),
-            
+
             // Test notification button (only in debug mode)
             if (kDebugMode) ...[
               Divider(),
@@ -270,10 +280,10 @@ class _NotificationSettingsWidgetState extends State<NotificationSettingsWidget>
                   iconPadding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
                   color: FlutterFlowTheme.of(context).secondaryBackground,
                   textStyle: FlutterFlowTheme.of(context).bodyMedium.override(
-                    fontFamily: 'Inter',
-                    color: FlutterFlowTheme.of(context).primaryText,
-                    height: 1.0,
-                  ),
+                        fontFamily: 'Inter',
+                        color: FlutterFlowTheme.of(context).primaryText,
+                        height: 1.0,
+                      ),
                   elevation: 0,
                   borderSide: BorderSide(
                     color: FlutterFlowTheme.of(context).alternate,
@@ -322,29 +332,31 @@ class _NotificationSettingsWidgetState extends State<NotificationSettingsWidget>
         title: Text(
           title,
           style: FlutterFlowTheme.of(context).bodyLarge.override(
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w600,
-            height: 1.0,
-          ),
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w600,
+                height: 1.0,
+              ),
         ),
         subtitle: Text(
           subtitle,
           style: FlutterFlowTheme.of(context).bodySmall.override(
-            fontFamily: 'Inter',
-            color: FlutterFlowTheme.of(context).secondaryText,
-            height: 1.0,
-          ),
+                fontFamily: 'Inter',
+                color: FlutterFlowTheme.of(context).secondaryText,
+                height: 1.0,
+              ),
         ),
         trailing: Switch(
           value: value,
           onChanged: onChanged,
           activeColor: FlutterFlowTheme.of(context).primary,
-          activeTrackColor: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
+          activeTrackColor:
+              FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
           inactiveThumbColor: FlutterFlowTheme.of(context).alternate,
-          inactiveTrackColor: FlutterFlowTheme.of(context).alternate.withValues(alpha: 0.3),
+          inactiveTrackColor:
+              FlutterFlowTheme.of(context).alternate.withValues(alpha: 0.3),
         ),
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
     );
   }
-} 
+}

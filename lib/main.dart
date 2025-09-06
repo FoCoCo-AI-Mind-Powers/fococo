@@ -12,6 +12,7 @@ import 'backend/firebase/firebase_config.dart';
 import 'backend/push_notifications/push_notifications_handler.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
+import '/services/stripe_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
@@ -35,6 +36,18 @@ void main() async {
   }
 
   await FlutterFlowTheme.initialize();
+
+  // Initialize Stripe
+  try {
+    await StripeService().initialize();
+    if (kDebugMode) {
+      print('✅ Stripe initialized successfully');
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      print('❌ Failed to initialize Stripe: $e');
+    }
+  }
 
   if (!kIsWeb) {
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
@@ -82,10 +95,10 @@ class _MyAppState extends State<MyApp> {
 
     _appStateNotifier = AppStateNotifier.instance;
     _router = createRouter(_appStateNotifier);
-    
+
     // Initialize the user stream and handle authentication state
     _initializeUserStream();
-    
+
     // Reduced timeout to prevent long loading times
     Future.delayed(
       Duration(milliseconds: 800), // Reduced from 2000ms to 800ms
@@ -95,6 +108,26 @@ class _MyAppState extends State<MyApp> {
             print('⏱️ Splash screen timeout - forcing stop');
           }
           _appStateNotifier.stopShowingSplashImage();
+
+          // Force navigation on timeout
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              final currentLocation = _router.getCurrentLocation();
+              if (currentLocation == '/' || currentLocation == '/splash') {
+                if (_appStateNotifier.loggedIn) {
+                  if (kDebugMode) {
+                    print('⏱️ Timeout: Navigating to dashboard');
+                  }
+                  _router.go('/dashboard');
+                } else {
+                  if (kDebugMode) {
+                    print('⏱️ Timeout: Navigating to home page');
+                  }
+                  _router.go('/home');
+                }
+              }
+            }
+          });
         }
       },
     );
@@ -108,6 +141,26 @@ class _MyAppState extends State<MyApp> {
             print('🚨 Emergency splash screen timeout - forcing stop');
           }
           _appStateNotifier.stopShowingSplashImage();
+
+          // Emergency navigation
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              final currentLocation = _router.getCurrentLocation();
+              if (currentLocation == '/' || currentLocation == '/splash') {
+                if (_appStateNotifier.loggedIn) {
+                  if (kDebugMode) {
+                    print('🚨 Emergency: Navigating to dashboard');
+                  }
+                  _router.go('/dashboard');
+                } else {
+                  if (kDebugMode) {
+                    print('🚨 Emergency: Navigating to home page');
+                  }
+                  _router.go('/home');
+                }
+              }
+            }
+          });
         }
       },
     );
@@ -116,26 +169,47 @@ class _MyAppState extends State<MyApp> {
   void _initializeUserStream() {
     try {
       userStream = foCoCoFirebaseUserStream();
-      
+
       // Listen to the user stream with a subscription
       userStreamSubscription = userStream.listen(
         (user) async {
           if (kDebugMode) {
-            print('🔄 User state changed: ${user.loggedIn ? 'logged in' : 'logged out'}');
+            print(
+                '🔄 User state changed: ${user.loggedIn ? 'logged in' : 'logged out'}');
           }
-          
+
           if (mounted) {
             _appStateNotifier.update(user);
-            
+
             // Stop showing splash screen immediately when user state is determined
             if (_appStateNotifier.showSplashImage) {
               if (kDebugMode) {
                 print('🛑 Stopping splash screen');
               }
               _appStateNotifier.stopShowingSplashImage();
+
+              // Force navigation to appropriate page after splash screen stops
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  final currentLocation = _router.getCurrentLocation();
+                  if (currentLocation == '/' || currentLocation == '/splash') {
+                    if (user.loggedIn) {
+                      if (kDebugMode) {
+                        print('🔄 Navigating to dashboard for logged in user');
+                      }
+                      _router.go('/dashboard');
+                    } else {
+                      if (kDebugMode) {
+                        print('🔄 Navigating to home page for logged out user');
+                      }
+                      _router.go('/home');
+                    }
+                  }
+                }
+              });
             }
           }
-          
+
           // Handle user authentication state (simplified)
           if (user.loggedIn) {
             if (kDebugMode) {
@@ -161,16 +235,18 @@ class _MyAppState extends State<MyApp> {
           }
         },
       );
-      
+
       // Simplified JWT token stream handling
-      jwtTokenStreamSubscription = jwtTokenStream.listen((_) {}, onError: (error) {
+      jwtTokenStreamSubscription =
+          jwtTokenStream.listen((_) {}, onError: (error) {
         if (kDebugMode) {
           print('❌ Error in JWT token stream: $error');
         }
       });
-      
+
       // Reduced delay for initial user check
-      Future.delayed(Duration(milliseconds: 200), () { // Reduced from 500ms to 200ms
+      Future.delayed(Duration(milliseconds: 200), () {
+        // Reduced from 500ms to 200ms
         if (_appStateNotifier.showSplashImage) {
           if (kDebugMode) {
             print('🔄 Forcing initial user check');
@@ -179,12 +255,34 @@ class _MyAppState extends State<MyApp> {
           foCoCoFirebaseUserStream().take(1).listen(
             (user) {
               if (kDebugMode) {
-                print('🔄 Initial user check: ${user.loggedIn ? 'logged in' : 'logged out'}');
+                print(
+                    '🔄 Initial user check: ${user.loggedIn ? 'logged in' : 'logged out'}');
               }
               if (mounted) {
                 _appStateNotifier.update(user);
                 if (_appStateNotifier.showSplashImage) {
                   _appStateNotifier.stopShowingSplashImage();
+
+                  // Force navigation after initial user check
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      final currentLocation = _router.getCurrentLocation();
+                      if (currentLocation == '/' ||
+                          currentLocation == '/splash') {
+                        if (user.loggedIn) {
+                          if (kDebugMode) {
+                            print('🔄 Initial check: Navigating to dashboard');
+                          }
+                          _router.go('/dashboard');
+                        } else {
+                          if (kDebugMode) {
+                            print('🔄 Initial check: Navigating to home page');
+                          }
+                          _router.go('/home');
+                        }
+                      }
+                    }
+                  });
                 }
               }
             },
@@ -199,13 +297,12 @@ class _MyAppState extends State<MyApp> {
           );
         }
       });
-      
     } catch (e) {
       if (kDebugMode) {
         print('❌ Error initializing user stream: $e');
       }
       // Ensure splash screen is stopped immediately even if user stream fails
-      if (mounted && _appStateNotifier.showSplashImage) {  
+      if (mounted && _appStateNotifier.showSplashImage) {
         if (kDebugMode) {
           print('🛑 Stopping splash screen due to initialization error');
         }

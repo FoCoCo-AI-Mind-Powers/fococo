@@ -28,3 +28,59 @@ doc/api/
 
 # FVM Version Cache
 .fvm/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# iOS/Xcode
+ios/Pods/
+ios/Podfile.lock
+ios/Runner.xcworkspace/xcuserdata/
+ios/Runner.xcodeproj/xcuserdata/
+ios/*.xcuserdata
+*.xcuserdata/
+xcuserdata/
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.pbxuser
+*.xccheckout
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+
+
+# Firebase
+firebase/functions/node_modules/
+firebase/functions/.env
+firebase/functions/lib/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+*.lcov
+*.coverage
+
+# Temporary files
+*.tmp
+*.temp
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini

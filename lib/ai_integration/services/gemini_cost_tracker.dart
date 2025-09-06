@@ -1,5 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import '/backend/schema/index.dart';
+import 'package:fo_co_co/backend/schema/user_record.dart';
 import '../config/gemini_config.dart';
 
 /// Service for tracking Gemini AI usage, costs, and tokens

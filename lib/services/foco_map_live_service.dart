@@ -1,333 +1,664 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '/backend/schema/index.dart';
-import '/auth/firebase_auth/auth_util.dart';
 
+import '/auth/firebase_auth/auth_util.dart';
+import '/backend/schema/round_logs_record.dart';
+import '/backend/schema/shot_logs_record.dart';
+
+/// Production FoCoMap Live Service
+/// Manages real-time data sync, live updates, and tier-based access
+/// Implements all features from FocoMap documentation
 class FoCoMapLiveService {
   static final FoCoMapLiveService _instance = FoCoMapLiveService._internal();
   factory FoCoMapLiveService() => _instance;
   FoCoMapLiveService._internal();
 
   // Stream controllers for real-time data
-  final StreamController<List<RoundLogsRecord>> _roundLogsController = 
+  final _roundLogsController =
       StreamController<List<RoundLogsRecord>>.broadcast();
-  final StreamController<List<ShotLogsRecord>> _shotLogsController = 
+  final _shotLogsController =
       StreamController<List<ShotLogsRecord>>.broadcast();
-  final StreamController<Map<String, dynamic>> _liveUpdateController = 
+  final _liveUpdateController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _filterUpdateController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _aiInsightsController =
+      StreamController<List<Map<String, dynamic>>>.broadcast();
 
   // Firestore listeners
-  StreamSubscription<QuerySnapshot>? _roundLogsSubscription;
-  StreamSubscription<QuerySnapshot>? _shotLogsSubscription;
+  StreamSubscription? _roundLogsSubscription;
+  StreamSubscription? _shotLogsSubscription;
+  StreamSubscription? _aiInsightsSubscription;
 
-  // Current data cache
-  List<RoundLogsRecord> _currentRoundLogs = [];
-  List<ShotLogsRecord> _currentShotLogs = [];
+  // State management
+  bool _isLiveMode = false;
+  String? _activeRoundId;
+  UserTier _userTier = UserTier.base;
 
-  // Getters for streams
-  Stream<List<RoundLogsRecord>> get roundLogsStream => _roundLogsController.stream;
+  // Data caching for performance
+  List<RoundLogsRecord> _cachedRoundLogs = [];
+  List<ShotLogsRecord> _cachedShotLogs = [];
+  List<Map<String, dynamic>> _cachedAIInsights = [];
+  Map<String, dynamic> _activeFilters = {};
+
+  // Performance optimization
+  DateTime? _lastRefresh;
+  static const Duration _refreshCooldown = Duration(seconds: 2);
+
+  // Streams
+  Stream<List<RoundLogsRecord>> get roundLogsStream =>
+      _roundLogsController.stream;
   Stream<List<ShotLogsRecord>> get shotLogsStream => _shotLogsController.stream;
-  Stream<Map<String, dynamic>> get liveUpdateStream => _liveUpdateController.stream;
+  Stream<Map<String, dynamic>> get liveUpdateStream =>
+      _liveUpdateController.stream;
+  Stream<Map<String, dynamic>> get filterUpdateStream =>
+      _filterUpdateController.stream;
+  Stream<List<Map<String, dynamic>>> get aiInsightsStream =>
+      _aiInsightsController.stream;
 
-  // Current data getters
-  List<RoundLogsRecord> get currentRoundLogs => List.from(_currentRoundLogs);
-  List<ShotLogsRecord> get currentShotLogs => List.from(_currentShotLogs);
+  // Getters
+  bool get isLiveMode => _isLiveMode;
+  String? get activeRoundId => _activeRoundId;
+  UserTier get userTier => _userTier;
+  List<RoundLogsRecord> get cachedRoundLogs => _cachedRoundLogs;
+  List<ShotLogsRecord> get cachedShotLogs => _cachedShotLogs;
+  List<Map<String, dynamic>> get cachedAIInsights => _cachedAIInsights;
 
-  bool _isActive = false;
-  bool get isActive => _isActive;
-
-  /// Start live monitoring for Plus/Prime tier users
-  Future<void> startLiveMode({
-    int roundLogsLimit = 50,
-    int shotLogsLimit = 500,
-    Duration? timeWindow,
-  }) async {
-    if (_isActive || currentUser == null) return;
-
-    _isActive = true;
-
+  /// Initialize the live service with user tier detection
+  Future<void> initialize() async {
     try {
-      // Set up round logs listener
-      Query roundLogsQuery = FirebaseFirestore.instance
-          .collection('round_logs')
-          .where('userId', isEqualTo: currentUser!.uid)
-          .orderBy('createdTime', descending: true)
-          .limit(roundLogsLimit);
+      // Detect user tier based on subscription
+      _userTier = await _detectUserTier();
 
-      // Add time window filter if specified
-      if (timeWindow != null) {
-        final cutoffTime = DateTime.now().subtract(timeWindow);
-        roundLogsQuery = roundLogsQuery.where('createdTime', isGreaterThan: cutoffTime);
-      }
-
-      _roundLogsSubscription = roundLogsQuery.snapshots().listen(
-        _onRoundLogsUpdate,
-        onError: _onError,
-      );
-
-      // Set up shot logs listener  
-      Query shotLogsQuery = FirebaseFirestore.instance
-          .collection('shot_logs')
-          .where('userId', isEqualTo: currentUser!.uid)
-          .orderBy('timestamp', descending: true)
-          .limit(shotLogsLimit);
-
-      if (timeWindow != null) {
-        final cutoffTime = DateTime.now().subtract(timeWindow);
-        shotLogsQuery = shotLogsQuery.where('timestamp', isGreaterThan: cutoffTime);
-      }
-
-      _shotLogsSubscription = shotLogsQuery.snapshots().listen(
-        _onShotLogsUpdate,
-        onError: _onError,
-      );
-
-      debugPrint('FoCoMap Live Mode: Started');
+      debugPrint('FoCoMap Live Service initialized - Tier: ${_userTier.name}');
     } catch (e) {
-      debugPrint('Error starting live mode: $e');
-      _isActive = false;
+      debugPrint('Error initializing FoCoMap Live Service: $e');
     }
   }
 
-  /// Stop live monitoring
-  Future<void> stopLiveMode() async {
-    if (!_isActive) return;
+  /// Start live mode with tier-based access control
+  Future<void> startLiveMode({String? roundId}) async {
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
 
-    await _roundLogsSubscription?.cancel();
-    await _shotLogsSubscription?.cancel();
-    
-    _roundLogsSubscription = null;
-    _shotLogsSubscription = null;
-    _isActive = false;
+    // Check tier permissions
+    if (!canAccessLiveMode()) {
+      throw Exception('Live mode requires Plus or Prime subscription');
+    }
 
-    debugPrint('FoCoMap Live Mode: Stopped');
+    try {
+      _isLiveMode = true;
+      _activeRoundId = roundId;
+
+      // Start real-time listeners based on tier
+      await _startRoundLogsListener();
+
+      if (_userTier == UserTier.prime) {
+        await _startShotLogsListener();
+        await _startAIInsightsListener();
+      }
+
+      _liveUpdateController.add({
+        'type': 'live_mode_started',
+        'tier': _userTier.name,
+        'roundId': roundId,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+
+      debugPrint(
+          'Live mode started - Round: $roundId, Tier: ${_userTier.name}');
+    } catch (e) {
+      debugPrint('Error starting live mode: $e');
+      _isLiveMode = false;
+      rethrow;
+    }
   }
 
-  void _onRoundLogsUpdate(QuerySnapshot snapshot) {
+  /// Stop live mode and clean up listeners
+  Future<void> stopLiveMode() async {
     try {
-      final newRoundLogs = snapshot.docs
+      _isLiveMode = false;
+      _activeRoundId = null;
+
+      // Cancel all listeners
+      await _roundLogsSubscription?.cancel();
+      await _shotLogsSubscription?.cancel();
+      await _aiInsightsSubscription?.cancel();
+
+      _liveUpdateController.add({
+        'type': 'live_mode_stopped',
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+
+      debugPrint('Live mode stopped');
+    } catch (e) {
+      debugPrint('Error stopping live mode: $e');
+    }
+  }
+
+  /// Refresh data manually (for Base tier users) with cooldown
+  Future<void> refreshData() async {
+    if (currentUser == null) return;
+
+    // Implement cooldown to prevent excessive requests
+    if (_lastRefresh != null &&
+        DateTime.now().difference(_lastRefresh!) < _refreshCooldown) {
+      debugPrint('Refresh cooldown active, skipping request');
+      return;
+    }
+
+    try {
+      _lastRefresh = DateTime.now();
+
+      // Fetch round logs with optimized query
+      final roundLogsQuery = FirebaseFirestore.instance
+          .collection('round_logs')
+          .where('userId', isEqualTo: currentUser!.uid)
+          .orderBy('date', descending: true)
+          .limit(50);
+
+      final roundLogsSnapshot = await roundLogsQuery.get();
+      _cachedRoundLogs = roundLogsSnapshot.docs
           .map((doc) => RoundLogsRecord.fromSnapshot(doc))
           .toList();
 
-      // Check for new entries (live updates)
-      final newEntries = _findNewEntries(_currentRoundLogs, newRoundLogs);
-      if (newEntries.isNotEmpty) {
-        _liveUpdateController.add({
-          'type': 'round_log',
-          'action': 'added',
-          'data': newEntries,
-          'timestamp': DateTime.now(),
-        });
+      _roundLogsController.add(_getFilteredRoundLogs());
+
+      // Fetch shot logs (Prime tier only)
+      if (_userTier == UserTier.prime) {
+        final shotLogsQuery = FirebaseFirestore.instance
+            .collection('shot_logs')
+            .where('userId', isEqualTo: currentUser!.uid)
+            .orderBy('timestamp', descending: true)
+            .limit(100);
+
+        final shotLogsSnapshot = await shotLogsQuery.get();
+        _cachedShotLogs = shotLogsSnapshot.docs
+            .map((doc) => ShotLogsRecord.fromSnapshot(doc))
+            .toList();
+
+        _shotLogsController.add(_getFilteredShotLogs());
+
+        // Fetch AI insights
+        await _fetchAIInsights();
       }
 
-      // Update cache and notify listeners
-      _currentRoundLogs = newRoundLogs;
-      _roundLogsController.add(newRoundLogs);
+      _liveUpdateController.add({
+        'type': 'data_refreshed',
+        'roundLogs': _cachedRoundLogs.length,
+        'shotLogs': _cachedShotLogs.length,
+        'aiInsights': _cachedAIInsights.length,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
 
+      debugPrint(
+          'Data refreshed - Rounds: ${_cachedRoundLogs.length}, Shots: ${_cachedShotLogs.length}');
     } catch (e) {
-      debugPrint('Error processing round logs update: $e');
+      debugPrint('Error refreshing data: $e');
+      _liveUpdateController.add({
+        'type': 'error',
+        'message': 'Failed to refresh data: $e',
+      });
     }
   }
 
-  void _onShotLogsUpdate(QuerySnapshot snapshot) {
-    try {
-      final newShotLogs = snapshot.docs
-          .map((doc) => ShotLogsRecord.fromSnapshot(doc))
-          .toList();
+  /// Apply filters to the data with real-time updates
+  void applyFilters(Map<String, dynamic> filters) {
+    _activeFilters = Map.from(filters);
 
-      // Check for new entries (live updates)
-      final newEntries = _findNewShotEntries(_currentShotLogs, newShotLogs);
-      if (newEntries.isNotEmpty) {
-        _liveUpdateController.add({
-          'type': 'shot_log',
-          'action': 'added',
-          'data': newEntries,
-          'timestamp': DateTime.now(),
-        });
-      }
+    // Filter cached data
+    final filteredRoundLogs = _getFilteredRoundLogs();
+    final filteredShotLogs = _getFilteredShotLogs();
 
-      // Update cache and notify listeners
-      _currentShotLogs = newShotLogs;
-      _shotLogsController.add(newShotLogs);
+    // Emit filtered data
+    _roundLogsController.add(filteredRoundLogs);
+    _shotLogsController.add(filteredShotLogs);
 
-    } catch (e) {
-      debugPrint('Error processing shot logs update: $e');
-    }
+    _filterUpdateController.add({
+      'type': 'filters_applied',
+      'filters': _activeFilters,
+      'results': {
+        'roundLogs': filteredRoundLogs.length,
+        'shotLogs': filteredShotLogs.length,
+      },
+    });
+
+    debugPrint('Filters applied: $_activeFilters');
   }
 
-  List<RoundLogsRecord> _findNewEntries(
-    List<RoundLogsRecord> oldList, 
-    List<RoundLogsRecord> newList
-  ) {
-    if (oldList.isEmpty) return [];
-    
-    final oldIds = oldList.map((r) => r.roundId).toSet();
-    return newList.where((r) => !oldIds.contains(r.roundId)).toList();
-  }
+  /// Clear all filters
+  void clearFilters() {
+    _activeFilters.clear();
+    _roundLogsController.add(_cachedRoundLogs);
+    _shotLogsController.add(_cachedShotLogs);
 
-  List<ShotLogsRecord> _findNewShotEntries(
-    List<ShotLogsRecord> oldList, 
-    List<ShotLogsRecord> newList
-  ) {
-    if (oldList.isEmpty) return [];
-    
-    final oldIds = oldList.map((s) => s.shotId).toSet();
-    return newList.where((s) => !oldIds.contains(s.shotId)).toList();
-  }
-
-  void _onError(error) {
-    debugPrint('FoCoMap Live Service Error: $error');
-    _liveUpdateController.add({
-      'type': 'error',
-      'message': error.toString(),
-      'timestamp': DateTime.now(),
+    _filterUpdateController.add({
+      'type': 'filters_cleared',
     });
   }
 
-  /// Get filtered data based on map layer and filters
-  List<RoundLogsRecord> getFilteredRoundLogs({
-    Map<String, bool>? filters,
-    String? courseFilter,
-    DateTime? startDate,
-    DateTime? endDate,
-  }) {
-    var filtered = List<RoundLogsRecord>.from(_currentRoundLogs);
-
-    // Apply date filters
-    if (startDate != null) {
-      filtered = filtered.where((r) => 
-        r.date != null && r.date!.isAfter(startDate)).toList();
-    }
-    if (endDate != null) {
-      filtered = filtered.where((r) => 
-        r.date != null && r.date!.isBefore(endDate)).toList();
-    }
-
-    // Apply course filter
-    if (courseFilter != null && courseFilter.isNotEmpty) {
-      filtered = filtered.where((r) => 
-        r.courseName.toLowerCase().contains(courseFilter.toLowerCase())).toList();
-    }
-
-    return filtered;
+  /// Get filtered data for specific layer
+  List<RoundLogsRecord> getFilteredRoundLogs() {
+    return _getFilteredRoundLogs();
   }
 
-  List<ShotLogsRecord> getFilteredShotLogs({
-    Map<String, bool>? clubFilters,
-    Map<String, bool>? cueFilters,
-    String? roundIdFilter,
-    DateTime? startDate,
-    DateTime? endDate,
-  }) {
-    var filtered = List<ShotLogsRecord>.from(_currentShotLogs);
-
-    // Apply date filters
-    if (startDate != null) {
-      filtered = filtered.where((s) => 
-        s.timestamp != null && s.timestamp!.isAfter(startDate)).toList();
-    }
-    if (endDate != null) {
-      filtered = filtered.where((s) => 
-        s.timestamp != null && s.timestamp!.isBefore(endDate)).toList();
-    }
-
-    // Apply club filters
-    if (clubFilters != null && clubFilters.isNotEmpty) {
-      filtered = filtered.where((s) {
-        final clubType = _getClubType(s.clubUsed);
-        return clubFilters[clubType] ?? true;
-      }).toList();
-    }
-
-    // Apply round filter
-    if (roundIdFilter != null && roundIdFilter.isNotEmpty) {
-      filtered = filtered.where((s) => s.roundId == roundIdFilter).toList();
-    }
-
-    return filtered;
+  List<ShotLogsRecord> getFilteredShotLogs() {
+    return _getFilteredShotLogs();
   }
 
-  String _getClubType(String club) {
-    final clubLower = club.toLowerCase();
-    if (clubLower.contains('driver')) return 'driver';
-    if (clubLower.contains('iron') || clubLower.contains('hybrid')) return 'iron';
-    if (clubLower.contains('wedge') || clubLower.contains('sand')) return 'wedge';
-    if (clubLower.contains('putter')) return 'putter';
-    return 'iron';
+  /// Start real-time round logs listener
+  Future<void> _startRoundLogsListener() async {
+    final query = FirebaseFirestore.instance
+        .collection('round_logs')
+        .where('userId', isEqualTo: currentUser!.uid)
+        .orderBy('date', descending: true)
+        .limit(50);
+
+    _roundLogsSubscription = query.snapshots().listen(
+      (snapshot) {
+        try {
+          _cachedRoundLogs = snapshot.docs
+              .map((doc) => RoundLogsRecord.fromSnapshot(doc))
+              .toList();
+
+          final filteredData = _getFilteredRoundLogs();
+          _roundLogsController.add(filteredData);
+
+          // Check for new entries and emit specific updates
+          for (final change in snapshot.docChanges) {
+            if (change.type == DocumentChangeType.added) {
+              final newRecord = RoundLogsRecord.fromSnapshot(change.doc);
+              _liveUpdateController.add({
+                'type': 'round_log_added',
+                'data': newRecord,
+                'timestamp': DateTime.now().toIso8601String(),
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Error in round logs listener: $e');
+        }
+      },
+      onError: (error) {
+        debugPrint('Round logs stream error: $error');
+        _liveUpdateController.add({
+          'type': 'error',
+          'message': 'Round logs sync error: $error',
+        });
+      },
+    );
   }
 
-  /// Manual refresh for Base tier users
-  Future<void> refreshData({
-    int roundLogsLimit = 50,
-    int shotLogsLimit = 500,
-  }) async {
-    if (currentUser == null) return;
+  /// Start real-time shot logs listener (Prime tier only)
+  Future<void> _startShotLogsListener() async {
+    if (_userTier != UserTier.prime) return;
+
+    final query = FirebaseFirestore.instance
+        .collection('shot_logs')
+        .where('userId', isEqualTo: currentUser!.uid)
+        .orderBy('timestamp', descending: true)
+        .limit(100);
+
+    _shotLogsSubscription = query.snapshots().listen(
+      (snapshot) {
+        try {
+          _cachedShotLogs = snapshot.docs
+              .map((doc) => ShotLogsRecord.fromSnapshot(doc))
+              .toList();
+
+          final filteredData = _getFilteredShotLogs();
+          _shotLogsController.add(filteredData);
+
+          // Check for new entries
+          for (final change in snapshot.docChanges) {
+            if (change.type == DocumentChangeType.added) {
+              final newRecord = ShotLogsRecord.fromSnapshot(change.doc);
+              _liveUpdateController.add({
+                'type': 'shot_log_added',
+                'data': newRecord,
+                'timestamp': DateTime.now().toIso8601String(),
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Error in shot logs listener: $e');
+        }
+      },
+      onError: (error) {
+        debugPrint('Shot logs stream error: $error');
+        _liveUpdateController.add({
+          'type': 'error',
+          'message': 'Shot logs sync error: $error',
+        });
+      },
+    );
+  }
+
+  /// Start AI insights listener (Prime tier only)
+  Future<void> _startAIInsightsListener() async {
+    if (_userTier != UserTier.prime) return;
+
+    final query = FirebaseFirestore.instance
+        .collection('ai_insights')
+        .where('userId', isEqualTo: currentUser!.uid)
+        .orderBy('timestamp', descending: true)
+        .limit(20);
+
+    _aiInsightsSubscription = query.snapshots().listen(
+      (snapshot) {
+        try {
+          _cachedAIInsights = snapshot.docs
+              .map((doc) => doc.data() as Map<String, dynamic>)
+              .toList();
+
+          _aiInsightsController.add(_cachedAIInsights);
+
+          for (final change in snapshot.docChanges) {
+            if (change.type == DocumentChangeType.added) {
+              _liveUpdateController.add({
+                'type': 'ai_insight_added',
+                'data': change.doc.data(),
+                'timestamp': DateTime.now().toIso8601String(),
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Error in AI insights listener: $e');
+        }
+      },
+      onError: (error) {
+        debugPrint('AI insights stream error: $error');
+      },
+    );
+  }
+
+  /// Fetch AI insights manually
+  Future<void> _fetchAIInsights() async {
+    if (_userTier != UserTier.prime) return;
 
     try {
-      // Fetch round logs
-      final roundLogsSnapshot = await FirebaseFirestore.instance
-          .collection('round_logs')
-          .where('userId', isEqualTo: currentUser!.uid)
-          .orderBy('createdTime', descending: true)
-          .limit(roundLogsLimit)
-          .get();
-
-      final roundLogs = roundLogsSnapshot.docs
-          .map((doc) => RoundLogsRecord.fromSnapshot(doc))
-          .toList();
-
-      // Fetch shot logs
-      final shotLogsSnapshot = await FirebaseFirestore.instance
-          .collection('shot_logs')
+      final query = FirebaseFirestore.instance
+          .collection('ai_insights')
           .where('userId', isEqualTo: currentUser!.uid)
           .orderBy('timestamp', descending: true)
-          .limit(shotLogsLimit)
-          .get();
+          .limit(20);
 
-      final shotLogs = shotLogsSnapshot.docs
-          .map((doc) => ShotLogsRecord.fromSnapshot(doc))
+      final snapshot = await query.get();
+      _cachedAIInsights = snapshot.docs
+          .map((doc) => doc.data() as Map<String, dynamic>)
           .toList();
 
-      // Update cache and notify
-      _currentRoundLogs = roundLogs;
-      _currentShotLogs = shotLogs;
-
-      _roundLogsController.add(roundLogs);
-      _shotLogsController.add(shotLogs);
-
-      debugPrint('FoCoMap: Manual refresh completed');
+      _aiInsightsController.add(_cachedAIInsights);
     } catch (e) {
-      debugPrint('Error refreshing data: $e');
+      debugPrint('Error fetching AI insights: $e');
     }
   }
 
-  /// Get last 5 rounds for pulse animation
-  List<RoundLogsRecord> getRecentRounds() {
-    final recent = List<RoundLogsRecord>.from(_currentRoundLogs);
-    recent.sort((a, b) => b.date?.compareTo(a.date ?? DateTime(1970)) ?? 0);
-    return recent.take(5).toList();
+  /// Filter round logs based on active filters
+  List<RoundLogsRecord> _getFilteredRoundLogs() {
+    if (_activeFilters.isEmpty) return _cachedRoundLogs;
+
+    return _cachedRoundLogs.where((log) {
+      // Date range filter
+      if (_activeFilters.containsKey('dateRange')) {
+        final dateRange = _activeFilters['dateRange'] as Map<String, DateTime>;
+        if (log.date != null) {
+          if (log.date!.isBefore(dateRange['start']!) ||
+              log.date!.isAfter(dateRange['end']!)) {
+            return false;
+          }
+        }
+      }
+
+      // Course type filter
+      if (_activeFilters.containsKey('courseType')) {
+        final courseTypes = _activeFilters['courseType'] as List<String>;
+        if (!courseTypes.contains(log.courseType)) {
+          return false;
+        }
+      }
+
+      // Mindset filter
+      if (_activeFilters.containsKey('mindsetColor')) {
+        final colors = _activeFilters['mindsetColor'] as List<String>;
+        if (!colors.contains(log.mindsetColor)) {
+          return false;
+        }
+      }
+
+      // Cue filter
+      if (_activeFilters.containsKey('cueUsed')) {
+        final cues = _activeFilters['cueUsed'] as List<String>;
+        if (!cues.contains(log.bestCue)) {
+          return false;
+        }
+      }
+
+      // Recovery zones filter
+      if (_activeFilters.containsKey('recoveryZones')) {
+        final showRecovery = _activeFilters['recoveryZones'] as bool;
+        if (showRecovery && log.recoveryHoles.isEmpty) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
   }
 
-  /// Get round by ID for replay
-  RoundLogsRecord? getRoundById(String roundId) {
+  /// Filter shot logs based on active filters
+  List<ShotLogsRecord> _getFilteredShotLogs() {
+    if (_activeFilters.isEmpty) return _cachedShotLogs;
+
+    return _cachedShotLogs.where((log) {
+      // Club filter
+      if (_activeFilters.containsKey('clubUsed')) {
+        final clubs = _activeFilters['clubUsed'] as List<String>;
+        if (!clubs.contains(log.clubUsed)) {
+          return false;
+        }
+      }
+
+      // Shot outcome filter
+      if (_activeFilters.containsKey('shotOutcome')) {
+        final outcomes = _activeFilters['shotOutcome'] as List<String>;
+        if (!outcomes.contains(log.shotOutcome)) {
+          return false;
+        }
+      }
+
+      // Wind condition filter
+      if (_activeFilters.containsKey('windCondition')) {
+        final conditions = _activeFilters['windCondition'] as List<String>;
+        if (!conditions.contains(log.windCondition)) {
+          return false;
+        }
+      }
+
+      // Performance rating filter
+      if (_activeFilters.containsKey('performanceRating')) {
+        final minRating = _activeFilters['performanceRating'] as int;
+        if (log.performanceRating < minRating) {
+          return false;
+        }
+      }
+
+      // Shot shape filter
+      if (_activeFilters.containsKey('shotShape')) {
+        final shapes = _activeFilters['shotShape'] as List<String>;
+        if (!shapes.contains(log.shotShape)) {
+          return false;
+        }
+      }
+
+      // Miss pattern filter
+      if (_activeFilters.containsKey('missPattern')) {
+        final patterns = _activeFilters['missPattern'] as List<String>;
+        if (!patterns.contains(log.missPattern)) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+  }
+
+  /// Detect user tier based on subscription
+  Future<UserTier> _detectUserTier() async {
+    if (currentUser == null) return UserTier.junior;
+
     try {
-      return _currentRoundLogs.firstWhere((r) => r.roundId == roundId);
+      // Check user subscription in Firestore
+      final userDoc = await FirebaseFirestore.instance
+          .collection('user')
+          .doc(currentUser!.uid)
+          .get();
+
+      if (!userDoc.exists) return UserTier.junior;
+
+      final userData = userDoc.data()!;
+      final subscription = userData['subscription'] as String?;
+
+      switch (subscription?.toLowerCase()) {
+        case 'prime':
+          return UserTier.prime;
+        case 'plus':
+          return UserTier.plus;
+        case 'base':
+          return UserTier.base;
+        default:
+          return UserTier.junior;
+      }
     } catch (e) {
-      return null;
+      debugPrint('Error detecting user tier: $e');
+      return UserTier.junior;
     }
   }
 
-  /// Get shots for specific round
-  List<ShotLogsRecord> getShotsForRound(String roundId) {
-    return _currentShotLogs.where((s) => s.roundId == roundId).toList();
+  /// Check if user can access live mode
+  bool canAccessLiveMode() {
+    return _userTier == UserTier.plus || _userTier == UserTier.prime;
   }
 
-  /// Cleanup resources
+  /// Check if user can access technical data
+  bool canAccessTechnicalData() {
+    return _userTier == UserTier.prime;
+  }
+
+  /// Check if user can access sync map
+  bool canAccessSyncMap() {
+    return _userTier == UserTier.prime;
+  }
+
+  /// Check if user can access GPS mapping
+  bool canAccessGPSMapping() {
+    return _userTier != UserTier.junior;
+  }
+
+  /// Get available layers based on tier
+  List<MapLayer> getAvailableLayers() {
+    switch (_userTier) {
+      case UserTier.junior:
+        return [];
+      case UserTier.base:
+        return [MapLayer.mindMap];
+      case UserTier.plus:
+        return [MapLayer.mindMap];
+      case UserTier.prime:
+        return [MapLayer.mindMap, MapLayer.shotMap, MapLayer.syncMap];
+    }
+  }
+
+  /// Get tier-specific features
+  Map<String, bool> getTierFeatures() {
+    return {
+      'reviewPastRounds': _userTier != UserTier.junior,
+      'liveMapUpdates': canAccessLiveMode(),
+      'technicalDataLayer': canAccessTechnicalData(),
+      'combinedSyncMapLayer': canAccessSyncMap(),
+      'gpsMapping': canAccessGPSMapping(),
+    };
+  }
+
+  /// Performance analytics for the current user
+  Future<Map<String, dynamic>> getPerformanceAnalytics() async {
+    if (_cachedRoundLogs.isEmpty) return {};
+
+    try {
+      // Calculate mental performance trends
+      final mentalScores = _cachedRoundLogs.map((round) {
+        return (round.mindsetFocus +
+                round.mindsetConfidence +
+                round.mindsetControl) /
+            3;
+      }).toList();
+
+      final avgMentalScore = mentalScores.isNotEmpty
+          ? mentalScores.reduce((a, b) => a + b) / mentalScores.length
+          : 0.0;
+
+      // Calculate course distribution
+      final courseDistribution = <String, int>{};
+      for (final round in _cachedRoundLogs) {
+        courseDistribution[round.courseName] =
+            (courseDistribution[round.courseName] ?? 0) + 1;
+      }
+
+      // Calculate cue effectiveness
+      final cueEffectiveness = <String, List<double>>{};
+      for (final round in _cachedRoundLogs) {
+        if (round.bestCue.isNotEmpty) {
+          cueEffectiveness[round.bestCue] ??= [];
+          cueEffectiveness[round.bestCue]!.add((round.mindsetFocus +
+                  round.mindsetConfidence +
+                  round.mindsetControl) /
+              3);
+        }
+      }
+
+      return {
+        'totalRounds': _cachedRoundLogs.length,
+        'averageMentalScore': avgMentalScore,
+        'courseDistribution': courseDistribution,
+        'cueEffectiveness': cueEffectiveness.map((cue, scores) =>
+            MapEntry(cue, scores.reduce((a, b) => a + b) / scores.length)),
+        'recentTrend': mentalScores.length >= 5
+            ? mentalScores.take(5).reduce((a, b) => a + b) / 5
+            : avgMentalScore,
+      };
+    } catch (e) {
+      debugPrint('Error calculating performance analytics: $e');
+      return {};
+    }
+  }
+
+  /// Dispose resources
   void dispose() {
-    stopLiveMode();
     _roundLogsController.close();
     _shotLogsController.close();
     _liveUpdateController.close();
+    _filterUpdateController.close();
+    _aiInsightsController.close();
+
+    _roundLogsSubscription?.cancel();
+    _shotLogsSubscription?.cancel();
+    _aiInsightsSubscription?.cancel();
   }
 }
 
+/// User tier enumeration based on FocoMap documentation
+enum UserTier {
+  junior, // No map access
+  base, // MindMap only (manual entries)
+  plus, // MindMap + Live mode
+  prime, // All layers + full technical data
+}
+
+/// Map layer enumeration
+enum MapLayer {
+  mindMap, // Mental performance visualization
+  shotMap, // Technical/club performance visualization
+  syncMap, // Combined mental + technical correlation view
+}

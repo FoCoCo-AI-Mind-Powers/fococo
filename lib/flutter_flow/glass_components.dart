@@ -19,7 +19,7 @@ class GlassDashboardCard extends StatelessWidget {
   final Color? tintColor;
   final bool showAIBadge;
   final String? aiInsight;
-  
+
   const GlassDashboardCard({
     super.key,
     required this.title,
@@ -32,11 +32,11 @@ class GlassDashboardCard extends StatelessWidget {
     this.showAIBadge = false,
     this.aiInsight,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
+
     return GlassDesignSystem.glass3DCard(
       onTap: onTap,
       tintColor: tintColor ?? theme.glassTint,
@@ -74,8 +74,7 @@ class GlassDashboardCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (showAIBadge)
-                          _buildAIBadge(theme),
+                        if (showAIBadge) _buildAIBadge(theme),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -95,13 +94,13 @@ class GlassDashboardCard extends StatelessWidget {
               ],
             ],
           ),
-          
+
           // AI Insight Section
           if (aiInsight != null && aiInsight!.isNotEmpty) ...[
             const SizedBox(height: 16),
             _buildAIInsightSection(context, theme),
           ],
-          
+
           // Additional Children
           if (children != null && children!.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -111,7 +110,7 @@ class GlassDashboardCard extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildAIBadge(FlutterFlowTheme theme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -148,7 +147,7 @@ class GlassDashboardCard extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildAIInsightSection(BuildContext context, FlutterFlowTheme theme) {
     return GlassDesignSystem.glassBackground(
       borderRadius: BorderRadius.circular(12),
@@ -200,7 +199,7 @@ class GlassPerformanceCard extends StatelessWidget {
   final Color? color;
   final bool isPositive;
   final VoidCallback? onTap;
-  
+
   const GlassPerformanceCard({
     super.key,
     required this.title,
@@ -211,12 +210,12 @@ class GlassPerformanceCard extends StatelessWidget {
     this.isPositive = true,
     this.onTap,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
     final effectiveColor = color ?? theme.primary;
-    
+
     return GlassDesignSystem.glass3DCard(
       onTap: onTap,
       child: Column(
@@ -239,7 +238,8 @@ class GlassPerformanceCard extends StatelessWidget {
               const Spacer(),
               if (change != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: (isPositive ? theme.success : theme.error)
                         .withValues(alpha: 0.1),
@@ -249,8 +249,8 @@ class GlassPerformanceCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isPositive 
-                            ? FontAwesomeIcons.arrowUp 
+                        isPositive
+                            ? FontAwesomeIcons.arrowUp
                             : FontAwesomeIcons.arrowDown,
                         size: 10,
                         color: isPositive ? theme.success : theme.error,
@@ -300,7 +300,7 @@ class GlassActivityItem extends StatelessWidget {
   final Widget? leading;
   final List<Widget>? metrics;
   final VoidCallback? onTap;
-  
+
   const GlassActivityItem({
     super.key,
     required this.title,
@@ -310,11 +310,11 @@ class GlassActivityItem extends StatelessWidget {
     this.metrics,
     this.onTap,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
+
     return GlassDesignSystem.glass3DCard(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
       onTap: onTap,
@@ -380,19 +380,19 @@ class GlassMetricBadge extends StatelessWidget {
   final String label;
   final String value;
   final Color? color;
-  
+
   const GlassMetricBadge({
     super.key,
     required this.label,
     required this.value,
     this.color,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
     final effectiveColor = color ?? theme.secondaryText;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -438,7 +438,7 @@ class GlassProgressRing extends StatefulWidget {
   final Color? color;
   final String? centerText;
   final Widget? centerWidget;
-  
+
   const GlassProgressRing({
     super.key,
     required this.progress,
@@ -447,7 +447,7 @@ class GlassProgressRing extends StatefulWidget {
     this.centerText,
     this.centerWidget,
   });
-  
+
   @override
   State<GlassProgressRing> createState() => _GlassProgressRingState();
 }
@@ -456,7 +456,7 @@ class _GlassProgressRingState extends State<GlassProgressRing>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _progressAnimation;
-  
+
   @override
   void initState() {
     super.initState();
@@ -473,18 +473,18 @@ class _GlassProgressRingState extends State<GlassProgressRing>
     ));
     _animationController.forward();
   }
-  
+
   @override
   void dispose() {
     _animationController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
     final effectiveColor = widget.color ?? theme.primary;
-    
+
     return SizedBox(
       width: widget.size,
       height: widget.size,
@@ -540,27 +540,27 @@ class _ProgressRingPainter extends CustomPainter {
   final double progress;
   final Color color;
   final double strokeWidth;
-  
+
   _ProgressRingPainter({
     required this.progress,
     required this.color,
     required this.strokeWidth,
   });
-  
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width - strokeWidth) / 2;
-    
+
     final paint = Paint()
       ..color = color
       ..strokeWidth = strokeWidth
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
-    
+
     final startAngle = -math.pi / 2;
     final sweepAngle = 2 * math.pi * progress;
-    
+
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       startAngle,
@@ -569,7 +569,7 @@ class _ProgressRingPainter extends CustomPainter {
       paint,
     );
   }
-  
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
@@ -581,7 +581,7 @@ class GlassFloatingActionButton extends StatelessWidget {
   final String? tooltip;
   final Color? backgroundColor;
   final Color? foregroundColor;
-  
+
   const GlassFloatingActionButton({
     super.key,
     required this.onPressed,
@@ -590,13 +590,13 @@ class GlassFloatingActionButton extends StatelessWidget {
     this.backgroundColor,
     this.foregroundColor,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
     final bgColor = backgroundColor ?? theme.primary;
     final fgColor = foregroundColor ?? Colors.white;
-    
+
     return Container(
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -656,7 +656,7 @@ class GlassSearchBar extends StatelessWidget {
   final String? hintText;
   final Function(String)? onChanged;
   final VoidCallback? onFilterTap;
-  
+
   const GlassSearchBar({
     super.key,
     this.controller,
@@ -664,11 +664,11 @@ class GlassSearchBar extends StatelessWidget {
     this.onChanged,
     this.onFilterTap,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
+
     return GlassDesignSystem.glassBackground(
       borderRadius: BorderRadius.circular(16),
       child: Row(
@@ -723,5 +723,113 @@ class GlassSearchBar extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// FoCoCo Glass Navigation Bar Component
+/// Easy-to-use wrapper for the glass navigation system
+class FoCoCoGlassNavBar extends StatelessWidget {
+  final String currentRoute;
+  final Function(String route)? onNavigate;
+  final VoidCallback? onVoicePressed;
+  final bool showLabels;
+  final double height;
+  final EdgeInsets? margin;
+  final bool enableVoiceAnimation;
+
+  const FoCoCoGlassNavBar({
+    super.key,
+    required this.currentRoute,
+    this.onNavigate,
+    this.onVoicePressed,
+    this.showLabels = false,
+    this.height = 70.0,
+    this.margin,
+    this.enableVoiceAnimation = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassDesignSystem.focoCoGlassNavBar(
+      currentRoute: currentRoute,
+      onNavigate: onNavigate ?? _defaultNavigate,
+      onVoicePressed: onVoicePressed ?? _defaultVoiceAction,
+      showLabels: showLabels,
+      height: height,
+      margin: margin,
+      enableVoiceAnimation: enableVoiceAnimation,
+    );
+  }
+
+  void _defaultNavigate(String route) {
+    // Default navigation implementation
+    // This can be overridden by providing onNavigate callback
+    print('Navigate to: $route');
+  }
+
+  void _defaultVoiceAction() {
+    // Default voice action implementation
+    // This can be overridden by providing onVoicePressed callback
+    print('Voice button pressed');
+  }
+}
+
+/// Navigation Helper for FoCoCo Routes
+class FoCoCoNavigation {
+  // Route constants
+  static const String dashboard = '/dashboard';
+  static const String golfRounds = '/golf_rounds';
+  static const String focoMap = '/foco_map';
+  static const String profile = '/profile';
+  static const String aiInsights = '/ai_insights';
+  static const String coachingModules = '/coaching_modules';
+  static const String progress = '/progress';
+  static const String achievements = '/achievements';
+  static const String varkOnboarding = '/vark_onboarding';
+
+  /// Navigate to a specific route with proper context
+  static void navigateTo(BuildContext context, String route) {
+    switch (route) {
+      case dashboard:
+        Navigator.pushReplacementNamed(context, '/dashboard');
+        break;
+      case golfRounds:
+        Navigator.pushReplacementNamed(context, '/golf_rounds');
+        break;
+      case focoMap:
+        Navigator.pushReplacementNamed(context, '/foco_map');
+        break;
+      case profile:
+        Navigator.pushReplacementNamed(context, '/profile');
+        break;
+      case aiInsights:
+        Navigator.pushNamed(context, '/ai_insights');
+        break;
+      case coachingModules:
+        Navigator.pushNamed(context, '/coaching_modules');
+        break;
+      case progress:
+        Navigator.pushNamed(context, '/progress');
+        break;
+      case achievements:
+        Navigator.pushNamed(context, '/achievements');
+        break;
+      case varkOnboarding:
+        Navigator.pushNamed(context, '/vark_onboarding');
+        break;
+      default:
+        Navigator.pushReplacementNamed(context, '/dashboard');
+    }
+  }
+
+  /// Get current route from context
+  static String getCurrentRoute(BuildContext context) {
+    final route = ModalRoute.of(context);
+    return route?.settings.name ?? '/dashboard';
+  }
+
+  /// Check if route is a main navigation route
+  static bool isMainRoute(String route) {
+    return [dashboard, golfRounds, focoMap, profile].contains(route);
   }
 }

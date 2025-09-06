@@ -1,6 +1,3 @@
----
-alwaysApply: true
----
 Based on the FoCoCo documentation, here are the complete AI features needed:
 
 ## Core AI Modules

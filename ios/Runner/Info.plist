@@ -76,6 +76,22 @@
 	<string>FoCoCo uses microphone access to enable voice-based coaching interactions, audio journaling features, and AI-powered speech analysis to enhance your mental performance training.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>FoCoCo uses speech recognition to provide voice-controlled navigation, transcribe your mental performance notes, and analyze speech patterns for personalized coaching insights.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>FoCoCo needs location access to show your position on the golf course map and provide location-based coaching insights.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>FoCoCo needs location access to show your position on the golf course map and provide location-based coaching insights.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>FoCoCo uses Face ID to provide secure and convenient authentication for accessing your mental performance data and coaching insights.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>FoCoCo uses camera access to enable video-based coaching sessions, capture swing analysis footage, and provide visual feedback for your mental performance training.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>FoCoCo needs access to your photo library to allow you to select and upload profile pictures and save coaching progress images.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>FoCoCo can save coaching progress screenshots and achievement images to your photo library for easy sharing and reference.</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>FoCoCo sends notifications to remind you of daily coaching sessions, notify you when AI insights are ready, and help maintain your mental training streaks.</string>
+	<key>io.flutter.embedded_views_preview</key>
+	<true/>
 	<key>FirebaseAppCheckProviderFactory</key>
 	<string>NO</string>
 	<key>FirebaseAppCheckTokenAutoRefreshEnabled</key>

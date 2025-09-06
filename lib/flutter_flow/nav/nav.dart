@@ -13,7 +13,16 @@ import '/flutter_flow/fococo_ui_components.dart';
 import '/index.dart';
 
 import '/pages/vark_onboarding/vark_onboarding_widget.dart';
+import '/pages/subscription/subscription_onboarding_widget.dart';
+import '/pages/onboarding/comprehensive_onboarding_widget.dart';
+import '/pages/subscription/subscription_management_widget.dart';
 import '/pages/foco_map/foco_map_conditional_widget.dart';
+import '/pages/splash/splash_widget.dart';
+import '/pages/security/face_id_settings_widget.dart';
+import '/pages/edit_profile/edit_profile_widget.dart';
+import '/pages/settings/settings_widget.dart';
+import '/pages/support/support_widget.dart';
+import '/pages/ai_insights/claude_style_ai_insights_widget.dart';
 
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
@@ -75,8 +84,8 @@ class AppStateNotifier extends ChangeNotifier {
   }
 }
 
-  GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
-    initialLocation: '/homePage',
+GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
+      initialLocation: '/',
       debugLogDiagnostics: true,
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
@@ -86,8 +95,12 @@ class AppStateNotifier extends ChangeNotifier {
         FFRoute(
           name: '_initialize',
           path: '/',
-          builder: (context, _) =>
-              appStateNotifier.loggedIn ? DashboardWidget() : HomePageWidget(),
+          builder: (context, _) => const SplashWidget(),
+        ),
+        FFRoute(
+          name: SplashWidget.routeName,
+          path: SplashWidget.routePath,
+          builder: (context, params) => const SplashWidget(),
         ),
         FFRoute(
           name: HomePageWidget.routeName,
@@ -112,10 +125,16 @@ class AppStateNotifier extends ChangeNotifier {
           builder: (context, params) => ProfileWidget(),
         ),
         FFRoute(
-          name: AiInsightsWidget.routeName,
-          path: AiInsightsWidget.routePath,
+          name: 'face_id_settings',
+          path: '/face-id-settings',
           requireAuth: true,
-          builder: (context, params) => AiInsightsWidget(),
+          builder: (context, params) => FaceIdSettingsWidget(),
+        ),
+        FFRoute(
+          name: 'ai_insights',
+          path: '/ai_insights',
+          requireAuth: true,
+          builder: (context, params) => const ClaudeStyleAiInsightsWidget(),
         ),
         FFRoute(
           name: GolfRoundsWidget.routeName,
@@ -152,10 +171,45 @@ class AppStateNotifier extends ChangeNotifier {
           builder: (context, params) => const VarkOnboardingWidget(),
         ),
         FFRoute(
+          name: ComprehensiveOnboardingWidget.routeName,
+          path: ComprehensiveOnboardingWidget.routePath,
+          builder: (context, params) => const ComprehensiveOnboardingWidget(),
+        ),
+        FFRoute(
+          name: 'subscription_onboarding',
+          path: '/subscription_onboarding',
+          requireAuth: true,
+          builder: (context, params) => const SubscriptionOnboardingWidget(),
+        ),
+        FFRoute(
+          name: 'subscription_management',
+          path: '/subscription_management',
+          requireAuth: true,
+          builder: (context, params) => const SubscriptionManagementWidget(),
+        ),
+        FFRoute(
           name: 'foco_map',
           path: '/foco_map',
           requireAuth: true,
           builder: (context, params) => const FoCoMapConditionalWidget(),
+        ),
+        FFRoute(
+          name: 'edit_profile',
+          path: '/edit-profile',
+          requireAuth: true,
+          builder: (context, params) => const EditProfileWidget(),
+        ),
+        FFRoute(
+          name: 'settings',
+          path: '/settings',
+          requireAuth: true,
+          builder: (context, params) => const SettingsWidget(),
+        ),
+        FFRoute(
+          name: 'support',
+          path: '/support',
+          requireAuth: true,
+          builder: (context, params) => const SupportWidget(),
         ),
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );

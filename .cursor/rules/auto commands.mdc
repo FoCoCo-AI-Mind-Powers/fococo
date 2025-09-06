@@ -1,0 +1,7 @@
+---
+alwaysApply: false
+---
+Each new modification on schema records files in the project need to run 
+
+Firestore schema deploy: firebase deploy --only firestore
+Firestore indexes: firebase deploy --only firestore:rules

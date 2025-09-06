@@ -1,10 +1,14 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:collection/collection.dart';
+import 'package:fo_co_co/backend/schema/structs/audio_preferences_struct.dart';
+import 'package:fo_co_co/backend/schema/structs/notification_settings_struct.dart';
+import 'package:fo_co_co/backend/schema/structs/vark_preferences_struct.dart';
+import 'package:fo_co_co/backend/schema/util/schema_util.dart';
 
 import '/backend/schema/util/firestore_util.dart';
 
-import 'index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 
 class UserRecord extends FirestoreRecord {
@@ -160,30 +164,66 @@ class UserRecord extends FirestoreRecord {
     _handicap = castToType<double>(snapshotData['handicap']);
     _golfExperience = snapshotData['golfExperience'] as String?;
     _homeClub = snapshotData['homeClub'] as String?;
-    _varkPreferences = snapshotData['varkPreferences'] is VarkPreferencesStruct
-        ? snapshotData['varkPreferences']
-        : VarkPreferencesStruct.maybeFromMap(snapshotData['varkPreferences']);
+
+    // Safe initialization of varkPreferences
+    try {
+      _varkPreferences =
+          snapshotData['varkPreferences'] is VarkPreferencesStruct
+              ? snapshotData['varkPreferences']
+              : VarkPreferencesStruct.maybeFromMap(
+                      snapshotData['varkPreferences']) ??
+                  VarkPreferencesStruct();
+    } catch (e) {
+      print('⚠️ Error parsing varkPreferences: $e');
+      _varkPreferences = VarkPreferencesStruct();
+    }
+
     _currentMembershipTier = snapshotData['currentMembershipTier'] as String?;
     _appleSubscriptionId = snapshotData['appleSubscriptionId'] as String?;
     _googleSubscriptionId = snapshotData['googleSubscriptionId'] as String?;
     _tokensRemaining = castToType<int>(snapshotData['tokensRemaining']);
-    _totalAIInsightsGenerated = castToType<int>(snapshotData['totalAIInsightsGenerated']);
-    _mentalPerformanceScore = castToType<double>(snapshotData['mentalPerformanceScore']);
+    _totalAIInsightsGenerated =
+        castToType<int>(snapshotData['totalAIInsightsGenerated']);
+    _mentalPerformanceScore =
+        castToType<double>(snapshotData['mentalPerformanceScore']);
     _coachingStreak = castToType<int>(snapshotData['coachingStreak']);
-    _totalModulesCompleted = castToType<int>(snapshotData['totalModulesCompleted']);
-    _notificationSettings = snapshotData['notificationSettings'] is NotificationSettingsStruct
-        ? snapshotData['notificationSettings']
-        : NotificationSettingsStruct.maybeFromMap(snapshotData['notificationSettings']);
-    _audioPreferences = snapshotData['audioPreferences'] is AudioPreferencesStruct
-        ? snapshotData['audioPreferences']
-        : AudioPreferencesStruct.maybeFromMap(snapshotData['audioPreferences']);
+    _totalModulesCompleted =
+        castToType<int>(snapshotData['totalModulesCompleted']);
+
+    // Safe initialization of notificationSettings
+    try {
+      _notificationSettings =
+          snapshotData['notificationSettings'] is NotificationSettingsStruct
+              ? snapshotData['notificationSettings']
+              : NotificationSettingsStruct.maybeFromMap(
+                      snapshotData['notificationSettings']) ??
+                  NotificationSettingsStruct();
+    } catch (e) {
+      print('⚠️ Error parsing notificationSettings: $e');
+      _notificationSettings = NotificationSettingsStruct();
+    }
+
+    // Safe initialization of audioPreferences
+    try {
+      _audioPreferences =
+          snapshotData['audioPreferences'] is AudioPreferencesStruct
+              ? snapshotData['audioPreferences']
+              : AudioPreferencesStruct.maybeFromMap(
+                      snapshotData['audioPreferences']) ??
+                  AudioPreferencesStruct();
+    } catch (e) {
+      print('⚠️ Error parsing audioPreferences: $e');
+      _audioPreferences = AudioPreferencesStruct();
+    }
+
     _timezone = snapshotData['timezone'] as String?;
     _createdTime = snapshotData['createdTime'] as DateTime?;
     _lastActive = snapshotData['lastActive'] as DateTime?;
     _notificationTokens = getDataList(snapshotData['notificationTokens']);
     _dataProcessingConsent = snapshotData['dataProcessingConsent'] as bool?;
     _marketingConsent = snapshotData['marketingConsent'] as bool?;
-    _lastPrivacyPolicyAccepted = snapshotData['lastPrivacyPolicyAccepted'] as DateTime?;
+    _lastPrivacyPolicyAccepted =
+        snapshotData['lastPrivacyPolicyAccepted'] as DateTime?;
     _appVersion = snapshotData['appVersion'] as String?;
     _platform = snapshotData['platform'] as String?;
     _referralSource = snapshotData['referralSource'] as String?;

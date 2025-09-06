@@ -15,7 +15,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-version: 1.0.0+4
+version: 1.0.0+5
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -105,12 +105,33 @@ dependencies:
   percent_indicator: ^4.2.3
   shimmer: ^3.0.0
 
+  # Biometric Authentication Dependencies
+  local_auth: ^2.3.0
+  local_auth_android: ^1.0.41
+  local_auth_darwin: ^1.4.1
+  local_auth_platform_interface: ^1.0.10
+  local_auth_windows: ^1.0.11
+
   # Audio Intelligence Dependencies
   flutter_tts: ^4.2.0
   speech_to_text: ^7.1.1
   just_audio: ^0.9.42
   permission_handler: ^11.3.1
-  # cloud_functions: ^5.5.2
+  record: ^4.4.4
+  audioplayers: ^6.1.0
+  web_socket_channel: ^3.0.1
+  http: ^1.2.2
+  fl_chart: ^0.71.0
+  cloud_functions: ^5.5.2
+
+  # Map Dependencies
+  apple_maps_flutter: ^1.0.2
+  google_maps_flutter: ^2.5.0
+  location: ^8.0.1
+  geolocator: ^13.0.1
+
+  # Stripe Payment Dependencies
+  flutter_stripe: ^11.2.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -126,7 +147,6 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: ^0.13.1
-  flutter_native_splash: ^2.4.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -143,6 +163,7 @@ flutter:
   assets:
     - assets/fonts/
     - assets/images/
+    - assets/images/logo/
     - assets/videos/
     - assets/audios/
     - assets/rive_animations/
@@ -168,56 +189,5 @@ flutter_launcher_icons:
     generate: true
     image_path: "assets/images/logo.png"
 
-# Flutter Native Splash Configuration
-flutter_native_splash:
-  # This package generates native code to customize Flutter's default white splash screen
-  # with background color and splash image.
-  # Customize the parameters below, and run the following command in the terminal:
-  # fvm flutter packages pub run flutter_native_splash:create
-  # To restore Flutter's default white splash screen, run the following command in terminal:
-  # fvm flutter packages pub run flutter_native_splash:remove
 
-  # color or background_image is the only required parameter.  Use color to set the background
-  # of your splash screen to a solid color.  For background_image, use a png file as a background_image.
-  # Set a dark background_image for dark mode support.
-  
-  # image is the path to the image used as the splash screen image.  If this parameter is
-  # not provided, the package will use the image from flutter_launcher_icons.
-  image: assets/images/logo.png
-  
-  # Sets the background color for the splash screen.
-  color: "#ffffff"
-  
-  # image_dark is an image which will be used in dark mode only. If specified, color_dark will be used as a background color
-  # for dark mode. If image_dark is not specified but color_dark is specified, color_dark will be used for both normal mode and dark mode.
-  # image_dark: assets/images/fococo logo.png
-  # color_dark: "#042A5C"
-  
-  # The branding property allows you to specify an image used as branding in the splash screen.
-  # It must be a png file and will be placed at the bottom of the screen, with its width being a maximum of the 80% of the screen width.
-  # branding: assets/images/dart.png
-  
-  # To position the branding image at the bottom of the screen you can also specify the branding_bottom_padding.
-  # branding_bottom_padding: 24
-  
-  # Specify platform specific settings
-  android_12:
-    # image: assets/images/fococo logo.png
-    icon_background_color: "#1A237E"
-    
-  android_gravity: center
-  ios_content_mode: center
-  web_image_mode: center
-  
-  # Platform specific images
-  android: true
-  ios: true
-  web: true
-  
-  # The position of the splash image can be set with android_gravity, ios_content_mode, and web_image_mode parameters.
-  # android_gravity can be one of the following Android Gravity (see https://developer.android.com/reference/android/view/Gravity): bottom, center, 
-  # center_horizontal, center_vertical, clip_horizontal, clip_vertical, end, fill, fill_horizontal, fill_vertical, left, right, start, or top.
-  # ios_content_mode can be one of the following iOS UIView.ContentMode (see https://developer.apple.com/documentation/uikit/uiview/contentmode): 
-  # scaleToFill, scaleAspectFit, scaleAspectFill, center, top, bottom, left, right, topLeft, topRight, bottomLeft, or bottomRight.
-  # web_image_mode can be one of the following modes: center, contain, stretch, and cover.
 

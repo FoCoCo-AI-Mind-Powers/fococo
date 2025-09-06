@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:fo_co_co/backend/schema/golf_rounds_record.dart';
+import 'package:fo_co_co/backend/schema/user_record.dart';
 
-import '/backend/schema/index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 
 /// Utility functions for AI integration

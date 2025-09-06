@@ -544,6 +544,7 @@ class FoCoCoMindfulnessCard extends StatelessWidget {
                   padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min, // Prevent overflow
                     children: [
                       // Session type badge
                       Container(
@@ -573,18 +574,22 @@ class FoCoCoMindfulnessCard extends StatelessWidget {
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
                         ),
-                      ),
-                      const SizedBox(height: FlutterFlowTheme.spacingS),
-                      Text(
-                        description,
-                        style: theme.bodyMedium.copyWith(
-                          color: Colors.white.withValues(alpha: 0.9),
-                        ),
-                        maxLines: 2,
+                        maxLines: 2, // Limit title lines
                         overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: FlutterFlowTheme.spacingS),
+                      Flexible( // Make description flexible
+                        child: Text(
+                          description,
+                          style: theme.bodyMedium.copyWith(
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       
-                      const SizedBox(height: FlutterFlowTheme.spacingM),
+                      const SizedBox(height: FlutterFlowTheme.spacingS), // Reduced spacing
                       
                       // Duration and progress
                       Row(
@@ -614,7 +619,7 @@ class FoCoCoMindfulnessCard extends StatelessWidget {
                       ),
                       
                       if (progress != null) ...[
-                        const SizedBox(height: FlutterFlowTheme.spacingS),
+                        const SizedBox(height: FlutterFlowTheme.spacingXS), // Reduced spacing
                         LinearProgressIndicator(
                           value: progress!,
                           backgroundColor: Colors.white.withValues(alpha: 0.2),
@@ -1235,7 +1240,7 @@ class FoCoCoCard extends StatelessWidget {
       case FoCoCoCardStyle.outlined:
         return Colors.transparent;
       case FoCoCoCardStyle.filled:
-        return FlutterFlowTheme.of(context).primary.withOpacity(0.1);
+        return FlutterFlowTheme.of(context).primary.withValues(alpha: 0.1);
       case FoCoCoCardStyle.premium:
         return const Color(0xFFF8F9FA);
       case FoCoCoCardStyle.wellness:
@@ -1259,7 +1264,7 @@ class FoCoCoCard extends StatelessWidget {
   Border? _getBorder(BuildContext context) {
     if (style == FoCoCoCardStyle.outlined) {
       return Border.all(
-        color: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+        color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
         width: 1,
       );
     }
@@ -1272,8 +1277,8 @@ class FoCoCoCard extends StatelessWidget {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          FlutterFlowTheme.of(context).primary.withOpacity(0.05),
-          FlutterFlowTheme.of(context).secondary.withOpacity(0.05),
+          FlutterFlowTheme.of(context).primary.withValues(alpha: 0.05),
+          FlutterFlowTheme.of(context).secondary.withValues(alpha: 0.05),
         ],
       );
     }
@@ -1343,7 +1348,7 @@ class AIInsightCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: FlutterFlowTheme.of(context).primary.withOpacity(0.1),
+                    color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -1419,7 +1424,7 @@ class PerformanceMetricCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: cardColor.withOpacity(0.1),
+                  color: cardColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -1436,7 +1441,7 @@ class PerformanceMetricCard extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: _getTrendColor(trend!).withOpacity(0.1),
+                    color: _getTrendColor(trend!).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -1512,8 +1517,8 @@ class AchievementBadge extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isUnlocked 
-            ? badgeColor.withOpacity(0.1) 
-            : Colors.grey.withOpacity(0.1),
+            ? badgeColor.withValues(alpha: 0.1) 
+            : Colors.grey.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isUnlocked ? badgeColor : Colors.grey,
@@ -1591,8 +1596,8 @@ class WellnessScoreCard extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  scoreColor.withOpacity(0.2),
-                  scoreColor.withOpacity(0.1),
+                  scoreColor.withValues(alpha: 0.2),
+                  scoreColor.withValues(alpha: 0.1),
                 ],
               ),
             ),

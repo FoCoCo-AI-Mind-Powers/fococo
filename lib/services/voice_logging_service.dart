@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '/backend/schema/index.dart';
+import 'package:fo_co_co/backend/backend.dart';
+import 'package:fo_co_co/flutter_flow/lat_lng.dart';
 import '/auth/firebase_auth/auth_util.dart';
 
 class VoiceLoggingService {

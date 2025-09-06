@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import '/backend/schema/index.dart';
 import '../models/gemini_models.dart';
 
 /// Service for managing AI conversation sessions and context

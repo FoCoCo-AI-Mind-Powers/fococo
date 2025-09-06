@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:fo_co_co/backend/schema/structs/vark_preferences_struct.dart';
+import 'package:fo_co_co/backend/schema/user_record.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:just_audio/just_audio.dart';
-import '/backend/schema/index.dart';
 import '../models/gemini_models.dart';
 import '../models/audio_intelligence_models.dart';
 

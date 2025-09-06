@@ -1,9 +1,16 @@
 import 'dart:async';
 
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fo_co_co/backend/schema/structs/approach_stats_struct.dart';
+import 'package:fo_co_co/backend/schema/structs/driving_stats_struct.dart';
+import 'package:fo_co_co/backend/schema/structs/putting_stats_struct.dart';
+import 'package:fo_co_co/backend/schema/structs/short_game_stats_struct.dart';
+import 'package:fo_co_co/backend/schema/structs/weather_struct.dart';
+import 'package:fo_co_co/backend/schema/util/schema_util.dart';
+
 import '/backend/schema/util/firestore_util.dart';
 
-import 'index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 
 class GolfRoundsRecord extends FirestoreRecord {

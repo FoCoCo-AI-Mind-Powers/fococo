@@ -1,5 +1,7 @@
 import 'dart:convert';
-import '/backend/schema/index.dart';
+import 'package:fo_co_co/backend/schema/ai_insights_record.dart';
+import 'package:fo_co_co/backend/schema/structs/recommendation_struct.dart';
+
 
 /// Base class for all AI response models
 abstract class BaseAIResponse {
@@ -55,7 +57,8 @@ class AIInsightResponse extends BaseAIResponse {
       recommendations: (data['recommendations'] as List)
           .map((r) => AIRecommendation.fromMap(r as Map<String, dynamic>))
           .toList(),
-      personalizedElements: List<String>.from(data['personalizedElements'] as List),
+      personalizedElements:
+          List<String>.from(data['personalizedElements'] as List),
       summaryText: data['summaryText'] as String,
       timestamp: DateTime.now(),
       model: response['model'] as String,
@@ -72,7 +75,8 @@ class AIInsightResponse extends BaseAIResponse {
   }) {
     // This would be used to create a new Firestore document
     // Implementation would depend on your specific Firestore setup
-    throw UnimplementedError('Implementation depends on Firestore document creation pattern');
+    throw UnimplementedError(
+        'Implementation depends on Firestore document creation pattern');
   }
 
   @override
@@ -94,17 +98,17 @@ class AIInsightResponse extends BaseAIResponse {
 
   static double? _calculateCost(Map<String, dynamic>? usage) {
     if (usage == null) return null;
-    
+
     final promptTokens = usage['prompt_tokens'] as int? ?? 0;
     final completionTokens = usage['completion_tokens'] as int? ?? 0;
-    
+
     // GPT-4o-mini pricing (as of 2024)
     const inputCostPer1K = 0.00015;
     const outputCostPer1K = 0.0006;
-    
+
     final inputCost = (promptTokens / 1000) * inputCostPer1K;
     final outputCost = (completionTokens / 1000) * outputCostPer1K;
-    
+
     return inputCost + outputCost;
   }
 }
@@ -129,7 +133,8 @@ class AIRecommendationResponse extends BaseAIResponse {
     super.estimatedCost,
   });
 
-  factory AIRecommendationResponse.fromOpenAIResponse(Map<String, dynamic> response) {
+  factory AIRecommendationResponse.fromOpenAIResponse(
+      Map<String, dynamic> response) {
     final content = response['choices'][0]['message']['content'] as String;
     final data = jsonDecode(content) as Map<String, dynamic>;
     final usage = response['usage'] as Map<String, dynamic>?;
@@ -140,7 +145,8 @@ class AIRecommendationResponse extends BaseAIResponse {
       recommendations: (data['recommendations'] as List)
           .map((r) => AIModuleRecommendation.fromMap(r as Map<String, dynamic>))
           .toList(),
-      weeklyPlan: AIWeeklyPlan.fromMap(data['weeklyPlan'] as Map<String, dynamic>),
+      weeklyPlan:
+          AIWeeklyPlan.fromMap(data['weeklyPlan'] as Map<String, dynamic>),
       motivationalMessage: data['motivationalMessage'] as String,
       timestamp: DateTime.now(),
       model: response['model'] as String,
@@ -474,4 +480,124 @@ class AINextStep {
       'difficulty': difficulty,
     };
   }
-} 
+}
+
+// ============================================================================
+// AUDIO-ENABLED RESPONSE MODELS
+// ============================================================================
+
+/// Enhanced AI insight response with optional audio data
+class AIInsightWithAudioResponse {
+  final AIInsightResponse textInsight;
+  final Map<String, dynamic>? audioData;
+
+  const AIInsightWithAudioResponse({
+    required this.textInsight,
+    this.audioData,
+  });
+
+  bool get hasAudio => audioData != null;
+
+  String? get audioPath => audioData?['audioPath'] as String?;
+  int? get audioSize => audioData?['audioSize'] as int?;
+  String? get voiceId => audioData?['voiceId'] as String?;
+  DateTime? get audioGeneratedAt {
+    final dateStr = audioData?['generatedAt'] as String?;
+    return dateStr != null ? DateTime.tryParse(dateStr) : null;
+  }
+
+  /// Get summary text for audio playback
+  String get summary => textInsight.summaryText;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'textInsight': textInsight.toMap(),
+      'audioData': audioData,
+      'hasAudio': hasAudio,
+    };
+  }
+}
+
+/// Enhanced AI recommendation response with optional audio data
+class AIRecommendationWithAudioResponse {
+  final AIRecommendationResponse textRecommendations;
+  final Map<String, dynamic>? audioData;
+
+  const AIRecommendationWithAudioResponse({
+    required this.textRecommendations,
+    this.audioData,
+  });
+
+  bool get hasAudio => audioData != null;
+
+  String? get audioPath => audioData?['audioPath'] as String?;
+  int? get audioSize => audioData?['audioSize'] as int?;
+  String? get voiceId => audioData?['voiceId'] as String?;
+  DateTime? get audioGeneratedAt {
+    final dateStr = audioData?['generatedAt'] as String?;
+    return dateStr != null ? DateTime.tryParse(dateStr) : null;
+  }
+
+  /// Get primary recommendation for quick access
+  String get primaryRecommendation => textRecommendations.primaryFocus;
+
+  /// Get focus areas as a list
+  List<String> get focusAreas => textRecommendations.weeklyPlan.focusAreas;
+
+  /// Get action items from recommendations
+  List<String> get actionItems =>
+      textRecommendations.recommendations.map((r) => r.description).toList();
+
+  Map<String, dynamic> toMap() {
+    return {
+      'textRecommendations': textRecommendations.toMap(),
+      'audioData': audioData,
+      'hasAudio': hasAudio,
+    };
+  }
+}
+
+/// Enhanced AI content response with optional audio data
+class AIContentWithAudioResponse {
+  final AIContentResponse textContent;
+  final Map<String, dynamic>? audioData;
+
+  const AIContentWithAudioResponse({
+    required this.textContent,
+    this.audioData,
+  });
+
+  bool get hasAudio => audioData != null;
+
+  String? get audioPath => audioData?['audioPath'] as String?;
+  int? get audioSize => audioData?['audioSize'] as int?;
+  String? get voiceId => audioData?['voiceId'] as String?;
+  DateTime? get audioGeneratedAt {
+    final dateStr = audioData?['generatedAt'] as String?;
+    return dateStr != null ? DateTime.tryParse(dateStr) : null;
+  }
+
+  /// Get content text for audio playback
+  String get content {
+    // Combine all sections into a single text for audio
+    final buffer = StringBuffer();
+    buffer.writeln(textContent.title);
+    buffer.writeln();
+
+    for (final section in textContent.sections) {
+      buffer.writeln(section.title);
+      buffer.writeln(section.content);
+      buffer.writeln();
+    }
+
+    return buffer.toString();
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'textContent': textContent.toMap(),
+      'audioData': audioData,
+      'hasAudio': hasAudio,
+    };
+  }
+}

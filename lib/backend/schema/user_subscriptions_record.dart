@@ -1,9 +1,9 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '/backend/schema/util/firestore_util.dart';
 
-import 'index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 
 class UserSubscriptionsRecord extends FirestoreRecord {
@@ -139,6 +139,36 @@ class UserSubscriptionsRecord extends FirestoreRecord {
   String get rawReceiptData => _rawReceiptData ?? '';
   bool hasRawReceiptData() => _rawReceiptData != null;
 
+  // "stripeCustomerId" field.
+  String? _stripeCustomerId;
+  String get stripeCustomerId => _stripeCustomerId ?? '';
+  bool hasStripeCustomerId() => _stripeCustomerId != null;
+
+  // "stripeSubscriptionId" field.
+  String? _stripeSubscriptionId;
+  String get stripeSubscriptionId => _stripeSubscriptionId ?? '';
+  bool hasStripeSubscriptionId() => _stripeSubscriptionId != null;
+
+  // "stripePriceId" field.
+  String? _stripePriceId;
+  String get stripePriceId => _stripePriceId ?? '';
+  bool hasStripePriceId() => _stripePriceId != null;
+
+  // "paymentMethodId" field.
+  String? _paymentMethodId;
+  String get paymentMethodId => _paymentMethodId ?? '';
+  bool hasPaymentMethodId() => _paymentMethodId != null;
+
+  // "lastPaymentDate" field.
+  DateTime? _lastPaymentDate;
+  DateTime? get lastPaymentDate => _lastPaymentDate;
+  bool hasLastPaymentDate() => _lastPaymentDate != null;
+
+  // "failedPaymentAttempts" field.
+  int? _failedPaymentAttempts;
+  int get failedPaymentAttempts => _failedPaymentAttempts ?? 0;
+  bool hasFailedPaymentAttempts() => _failedPaymentAttempts != null;
+
   void _initializeFields() {
     _userId = snapshotData['userId'] as String?;
     _platform = snapshotData['platform'] as String?;
@@ -165,6 +195,13 @@ class UserSubscriptionsRecord extends FirestoreRecord {
     _updatedTime = snapshotData['updatedTime'] as DateTime?;
     _lastValidated = snapshotData['lastValidated'] as DateTime?;
     _rawReceiptData = snapshotData['rawReceiptData'] as String?;
+    _stripeCustomerId = snapshotData['stripeCustomerId'] as String?;
+    _stripeSubscriptionId = snapshotData['stripeSubscriptionId'] as String?;
+    _stripePriceId = snapshotData['stripePriceId'] as String?;
+    _paymentMethodId = snapshotData['paymentMethodId'] as String?;
+    _lastPaymentDate = snapshotData['lastPaymentDate'] as DateTime?;
+    _failedPaymentAttempts =
+        castToType<int>(snapshotData['failedPaymentAttempts']);
   }
 
   static CollectionReference get collection =>
@@ -173,10 +210,12 @@ class UserSubscriptionsRecord extends FirestoreRecord {
   static Stream<UserSubscriptionsRecord> getDocument(DocumentReference ref) =>
       ref.snapshots().map((s) => UserSubscriptionsRecord.fromSnapshot(s));
 
-  static Future<UserSubscriptionsRecord> getDocumentOnce(DocumentReference ref) =>
+  static Future<UserSubscriptionsRecord> getDocumentOnce(
+          DocumentReference ref) =>
       ref.get().then((s) => UserSubscriptionsRecord.fromSnapshot(s));
 
-  static UserSubscriptionsRecord fromSnapshot(DocumentSnapshot snapshot) => UserSubscriptionsRecord._(
+  static UserSubscriptionsRecord fromSnapshot(DocumentSnapshot snapshot) =>
+      UserSubscriptionsRecord._(
         snapshot.reference,
         mapFromFirestore(snapshot.data() as Map<String, dynamic>),
       );
@@ -198,4 +237,4 @@ class UserSubscriptionsRecord extends FirestoreRecord {
   bool operator ==(other) =>
       other is UserSubscriptionsRecord &&
       reference.path.hashCode == other.reference.path.hashCode;
-} 
+}

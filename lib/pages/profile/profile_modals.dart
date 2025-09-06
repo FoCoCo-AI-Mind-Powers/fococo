@@ -1,6 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:fo_co_co/backend/schema/structs/audio_preferences_struct.dart';
+import 'package:fo_co_co/backend/schema/structs/notification_settings_struct.dart';
+import 'package:fo_co_co/backend/schema/structs/vark_preferences_struct.dart';
 import '/auth/firebase_auth/auth_util.dart';
-import '/backend/schema/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/fococo_ui_components.dart';
@@ -25,18 +28,18 @@ class BaseModal extends StatelessWidget {
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.8), // Glass background effect
+        color: Colors.black.withValues(alpha: 0.8), // Glass background effect
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(24),
           topRight: Radius.circular(24),
         ),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withValues(alpha: 0.2),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, -8),
           ),
@@ -50,7 +53,7 @@ class BaseModal extends StatelessWidget {
             height: 4,
             margin: const EdgeInsets.only(top: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.5),
+              color: Colors.white.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -82,7 +85,7 @@ class BaseModal extends StatelessWidget {
                               subtitle!,
                               style: TextStyle(
                                 fontFamily: 'Inter',
-                                color: Colors.white.withOpacity(0.8),
+                                color: Colors.white.withValues(alpha: 0.8),
                                 fontSize: 14,
                               ),
                             ),
@@ -94,7 +97,7 @@ class BaseModal extends StatelessWidget {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
@@ -123,7 +126,7 @@ class BaseModal extends StatelessWidget {
               decoration: BoxDecoration(
                 border: Border(
                   top: BorderSide(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                     width: 1,
                   ),
                 ),
@@ -608,7 +611,7 @@ class _VarkAssessmentModalState extends State<VarkAssessmentModal> {
                               options: FFButtonOptions(
                                 width: double.infinity,
                                 height: 56,
-                                color: Colors.white.withOpacity(0.1),
+                                color: Colors.white.withValues(alpha: 0.1),
                                 textStyle: const TextStyle(
                                   fontFamily: 'Inter',
                                   color: Colors.white,
@@ -762,7 +765,7 @@ class _PersonalInfoModalState extends State<PersonalInfoModal> {
                 hintText: 'Enter your display name',
                 hintStyle: const TextStyle(color: Colors.white54),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                fillColor: Colors.white.withValues(alpha: 0.1),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.white30),
@@ -804,7 +807,7 @@ class _PersonalInfoModalState extends State<PersonalInfoModal> {
                 hintText: 'Enter your handicap',
                 hintStyle: const TextStyle(color: Colors.white54),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                fillColor: Colors.white.withValues(alpha: 0.1),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.white30),
@@ -849,7 +852,7 @@ class _PersonalInfoModalState extends State<PersonalInfoModal> {
                 hintText: 'Select your experience level',
                 hintStyle: const TextStyle(color: Colors.white54),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                fillColor: Colors.white.withValues(alpha: 0.1),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.white30),
@@ -895,7 +898,7 @@ class _PersonalInfoModalState extends State<PersonalInfoModal> {
                 hintText: 'Enter your home golf club',
                 hintStyle: const TextStyle(color: Colors.white54),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                fillColor: Colors.white.withValues(alpha: 0.1),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.white30),
@@ -1054,15 +1057,15 @@ class _NotificationSettingsModalState extends State<NotificationSettingsModal> {
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1), // Glass effect
+              color: Colors.white.withValues(alpha: 0.1), // Glass effect
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -1084,7 +1087,7 @@ class _NotificationSettingsModalState extends State<NotificationSettingsModal> {
                   }),
                 ),
                 
-                Divider(color: Colors.white.withOpacity(0.1)),
+                Divider(color: Colors.white.withValues(alpha: 0.1)),
                 _buildNotificationToggle(
                   'Insight Notifications',
                   'Get notified of new AI insights',
@@ -1099,7 +1102,7 @@ class _NotificationSettingsModalState extends State<NotificationSettingsModal> {
                   }),
                 ),
                 
-                Divider(color: Colors.white.withOpacity(0.1)),
+                Divider(color: Colors.white.withValues(alpha: 0.1)),
                 _buildNotificationToggle(
                   'Achievement Alerts',
                   'Get notified of new achievements',
@@ -1114,7 +1117,7 @@ class _NotificationSettingsModalState extends State<NotificationSettingsModal> {
                   }),
                 ),
                 
-                Divider(color: Colors.white.withOpacity(0.1)),
+                Divider(color: Colors.white.withValues(alpha: 0.1)),
                 _buildNotificationToggle(
                   'Weekly Progress',
                   'Weekly progress summary notifications',
@@ -1185,7 +1188,7 @@ class _NotificationSettingsModalState extends State<NotificationSettingsModal> {
                   subtitle,
                   style: TextStyle(
                     fontFamily: 'Inter',
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                     fontSize: 14,
                   ),
                 ),

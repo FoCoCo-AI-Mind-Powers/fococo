@@ -1,10 +1,10 @@
+import 'package:fo_co_co/backend/schema/structs/vark_preferences_struct.dart';
+
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
-import '/flutter_flow/fococo_ui_components.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'vark_onboarding_model.dart';
@@ -33,17 +33,17 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
   void initState() {
     super.initState();
     _model = createModel(context, () => VarkOnboardingModel());
-    
+
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    
+
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-    
+
     _pageController = PageController();
     _fadeController.forward();
   }
@@ -75,14 +75,15 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
   void _completeAssessment() async {
     final scores = _calculateVARKScores();
     final dominantStyle = _getDominantStyle(scores);
-    
+
     // Show results summary screen
     await _showResultsSummary(scores, dominantStyle);
   }
 
-  Future<void> _showResultsSummary(Map<String, double> scores, String dominantStyle) async {
+  Future<void> _showResultsSummary(
+      Map<String, double> scores, String dominantStyle) async {
     final theme = FlutterFlowTheme.of(context);
-    
+
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -115,18 +116,18 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // Success icon
                   Container(
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -136,7 +137,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   Text(
                     'Assessment Complete!',
                     style: theme.headlineMedium.override(
@@ -152,7 +153,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                     'Your learning style has been identified',
                     style: theme.bodyMedium.override(
                       fontFamily: 'Inter',
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       fontSize: 16,
                       height: 1.3,
                     ),
@@ -160,7 +161,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                 ],
               ),
             ),
-            
+
             // Results Content
             Expanded(
               child: SingleChildScrollView(
@@ -174,15 +175,21 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            theme.getVarkColor(dominantStyle).withOpacity(0.1),
-                            theme.getVarkColor(dominantStyle).withOpacity(0.05),
+                            theme
+                                .getVarkColor(dominantStyle)
+                                .withValues(alpha: 0.1),
+                            theme
+                                .getVarkColor(dominantStyle)
+                                .withValues(alpha: 0.05),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: theme.getVarkColor(dominantStyle).withOpacity(0.3),
+                          color: theme
+                              .getVarkColor(dominantStyle)
+                              .withValues(alpha: 0.3),
                           width: 2,
                         ),
                       ),
@@ -236,9 +243,9 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Score Breakdown
                     Text(
                       'Your Learning Style Breakdown',
@@ -251,13 +258,13 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
-                    ...['visual', 'aural', 'readWrite', 'kinesthetic'].map((style) =>
-                      _buildScoreBar(style, scores[style]!, theme),
+
+                    ...['visual', 'aural', 'readWrite', 'kinesthetic'].map(
+                      (style) => _buildScoreBar(style, scores[style]!, theme),
                     ),
-                    
+
                     const SizedBox(height: 32),
-                    
+
                     // What's Next
                     Container(
                       width: double.infinity,
@@ -310,7 +317,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                 ),
               ),
             ),
-            
+
             // Action Buttons
             Container(
               padding: const EdgeInsets.all(24),
@@ -417,7 +424,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
             width: double.infinity,
             height: 8,
             decoration: BoxDecoration(
-              color: theme.getVarkColor(style).withOpacity(0.2),
+              color: theme.getVarkColor(style).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(4),
             ),
             child: FractionallySizedBox(
@@ -481,10 +488,14 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
     }
   }
 
-  Future<void> _finalizeSaveAndNavigate(Map<String, double> scores, String dominantStyle) async {
+  Future<void> _finalizeSaveAndNavigate(
+      Map<String, double> scores, String dominantStyle) async {
     // Save VARK preferences to user profile
     if (loggedIn && currentUserUid.isNotEmpty) {
-      await FirebaseFirestore.instance.collection('users').doc(currentUserUid).update({
+      await FirebaseFirestore.instance
+          .collection('user')
+          .doc(currentUserUid)
+          .update({
         'vark_preferences': VarkPreferencesStruct(
           visual: dominantStyle == 'visual',
           aural: dominantStyle == 'aural',
@@ -496,9 +507,9 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
         'assessment_date': FieldValue.serverTimestamp(),
       });
     }
-    
-    // Navigate to home page instead of dashboard
-    context.goNamed('home_page');
+
+    // Navigate to subscription onboarding for new users
+    context.goNamed('subscription_onboarding');
   }
 
   Map<String, double> _calculateVARKScores() {
@@ -508,46 +519,41 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
       'readWrite': 0.0,
       'kinesthetic': 0.0,
     };
-    
+
     for (int i = 0; i < _model.answers.length; i++) {
       final answer = _model.answers[i];
       final questionType = _model.questions[i]['options'][answer]['type'];
       scores[questionType] = scores[questionType]! + 1;
     }
-    
+
     final total = scores.values.reduce((a, b) => a + b);
     if (total > 0) {
       scores.forEach((key, value) {
         scores[key] = (value / total) * 100;
       });
     }
-    
+
     return scores;
   }
-  
+
   String _getDominantStyle(Map<String, double> scores) {
     double maxScore = 0;
     String dominantStyle = 'visual';
-    
+
     scores.forEach((style, score) {
       if (score > maxScore) {
         maxScore = score;
         dominantStyle = style;
       }
     });
-    
+
     return dominantStyle;
-  }
-  
-  bool _isMultiModal(Map<String, double> scores) {
-    final sortedScores = scores.values.toList()..sort((a, b) => b.compareTo(a));
-    return (sortedScores[0] - sortedScores[1]) < 15.0; // Less than 15% difference
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
+
     return GestureDetector(
       onTap: () {
         FocusScope.of(context).unfocus();
@@ -585,13 +591,14 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                         width: double.infinity,
                         height: 8,
                         decoration: BoxDecoration(
-                                                     color: Colors.white.withOpacity(0.3),
+                          color: Colors.white.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
-                          width: MediaQuery.of(context).size.width * 
-                                 ((_model.currentQuestionIndex + 1) / _model.questions.length),
+                          width: MediaQuery.of(context).size.width *
+                              ((_model.currentQuestionIndex + 1) /
+                                  _model.questions.length),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFD54F),
                             borderRadius: BorderRadius.circular(4),
@@ -599,20 +606,20 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                         ),
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Question Counter
                       Text(
                         'Question ${_model.currentQuestionIndex + 1} of ${_model.questions.length}',
                         style: theme.bodyLarge.override(
                           fontFamily: 'Inter',
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                           height: 1.0,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Title
                       Text(
                         'Discover Your Learning Style',
@@ -625,14 +632,14 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                         ),
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Subtitle
                       Text(
                         'Let\'s personalize your mental performance training',
                         textAlign: TextAlign.center,
                         style: theme.bodyMedium.override(
                           fontFamily: 'Inter',
-                                                     color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                           fontSize: 16,
                           height: 1.3,
                         ),
@@ -640,7 +647,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                     ],
                   ),
                 ),
-                
+
                 // Question Content
                 Expanded(
                   child: Container(
@@ -677,17 +684,29 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      _buildLearningStyleIcon(FontAwesomeIcons.eye, 'Visual', const Color(0xFF2196F3)),
+                                      _buildLearningStyleIcon(
+                                          FontAwesomeIcons.eye,
+                                          'Visual',
+                                          const Color(0xFF2196F3)),
                                       const SizedBox(width: 16),
-                                      _buildLearningStyleIcon(FontAwesomeIcons.volumeHigh, 'Auditory', const Color(0xFF4CAF50)),
+                                      _buildLearningStyleIcon(
+                                          FontAwesomeIcons.volumeHigh,
+                                          'Auditory',
+                                          const Color(0xFF4CAF50)),
                                       const SizedBox(width: 16),
-                                      _buildLearningStyleIcon(FontAwesomeIcons.pencil, 'Read/Write', const Color(0xFFFF9800)),
+                                      _buildLearningStyleIcon(
+                                          FontAwesomeIcons.pencil,
+                                          'Read/Write',
+                                          const Color(0xFFFF9800)),
                                       const SizedBox(width: 16),
-                                      _buildLearningStyleIcon(FontAwesomeIcons.handPointer, 'Kinesthetic', const Color(0xFF9C27B0)),
+                                      _buildLearningStyleIcon(
+                                          FontAwesomeIcons.handPointer,
+                                          'Kinesthetic',
+                                          const Color(0xFF9C27B0)),
                                     ],
                                   ),
                                   const SizedBox(height: 40),
-                                  
+
                                   // Question
                                   Container(
                                     width: double.infinity,
@@ -696,12 +715,14 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                                       color: const Color(0xFFF8F9FA),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
-                                        color: const Color(0xFF2E7D32).withValues(alpha: 0.2),
+                                        color: const Color(0xFF2E7D32)
+                                            .withValues(alpha: 0.2),
                                         width: 1,
                                       ),
                                     ),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Icon(
                                           Icons.golf_course,
@@ -735,7 +756,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                                     ),
                                   ),
                                   const SizedBox(height: 32),
-                                  
+
                                   // Answer Options
                                   Text(
                                     'Choose the option that best describes how you would handle this situation:',
@@ -748,7 +769,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                                     ),
                                   ),
                                   const SizedBox(height: 20),
-                                  
+
                                   ...List.generate(
                                     question['options'].length,
                                     (optionIndex) => _buildAnswerOption(
@@ -781,9 +802,9 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
           width: 50,
           height: 50,
           decoration: BoxDecoration(
-                         color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             shape: BoxShape.circle,
-            border: Border.all(color: color.withOpacity(0.3), width: 2),
+            border: Border.all(color: color.withValues(alpha: 0.3), width: 2),
           ),
           child: Icon(
             icon,
@@ -795,36 +816,37 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
         Text(
           label,
           style: FlutterFlowTheme.of(context).bodySmall.override(
-            fontFamily: 'Inter',
-            color: color,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            height: 1.0,
-          ),
+                fontFamily: 'Inter',
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                height: 1.0,
+              ),
         ),
       ],
     );
   }
 
-  Widget _buildAnswerOption(Map<String, dynamic> option, int optionIndex, int questionIndex) {
-    final isSelected = _model.answers.length > questionIndex && 
-                       _model.answers[questionIndex] == optionIndex;
+  Widget _buildAnswerOption(
+      Map<String, dynamic> option, int optionIndex, int questionIndex) {
+    final isSelected = _model.answers.length > questionIndex &&
+        _model.answers[questionIndex] == optionIndex;
     final theme = FlutterFlowTheme.of(context);
-    
+
     final typeColors = {
       'visual': const Color(0xFF2196F3),
       'aural': const Color(0xFF4CAF50),
       'readWrite': const Color(0xFFFF9800),
       'kinesthetic': const Color(0xFF9C27B0),
     };
-    
+
     final typeIcons = {
       'visual': FontAwesomeIcons.eye,
-      'aural': FontAwesomeIcons.volumeUp,
+      'aural': FontAwesomeIcons.volumeHigh,
       'readWrite': FontAwesomeIcons.pencil,
       'kinesthetic': FontAwesomeIcons.handPointer,
     };
-    
+
     final color = typeColors[option['type']] ?? const Color(0xFF2E7D32);
     final icon = typeIcons[option['type']] ?? Icons.help;
 
@@ -842,7 +864,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                 _model.answers.add(optionIndex);
               }
             });
-            
+
             // Auto-advance after a short delay
             Future.delayed(const Duration(milliseconds: 500), () {
               _nextQuestion();
@@ -894,7 +916,8 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                           fontFamily: 'Inter',
                           color: isSelected ? color : const Color(0xFF1B5E20),
                           fontSize: 16,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.normal,
                           height: 1.4,
                         ),
                       ),
@@ -904,7 +927,8 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                           option['description'],
                           style: theme.bodySmall.override(
                             fontFamily: 'Inter',
-                            color: (isSelected ? color : Colors.grey.shade600).withValues(alpha: 0.8),
+                            color: (isSelected ? color : Colors.grey.shade600)
+                                .withValues(alpha: 0.8),
                             fontSize: 14,
                             height: 1.3,
                           ),
@@ -926,4 +950,4 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
       ),
     );
   }
-} 
+}

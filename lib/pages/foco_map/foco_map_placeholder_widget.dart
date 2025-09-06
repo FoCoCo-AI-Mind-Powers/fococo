@@ -1,7 +1,8 @@
+import 'package:fo_co_co/backend/backend.dart';
+
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
-import '/backend/schema/index.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/services/foco_map_live_service.dart';
 import 'foco_map_model.dart';
@@ -232,7 +233,7 @@ class _FoCoMapPlaceholderWidgetState extends State<FoCoMapPlaceholderWidget> {
                     Icon(
                       Icons.map_outlined,
                       size: 100,
-                      color: FlutterFlowTheme.of(context).primaryText.withOpacity(0.3),
+                      color: FlutterFlowTheme.of(context).primaryText.withValues(alpha: 0.3),
                     ),
                     const SizedBox(height: 24),
                     Text(
@@ -330,7 +331,7 @@ class _FoCoMapPlaceholderWidgetState extends State<FoCoMapPlaceholderWidget> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 8,
                       offset: const Offset(0, -2),
                     ),

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fo_co_co/backend/schema/golf_rounds_record.dart';
 
 import 'schema/util/firestore_util.dart';
 
@@ -50,6 +51,43 @@ Future<List<UserRecord>> queryUserRecordOnce({
       singleRecord: singleRecord,
     );
 
+/// Functions to query GolfRoundsRecords (as a Stream and as a Future).
+Future<int> queryGolfRoundsRecordCount({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+}) =>
+    queryCollectionCount(
+      GolfRoundsRecord.collection,
+      queryBuilder: queryBuilder,
+      limit: limit,
+    );
+
+Stream<List<GolfRoundsRecord>> queryGolfRoundsRecord({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryCollection(
+      GolfRoundsRecord.collection,
+      GolfRoundsRecord.fromSnapshot,
+      queryBuilder: queryBuilder,
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+Future<List<GolfRoundsRecord>> queryGolfRoundsRecordOnce({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryCollectionOnce(
+      GolfRoundsRecord.collection,
+      GolfRoundsRecord.fromSnapshot,
+      queryBuilder: queryBuilder,
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
 Future<int> queryCollectionCount(
   Query collection, {
   Query Function(Query)? queryBuilder,
@@ -61,7 +99,11 @@ Future<int> queryCollectionCount(
     query = query.limit(limit);
   }
 
-  return query.count().get().then((value) => value.count ?? 0).catchError((err) {
+  return query
+      .count()
+      .get()
+      .then((value) => value.count ?? 0)
+      .catchError((err) {
     print('Error querying $collection: $err');
     return 0;
   });

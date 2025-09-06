@@ -1,5 +1,5 @@
 import 'package:firebase_ai/firebase_ai.dart';
-import '/backend/schema/index.dart';
+import 'package:fo_co_co/backend/schema/structs/recommendation_struct.dart';
 
 /// Base class for all Gemini AI response models
 abstract class BaseGeminiResponse {

@@ -1,7 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:fo_co_co/backend/schema/ai_insights_record.dart';
+import 'package:fo_co_co/backend/schema/golf_rounds_record.dart';
+import 'package:fo_co_co/backend/schema/mental_sessions_record.dart';
+import 'package:fo_co_co/backend/schema/structs/vark_preferences_struct.dart';
+import 'package:fo_co_co/backend/schema/user_record.dart';
 
-
-import '/backend/schema/index.dart';
 import '../ai_client.dart';
 import '../models/ai_models.dart';
 import '../config/ai_config.dart';
@@ -10,7 +14,7 @@ import 'ai_cost_tracker.dart';
 /// Service for AI-powered mental coaching and recommendations
 class AICoachingService {
   AICoachingService._();
-  
+
   static AICoachingService? _instance;
   static AICoachingService get instance => _instance ??= AICoachingService._();
 
@@ -34,14 +38,27 @@ class AICoachingService {
       // Get user data
       final userProfile = await _getUserProfile(userId);
       if (userProfile == null) {
-        throw Exception('User profile not found');
+        // Return default recommendations if user profile doesn't exist
+        return AIRecommendationResponse(
+          recommendationType: 'default',
+          recommendations: _getDefaultRecommendations(),
+          primaryFocus: 'Getting Started',
+          weeklyPlan: _getDefaultWeeklyPlan(),
+          motivationalMessage:
+              'Welcome to FoCoCo! Let\'s start building your mental game.',
+          timestamp: DateTime.now(),
+          model: 'default',
+          tokensUsed: 0,
+          estimatedCost: 0.0,
+        );
       }
 
       final recentSessions = await _getRecentMentalSessions(userId, limit: 10);
       final recentRounds = await _getRecentGolfRounds(userId, limit: 5);
 
       // Generate recommendations
-      final recommendations = await _aiClient.generateMentalCoachingRecommendations(
+      final recommendations =
+          await _aiClient.generateMentalCoachingRecommendations(
         userId: userId,
         userProfile: userProfile,
         recentSessions: recentSessions,
@@ -59,7 +76,8 @@ class AICoachingService {
       if (kDebugMode) {
         print('✅ Generated coaching recommendations for user $userId');
         print('🎯 Primary focus: ${recommendations.primaryFocus}');
-        print('💰 Estimated cost: \$${recommendations.estimatedCost?.toStringAsFixed(4)}');
+        print(
+            '💰 Estimated cost: \$${recommendations.estimatedCost?.toStringAsFixed(4)}');
       }
 
       return recommendations;
@@ -74,7 +92,8 @@ class AICoachingService {
   /// Generate personalized content based on VARK preferences
   Future<AIContentResponse> generatePersonalizedContent({
     required String userId,
-    required String contentType, // 'lesson', 'exercise', 'visualization', 'technique'
+    required String
+        contentType, // 'lesson', 'exercise', 'visualization', 'technique'
     required String topic,
     Map<String, dynamic>? additionalContext,
   }) async {
@@ -108,7 +127,8 @@ class AICoachingService {
       );
 
       if (kDebugMode) {
-        print('✅ Generated personalized $contentType content about "$topic" for user $userId');
+        print(
+            '✅ Generated personalized $contentType content about "$topic" for user $userId');
         print('🎨 Adapted for: ${content.adaptedFor.join(", ")}');
       }
 
@@ -158,7 +178,8 @@ class AICoachingService {
       );
 
       if (kDebugMode) {
-        print('✅ Generated session feedback for session ${session.reference.id}');
+        print(
+            '✅ Generated session feedback for session ${session.reference.id}');
         print('📊 Assessment: ${feedback.overallAssessment}');
       }
 
@@ -177,8 +198,9 @@ class AICoachingService {
     int pathLength = 5,
   }) async {
     try {
-      final recommendations = await generateCoachingRecommendations(userId: userId);
-      
+      final recommendations =
+          await generateCoachingRecommendations(userId: userId);
+
       // Sort recommendations by priority and learning style match
       final userProfile = await _getUserProfile(userId);
       final sortedRecommendations = _sortRecommendationsByRelevance(
@@ -199,7 +221,12 @@ class AICoachingService {
   Future<Map<String, AIContentResponse>> generateMultiModalContent({
     required String userId,
     required String topic,
-    List<String> targetStyles = const ['visual', 'aural', 'readwrite', 'kinesthetic'],
+    List<String> targetStyles = const [
+      'visual',
+      'aural',
+      'readwrite',
+      'kinesthetic'
+    ],
   }) async {
     final results = <String, AIContentResponse>{};
 
@@ -246,7 +273,7 @@ class AICoachingService {
       final today = DateTime.now();
       final startOfDay = DateTime(today.year, today.month, today.day);
 
-      // This is a simplified check - in a real app, you might want separate 
+      // This is a simplified check - in a real app, you might want separate
       // tracking for each AI service type
       final todayRequests = await AiInsightsRecord.collection
           .where('userId', isEqualTo: userId)
@@ -257,7 +284,8 @@ class AICoachingService {
       final canGenerate = count < AIConfig.maxRequestsPerUserPerDay;
 
       if (!canGenerate && kDebugMode) {
-        print('⚠️ User $userId has reached daily $type limit ($count/${AIConfig.maxRequestsPerUserPerDay})');
+        print(
+            '⚠️ User $userId has reached daily $type limit ($count/${AIConfig.maxRequestsPerUserPerDay})');
       }
 
       return canGenerate;
@@ -283,7 +311,8 @@ class AICoachingService {
   }
 
   /// Get recent mental sessions
-  Future<List<MentalSessionsRecord>> _getRecentMentalSessions(String userId, {int limit = 10}) async {
+  Future<List<MentalSessionsRecord>> _getRecentMentalSessions(String userId,
+      {int limit = 10}) async {
     try {
       final snapshot = await MentalSessionsRecord.collection
           .where('userId', isEqualTo: userId)
@@ -303,7 +332,8 @@ class AICoachingService {
   }
 
   /// Get recent golf rounds
-  Future<List<GolfRoundsRecord>> _getRecentGolfRounds(String userId, {int limit = 5}) async {
+  Future<List<GolfRoundsRecord>> _getRecentGolfRounds(String userId,
+      {int limit = 5}) async {
     try {
       final snapshot = await GolfRoundsRecord.collection
           .where('userId', isEqualTo: userId)
@@ -329,13 +359,14 @@ class AICoachingService {
   ) {
     if (varkPreferences == null) return recommendations;
 
-    return recommendations..sort((a, b) {
-      final aScore = _calculateRelevanceScore(a, varkPreferences);
-      final bScore = _calculateRelevanceScore(b, varkPreferences);
-      
-      // Higher score comes first
-      return bScore.compareTo(aScore);
-    });
+    return recommendations
+      ..sort((a, b) {
+        final aScore = _calculateRelevanceScore(a, varkPreferences);
+        final bScore = _calculateRelevanceScore(b, varkPreferences);
+
+        // Higher score comes first
+        return bScore.compareTo(aScore);
+      });
   }
 
   /// Calculate relevance score based on VARK preferences and priority
@@ -362,15 +393,19 @@ class AICoachingService {
     final learningStyle = recommendation.learningStyle.toLowerCase();
     if (learningStyle.contains('visual') && varkPreferences.visual) score += 15;
     if (learningStyle.contains('aural') && varkPreferences.aural) score += 15;
-    if (learningStyle.contains('read') && varkPreferences.readWrite) score += 15;
-    if (learningStyle.contains('kinesthetic') && varkPreferences.kinesthetic) score += 15;
-    if (learningStyle.contains('mixed')) score += 5; // Mixed content is always somewhat relevant
+    if (learningStyle.contains('read') && varkPreferences.readWrite)
+      score += 15;
+    if (learningStyle.contains('kinesthetic') && varkPreferences.kinesthetic)
+      score += 15;
+    if (learningStyle.contains('mixed'))
+      score += 5; // Mixed content is always somewhat relevant
 
     return score;
   }
 
   /// Update user recommendation statistics
-  Future<void> _updateUserRecommendationStats(String userId, AIRecommendationResponse response) async {
+  Future<void> _updateUserRecommendationStats(
+      String userId, AIRecommendationResponse response) async {
     try {
       await UserRecord.collection.doc(userId).update({
         'tokensRemaining': FieldValue.increment(-(response.tokensUsed ?? 0)),
@@ -384,7 +419,8 @@ class AICoachingService {
   }
 
   /// Update user content generation statistics
-  Future<void> _updateUserContentStats(String userId, AIContentResponse response) async {
+  Future<void> _updateUserContentStats(
+      String userId, AIContentResponse response) async {
     try {
       await UserRecord.collection.doc(userId).update({
         'tokensRemaining': FieldValue.increment(-(response.tokensUsed ?? 0)),
@@ -398,7 +434,8 @@ class AICoachingService {
   }
 
   /// Update user feedback generation statistics
-  Future<void> _updateUserFeedbackStats(String userId, AIFeedbackResponse response) async {
+  Future<void> _updateUserFeedbackStats(
+      String userId, AIFeedbackResponse response) async {
     try {
       await UserRecord.collection.doc(userId).update({
         'tokensRemaining': FieldValue.increment(-(response.tokensUsed ?? 0)),
@@ -410,4 +447,49 @@ class AICoachingService {
       }
     }
   }
-} 
+
+  /// Get default recommendations for new users
+  List<AIModuleRecommendation> _getDefaultRecommendations() {
+    return [
+      AIModuleRecommendation(
+        moduleId: 'intro_mental_game',
+        moduleTitle: 'Introduction to Mental Game',
+        description: 'Learn the fundamentals of mental performance in golf',
+        priority: 'high',
+        estimatedDuration: 15,
+        learningStyle: 'mixed',
+      ),
+      AIModuleRecommendation(
+        moduleId: 'basic_breathing',
+        moduleTitle: 'Basic Breathing Techniques',
+        description: 'Master fundamental breathing exercises for golf',
+        priority: 'high',
+        estimatedDuration: 10,
+        learningStyle: 'kinesthetic',
+      ),
+      AIModuleRecommendation(
+        moduleId: 'pre_shot_routine',
+        moduleTitle: 'Pre-Shot Routine Development',
+        description: 'Build a consistent mental pre-shot routine',
+        priority: 'medium',
+        estimatedDuration: 20,
+        learningStyle: 'visual',
+      ),
+    ];
+  }
+
+  /// Get default weekly plan for new users
+  AIWeeklyPlan _getDefaultWeeklyPlan() {
+    return AIWeeklyPlan(
+      sessionsPerWeek: 3,
+      totalWeeklyMinutes: 45,
+      focusAreas: [
+        'Complete VARK learning style assessment',
+        'Practice basic breathing exercises (5 minutes daily)',
+        'Develop your pre-shot routine',
+        'Try one mental training module',
+        'Set your first mental game goals',
+      ],
+    );
+  }
+}

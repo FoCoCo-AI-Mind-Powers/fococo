@@ -47,7 +47,8 @@ class _RegisterWidgetState extends State<RegisterWidget> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
+            icon:
+                const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
             onPressed: () => context.safePop(),
           ),
         ),
@@ -111,7 +112,9 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                             const SizedBox(height: 16),
                             Text(
                               'Join the Club',
-                              style: FlutterFlowTheme.of(context).displayMedium.override(
+                              style: FlutterFlowTheme.of(context)
+                                  .displayMedium
+                                  .override(
                                 fontFamily: 'Inter',
                                 color: Colors.white,
                                 fontSize: 32,
@@ -129,19 +132,22 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                             const SizedBox(height: 8),
                             Text(
                               'Start your journey to lower scores',
-                              style: FlutterFlowTheme.of(context).bodyLarge.override(
-                                fontFamily: 'Inter',
-                                color: const Color(0xFFFFD54F), // Gold accent
-                                fontSize: 16,
-                                height: 1.0,
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: FlutterFlowTheme.of(context)
+                                  .bodyLarge
+                                  .override(
+                                    fontFamily: 'Inter',
+                                    color:
+                                        const Color(0xFFFFD54F), // Gold accent
+                                    fontSize: 16,
+                                    height: 1.0,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    
+
                     // Form Section
                     Expanded(
                       flex: 4,
@@ -163,7 +169,8 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                         ),
                         child: SingleChildScrollView(
                           child: Padding(
-                            padding: const EdgeInsetsDirectional.fromSTEB(32, 48, 32, 32),
+                            padding: const EdgeInsetsDirectional.fromSTEB(
+                                32, 48, 32, 32),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -179,38 +186,45 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                     const SizedBox(width: 8),
                                     Text(
                                       'Player Registration',
-                                      style: FlutterFlowTheme.of(context).headlineSmall.override(
-                                        fontFamily: 'Inter',
-                                        color: const Color(0xFF1B5E20),
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                        height: 1.0,
-                                      ),
+                                      style: FlutterFlowTheme.of(context)
+                                          .headlineSmall
+                                          .override(
+                                            fontFamily: 'Inter',
+                                            color: const Color(0xFF1B5E20),
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.bold,
+                                            height: 1.0,
+                                          ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 24),
-                                
+
                                 // Name Field
                                 TextFormField(
                                   controller: _model.nameTextController,
                                   focusNode: _model.nameFocusNode,
                                   decoration: InputDecoration(
                                     labelText: 'Full Name',
-                                    labelStyle: FlutterFlowTheme.of(context).bodyMedium.override(
-                                      fontFamily: 'Inter',
-                                      color: const Color(0xFF2E7D32),
-                                      height: 1.0,
-                                    ),
+                                    labelStyle: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          fontFamily: 'Inter',
+                                          color: const Color(0xFF2E7D32),
+                                          height: 1.0,
+                                        ),
                                     hintText: 'Enter your full name',
-                                    hintStyle: FlutterFlowTheme.of(context).bodyMedium.override(
-                                      fontFamily: 'Inter',
-                                      color: Colors.grey[400],
-                                      height: 1.0,
-                                    ),
+                                    hintStyle: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          fontFamily: 'Inter',
+                                          color: Colors.grey[400],
+                                          height: 1.0,
+                                        ),
                                     enabledBorder: OutlineInputBorder(
                                       borderSide: BorderSide(
-                                        color: const Color(0xFF2E7D32).withValues(alpha: 0.3),
+                                        color: const Color(0xFF2E7D32)
+                                            .withValues(alpha: 0.3),
                                         width: 1.5,
                                       ),
                                       borderRadius: BorderRadius.circular(16),
@@ -223,44 +237,55 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                     filled: true,
-                                    fillColor: const Color(0xFFF5FFF5), // Very light green tint
-                                    contentPadding: const EdgeInsetsDirectional.fromSTEB(20, 16, 20, 16),
+                                    fillColor: const Color(
+                                        0xFFF5FFF5), // Very light green tint
+                                    contentPadding:
+                                        const EdgeInsetsDirectional.fromSTEB(
+                                            20, 16, 20, 16),
                                     prefixIcon: const Icon(
                                       Icons.person_outline,
                                       color: Color(0xFF2E7D32),
                                       size: 20,
                                     ),
                                   ),
-                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    fontSize: 16,
-                                    height: 1.0,
-                                    color: const Color(0xFF1B5E20),
-                                  ),
-                                  validator: _model.nameTextControllerValidator.asValidator(context),
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodyMedium
+                                      .override(
+                                        fontFamily: 'Inter',
+                                        fontSize: 16,
+                                        height: 1.0,
+                                        color: const Color(0xFF1B5E20),
+                                      ),
+                                  validator: _model.nameTextControllerValidator
+                                      .asValidator(context),
                                 ),
                                 const SizedBox(height: 20),
-                                
+
                                 // Email Field
                                 TextFormField(
                                   controller: _model.emailTextController,
                                   focusNode: _model.emailFocusNode,
                                   decoration: InputDecoration(
                                     labelText: 'Email',
-                                    labelStyle: FlutterFlowTheme.of(context).bodyMedium.override(
-                                      fontFamily: 'Inter',
-                                      color: const Color(0xFF2E7D32),
-                                      height: 1.0,
-                                    ),
+                                    labelStyle: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          fontFamily: 'Inter',
+                                          color: const Color(0xFF2E7D32),
+                                          height: 1.0,
+                                        ),
                                     hintText: 'Enter your email',
-                                    hintStyle: FlutterFlowTheme.of(context).bodyMedium.override(
-                                      fontFamily: 'Inter',
-                                      color: Colors.grey[400],
-                                      height: 1.0,
-                                    ),
+                                    hintStyle: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          fontFamily: 'Inter',
+                                          color: Colors.grey[400],
+                                          height: 1.0,
+                                        ),
                                     enabledBorder: OutlineInputBorder(
                                       borderSide: BorderSide(
-                                        color: const Color(0xFF2E7D32).withValues(alpha: 0.3),
+                                        color: const Color(0xFF2E7D32)
+                                            .withValues(alpha: 0.3),
                                         width: 1.5,
                                       ),
                                       borderRadius: BorderRadius.circular(16),
@@ -274,24 +299,29 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                     ),
                                     filled: true,
                                     fillColor: const Color(0xFFF5FFF5),
-                                    contentPadding: const EdgeInsetsDirectional.fromSTEB(20, 16, 20, 16),
+                                    contentPadding:
+                                        const EdgeInsetsDirectional.fromSTEB(
+                                            20, 16, 20, 16),
                                     prefixIcon: const Icon(
                                       Icons.email_outlined,
                                       color: Color(0xFF2E7D32),
                                       size: 20,
                                     ),
                                   ),
-                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    fontSize: 16,
-                                    height: 1.0,
-                                    color: const Color(0xFF1B5E20),
-                                  ),
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodyMedium
+                                      .override(
+                                        fontFamily: 'Inter',
+                                        fontSize: 16,
+                                        height: 1.0,
+                                        color: const Color(0xFF1B5E20),
+                                      ),
                                   keyboardType: TextInputType.emailAddress,
-                                  validator: _model.emailTextControllerValidator.asValidator(context),
+                                  validator: _model.emailTextControllerValidator
+                                      .asValidator(context),
                                 ),
                                 const SizedBox(height: 20),
-                                
+
                                 // Password Field
                                 TextFormField(
                                   controller: _model.passwordTextController,
@@ -299,20 +329,25 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                   obscureText: !_model.passwordVisibility,
                                   decoration: InputDecoration(
                                     labelText: 'Password',
-                                    labelStyle: FlutterFlowTheme.of(context).bodyMedium.override(
-                                      fontFamily: 'Inter',
-                                      color: const Color(0xFF2E7D32),
-                                      height: 1.0,
-                                    ),
+                                    labelStyle: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          fontFamily: 'Inter',
+                                          color: const Color(0xFF2E7D32),
+                                          height: 1.0,
+                                        ),
                                     hintText: 'Create a strong password',
-                                    hintStyle: FlutterFlowTheme.of(context).bodyMedium.override(
-                                      fontFamily: 'Inter',
-                                      color: Colors.grey[400],
-                                      height: 1.0,
-                                    ),
+                                    hintStyle: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          fontFamily: 'Inter',
+                                          color: Colors.grey[400],
+                                          height: 1.0,
+                                        ),
                                     enabledBorder: OutlineInputBorder(
                                       borderSide: BorderSide(
-                                        color: const Color(0xFF2E7D32).withValues(alpha: 0.3),
+                                        color: const Color(0xFF2E7D32)
+                                            .withValues(alpha: 0.3),
                                         width: 1.5,
                                       ),
                                       borderRadius: BorderRadius.circular(16),
@@ -326,54 +361,69 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                     ),
                                     filled: true,
                                     fillColor: const Color(0xFFF5FFF5),
-                                    contentPadding: const EdgeInsetsDirectional.fromSTEB(20, 16, 20, 16),
+                                    contentPadding:
+                                        const EdgeInsetsDirectional.fromSTEB(
+                                            20, 16, 20, 16),
                                     prefixIcon: const Icon(
                                       Icons.lock_outline,
                                       color: Color(0xFF2E7D32),
                                       size: 20,
                                     ),
                                     suffixIcon: InkWell(
-                                      onTap: () => setState(() => _model.passwordVisibility = !_model.passwordVisibility),
+                                      onTap: () => setState(() =>
+                                          _model.passwordVisibility =
+                                              !_model.passwordVisibility),
                                       child: Icon(
-                                        _model.passwordVisibility 
-                                          ? Icons.visibility_outlined 
-                                          : Icons.visibility_off_outlined,
+                                        _model.passwordVisibility
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
                                         color: const Color(0xFF388E3C),
                                         size: 20,
                                       ),
                                     ),
                                   ),
-                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    fontSize: 16,
-                                    height: 1.0,
-                                    color: const Color(0xFF1B5E20),
-                                  ),
-                                  validator: _model.passwordTextControllerValidator.asValidator(context),
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodyMedium
+                                      .override(
+                                        fontFamily: 'Inter',
+                                        fontSize: 16,
+                                        height: 1.0,
+                                        color: const Color(0xFF1B5E20),
+                                      ),
+                                  validator: _model
+                                      .passwordTextControllerValidator
+                                      .asValidator(context),
                                 ),
                                 const SizedBox(height: 20),
-                                
+
                                 // Confirm Password Field
                                 TextFormField(
-                                  controller: _model.confirmPasswordTextController,
+                                  controller:
+                                      _model.confirmPasswordTextController,
                                   focusNode: _model.confirmPasswordFocusNode,
-                                  obscureText: !_model.confirmPasswordVisibility,
+                                  obscureText:
+                                      !_model.confirmPasswordVisibility,
                                   decoration: InputDecoration(
                                     labelText: 'Confirm Password',
-                                    labelStyle: FlutterFlowTheme.of(context).bodyMedium.override(
-                                      fontFamily: 'Inter',
-                                      color: const Color(0xFF2E7D32),
-                                      height: 1.0,
-                                    ),
+                                    labelStyle: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          fontFamily: 'Inter',
+                                          color: const Color(0xFF2E7D32),
+                                          height: 1.0,
+                                        ),
                                     hintText: 'Confirm your password',
-                                    hintStyle: FlutterFlowTheme.of(context).bodyMedium.override(
-                                      fontFamily: 'Inter',
-                                      color: Colors.grey[400],
-                                      height: 1.0,
-                                    ),
+                                    hintStyle: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          fontFamily: 'Inter',
+                                          color: Colors.grey[400],
+                                          height: 1.0,
+                                        ),
                                     enabledBorder: OutlineInputBorder(
                                       borderSide: BorderSide(
-                                        color: const Color(0xFF2E7D32).withValues(alpha: 0.3),
+                                        color: const Color(0xFF2E7D32)
+                                            .withValues(alpha: 0.3),
                                         width: 1.5,
                                       ),
                                       borderRadius: BorderRadius.circular(16),
@@ -387,33 +437,41 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                     ),
                                     filled: true,
                                     fillColor: const Color(0xFFF5FFF5),
-                                    contentPadding: const EdgeInsetsDirectional.fromSTEB(20, 16, 20, 16),
+                                    contentPadding:
+                                        const EdgeInsetsDirectional.fromSTEB(
+                                            20, 16, 20, 16),
                                     prefixIcon: const Icon(
                                       Icons.lock_outline,
                                       color: Color(0xFF2E7D32),
                                       size: 20,
                                     ),
                                     suffixIcon: InkWell(
-                                      onTap: () => setState(() => _model.confirmPasswordVisibility = !_model.confirmPasswordVisibility),
+                                      onTap: () => setState(() => _model
+                                              .confirmPasswordVisibility =
+                                          !_model.confirmPasswordVisibility),
                                       child: Icon(
-                                        _model.confirmPasswordVisibility 
-                                          ? Icons.visibility_outlined 
-                                          : Icons.visibility_off_outlined,
+                                        _model.confirmPasswordVisibility
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
                                         color: const Color(0xFF388E3C),
                                         size: 20,
                                       ),
                                     ),
                                   ),
-                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    fontSize: 16,
-                                    height: 1.0,
-                                    color: const Color(0xFF1B5E20),
-                                  ),
-                                  validator: _model.confirmPasswordTextControllerValidator.asValidator(context),
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodyMedium
+                                      .override(
+                                        fontFamily: 'Inter',
+                                        fontSize: 16,
+                                        height: 1.0,
+                                        color: const Color(0xFF1B5E20),
+                                      ),
+                                  validator: _model
+                                      .confirmPasswordTextControllerValidator
+                                      .asValidator(context),
                                 ),
                                 const SizedBox(height: 32),
-                                
+
                                 // Create Account Button with golf theme
                                 Container(
                                   width: double.infinity,
@@ -430,7 +488,8 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                     borderRadius: BorderRadius.circular(16),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFF2E7D32).withValues(alpha: 0.3),
+                                        color: const Color(0xFF2E7D32)
+                                            .withValues(alpha: 0.3),
                                         blurRadius: 8,
                                         offset: const Offset(0, 4),
                                       ),
@@ -439,30 +498,76 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                   child: FFButtonWidget(
                                     onPressed: () async {
                                       GoRouter.of(context).prepareAuthEvent();
-                                      if (_model.passwordTextController.text != _model.confirmPasswordTextController.text) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                      if (_model.passwordTextController.text !=
+                                          _model.confirmPasswordTextController
+                                              .text) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
                                           SnackBar(
                                             content: Row(
                                               children: [
-                                                Icon(Icons.warning_amber_rounded, color: Colors.white),
+                                                Icon(
+                                                    Icons.warning_amber_rounded,
+                                                    color: Colors.white),
                                                 const SizedBox(width: 8),
                                                 Text('Passwords don\'t match!'),
                                               ],
                                             ),
-                                            backgroundColor: Colors.red.shade600,
+                                            backgroundColor:
+                                                Colors.red.shade600,
                                           ),
                                         );
                                         return;
                                       }
 
-                                      final user = await authManager.createAccountWithEmail(
+                                      final user = await authManager
+                                          .createAccountWithEmail(
                                         context,
                                         _model.emailTextController.text,
                                         _model.passwordTextController.text,
                                       );
                                       if (user == null) return;
 
-                                      context.goNamedAuth('onboarding', context.mounted);
+                                      // Send email verification
+                                      try {
+                                        await currentUser
+                                            ?.sendEmailVerification();
+
+                                        // Show success message
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Account created! Please check your email to verify your account.',
+                                              style: TextStyle(
+                                                  color: Colors.white),
+                                            ),
+                                            backgroundColor:
+                                                Colors.green.shade600,
+                                            behavior: SnackBarBehavior.floating,
+                                            duration: Duration(seconds: 5),
+                                          ),
+                                        );
+                                      } catch (e) {
+                                        // Show warning if email verification fails
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Account created, but failed to send verification email. You can resend it from your profile.',
+                                              style: TextStyle(
+                                                  color: Colors.white),
+                                            ),
+                                            backgroundColor:
+                                                Colors.orange.shade600,
+                                            behavior: SnackBarBehavior.floating,
+                                            duration: Duration(seconds: 5),
+                                          ),
+                                        );
+                                      }
+
+                                      context.goNamedAuth(
+                                          'onboarding', context.mounted);
                                     },
                                     text: 'Tee Off Your Journey',
                                     icon: const Icon(
@@ -473,16 +578,22 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                     options: FFButtonOptions(
                                       width: double.infinity,
                                       height: 56,
-                                      padding: const EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
-                                      iconPadding: const EdgeInsetsDirectional.fromSTEB(0, 0, 8, 0),
+                                      padding:
+                                          const EdgeInsetsDirectional.fromSTEB(
+                                              0, 0, 0, 0),
+                                      iconPadding:
+                                          const EdgeInsetsDirectional.fromSTEB(
+                                              0, 0, 8, 0),
                                       color: Colors.transparent,
-                                      textStyle: FlutterFlowTheme.of(context).titleMedium.override(
-                                        fontFamily: 'Inter',
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        height: 1.0,
-                                      ),
+                                      textStyle: FlutterFlowTheme.of(context)
+                                          .titleMedium
+                                          .override(
+                                            fontFamily: 'Inter',
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1.0,
+                                          ),
                                       elevation: 0,
                                       borderSide: const BorderSide(
                                         color: Colors.transparent,
@@ -493,45 +604,51 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                   ),
                                 ),
                                 const SizedBox(height: 24),
-                                
+
                                 // Sign In Link with golf ball divider
                                 Row(
                                   children: [
                                     Expanded(
                                       child: Divider(
                                         thickness: 1,
-                                        color: const Color(0xFF2E7D32).withValues(alpha: 0.2),
+                                        color: const Color(0xFF2E7D32)
+                                            .withValues(alpha: 0.2),
                                       ),
                                     ),
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16),
                                       child: Icon(
                                         Icons.sports_golf,
-                                        color: const Color(0xFF2E7D32).withValues(alpha: 0.5),
+                                        color: const Color(0xFF2E7D32)
+                                            .withValues(alpha: 0.5),
                                         size: 16,
                                       ),
                                     ),
                                     Expanded(
                                       child: Divider(
                                         thickness: 1,
-                                        color: const Color(0xFF2E7D32).withValues(alpha: 0.2),
+                                        color: const Color(0xFF2E7D32)
+                                            .withValues(alpha: 0.2),
                                       ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 16),
-                                
+
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
                                       'Already on the course? ',
-                                      style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                        fontFamily: 'Inter',
-                                        color: Colors.grey[600],
-                                        fontSize: 14,
-                                        height: 1.0,
-                                      ),
+                                      style: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .override(
+                                            fontFamily: 'Inter',
+                                            color: Colors.grey[600],
+                                            fontSize: 14,
+                                            height: 1.0,
+                                          ),
                                     ),
                                     InkWell(
                                       onTap: () => context.goNamed('login'),
@@ -539,13 +656,16 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                         children: [
                                           Text(
                                             'Sign In',
-                                            style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                              fontFamily: 'Inter',
-                                              color: const Color(0xFF2E7D32),
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              height: 1.0,
-                                            ),
+                                            style: FlutterFlowTheme.of(context)
+                                                .bodyMedium
+                                                .override(
+                                                  fontFamily: 'Inter',
+                                                  color:
+                                                      const Color(0xFF2E7D32),
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  height: 1.0,
+                                                ),
                                           ),
                                           const SizedBox(width: 4),
                                           Icon(
@@ -582,7 +702,7 @@ class GolfPatternPainter extends CustomPainter {
     final paint = Paint()
       ..color = Colors.white.withValues(alpha: 0.05)
       ..style = PaintingStyle.fill;
-    
+
     // Draw golf ball patterns
     for (int i = 0; i < 3; i++) {
       final offset = Offset(
@@ -591,16 +711,16 @@ class GolfPatternPainter extends CustomPainter {
       );
       canvas.drawCircle(offset, 30, paint);
     }
-    
+
     // Draw tee patterns
     final teePaint = Paint()
       ..color = const Color(0xFFFFD54F).withValues(alpha: 0.08)
       ..style = PaintingStyle.fill;
-    
+
     for (int i = 0; i < 2; i++) {
       final x = size.width * (0.7 + i * 0.15);
       final y = size.height * (0.2 + i * 0.1);
-      
+
       canvas.drawRect(
         Rect.fromCenter(
           center: Offset(x, y),
@@ -611,7 +731,7 @@ class GolfPatternPainter extends CustomPainter {
       );
     }
   }
-  
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-} 
+}

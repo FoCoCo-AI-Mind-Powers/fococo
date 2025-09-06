@@ -20,6 +20,9 @@ export 'services/mental_coach_system.dart';
 export 'services/conversation_manager.dart';
 export 'services/gemini_cost_tracker.dart';
 export 'services/gemini_voice_service.dart';
+export 'services/unified_ai_service.dart';
+export 'services/gemini_live_api_service.dart';
+export 'services/permission_service.dart';
 
 // ============================================================================
 // LEGACY AI INTEGRATION (For Migration/Compatibility)
@@ -50,40 +53,44 @@ export 'utils/ai_utils.dart';
 export 'widgets/ai_insight_widget.dart';
 export 'widgets/voice_chat_button.dart';
 export 'widgets/voice_chat_modal.dart';
-export 'widgets/enhanced_navigation_with_voice.dart';
+export 'widgets/navbar_widget.dart';
 
 // ============================================================================
 // MAIN FACADE CLASS
 // ============================================================================
 
 import 'package:flutter/foundation.dart';
+import 'package:fo_co_co/backend/schema/golf_rounds_record.dart';
+import 'package:fo_co_co/backend/schema/mental_sessions_record.dart';
+import 'package:fo_co_co/backend/schema/structs/vark_preferences_struct.dart';
+import 'package:fo_co_co/backend/schema/user_record.dart';
 import 'gemini_ai_client.dart';
 import 'models/gemini_models.dart';
 import 'services/mental_coach_system.dart';
 import 'services/conversation_manager.dart';
 import 'services/gemini_cost_tracker.dart';
 import 'config/gemini_config.dart';
-import '/backend/schema/index.dart';
 
 /// Main AI Integration facade for FoCoCo using Gemini
 class FoCoCoAI {
   FoCoCoAI._();
-  
+
   static FoCoCoAI? _instance;
   static FoCoCoAI get instance => _instance ??= FoCoCoAI._();
 
   /// Gemini AI Client for direct API access
-  static GeminiAIClient get client => GeminiAIClient(apiKey: 'firebase_ai_logic');
-  
+  static GeminiAIClient get client =>
+      GeminiAIClient(apiKey: 'firebase_ai_logic');
+
   /// Mental Coach System for specialized coaching
   static MentalCoachSystem get mentalCoach => MentalCoachSystem(
-    geminiClient: client,
-    costTracker: costTracker,
-  );
-  
+        geminiClient: client,
+        costTracker: costTracker,
+      );
+
   /// Conversation Manager for multi-turn conversations
   static ConversationManager get conversations => ConversationManager.instance;
-  
+
   /// Cost Tracker for usage analytics and budgeting
   static GeminiCostTracker get costTracker => GeminiCostTracker.instance;
 
@@ -94,10 +101,10 @@ class FoCoCoAI {
       if (!GeminiConfig.validateConfiguration()) {
         throw Exception('Gemini configuration validation failed');
       }
-      
+
       // Initialize all services
       await costTracker.initialize();
-      
+
       if (kDebugMode) {
         print('🤖 FoCoCo AI Integration initialized with Gemini');
         print('✅ Features enabled:');
@@ -164,7 +171,7 @@ class FoCoCoAI {
         'preferences': []
       }
     };
-    
+
     // Create VARK preferences map
     final varkPreferencesMap = {
       'visual': userProfile.varkPreferences.visual,
@@ -172,17 +179,19 @@ class FoCoCoAI {
       'readWrite': userProfile.varkPreferences.readWrite,
       'kinesthetic': userProfile.varkPreferences.kinesthetic,
     };
-    
+
     return await client.generateMentalCoachingRecommendations(
       userId: userId,
       userProfile: userProfileMap,
       subscriptionTier: 'BASE',
       varkPreferences: varkPreferencesMap,
-      recentRounds: recentRounds?.map((r) => {
-        'score': r.score,
-        'date': r.date?.toIso8601String() ?? '',
-        'notes': r.notes,
-      }).toList(),
+      recentRounds: recentRounds
+          ?.map((r) => {
+                'score': r.score,
+                'date': r.date?.toIso8601String() ?? '',
+                'notes': r.notes,
+              })
+          .toList(),
     );
   }
 
@@ -202,7 +211,7 @@ class FoCoCoAI {
       'readWrite': varkPreferences.readWrite,
       'kinesthetic': varkPreferences.kinesthetic,
     };
-    
+
     return await client.generatePersonalizedContent(
       userId: userId,
       contentType: contentType,
@@ -266,7 +275,7 @@ class FoCoCoAI {
       analysisWeeks: analysisWeeks,
       sessionId: sessionId,
     );
-    
+
     // Convert MindsetTrendAnalysis to Map<String, dynamic>
     return {
       'moodPatterns': result.moodPatterns,
@@ -294,7 +303,7 @@ class FoCoCoAI {
       recentRounds: recentRounds,
       sessionId: sessionId,
     );
-    
+
     // Convert RoutineOptimizationResult to Map<String, dynamic>
     return {
       'routineType': result.routineType,
@@ -539,11 +548,11 @@ class AIMigrationHelper {
       if (kDebugMode) {
         print('🔄 Migrating user data from OpenAI to Gemini for user: $userId');
       }
-      
+
       // Convert legacy insights to Gemini format
       // Convert legacy coaching data to Gemini format
       // Update user preferences for new system
-      
+
       if (kDebugMode) {
         print('✅ Migration completed for user: $userId');
       }
@@ -567,4 +576,4 @@ class AIMigrationHelper {
       return false;
     }
   }
-} 
+}

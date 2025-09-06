@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
-import '/backend/schema/index.dart';
+import 'package:fo_co_co/backend/schema/golf_rounds_record.dart';
+import 'package:fo_co_co/backend/schema/mental_sessions_record.dart';
+import 'package:fo_co_co/backend/schema/structs/vark_preferences_struct.dart';
+import 'package:fo_co_co/backend/schema/user_record.dart';
 import '../gemini_ai_client.dart';
 import '../models/gemini_models.dart';
 import 'gemini_cost_tracker.dart';

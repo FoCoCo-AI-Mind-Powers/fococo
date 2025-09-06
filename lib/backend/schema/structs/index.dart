@@ -9,3 +9,6 @@ export 'recommendation_struct.dart';
 export 'short_game_stats_struct.dart';
 export 'vark_preferences_struct.dart';
 export 'weather_struct.dart';
+export 'module_content_struct.dart';
+export 'module_content_versions_struct.dart';
+export 'achievement_criteria_struct.dart';

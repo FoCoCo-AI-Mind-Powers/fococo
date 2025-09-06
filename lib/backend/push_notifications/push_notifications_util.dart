@@ -1,21 +1,23 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:fo_co_co/backend/schema/structs/notification_settings_struct.dart';
 
 import '/auth/firebase_auth/auth_util.dart';
-import '/backend/schema/index.dart';
 import 'push_notifications_handler.dart';
 
 /// Utility class for managing push notifications based on user preferences
 class PushNotificationsUtil {
   PushNotificationsUtil._();
 
-  static final PushNotificationsHandler _handler = PushNotificationsHandler.instance;
+  static final PushNotificationsHandler _handler =
+      PushNotificationsHandler.instance;
 
   /// Initialize push notifications for the current user
   static Future<void> initializeForUser() async {
     try {
-    await _handler.initialize();
-    await _scheduleUserNotifications();
+      await _handler.initialize();
+      await _scheduleUserNotifications();
     } catch (e) {
       if (kDebugMode) {
         print('❌ Error initializing push notifications for user: $e');
@@ -29,7 +31,7 @@ class PushNotificationsUtil {
       if (currentUserUid.isEmpty) return;
 
       final userDoc = await FirebaseFirestore.instance
-          .collection('users')
+          .collection('user')
           .doc(currentUserUid)
           .get();
 
@@ -76,7 +78,8 @@ class PushNotificationsUtil {
 
       await _handler.scheduleDailyReminder(
         title: '🧠 Time for Your Mental Golf Training',
-        body: 'Keep your streak alive! Complete today\'s mental coaching session.',
+        body:
+            'Keep your streak alive! Complete today\'s mental coaching session.',
         reminderTime: defaultReminderTime,
       );
     } catch (e) {
@@ -92,7 +95,8 @@ class PushNotificationsUtil {
       // Schedule for Sunday evenings
       final now = DateTime.now();
       var nextSunday = now.add(Duration(days: 7 - now.weekday));
-      nextSunday = DateTime(nextSunday.year, nextSunday.month, nextSunday.day, 18, 0);
+      nextSunday =
+          DateTime(nextSunday.year, nextSunday.month, nextSunday.day, 18, 0);
 
       await _handler.scheduleNotification(
         id: 'weekly_progress'.hashCode,
@@ -117,7 +121,8 @@ class PushNotificationsUtil {
   }) async {
     try {
       final title = '🤖 New AI Golf Insight Ready!';
-      final body = customMessage ?? 'Your personalized golf insight "$insightTitle" is ready to view.';
+      final body = customMessage ??
+          'Your personalized golf insight "$insightTitle" is ready to view.';
 
       await _handler.scheduleAIInsightNotification(
         insightId: insightId,
@@ -161,10 +166,12 @@ class PushNotificationsUtil {
 
       if (isAtRisk) {
         title = '🔥 Don\'t Break Your Streak!';
-        body = 'You\'re at $currentStreak days. Complete a session today to keep it going!';
+        body =
+            'You\'re at $currentStreak days. Complete a session today to keep it going!';
       } else {
         title = '🔥 Amazing Streak!';
-        body = 'You\'re on a $currentStreak day streak! Keep up the great work!';
+        body =
+            'You\'re on a $currentStreak day streak! Keep up the great work!';
       }
 
       await _handler.scheduleStreakReminder(
@@ -188,7 +195,7 @@ class PushNotificationsUtil {
 
       // Update user document with new notification settings
       await FirebaseFirestore.instance
-          .collection('users')
+          .collection('user')
           .doc(currentUserUid)
           .update({
         'notificationSettings': newSettings.toMap(),
@@ -217,7 +224,7 @@ class PushNotificationsUtil {
       if (currentUserUid.isEmpty) return false;
 
       final userDoc = await FirebaseFirestore.instance
-          .collection('users')
+          .collection('user')
           .doc(currentUserUid)
           .get();
 
@@ -257,11 +264,13 @@ class PushNotificationsUtil {
     required int score,
   }) async {
     try {
-      final isEnabled = await isNotificationTypeEnabled('insight_notifications');
+      final isEnabled =
+          await isNotificationTypeEnabled('insight_notifications');
       if (!isEnabled) return;
 
       final title = '⛳ Round Analysis Complete';
-      final body = 'Your round at $courseName (Score: $score) has been analyzed. Check out your insights!';
+      final body =
+          'Your round at $courseName (Score: $score) has been analyzed. Check out your insights!';
 
       await _handler.scheduleNotification(
         id: roundId.hashCode,
@@ -287,16 +296,18 @@ class PushNotificationsUtil {
   }) async {
     try {
       final daysUntilExpiry = expiryDate.difference(DateTime.now()).inDays;
-      
+
       String title;
       String body;
 
       if (daysUntilExpiry <= 3) {
         title = '⚠️ Subscription Expiring Soon';
-        body = 'Your $membershipTier subscription expires in $daysUntilExpiry days. Renew now to keep your access!';
+        body =
+            'Your $membershipTier subscription expires in $daysUntilExpiry days. Renew now to keep your access!';
       } else if (daysUntilExpiry <= 7) {
         title = '💳 Subscription Reminder';
-        body = 'Your $membershipTier subscription expires in $daysUntilExpiry days.';
+        body =
+            'Your $membershipTier subscription expires in $daysUntilExpiry days.';
       } else {
         return; // Don't send notification if more than 7 days
       }
@@ -351,11 +362,11 @@ extension TimeOfDayExtension on TimeOfDay {
   DateTime toNextOccurrence() {
     final dateTime = toDateTime();
     final now = DateTime.now();
-    
+
     if (dateTime.isAfter(now)) {
       return dateTime;
     } else {
       return dateTime.add(const Duration(days: 1));
     }
   }
-} 
+}

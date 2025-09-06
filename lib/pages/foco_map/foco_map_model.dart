@@ -1,5 +1,7 @@
+import 'package:fo_co_co/backend/schema/round_logs_record.dart';
+import 'package:fo_co_co/backend/schema/shot_logs_record.dart';
+
 import '/flutter_flow/flutter_flow_util.dart';
-import '/backend/schema/index.dart';
 import 'foco_map_widget.dart' show FoCoMapWidget;
 import 'package:flutter/material.dart';
 
@@ -15,10 +17,10 @@ class FoCoMapModel extends FlutterFlowModel<FoCoMapWidget> with ChangeNotifier {
 
   /// Map Layer Selection
   String selectedLayer = 'MindMap'; // MindMap, ShotMap, SyncMap
-  
+
   /// Live Mode Toggle
   bool isLiveMode = false;
-  
+
   /// Filter states
   Map<String, bool> clubFilters = {
     'driver': true,
@@ -26,20 +28,20 @@ class FoCoMapModel extends FlutterFlowModel<FoCoMapWidget> with ChangeNotifier {
     'wedge': true,
     'putter': true,
   };
-  
+
   Map<String, bool> cueFilters = {};
   Map<String, bool> weatherFilters = {};
-  
+
   /// Data streams
   List<RoundLogsRecord> roundLogs = [];
   List<ShotLogsRecord> shotLogs = [];
-  
+
   /// Selected round for replay
   String? selectedRoundId;
-  
+
   /// Map zoom level
   double currentZoom = 10.0;
-  
+
   /// Selected marker for detail view
   String? selectedMarkerId;
   bool showMarkerDetail = false;
@@ -62,6 +64,11 @@ class FoCoMapModel extends FlutterFlowModel<FoCoMapWidget> with ChangeNotifier {
   /// Toggle live mode
   void toggleLiveMode() {
     isLiveMode = !isLiveMode;
+    notifyListeners();
+  }
+
+  void setLiveMode(bool enabled) {
+    isLiveMode = enabled;
     notifyListeners();
   }
 
@@ -91,7 +98,9 @@ class FoCoMapModel extends FlutterFlowModel<FoCoMapWidget> with ChangeNotifier {
 
   /// Get mindset color for round
   String getMindsetColor(RoundLogsRecord round) {
-    final avgMindset = (round.mindsetFocus + round.mindsetConfidence + round.mindsetControl) / 3;
+    final avgMindset =
+        (round.mindsetFocus + round.mindsetConfidence + round.mindsetControl) /
+            3;
     if (avgMindset >= 8) return 'green';
     if (avgMindset >= 5) return 'yellow';
     return 'red';
@@ -113,7 +122,7 @@ class FoCoMapModel extends FlutterFlowModel<FoCoMapWidget> with ChangeNotifier {
         final clubType = _getClubType(shot.clubUsed);
         if (clubFilters[clubType] == false) return false;
       }
-      
+
       // Apply other filters
       return true;
     }).toList();
@@ -121,8 +130,10 @@ class FoCoMapModel extends FlutterFlowModel<FoCoMapWidget> with ChangeNotifier {
 
   String _getClubType(String club) {
     if (club.toLowerCase().contains('driver')) return 'driver';
-    if (club.toLowerCase().contains('iron') || club.toLowerCase().contains('hybrid')) return 'iron';
-    if (club.toLowerCase().contains('wedge') || club.toLowerCase().contains('sand')) return 'wedge';
+    if (club.toLowerCase().contains('iron') ||
+        club.toLowerCase().contains('hybrid')) return 'iron';
+    if (club.toLowerCase().contains('wedge') ||
+        club.toLowerCase().contains('sand')) return 'wedge';
     if (club.toLowerCase().contains('putter')) return 'putter';
     return 'iron'; // default
   }

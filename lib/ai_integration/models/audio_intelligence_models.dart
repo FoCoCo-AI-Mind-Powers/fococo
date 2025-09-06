@@ -1,4 +1,5 @@
-import '/backend/schema/index.dart';
+import 'package:fo_co_co/backend/schema/structs/vark_preferences_struct.dart';
+
 
 /// Comprehensive user audio profile for intelligent adaptations
 class UserAudioProfile {

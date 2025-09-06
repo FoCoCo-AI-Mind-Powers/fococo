@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:fo_co_co/backend/schema/golf_rounds_record.dart';
+import 'package:fo_co_co/backend/schema/mental_sessions_record.dart';
+import 'package:fo_co_co/backend/schema/structs/vark_preferences_struct.dart';
+import 'package:fo_co_co/backend/schema/user_record.dart';
 import 'package:http/http.dart' as http;
 
-import '/backend/schema/index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'models/ai_models.dart';
 import 'config/ai_config.dart';
@@ -10,7 +13,7 @@ import 'config/ai_config.dart';
 /// Main OpenAI client for handling API communications
 class AIClient {
   AIClient._();
-  
+
   static AIClient? _instance;
   static AIClient get instance => _instance ??= AIClient._();
 
@@ -197,11 +200,11 @@ class AIClient {
     required Map<String, dynamic> requestData,
   }) async {
     final url = Uri.parse('$_baseUrl$endpoint');
-    
+
     final headers = {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ${AIConfig.openAIApiKey}',
-      if (AIConfig.organizationId != null) 
+      if (AIConfig.organizationId != null)
         'OpenAI-Organization': AIConfig.organizationId!,
     };
 
@@ -218,22 +221,23 @@ class AIClient {
 
     if (response.statusCode == 200) {
       final responseData = jsonDecode(response.body) as Map<String, dynamic>;
-      
+
       if (kDebugMode) {
         print('✅ OpenAI response successful');
         print('💰 Usage: ${responseData['usage']}');
       }
-      
+
       return responseData;
     } else {
       final errorData = jsonDecode(response.body) as Map<String, dynamic>;
-      final errorMessage = errorData['error']?['message'] ?? 'Unknown OpenAI API error';
-      
+      final errorMessage =
+          errorData['error']?['message'] ?? 'Unknown OpenAI API error';
+
       if (kDebugMode) {
         print('❌ OpenAI API error: ${response.statusCode}');
         print('📝 Error details: $errorMessage');
       }
-      
+
       throw AIException(
         message: errorMessage,
         statusCode: response.statusCode,
@@ -250,10 +254,11 @@ class AIClient {
     required List<MentalSessionsRecord> mentalSessions,
   }) {
     final buffer = StringBuffer();
-    
-    buffer.writeln('Generate a comprehensive golf performance insight based on the following data:');
+
+    buffer.writeln(
+        'Generate a comprehensive golf performance insight based on the following data:');
     buffer.writeln();
-    
+
     // Current round data
     buffer.writeln('CURRENT ROUND:');
     buffer.writeln('Course: ${golfRound.courseName}');
@@ -265,37 +270,41 @@ class AIClient {
     buffer.writeln('Pre-round Mood: ${golfRound.preRoundMood}');
     buffer.writeln('Post-round Mood: ${golfRound.postRoundMood}');
     buffer.writeln();
-    
+
     // User profile context
     if (userProfile != null) {
       buffer.writeln('PLAYER PROFILE:');
       buffer.writeln('Handicap: ${userProfile.handicap}');
       buffer.writeln('Experience: ${userProfile.golfExperience}');
-      buffer.writeln('Mental Performance Score: ${userProfile.mentalPerformanceScore}');
+      buffer.writeln(
+          'Mental Performance Score: ${userProfile.mentalPerformanceScore}');
       buffer.writeln('Coaching Streak: ${userProfile.coachingStreak} days');
       buffer.writeln();
     }
-    
+
     // Historical context
     if (historicalRounds.isNotEmpty) {
       buffer.writeln('RECENT PERFORMANCE TRENDS:');
       for (final round in historicalRounds.take(5)) {
-        buffer.writeln('${round.date}: Score ${round.score}, Mental Focus ${round.mentalFocus}/10');
+        buffer.writeln(
+            '${round.date}: Score ${round.score}, Mental Focus ${round.mentalFocus}/10');
       }
       buffer.writeln();
     }
-    
+
     // Mental coaching context
     if (mentalSessions.isNotEmpty) {
       buffer.writeln('RECENT MENTAL COACHING:');
       for (final session in mentalSessions.take(3)) {
-        buffer.writeln('${session.dateCompleted}: ${session.moduleTitle} - Value: ${session.perceivedValue}/10');
+        buffer.writeln(
+            '${session.dateCompleted}: ${session.moduleTitle} - Value: ${session.perceivedValue}/10');
       }
       buffer.writeln();
     }
-    
-    buffer.writeln('Please provide actionable insights focusing on mental performance and areas for improvement.');
-    
+
+    buffer.writeln(
+        'Please provide actionable insights focusing on mental performance and areas for improvement.');
+
     return buffer.toString();
   }
 
@@ -306,36 +315,42 @@ class AIClient {
     required List<GolfRoundsRecord> recentRounds,
   }) {
     final buffer = StringBuffer();
-    
-    buffer.writeln('Generate personalized mental coaching recommendations for this golfer:');
+
+    buffer.writeln(
+        'Generate personalized mental coaching recommendations for this golfer:');
     buffer.writeln();
-    
+
     buffer.writeln('PLAYER PROFILE:');
     buffer.writeln('Handicap: ${userProfile.handicap}');
     buffer.writeln('Experience: ${userProfile.golfExperience}');
-    buffer.writeln('Mental Performance Score: ${userProfile.mentalPerformanceScore}');
+    buffer.writeln(
+        'Mental Performance Score: ${userProfile.mentalPerformanceScore}');
     buffer.writeln('Coaching Streak: ${userProfile.coachingStreak} days');
-    buffer.writeln('VARK Preferences: Visual=${userProfile.varkPreferences.visual}, Aural=${userProfile.varkPreferences.aural}, Read/Write=${userProfile.varkPreferences.readWrite}, Kinesthetic=${userProfile.varkPreferences.kinesthetic}');
+    buffer.writeln(
+        'VARK Preferences: Visual=${userProfile.varkPreferences.visual}, Aural=${userProfile.varkPreferences.aural}, Read/Write=${userProfile.varkPreferences.readWrite}, Kinesthetic=${userProfile.varkPreferences.kinesthetic}');
     buffer.writeln();
-    
+
     if (recentSessions.isNotEmpty) {
       buffer.writeln('RECENT COACHING SESSIONS:');
       for (final session in recentSessions) {
-        buffer.writeln('${session.moduleTitle}: Completion ${session.progressPercentage}%, Value ${session.perceivedValue}/10');
+        buffer.writeln(
+            '${session.moduleTitle}: Completion ${session.progressPercentage}%, Value ${session.perceivedValue}/10');
       }
       buffer.writeln();
     }
-    
+
     if (recentRounds.isNotEmpty) {
       buffer.writeln('RECENT PERFORMANCE:');
       for (final round in recentRounds) {
-        buffer.writeln('Score: ${round.score}, Mental Focus: ${round.mentalFocus}/10, Emotional Control: ${round.emotionalControl}/10');
+        buffer.writeln(
+            'Score: ${round.score}, Mental Focus: ${round.mentalFocus}/10, Emotional Control: ${round.emotionalControl}/10');
       }
       buffer.writeln();
     }
-    
-    buffer.writeln('Recommend specific mental coaching modules and strategies based on their needs and learning preferences.');
-    
+
+    buffer.writeln(
+        'Recommend specific mental coaching modules and strategies based on their needs and learning preferences.');
+
     return buffer.toString();
   }
 
@@ -347,17 +362,22 @@ class AIClient {
     required Map<String, dynamic> additionalContext,
   }) {
     final buffer = StringBuffer();
-    
-    buffer.writeln('Generate personalized $contentType content about $topic based on these learning preferences:');
+
+    buffer.writeln(
+        'Generate personalized $contentType content about $topic based on these learning preferences:');
     buffer.writeln();
-    
+
     buffer.writeln('LEARNING PREFERENCES (VARK):');
-    buffer.writeln('Visual: ${varkPreferences.visual ? "Preferred" : "Not preferred"}');
-    buffer.writeln('Aural: ${varkPreferences.aural ? "Preferred" : "Not preferred"}');
-    buffer.writeln('Read/Write: ${varkPreferences.readWrite ? "Preferred" : "Not preferred"}');
-    buffer.writeln('Kinesthetic: ${varkPreferences.kinesthetic ? "Preferred" : "Not preferred"}');
+    buffer.writeln(
+        'Visual: ${varkPreferences.visual ? "Preferred" : "Not preferred"}');
+    buffer.writeln(
+        'Aural: ${varkPreferences.aural ? "Preferred" : "Not preferred"}');
+    buffer.writeln(
+        'Read/Write: ${varkPreferences.readWrite ? "Preferred" : "Not preferred"}');
+    buffer.writeln(
+        'Kinesthetic: ${varkPreferences.kinesthetic ? "Preferred" : "Not preferred"}');
     buffer.writeln();
-    
+
     if (additionalContext.isNotEmpty) {
       buffer.writeln('ADDITIONAL CONTEXT:');
       additionalContext.forEach((key, value) {
@@ -365,9 +385,10 @@ class AIClient {
       });
       buffer.writeln();
     }
-    
-    buffer.writeln('Create content that aligns with their learning style preferences for maximum effectiveness.');
-    
+
+    buffer.writeln(
+        'Create content that aligns with their learning style preferences for maximum effectiveness.');
+
     return buffer.toString();
   }
 
@@ -377,10 +398,11 @@ class AIClient {
     UserRecord? userProfile,
   }) {
     final buffer = StringBuffer();
-    
-    buffer.writeln('Provide personalized feedback for this mental coaching session:');
+
+    buffer.writeln(
+        'Provide personalized feedback for this mental coaching session:');
     buffer.writeln();
-    
+
     buffer.writeln('SESSION DETAILS:');
     buffer.writeln('Module: ${session.moduleTitle}');
     buffer.writeln('Duration: ${session.duration} minutes');
@@ -390,16 +412,17 @@ class AIClient {
     buffer.writeln('Perceived Value: ${session.perceivedValue}/10');
     buffer.writeln('Journal Entry: ${session.journalEntry}');
     buffer.writeln();
-    
+
     if (userProfile != null) {
       buffer.writeln('PLAYER CONTEXT:');
       buffer.writeln('Experience: ${userProfile.golfExperience}');
       buffer.writeln('Current Streak: ${userProfile.coachingStreak} days');
       buffer.writeln();
     }
-    
-    buffer.writeln('Provide encouraging, constructive feedback and suggestions for continued improvement.');
-    
+
+    buffer.writeln(
+        'Provide encouraging, constructive feedback and suggestions for continued improvement.');
+
     return buffer.toString();
   }
 
@@ -422,5 +445,6 @@ class AIException implements Exception {
   });
 
   @override
-  String toString() => 'AIException: $message (Status: $statusCode, Type: $errorType)';
-} 
+  String toString() =>
+      'AIException: $message (Status: $statusCode, Type: $errorType)';
+}

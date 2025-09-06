@@ -29,36 +29,36 @@ class _VoiceChatButtonState extends State<VoiceChatButton>
   late AnimationController _scaleController;
   late Animation<double> _pulseAnimation;
   late Animation<double> _scaleAnimation;
-  
+
   bool _isPressed = false;
   VoiceServiceState _voiceState = VoiceServiceState.uninitialized;
 
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize animations
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    
+
     _scaleController = AnimationController(
       duration: const Duration(milliseconds: 150),
       vsync: this,
     );
-    
+
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-    
+
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.9).animate(
       CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut),
     );
 
     // Start pulse animation
     _pulseController.repeat(reverse: true);
-    
+
     // Listen to voice service state
     GeminiVoiceService().stateStream.listen(_onVoiceStateChanged);
   }
@@ -75,7 +75,7 @@ class _VoiceChatButtonState extends State<VoiceChatButton>
       setState(() {
         _voiceState = state;
       });
-      
+
       // Adjust animations based on state
       switch (state) {
         case VoiceServiceState.listening:
@@ -99,7 +99,7 @@ class _VoiceChatButtonState extends State<VoiceChatButton>
 
     // Haptic feedback
     HapticFeedback.mediumImpact();
-    
+
     // Scale animation
     setState(() => _isPressed = true);
     await _scaleController.forward();
@@ -112,8 +112,8 @@ class _VoiceChatButtonState extends State<VoiceChatButton>
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        barrierColor: Colors.black.withOpacity(0.5),
-        builder: (context) => const VoiceChatModal(),
+        barrierColor: Colors.black.withValues(alpha: 0.5),
+        builder: (context) => const FoCoCoVoiceChatModal(),
       );
     }
 
@@ -124,7 +124,7 @@ class _VoiceChatButtonState extends State<VoiceChatButton>
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
+
     return AnimatedBuilder(
       animation: Listenable.merge([_pulseAnimation, _scaleAnimation]),
       builder: (context, child) {
@@ -137,11 +137,11 @@ class _VoiceChatButtonState extends State<VoiceChatButton>
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: _getButtonColor(theme).withOpacity(0.3),
+                  color: _getButtonColor(theme).withValues(alpha: 0.3),
                   blurRadius: 12,
-                  spreadRadius: _voiceState == VoiceServiceState.listening 
-                    ? _pulseAnimation.value * 8 
-                    : 4,
+                  spreadRadius: _voiceState == VoiceServiceState.listening
+                      ? _pulseAnimation.value * 8
+                      : 4,
                   offset: const Offset(0, 4),
                 ),
               ],
@@ -156,7 +156,7 @@ class _VoiceChatButtonState extends State<VoiceChatButton>
                     shape: BoxShape.circle,
                     gradient: _getButtonGradient(theme),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       width: 2,
                     ),
                   ),
@@ -257,13 +257,13 @@ class _VoiceChatButtonState extends State<VoiceChatButton>
 
   Gradient _getButtonGradient(FlutterFlowTheme theme) {
     final color = _getButtonColor(theme);
-    
+
     return LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
       colors: [
         color,
-        color.withOpacity(0.8),
+        color.withValues(alpha: 0.8),
       ],
       stops: const [0.0, 1.0],
     );
@@ -286,7 +286,8 @@ class EnhancedVoiceChatButton extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<EnhancedVoiceChatButton> createState() => _EnhancedVoiceChatButtonState();
+  State<EnhancedVoiceChatButton> createState() =>
+      _EnhancedVoiceChatButtonState();
 }
 
 class _EnhancedVoiceChatButtonState extends State<EnhancedVoiceChatButton>
@@ -297,47 +298,47 @@ class _EnhancedVoiceChatButtonState extends State<EnhancedVoiceChatButton>
   late Animation<double> _breathingAnimation;
   late Animation<double> _rippleAnimation;
   late Animation<double> _rotationAnimation;
-  
+
   VoiceServiceState _voiceState = VoiceServiceState.uninitialized;
   bool _showTooltip = false;
 
   @override
   void initState() {
     super.initState();
-    
+
     _breathingController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
-    
+
     _rippleController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-    
+
     _rotationController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    
+
     _breathingAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _breathingController, curve: Curves.easeInOut),
     );
-    
+
     _rippleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _rippleController, curve: Curves.easeOut),
     );
-    
+
     _rotationAnimation = Tween<double>(begin: 0.0, end: 2.0).animate(
       CurvedAnimation(parent: _rotationController, curve: Curves.linear),
     );
 
     // Start breathing animation
     _breathingController.repeat(reverse: true);
-    
+
     // Listen to voice service state
     GeminiVoiceService().stateStream.listen(_onVoiceStateChanged);
-    
+
     // Show tooltip after a delay
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
@@ -362,7 +363,7 @@ class _EnhancedVoiceChatButtonState extends State<EnhancedVoiceChatButton>
       setState(() {
         _voiceState = state;
       });
-      
+
       switch (state) {
         case VoiceServiceState.listening:
           _rippleController.repeat();
@@ -390,7 +391,7 @@ class _EnhancedVoiceChatButtonState extends State<EnhancedVoiceChatButton>
     if (!widget.enabled) return;
 
     HapticFeedback.lightImpact();
-    
+
     // Trigger ripple effect
     _rippleController.forward(from: 0.0);
 
@@ -400,10 +401,10 @@ class _EnhancedVoiceChatButtonState extends State<EnhancedVoiceChatButton>
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        barrierColor: Colors.black.withOpacity(0.6),
+        barrierColor: Colors.black.withValues(alpha: 0.6),
         enableDrag: true,
         isDismissible: true,
-        builder: (context) => const VoiceChatModal(),
+        builder: (context) => const FoCoCoVoiceChatModal(),
       );
     }
 
@@ -413,7 +414,7 @@ class _EnhancedVoiceChatButtonState extends State<EnhancedVoiceChatButton>
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
+
     return Positioned(
       bottom: widget.margin.bottom,
       left: 0,
@@ -432,8 +433,8 @@ class _EnhancedVoiceChatButtonState extends State<EnhancedVoiceChatButton>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: theme.primary.withOpacity(
-                        0.3 * (1 - _rippleAnimation.value),
+                      color: theme.primary.withValues(
+                        alpha: 0.3 * (1 - _rippleAnimation.value),
                       ),
                       width: 2,
                     ),
@@ -441,7 +442,7 @@ class _EnhancedVoiceChatButtonState extends State<EnhancedVoiceChatButton>
                 );
               },
             ),
-            
+
             // Main button with breathing animation
             AnimatedBuilder(
               animation: _breathingAnimation,
@@ -464,7 +465,7 @@ class _EnhancedVoiceChatButtonState extends State<EnhancedVoiceChatButton>
                 );
               },
             ),
-            
+
             // Tooltip
             if (_showTooltip)
               Positioned(
@@ -482,7 +483,7 @@ class _EnhancedVoiceChatButtonState extends State<EnhancedVoiceChatButton>
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),

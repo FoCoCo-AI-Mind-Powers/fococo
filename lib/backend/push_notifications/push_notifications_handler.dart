@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,7 +9,6 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '/auth/firebase_auth/auth_util.dart';
-import '/backend/schema/index.dart';
 
 // Notification types for the FoCoCo app
 enum NotificationType {
@@ -27,10 +27,12 @@ class PushNotificationsHandler {
   PushNotificationsHandler._();
 
   static PushNotificationsHandler? _instance;
-  static PushNotificationsHandler get instance => _instance ??= PushNotificationsHandler._();
+  static PushNotificationsHandler get instance =>
+      _instance ??= PushNotificationsHandler._();
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
 
@@ -59,7 +61,8 @@ class PushNotificationsHandler {
   }
 
   Future<void> _requestPermission() async {
-    final NotificationSettings settings = await _firebaseMessaging.requestPermission(
+    final NotificationSettings settings =
+        await _firebaseMessaging.requestPermission(
       alert: true,
       announcement: false,
       badge: true,
@@ -70,7 +73,8 @@ class PushNotificationsHandler {
     );
 
     if (kDebugMode) {
-      print('Push notification permission granted: ${settings.authorizationStatus}');
+      print(
+          'Push notification permission granted: ${settings.authorizationStatus}');
     }
   }
 
@@ -78,13 +82,15 @@ class PushNotificationsHandler {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const DarwinInitializationSettings initializationSettingsIOS = DarwinInitializationSettings(
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
       requestSoundPermission: true,
       requestBadgePermission: true,
       requestAlertPermission: true,
     );
 
-    const InitializationSettings initializationSettings = InitializationSettings(
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
       android: initializationSettingsAndroid,
       iOS: initializationSettingsIOS,
     );
@@ -103,7 +109,8 @@ class PushNotificationsHandler {
     FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
 
     // Handle initial message if app was opened from terminated state
-    final RemoteMessage? initialMessage = await _firebaseMessaging.getInitialMessage();
+    final RemoteMessage? initialMessage =
+        await _firebaseMessaging.getInitialMessage();
     if (initialMessage != null) {
       _handleNotificationTap(initialMessage);
     }
@@ -141,7 +148,8 @@ class PushNotificationsHandler {
         icon: '@mipmap/ic_launcher',
       );
 
-      const DarwinNotificationDetails iOSPlatformChannelSpecifics = DarwinNotificationDetails(
+      const DarwinNotificationDetails iOSPlatformChannelSpecifics =
+          DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
@@ -165,7 +173,7 @@ class PushNotificationsHandler {
   Future<void> _handleInAppNotification(RemoteMessage message) async {
     // Parse notification type and handle accordingly
     final notificationType = _parseNotificationType(message.data['type']);
-    
+
     if (notificationType != null) {
       switch (notificationType) {
         case NotificationType.aiInsightReady:
@@ -201,7 +209,7 @@ class PushNotificationsHandler {
 
   NotificationType? _parseNotificationType(String? type) {
     if (type == null) return null;
-    
+
     switch (type) {
       case 'daily_reminder':
         return NotificationType.dailyReminder;
@@ -259,7 +267,8 @@ class PushNotificationsHandler {
     }
   }
 
-  Future<void> _handleModuleRecommendationNotification(RemoteMessage message) async {
+  Future<void> _handleModuleRecommendationNotification(
+      RemoteMessage message) async {
     final moduleId = message.data['moduleId'];
     if (moduleId != null && kDebugMode) {
       print('📚 Module recommendation: $moduleId');
@@ -273,7 +282,8 @@ class PushNotificationsHandler {
     }
   }
 
-  Future<void> _handleSubscriptionReminderNotification(RemoteMessage message) async {
+  Future<void> _handleSubscriptionReminderNotification(
+      RemoteMessage message) async {
     if (kDebugMode) {
       print('💳 Subscription reminder notification received');
     }
@@ -291,7 +301,7 @@ class PushNotificationsHandler {
     }
 
     final notificationType = _parseNotificationType(message.data['type']);
-    
+
     if (notificationType != null) {
       _navigateToPage(notificationType, message.data);
     }
@@ -340,7 +350,8 @@ class PushNotificationsHandler {
           final apnsToken = await _firebaseMessaging.getAPNSToken();
           if (apnsToken == null) {
             if (kDebugMode) {
-              print('📱 APNS token not available yet, skipping FCM token retrieval');
+              print(
+                  '📱 APNS token not available yet, skipping FCM token retrieval');
             }
             // Schedule a retry after a delay
             Timer(const Duration(seconds: 5), () => _updateFCMToken());
@@ -382,8 +393,9 @@ class PushNotificationsHandler {
     try {
       if (currentUserUid.isEmpty) return;
 
-      final userDocRef = FirebaseFirestore.instance.collection('users').doc(currentUserUid);
-      
+      final userDocRef =
+          FirebaseFirestore.instance.collection('user').doc(currentUserUid);
+
       await userDocRef.update({
         'notificationTokens': FieldValue.arrayUnion([token]),
         'lastActive': FieldValue.serverTimestamp(),
@@ -449,7 +461,10 @@ class PushNotificationsHandler {
       id: 'streak_reminder'.hashCode,
       title: title,
       body: body,
-      payload: {'type': 'streak_reminder', 'streakCount': streakCount.toString()},
+      payload: {
+        'type': 'streak_reminder',
+        'streakCount': streakCount.toString()
+      },
       scheduledDate: DateTime.now().add(const Duration(hours: 20)),
     );
   }
@@ -472,7 +487,8 @@ class PushNotificationsHandler {
       icon: '@mipmap/ic_launcher',
     );
 
-    const DarwinNotificationDetails iOSPlatformChannelSpecifics = DarwinNotificationDetails(
+    const DarwinNotificationDetails iOSPlatformChannelSpecifics =
+        DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
@@ -520,10 +536,10 @@ class PushNotificationsHandler {
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
-  if (kDebugMode) {
-    print('📱 Background message received: ${message.notification?.title}');
+    if (kDebugMode) {
+      print('📱 Background message received: ${message.notification?.title}');
     }
-    
+
     // Handle background message processing here if needed
     // For now, just log the message
   } catch (e) {
@@ -531,4 +547,4 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       print('❌ Error in background message handler: $e');
     }
   }
-} 
+}

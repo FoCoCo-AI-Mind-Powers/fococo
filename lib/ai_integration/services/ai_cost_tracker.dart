@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 
-import '/backend/schema/index.dart';
 import '../config/ai_config.dart';
 
 /// Service for tracking AI usage costs and analytics

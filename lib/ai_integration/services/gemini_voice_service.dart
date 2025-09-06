@@ -18,9 +18,9 @@ class GeminiVoiceService {
   GeminiVoiceService._internal();
 
   // Audio components
-  late stt.SpeechToText _speechToText;
-  late FlutterTts _flutterTts;
-  late AudioPlayer _audioPlayer;
+  stt.SpeechToText? _speechToText;
+  FlutterTts? _flutterTts;
+  AudioPlayer? _audioPlayer;
   
   // State management
   bool _isListening = false;
@@ -61,7 +61,7 @@ class GeminiVoiceService {
       _audioPlayer = AudioPlayer();
 
       // Initialize speech-to-text
-      final speechAvailable = await _speechToText.initialize(
+      final speechAvailable = await _speechToText!.initialize(
         onStatus: _onSpeechStatus,
         onError: _onSpeechError,
       );
@@ -101,19 +101,24 @@ class GeminiVoiceService {
 
   /// Configure TTS settings
   Future<void> _configureTTS() async {
-    await _flutterTts.setLanguage('en-US');
-    await _flutterTts.setPitch(0.9);
-    await _flutterTts.setSpeechRate(0.9);
-    await _flutterTts.setVolume(1.0);
+    if (_flutterTts == null) return;
     
-    _flutterTts.setCompletionHandler(() {
+    await _flutterTts!.setLanguage('en-US');
+    await _flutterTts!.setPitch(0.9);
+    await _flutterTts!.setSpeechRate(0.9);
+    await _flutterTts!.setVolume(1.0);
+    
+    _flutterTts!.setCompletionHandler(() {
       _isSpeaking = false;
       _updateState(VoiceServiceState.ready);
     });
     
-    _flutterTts.setErrorHandler((msg) {
+    _flutterTts!.setErrorHandler((msg) {
       _isSpeaking = false;
       _updateState(VoiceServiceState.error);
+      if (kDebugMode) {
+        print('❌ Error speaking response: $msg');
+      }
     });
   }
 
@@ -131,16 +136,18 @@ class GeminiVoiceService {
       _isListening = true;
       _updateState(VoiceServiceState.listening);
 
-      await _speechToText.listen(
-        onResult: (result) => _onSpeechResult(result, type),
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 3),
-        listenOptions: stt.SpeechListenOptions(
-          partialResults: true,
-          cancelOnError: false,
-          listenMode: stt.ListenMode.confirmation,
-        ),
-      );
+      if (_speechToText != null) {
+        await _speechToText!.listen(
+          onResult: (result) => _onSpeechResult(result, type),
+          listenFor: const Duration(seconds: 30),
+          pauseFor: const Duration(seconds: 3),
+          listenOptions: stt.SpeechListenOptions(
+            partialResults: true,
+            cancelOnError: false,
+            listenMode: stt.ListenMode.confirmation,
+          ),
+        );
+      }
       
     } catch (e) {
       _isListening = false;
@@ -155,7 +162,9 @@ class GeminiVoiceService {
   Future<void> stopListening() async {
     if (!_isListening) return;
 
-    await _speechToText.stop();
+    if (_speechToText != null) {
+      await _speechToText!.stop();
+    }
     _isListening = false;
     _updateState(VoiceServiceState.ready);
   }
@@ -369,13 +378,15 @@ KINESTHETIC LEARNER ADAPTATIONS:
       _isSpeaking = true;
       _updateState(VoiceServiceState.speaking);
 
-      if (audioUrl != null && audioUrl.isNotEmpty) {
+      if (audioUrl != null && audioUrl.isNotEmpty && _audioPlayer != null) {
         // Use provided audio URL (from native audio models)
-        await _audioPlayer.setUrl(audioUrl);
-        await _audioPlayer.play();
+        await _audioPlayer!.setUrl(audioUrl);
+        await _audioPlayer!.play();
       } else {
         // Use local TTS
-        await _flutterTts.speak(text);
+        if (_flutterTts != null) {
+          await _flutterTts!.speak(text);
+        }
       }
       
     } catch (e) {
@@ -457,8 +468,12 @@ KINESTHETIC LEARNER ADAPTATIONS:
   /// Stop all audio playback
   Future<void> stopAudioPlayback() async {
     if (_isSpeaking) {
-      await _flutterTts.stop();
-      await _audioPlayer.stop();
+      if (_flutterTts != null) {
+        await _flutterTts!.stop();
+      }
+      if (_audioPlayer != null) {
+        await _audioPlayer!.stop();
+      }
       _isSpeaking = false;
       _updateState(VoiceServiceState.ready);
     }
@@ -466,9 +481,9 @@ KINESTHETIC LEARNER ADAPTATIONS:
 
   /// Dispose of resources
   void dispose() {
-    _speechToText.cancel();
-    _flutterTts.stop();
-    _audioPlayer.dispose();
+    _speechToText?.cancel();
+    _flutterTts?.stop();
+    _audioPlayer?.dispose();
     _stateController.close();
     _transcriptController.close();
     _volumeController.close();

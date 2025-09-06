@@ -1,7 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:fo_co_co/backend/schema/ai_insights_record.dart';
+import 'package:fo_co_co/backend/schema/golf_rounds_record.dart';
+import 'package:fo_co_co/backend/schema/mental_sessions_record.dart';
+import 'package:fo_co_co/backend/schema/user_record.dart';
 
 
-import '/backend/schema/index.dart';
 import '/backend/push_notifications/push_notifications_util.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '../ai_client.dart';

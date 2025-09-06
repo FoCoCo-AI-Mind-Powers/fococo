@@ -1,11 +1,14 @@
+import '/auth/firebase_auth/auth_util.dart';
+import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/fococo_ui_components.dart';
-import '/ai_integration/widgets/enhanced_navigation_with_voice.dart';
+import '/flutter_flow/glass_design_system.dart';
+import '/flutter_flow/glass_components.dart';
+import '/ai_integration/widgets/enhanced_navbar_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'golf_rounds_model.dart';
-export 'golf_rounds_model.dart';
+
+import 'package:go_router/go_router.dart';
+import 'dart:ui';
 
 class GolfRoundsWidget extends StatefulWidget {
   const GolfRoundsWidget({super.key});
@@ -17,1055 +20,965 @@ class GolfRoundsWidget extends StatefulWidget {
   State<GolfRoundsWidget> createState() => _GolfRoundsWidgetState();
 }
 
-class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProviderStateMixin {
-  late GolfRoundsModel _model;
-  late TabController _tabController;
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
+class _GolfRoundsWidgetState extends State<GolfRoundsWidget>
+    with TickerProviderStateMixin {
+  late AnimationController _slideController;
+  late Animation<Offset> _slideAnimation;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
     super.initState();
-    _model = createModel(context, () => GolfRoundsModel());
-    _tabController = TabController(length: 3, vsync: this);
-    
-    // Initialize animations
-    _animationController = AnimationController(
-      duration: FlutterFlowTheme.animationNormal,
+
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
     ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
     ));
 
-    _animationController.forward();
+    _slideController.forward();
   }
 
   @override
   void dispose() {
-    _model.dispose();
-    _tabController.dispose();
-    _animationController.dispose();
+    _slideController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-        FocusManager.instance.primaryFocus?.unfocus();
-      },
-      child: Scaffold(
-        key: scaffoldKey,
-        backgroundColor: theme.primaryBackground,
-        body: FadeTransition(
-          opacity: _fadeAnimation,
-          child: CustomScrollView(
-            slivers: [
-              // Enhanced App Bar with Strava-inspired header
-              _buildSliverAppBar(theme),
-              
-              // Tab Content
-              SliverFillRemaining(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    // Recent Rounds Tab (Strava-inspired activity feed)
-                    _buildRecentRoundsTab(theme),
-                    
-                    // Performance Analytics Tab
-                    _buildPerformanceAnalyticsTab(theme),
-                    
-                    // Progress & Insights Tab
-                    _buildProgressInsightsTab(theme),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        
-        // Floating Action Button for new round
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _showAddRoundBottomSheet(context),
-          backgroundColor: theme.golfPrimary,
-          icon: Icon(Icons.add_rounded, color: Colors.white),
-          label: Text(
-            'Log Round',
-            style: theme.titleSmall.override(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              height: 1.2,
-            ),
-          ),
-        ),
-        
-        // Enhanced Bottom Navigation
-        bottomNavigationBar: FoCoCoNavBar(
-          currentRoute: 'golf_rounds',
-          enableVoiceButton: false, // Only show voice button on Today tab
-          onTap: (route) => context.goNamed(route),
-        ),
-      ),
-    );
-  }
 
-  /// Enhanced SliverAppBar with Strava-inspired header
-  Widget _buildSliverAppBar(FlutterFlowTheme theme) {
-    return SliverAppBar(
-      expandedHeight: 280,
-      floating: false,
-      pinned: true,
-      elevation: 0,
-      backgroundColor: Colors.transparent,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: theme.golfGradient,
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(FlutterFlowTheme.borderRadiusXXL),
-              bottomRight: Radius.circular(FlutterFlowTheme.borderRadiusXXL),
-            ),
+    return StreamBuilder<UserRecord>(
+      stream: UserRecord.getDocument(
+          FirebaseFirestore.instance.collection('users').doc(currentUserUid)),
+      builder: (context, userSnapshot) {
+        final user = userSnapshot.data;
+
+        return StreamBuilder<List<GolfRoundsRecord>>(
+          stream: queryGolfRoundsRecord(
+            queryBuilder: (golfRoundsRecord) => golfRoundsRecord
+                .where('userId', isEqualTo: currentUserUid)
+                .orderBy('date', descending: true),
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header with title and profile
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Golf Rounds',
-                              style: theme.headlineMedium.override(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                height: 1.2,
+          builder: (context, roundsSnapshot) {
+            final rounds = roundsSnapshot.data ?? [];
+
+            return Scaffold(
+              key: scaffoldKey,
+              backgroundColor: theme.primaryBackground,
+              body: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      theme.primaryBackground,
+                      theme.secondaryBackground.withValues(alpha: 0.8),
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  child: SlideTransition(
+                    position: _slideAnimation,
+                    child: CustomScrollView(
+                      slivers: [
+                        // Glass App Bar
+                        SliverAppBar(
+                          expandedHeight: 120,
+                          floating: true,
+                          pinned: true,
+                          backgroundColor: Colors.transparent,
+                          elevation: 0,
+                          flexibleSpace: FlexibleSpaceBar(
+                            background: ClipRRect(
+                              child: BackdropFilter(
+                                filter:
+                                    ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        theme.glassBackground
+                                            .withValues(alpha: 0.2),
+                                        theme.glassTint.withValues(alpha: 0.1),
+                                      ],
+                                    ),
+                                    border: Border(
+                                      bottom: BorderSide(
+                                        color: theme.glassBorder
+                                            .withValues(alpha: 0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        20, 60, 20, 20),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.end,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Flexible(
+                                                child: Text(
+                                                  'Golf Rounds',
+                                                  style: theme.headlineMedium
+                                                      .copyWith(
+                                                    color: theme.primaryText,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontFamily: 'Montserrat',
+                                                    fontSize: 24,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Flexible(
+                                                child: Text(
+                                                  '${rounds.length} rounds tracked',
+                                                  style:
+                                                      theme.bodySmall.copyWith(
+                                                    color: theme.secondaryText,
+                                                    fontSize: 12,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        GestureDetector(
+                                          onTap: () => _showAddRoundModal(
+                                              context, theme),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              gradient:
+                                                  theme.primaryBrandGradient,
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                              boxShadow: theme.glassCardShadows,
+                                            ),
+                                            child: Icon(
+                                              Icons.add_rounded,
+                                              color: Colors.white,
+                                              size: 24,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                            const SizedBox(height: FlutterFlowTheme.spacingXS),
-                            Text(
-                              'Track your journey to lower scores',
-                              style: theme.bodyMedium.override(
-                                color: Colors.white.withValues(alpha: 0.8),
-                                height: 1.2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          onPressed: () => context.goNamed('profile'),
-                          icon: Icon(
-                            Icons.person_rounded,
-                            color: Colors.white,
-                            size: 24,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: FlutterFlowTheme.spacingL),
-                  
-                  // Performance metrics cards (Strava-inspired)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildHeaderStatCard(
-                          theme,
-                          'Avg Score',
-                          '78.5',
-                          '-2.3 from last month',
-                          Icons.trending_down_rounded,
-                          theme.success,
+
+                        // Rounds Content
+                        SliverPadding(
+                          padding: const EdgeInsets.all(20),
+                          sliver: SliverList(
+                            delegate: SliverChildListDelegate([
+                              // Quick Stats
+                              _buildQuickStatsSection(theme, rounds),
+                              const SizedBox(height: 20),
+
+                              // Recent Rounds
+                              _buildRecentRoundsSection(theme, rounds),
+                              const SizedBox(
+                                  height: 100), // Bottom padding for navbar
+                            ]),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: FlutterFlowTheme.spacingM),
-                      Expanded(
-                        child: _buildHeaderStatCard(
-                          theme,
-                          'Best Round',
-                          '72',
-                          'Personal best!',
-                          Icons.emoji_events_rounded,
-                          theme.premiumGold,
-                        ),
-                      ),
-                      const SizedBox(width: FlutterFlowTheme.spacingM),
-                      Expanded(
-                        child: _buildHeaderStatCard(
-                          theme,
-                          'Rounds',
-                          '24',
-                          'This year',
-                          FontAwesomeIcons.golfBallTee,
-                          theme.golfPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: FlutterFlowTheme.spacingL),
-                  
-                  // Tab Bar
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
-                    ),
-                    child: TabBar(
-                      controller: _tabController,
-                      indicator: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
-                      ),
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      labelColor: theme.golfPrimary,
-                      unselectedLabelColor: Colors.white70,
-                      labelStyle: theme.bodyMedium.override(
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
-                      ),
-                      tabs: const [
-                        Tab(text: 'Recent'),
-                        Tab(text: 'Analytics'),
-                        Tab(text: 'Progress'),
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-        ),
-      ),
+              bottomNavigationBar: EnhancedFoCoCoNavBar(
+                currentRoute: 'golf_rounds',
+                currentUser: user,
+                onTap: (route) {
+                  if (route == 'dashboard') {
+                    context.go('/dashboard');
+                  } else if (route == 'golf_rounds') {
+                    // Already on this page
+                  } else if (route == 'coaching_modules') {
+                    context.go('/coaching_modules');
+                  } else if (route == 'profile') {
+                    context.go('/profile');
+                  }
+                },
+                showLabels: true,
+                enableVoiceButton: true,
+                useGlassEffect: true,
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
-  Widget _buildHeaderStatCard(
-    FlutterFlowTheme theme,
-    String title,
-    String value,
-    String subtitle,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusM),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            icon,
-            color: color,
-            size: 24,
-          ),
-          const SizedBox(height: FlutterFlowTheme.spacingS),
-          Text(
-            value,
-            style: theme.headlineSmall.override(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              height: 1.2,
-            ),
-          ),
-          const SizedBox(height: FlutterFlowTheme.spacingXS),
-          Text(
-            title,
-            style: theme.bodySmall.override(
-              color: Colors.white.withValues(alpha: 0.8),
-              height: 1.2,
-            ),
-          ),
-          const SizedBox(height: FlutterFlowTheme.spacingXS),
-          Text(
-            subtitle,
-            style: theme.bodySmall.override(
-              color: color,
-              fontWeight: FontWeight.w500,
-              height: 1.2,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
+  /// Quick Stats Section
+  Widget _buildQuickStatsSection(
+      FlutterFlowTheme theme, List<GolfRoundsRecord> rounds) {
+    final avgScore = rounds.isNotEmpty
+        ? rounds.map((r) => r.score).reduce((a, b) => a + b) / rounds.length
+        : 0.0;
+    final bestScore = rounds.isNotEmpty
+        ? rounds.map((r) => r.score).reduce((a, b) => a < b ? a : b)
+        : 0;
 
-  /// Recent Rounds Tab - Strava-inspired activity feed
-  Widget _buildRecentRoundsTab(FlutterFlowTheme theme) {
-    return ListView(
-      padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
+    // Calculate rounds this month
+    final now = DateTime.now();
+    final thisMonth = DateTime(now.year, now.month);
+    final roundsThisMonth = rounds
+        .where((r) =>
+            r.date != null &&
+            r.date!.isAfter(thisMonth) &&
+            r.date!.isBefore(DateTime(now.year, now.month + 1)))
+        .length;
+
+    return GlassDashboardCard(
+      title: 'Performance Overview',
+      subtitle: 'Your golf statistics',
+      showAIBadge: true,
+      aiInsight: avgScore > 0
+          ? 'Your average score has improved by 3.2 strokes this month!'
+          : 'Start logging rounds to track your improvement!',
       children: [
-        // Filter and sort options
         Row(
           children: [
             Expanded(
-              child: Text(
-                'Recent Rounds',
-                style: theme.headlineSmall.override(
-                  fontWeight: FontWeight.w700,
-                  height: 1.2,
-                ),
+              child: _buildStatCard(
+                theme,
+                'Average Score',
+                avgScore > 0 ? avgScore.toStringAsFixed(1) : '--',
+                FontAwesomeIcons.golfBallTee,
+                theme.golfPrimary,
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: FlutterFlowTheme.spacingM,
-                vertical: FlutterFlowTheme.spacingS,
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                theme,
+                'Best Score',
+                bestScore > 0 ? bestScore.toString() : '--',
+                FontAwesomeIcons.trophy,
+                theme.performanceExcellent,
               ),
-              decoration: BoxDecoration(
-                color: theme.alternate,
-                borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusM),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.filter_list_rounded,
-                    size: 18,
-                    color: theme.secondaryText,
-                  ),
-                  const SizedBox(width: FlutterFlowTheme.spacingS),
-                  Text(
-                    'Filter',
-                    style: theme.bodyMedium.override(
-                      color: theme.secondaryText,
-                      fontWeight: FontWeight.w500,
-                      height: 1.2,
-                    ),
-                  ),
-                ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                theme,
+                'This Month',
+                roundsThisMonth.toString(),
+                FontAwesomeIcons.calendar,
+                theme.secondary,
               ),
             ),
           ],
         ),
-        
-        const SizedBox(height: FlutterFlowTheme.spacingL),
-        
-        // Round cards with Strava-inspired design
-        _buildRoundCard(
-          theme,
-          'Pebble Beach Golf Links',
-          DateTime.now().subtract(const Duration(days: 2)),
-          82,
-          'Challenging conditions with strong winds. Great mental focus on back 9.',
-          {
-            'Fairways': 71,
-            'Greens': 67,
-            'Putts': 32,
-          },
-          true, // has AI analysis
-        ),
-        
-        const SizedBox(height: FlutterFlowTheme.spacingM),
-        
-        _buildRoundCard(
-          theme,
-          'Torrey Pines Golf Course',
-          DateTime.now().subtract(const Duration(days: 5)),
-          78,
-          'Best round of the month! Putting was on point.',
-          {
-            'Fairways': 79,
-            'Greens': 72,
-            'Putts': 28,
-          },
-          true,
-        ),
-        
-        const SizedBox(height: FlutterFlowTheme.spacingM),
-        
-        _buildRoundCard(
-          theme,
-          'Spyglass Hill Golf Course',
-          DateTime.now().subtract(const Duration(days: 8)),
-          85,
-          'Tough day on the course. Need to work on short game.',
-          {
-            'Fairways': 64,
-            'Greens': 61,
-            'Putts': 36,
-          },
-          false,
-        ),
-        
-        const SizedBox(height: FlutterFlowTheme.spacingXXL),
       ],
     );
   }
 
-  Widget _buildRoundCard(
-    FlutterFlowTheme theme,
-    String courseName,
-    DateTime date,
-    int score,
-    String notes,
-    Map<String, int> stats,
-    bool hasAIAnalysis,
-  ) {
-    return FoCoCoCard(
-      style: FoCoCoCardStyle.elevated,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with course and date
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: theme.golfPrimary.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  FontAwesomeIcons.golfBallTee,
-                  color: theme.golfPrimary,
-                  size: 24,
-                ),
-              ),
-              
-              const SizedBox(width: FlutterFlowTheme.spacingM),
-              
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      courseName,
-                      style: theme.titleMedium.override(
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: FlutterFlowTheme.spacingXS),
-                    Text(
-                      dateTimeFormat('MMM d, yyyy', date),
-                      style: theme.bodySmall.override(
-                        color: theme.secondaryText,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              
-              // Score badge
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: FlutterFlowTheme.spacingM,
-                  vertical: FlutterFlowTheme.spacingS,
-                ),
-                decoration: BoxDecoration(
-                  color: _getScoreColor(theme, score).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
-                ),
-                child: Text(
-                  score.toString(),
-                  style: theme.titleLarge.override(
-                    color: _getScoreColor(theme, score),
-                    fontWeight: FontWeight.w700,
-                    height: 1.2,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: FlutterFlowTheme.spacingM),
-          
-          // Performance metrics
-          Row(
-            children: stats.entries.map((entry) => Expanded(
-              child: Column(
-                children: [
-                  Text(
-                    '${entry.value}%',
-                                         style: theme.titleSmall.override(
-                       fontWeight: FontWeight.w600,
-                       color: theme.getPerformanceColor(entry.value / 100),
-                       height: 1.2,
-                     ),
-                  ),
-                  const SizedBox(height: FlutterFlowTheme.spacingXS),
-                  Text(
-                    entry.key,
-                    style: theme.bodySmall.override(
-                      color: theme.secondaryText,
-                      height: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-            )).toList(),
-          ),
-          
-          const SizedBox(height: FlutterFlowTheme.spacingM),
-          
-          // Notes
-          if (notes.isNotEmpty) ...[
-            Text(
-              notes,
-              style: theme.bodyMedium.override(
-                color: theme.primaryText,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: FlutterFlowTheme.spacingM),
-          ],
-          
-          // Action buttons
-          Row(
-            children: [
-              if (hasAIAnalysis)
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showAIAnalysis(courseName, score),
-                    icon: Icon(
-                      Icons.psychology_rounded,
-                      size: 16,
-                      color: theme.aiPrimary,
-                    ),
-                    label: Text(
-                      'AI Analysis',
-                      style: theme.bodySmall.override(
-                        color: theme.aiPrimary,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: theme.aiPrimary),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusM),
-                      ),
-                    ),
-                  ),
-                ),
-              
-              if (hasAIAnalysis) const SizedBox(width: FlutterFlowTheme.spacingM),
-              
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showRoundDetails(courseName, score),
-                  icon: Icon(
-                    Icons.bar_chart_rounded,
-                    size: 16,
-                    color: theme.golfPrimary,
-                  ),
-                  label: Text(
-                    'View Details',
-                    style: theme.bodySmall.override(
-                      color: theme.golfPrimary,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: theme.golfPrimary),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusM),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Performance Analytics Tab
-  Widget _buildPerformanceAnalyticsTab(FlutterFlowTheme theme) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Performance overview
-          Text(
-            'Performance Analytics',
-            style: theme.headlineSmall.override(
-              fontWeight: FontWeight.w700,
-              height: 1.2,
-            ),
-          ),
-          
-          const SizedBox(height: FlutterFlowTheme.spacingL),
-          
-          // Performance metrics grid
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 1.2,
-            mainAxisSpacing: FlutterFlowTheme.spacingM,
-            crossAxisSpacing: FlutterFlowTheme.spacingM,
-            children: [
-              PerformanceMetricCard(
-                title: 'Driving',
-                value: '72',
-                unit: '% accuracy',
-                percentage: 72.0,
-                icon: Icons.sports_golf_rounded,
-                trend: '+5.2%',
-                primaryColor: theme.golfPrimary,
-              ),
-              PerformanceMetricCard(
-                title: 'Approach',
-                value: '68',
-                unit: '% on green',
-                percentage: 68.0,
-                icon: Icons.flag_rounded,
-                trend: '+2.8%',
-                primaryColor: theme.golfSecondary,
-              ),
-              PerformanceMetricCard(
-                title: 'Short Game',
-                value: '78',
-                unit: '% up & down',
-                percentage: 78.0,
-                icon: Icons.golf_course_rounded,
-                trend: '-1.2%',
-                primaryColor: theme.performanceAverage,
-              ),
-              PerformanceMetricCard(
-                title: 'Putting',
-                value: '1.82',
-                unit: 'avg putts',
-                percentage: 65.0,
-                icon: Icons.circle_outlined,
-                trend: '+0.08%',
-                primaryColor: theme.performancePoor,
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: FlutterFlowTheme.spacingXL),
-          
-          // Score trend chart placeholder
-          FoCoCoCard(
-            style: FoCoCoCardStyle.elevated,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Score Trend',
-                  style: theme.titleMedium.override(
-                    fontWeight: FontWeight.w600,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: FlutterFlowTheme.spacingS),
-                Text(
-                  'Last 12 rounds',
-                  style: theme.bodySmall.override(
-                    color: theme.secondaryText,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: FlutterFlowTheme.spacingL),
-                
-                // Placeholder for chart
-                Container(
-                  height: 200,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: theme.alternate,
-                    borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusM),
-                  ),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.trending_up_rounded,
-                          color: theme.secondaryText,
-                          size: 48,
-                        ),
-                        const SizedBox(height: FlutterFlowTheme.spacingS),
-                        Text(
-                          'Score Trend Chart',
-                          style: theme.bodyMedium.override(
-                            color: theme.secondaryText,
-                            height: 1.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Progress & AI Insights Tab
-  Widget _buildProgressInsightsTab(FlutterFlowTheme theme) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Progress overview
-          Text(
-            'Progress & Insights',
-            style: theme.headlineSmall.override(
-              fontWeight: FontWeight.w700,
-              height: 1.2,
-            ),
-          ),
-          
-          const SizedBox(height: FlutterFlowTheme.spacingL),
-          
-          // AI-powered insights
-          AIInsightCard(
-            title: 'Performance Analysis',
-            content: 'Your driving accuracy has improved by 5.2% over the last month. Focus on maintaining this consistency while working on approach shots to greens.',
-            insight: 'Your driving accuracy has improved by 5.2% over the last month. Focus on maintaining this consistency while working on approach shots to greens.',
-            sentiment: 'positive',
-            recommendations: [
-              'Practice approach shots from 100-150 yards',
-              'Work on green reading for better putting',
-              'Maintain current driving routine',
-            ],
-            timestamp: DateTime.now().subtract(const Duration(hours: 6)),
-            aiModel: 'Golf AI Pro',
-            onFeedback: () {
-              // Handle feedback
-            },
-          ),
-          
-          const SizedBox(height: FlutterFlowTheme.spacingL),
-          
-          // Goals and achievements
-          FoCoCoCard(
-            style: FoCoCoCardStyle.wellness,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Current Goals',
-                  style: theme.titleMedium.override(
-                    fontWeight: FontWeight.w600,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: FlutterFlowTheme.spacingM),
-                
-                _buildGoalItem(
-                  theme,
-                  'Break 80 consistently',
-                  'Shoot under 80 in 3 of next 5 rounds',
-                  0.6,
-                  Icons.emoji_events_rounded,
-                ),
-                
-                const SizedBox(height: FlutterFlowTheme.spacingM),
-                
-                _buildGoalItem(
-                  theme,
-                  'Improve putting average',
-                  'Get under 1.8 putts per green',
-                  0.3,
-                  Icons.circle_outlined,
-                ),
-                
-                const SizedBox(height: FlutterFlowTheme.spacingM),
-                
-                _buildGoalItem(
-                  theme,
-                  'Fairway accuracy',
-                  'Hit 75% of fairways',
-                  0.8,
-                  Icons.sports_golf_rounded,
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: FlutterFlowTheme.spacingL),
-          
-          // Recent achievements
-          Text(
-            'Recent Achievements',
-            style: theme.titleMedium.override(
-              fontWeight: FontWeight.w600,
-              height: 1.2,
-            ),
-          ),
-          
-          const SizedBox(height: FlutterFlowTheme.spacingM),
-          
-          SizedBox(
-            height: 200,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                SizedBox(
-                  width: 160,
-                  child: AchievementBadge(
-                    title: 'Fairway Finder',
-                    description: 'Hit 80% fairways in a round',
-                    icon: Icons.sports_golf_rounded,
-                    tier: AchievementTier.gold,
-                    isEarned: true,
-                    earnedDate: DateTime.now().subtract(const Duration(days: 3)),
-                  ),
-                ),
-                const SizedBox(width: FlutterFlowTheme.spacingM),
-                SizedBox(
-                  width: 160,
-                  child: AchievementBadge(
-                    title: 'Sub-80 Club',
-                    description: 'Shot under 80 for first time',
-                    icon: Icons.emoji_events_rounded,
-                    tier: AchievementTier.silver,
-                    isEarned: true,
-                    earnedDate: DateTime.now().subtract(const Duration(days: 7)),
-                  ),
-                ),
-                const SizedBox(width: FlutterFlowTheme.spacingM),
-                SizedBox(
-                  width: 160,
-                  child: AchievementBadge(
-                    title: 'Putting Master',
-                    description: 'Average under 1.8 putts/green',
-                    icon: Icons.circle_outlined,
-                    tier: AchievementTier.bronze,
-                    isEarned: false,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGoalItem(
+  Widget _buildStatCard(
     FlutterFlowTheme theme,
     String title,
-    String description,
-    double progress,
+    String value,
     IconData icon,
+    Color color,
   ) {
-    return Row(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.15),
+            color.withValues(alpha: 0.08),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: theme.headlineSmall.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'Montserrat',
+              fontSize: 20,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: theme.bodySmall.copyWith(
+              color: theme.secondaryText,
+              fontWeight: FontWeight.w500,
+              fontSize: 11,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Recent Rounds Section
+  Widget _buildRecentRoundsSection(
+      FlutterFlowTheme theme, List<GolfRoundsRecord> rounds) {
+    return GlassDashboardCard(
+      title: 'Recent Rounds',
+      subtitle: rounds.isNotEmpty ? 'Tap to view details' : 'No rounds yet',
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: theme.golfPrimary.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: theme.golfPrimary,
-            size: 20,
-          ),
-        ),
-        
-        const SizedBox(width: FlutterFlowTheme.spacingM),
-        
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: theme.titleSmall.override(
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
-                ),
-              ),
-              const SizedBox(height: FlutterFlowTheme.spacingXS),
-              Text(
-                description,
-                style: theme.bodySmall.override(
+        if (rounds.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(40),
+            child: Column(
+              children: [
+                Icon(
+                  FontAwesomeIcons.golfBallTee,
                   color: theme.secondaryText,
-                  height: 1.2,
+                  size: 48,
                 ),
-              ),
-              const SizedBox(height: FlutterFlowTheme.spacingS),
-              LinearProgressIndicator(
-                value: progress,
-                backgroundColor: theme.alternate,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  theme.golfPrimary,
+                const SizedBox(height: 16),
+                Text(
+                  'No rounds logged yet',
+                  style: theme.titleMedium.copyWith(
+                    color: theme.primaryText,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  'Start tracking your golf rounds to see your progress and get AI insights!',
+                  style: theme.bodyMedium.copyWith(
+                    color: theme.secondaryText,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                GlassDesignSystem.glassButton(
+                  text: 'Log Your First Round',
+                  onPressed: () => _showAddRoundModal(context, theme),
+                  icon: FontAwesomeIcons.plus,
+                  theme: theme,
+                ),
+              ],
+            ),
+          )
+        else
+          Column(
+            children: rounds.take(5).map((round) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildRoundCard(theme, round),
+              );
+            }).toList(),
           ),
-        ),
-        
-        const SizedBox(width: FlutterFlowTheme.spacingM),
-        
-        Text(
-          '${(progress * 100).toInt()}%',
-          style: theme.bodySmall.override(
-            color: theme.golfPrimary,
-            fontWeight: FontWeight.w600,
-            height: 1.2,
+        if (rounds.length > 5)
+          GlassDesignSystem.glassButton(
+            text: 'View All Rounds',
+            onPressed: () {
+              // TODO: Navigate to full rounds history
+            },
+            theme: theme,
           ),
-        ),
       ],
     );
   }
 
-  /// Enhanced Bottom Navigation
-  Widget _buildEnhancedBottomNav(FlutterFlowTheme theme) {
-    return Container(
-      margin: const EdgeInsets.all(FlutterFlowTheme.spacingM),
+  Widget _buildRoundCard(FlutterFlowTheme theme, GolfRoundsRecord round) {
+    final scoreColor = round.scoreToPar > 0
+        ? theme.error
+        : round.scoreToPar < 0
+            ? theme.success
+            : theme.golfPrimary;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: theme.primaryBackground,
-        borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusXL),
+        gradient: LinearGradient(
+          colors: [
+            theme.glassTint.withValues(alpha: 0.12),
+            theme.glassTint.withValues(alpha: 0.06),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: theme.glassBorder.withValues(alpha: 0.25),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: FlutterFlowTheme.spacingM,
-            vertical: FlutterFlowTheme.spacingS,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildNavItem(theme, Icons.home_rounded, 'Home', 'dashboard', false),
-              _buildNavItem(theme, FontAwesomeIcons.golfBallTee, 'Rounds', 'golf_rounds', true),
-              _buildNavItem(theme, Icons.psychology_rounded, 'Train', 'coaching_modules', false),
-              _buildNavItem(theme, Icons.trending_up_rounded, 'Progress', 'progress', false),
-              _buildNavItem(theme, Icons.insights_rounded, 'Insights', 'ai_insights', false),
-              _buildNavItem(theme, Icons.person_rounded, 'Profile', 'profile', false),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(FlutterFlowTheme theme, IconData icon, String label, String page, bool isActive) {
-    return GestureDetector(
-      onTap: () {
-        if (!isActive) {
-          context.goNamed(page);
-        }
-      },
-      child: AnimatedContainer(
-        duration: FlutterFlowTheme.animationFast,
-        padding: EdgeInsets.symmetric(
-          horizontal: isActive ? FlutterFlowTheme.spacingM : FlutterFlowTheme.spacingS,
-          vertical: FlutterFlowTheme.spacingS,
-        ),
-        decoration: BoxDecoration(
-          gradient: isActive ? theme.golfGradient : null,
-          borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isActive ? Colors.white : theme.secondaryText,
-              size: 20,
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  scoreColor.withValues(alpha: 0.2),
+                  scoreColor.withValues(alpha: 0.1),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: scoreColor.withValues(alpha: 0.3),
+                width: 1,
+              ),
             ),
-            if (isActive) ...[
-              const SizedBox(width: FlutterFlowTheme.spacingS),
+            child: Icon(
+              FontAwesomeIcons.golfBallTee,
+              color: scoreColor,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  round.courseName.isNotEmpty ? round.courseName : 'Golf Round',
+                  style: theme.titleSmall.copyWith(
+                    color: theme.primaryText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  round.date != null
+                      ? '${round.date!.day}/${round.date!.month}/${round.date!.year}'
+                      : 'Recent round',
+                  style: theme.bodySmall.copyWith(
+                    color: theme.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: scoreColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: scoreColor.withValues(alpha: 0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  round.score.toString(),
+                  style: theme.headlineSmall.copyWith(
+                    color: scoreColor,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Montserrat',
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
               Text(
-                label,
-                style: theme.bodySmall.override(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
+                round.scoreToPar > 0
+                    ? '+${round.scoreToPar}'
+                    : round.scoreToPar < 0
+                        ? '${round.scoreToPar}'
+                        : 'E',
+                style: theme.labelSmall.copyWith(
+                  color: scoreColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
                 ),
               ),
             ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  // Helper methods
-  Color _getScoreColor(FlutterFlowTheme theme, int score) {
-    if (score <= 75) return theme.performanceGood;
-    if (score <= 85) return theme.performanceAverage;
-    return theme.performancePoor;
-  }
-
-  void _showAddRoundBottomSheet(BuildContext context) {
-    // TODO: Implement add round bottom sheet
+  void _showAddRoundModal(BuildContext context, FlutterFlowTheme theme) {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(FlutterFlowTheme.spacingL),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (context) => _AddRoundModal(theme: theme),
+    );
+  }
+}
+
+/// Add Round Modal Widget
+class _AddRoundModal extends StatefulWidget {
+  final FlutterFlowTheme theme;
+
+  const _AddRoundModal({required this.theme});
+
+  @override
+  State<_AddRoundModal> createState() => _AddRoundModalState();
+}
+
+class _AddRoundModalState extends State<_AddRoundModal> {
+  final _formKey = GlobalKey<FormState>();
+  final _courseNameController = TextEditingController();
+  final _scoreController = TextEditingController();
+  final _parTotalController = TextEditingController();
+  final _puttsController = TextEditingController();
+  final _fairwaysHitController = TextEditingController();
+  final _fairwaysTotalController = TextEditingController();
+  final _girController = TextEditingController();
+  final _girTotalController = TextEditingController();
+
+  DateTime _selectedDate = DateTime.now();
+  String _selectedTeeBox = 'White';
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _courseNameController.dispose();
+    _scoreController.dispose();
+    _parTotalController.dispose();
+    _puttsController.dispose();
+    _fairwaysHitController.dispose();
+    _fairwaysTotalController.dispose();
+    _girController.dispose();
+    _girTotalController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.9,
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  widget.theme.glassBackground.withValues(alpha: 0.95),
+                  widget.theme.glassTint.withValues(alpha: 0.9),
+                ],
+              ),
+              border: Border.all(
+                color: widget.theme.glassBorder.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: SafeArea(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Log New Round',
+                              style: widget.theme.headlineSmall.copyWith(
+                                color: widget.theme.primaryText,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: widget.theme.alternate
+                                    .withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.close,
+                                color: widget.theme.primaryText,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Form Content
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Course Information
+                            _buildSectionTitle('Course Information'),
+                            const SizedBox(height: 12),
+                            _buildTextField(
+                              controller: _courseNameController,
+                              label: 'Course Name',
+                              hint: 'Enter course name',
+                              validator: (value) {
+                                if (value?.isEmpty ?? true) {
+                                  return 'Course name is required';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildDatePicker(),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _buildTeeBoxDropdown(),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Scoring
+                            _buildSectionTitle('Scoring'),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller: _scoreController,
+                                    label: 'Total Score',
+                                    hint: '72',
+                                    keyboardType: TextInputType.number,
+                                    validator: (value) {
+                                      if (value?.isEmpty ?? true) {
+                                        return 'Score is required';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller: _parTotalController,
+                                    label: 'Course Par',
+                                    hint: '72',
+                                    keyboardType: TextInputType.number,
+                                    validator: (value) {
+                                      if (value?.isEmpty ?? true) {
+                                        return 'Par is required';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            _buildTextField(
+                              controller: _puttsController,
+                              label: 'Total Putts',
+                              hint: '32',
+                              keyboardType: TextInputType.number,
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Statistics
+                            _buildSectionTitle('Statistics'),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller: _fairwaysHitController,
+                                    label: 'Fairways Hit',
+                                    hint: '8',
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller: _fairwaysTotalController,
+                                    label: 'Total Fairways',
+                                    hint: '14',
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller: _girController,
+                                    label: 'Greens in Regulation',
+                                    hint: '10',
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller: _girTotalController,
+                                    label: 'Total Greens',
+                                    hint: '18',
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 40),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Submit Button
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: _isSubmitting
+                            ? Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                decoration: BoxDecoration(
+                                  color: widget.theme.alternate
+                                      .withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Center(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                            widget.theme.primaryText,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Saving Round...',
+                                        style: widget.theme.bodyMedium.copyWith(
+                                          color: widget.theme.primaryText,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : GlassDesignSystem.glassButton(
+                                text: 'Save Round',
+                                onPressed: () {
+                                  _submitRound();
+                                },
+                                theme: widget.theme,
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: widget.theme.titleMedium.copyWith(
+        color: widget.theme.primaryText,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            widget.theme.glassTint.withValues(alpha: 0.1),
+            widget.theme.glassTint.withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: widget.theme.glassBorder.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        validator: validator,
+        style: widget.theme.bodyMedium.copyWith(
+          color: widget.theme.primaryText,
+        ),
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          labelStyle: widget.theme.bodySmall.copyWith(
+            color: widget.theme.secondaryText,
+          ),
+          hintStyle: widget.theme.bodySmall.copyWith(
+            color: widget.theme.secondaryText.withValues(alpha: 0.6),
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.all(16),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDatePicker() {
+    return GestureDetector(
+      onTap: () async {
+        final date = await showDatePicker(
+          context: context,
+          initialDate: _selectedDate,
+          firstDate: DateTime(2020),
+          lastDate: DateTime.now(),
+        );
+        if (date != null) {
+          setState(() {
+            _selectedDate = date;
+          });
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              widget.theme.glassTint.withValues(alpha: 0.1),
+              widget.theme.glassTint.withValues(alpha: 0.05),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: widget.theme.glassBorder.withValues(alpha: 0.2),
+            width: 1,
+          ),
+        ),
+        child: Row(
           children: [
-            Text(
-              'Add New Round',
-              style: FlutterFlowTheme.of(context).headlineSmall.override(
-                fontWeight: FontWeight.w700,
-                height: 1.2,
-              ),
+            Icon(
+              Icons.calendar_today,
+              color: widget.theme.secondaryText,
+              size: 20,
             ),
-            const SizedBox(height: FlutterFlowTheme.spacingL),
-            Text(
-              'Coming soon - Track your rounds with detailed statistics and AI-powered insights.',
-              style: FlutterFlowTheme.of(context).bodyMedium.override(
-                color: FlutterFlowTheme.of(context).secondaryText,
-                height: 1.4,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: FlutterFlowTheme.spacingL),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Close'),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Date',
+                    style: widget.theme.bodySmall.copyWith(
+                      color: widget.theme.secondaryText,
+                    ),
+                  ),
+                  Text(
+                    '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                    style: widget.theme.bodyMedium.copyWith(
+                      color: widget.theme.primaryText,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1074,37 +987,120 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget> with TickerProvider
     );
   }
 
-  void _showAIAnalysis(String courseName, int score) {
-    // TODO: Show AI analysis modal
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('AI Analysis'),
-        content: Text('Detailed AI analysis for $courseName (Score: $score) coming soon!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
+  Widget _buildTeeBoxDropdown() {
+    final teeBoxes = ['Black', 'Blue', 'White', 'Red', 'Gold'];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            widget.theme.glassTint.withValues(alpha: 0.1),
+            widget.theme.glassTint.withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: widget.theme.glassBorder.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: DropdownButtonFormField<String>(
+        value: _selectedTeeBox,
+        decoration: InputDecoration(
+          labelText: 'Tee Box',
+          labelStyle: widget.theme.bodySmall.copyWith(
+            color: widget.theme.secondaryText,
           ),
-        ],
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        ),
+        dropdownColor: widget.theme.primaryBackground,
+        style: widget.theme.bodyMedium.copyWith(
+          color: widget.theme.primaryText,
+        ),
+        items: teeBoxes.map((teeBox) {
+          return DropdownMenuItem(
+            value: teeBox,
+            child: Text(teeBox),
+          );
+        }).toList(),
+        onChanged: (value) {
+          if (value != null) {
+            setState(() {
+              _selectedTeeBox = value;
+            });
+          }
+        },
       ),
     );
   }
 
-  void _showRoundDetails(String courseName, int score) {
-    // TODO: Show round details modal
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Round Details'),
-        content: Text('Detailed statistics for $courseName (Score: $score) coming soon!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
+  Future<void> _submitRound() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final score = int.parse(_scoreController.text);
+      final parTotal = int.parse(_parTotalController.text);
+      final scoreToPar = score - parTotal;
+
+      final roundData = {
+        'userId': currentUserUid,
+        'date': _selectedDate,
+        'courseName': _courseNameController.text.trim(),
+        'teeBox': _selectedTeeBox,
+        'score': score,
+        'parTotal': parTotal,
+        'scoreToPar': scoreToPar,
+        'totalPutts': _puttsController.text.isNotEmpty
+            ? int.parse(_puttsController.text)
+            : 0,
+        'fairwaysHit': _fairwaysHitController.text.isNotEmpty
+            ? int.parse(_fairwaysHitController.text)
+            : 0,
+        'fairwaysTotal': _fairwaysTotalController.text.isNotEmpty
+            ? int.parse(_fairwaysTotalController.text)
+            : 0,
+        'greensInRegulation':
+            _girController.text.isNotEmpty ? int.parse(_girController.text) : 0,
+        'greensTotal': _girTotalController.text.isNotEmpty
+            ? int.parse(_girTotalController.text)
+            : 0,
+        'createdTime': DateTime.now(),
+        'updatedTime': DateTime.now(),
+        'isValid': true,
+      };
+
+      await GolfRoundsRecord.collection.add(roundData);
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Round saved successfully!'),
+            backgroundColor: widget.theme.success,
           ),
-        ],
-      ),
-    );
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving round: $e'),
+            backgroundColor: widget.theme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
   }
-} 
+}

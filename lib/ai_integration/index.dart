@@ -51,8 +51,10 @@ export 'utils/ai_utils.dart';
 
 // AI Widgets
 export 'widgets/ai_insight_widget.dart';
+export 'widgets/ai_insight_widget_enhanced.dart';
 export 'widgets/voice_chat_button.dart';
-export 'widgets/voice_chat_modal.dart';
+export 'widgets/voice_chat_modal.dart'
+    hide ChatMessage; // Hide to avoid conflict
 export 'widgets/navbar_widget.dart';
 
 // ============================================================================

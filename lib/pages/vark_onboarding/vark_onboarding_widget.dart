@@ -191,16 +191,22 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.grey.shade700.withValues(alpha: 0.3)
+                    : Colors.white.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.3),
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey.shade500.withValues(alpha: 0.5)
+                      : Colors.white.withValues(alpha: 0.3),
                   width: 3,
                 ),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.golf_course,
-                color: Colors.white,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.grey.shade200
+                    : Colors.white,
                 size: 60,
               ),
             ),
@@ -216,7 +222,9 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                   'Welcome to FoCoCo',
                   style: theme.displaySmall.override(
                     fontFamily: 'Montserrat',
-                    color: Colors.white,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade100
+                        : Colors.white,
                     fontSize: 36,
                     fontWeight: FontWeight.bold,
                     height: 1.2,
@@ -273,7 +281,8 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
           // CTA Button
           Container(
             width: double.infinity,
-            margin: const EdgeInsets.only(bottom: 32),
+            margin: EdgeInsets.only(
+                bottom: MediaQuery.of(context).padding.bottom + 32),
             child: FFButtonWidget(
               onPressed: _nextStep,
               text: 'Begin Your Journey',
@@ -309,14 +318,20 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
     required Color color,
     required FlutterFlowTheme theme,
   }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
+        color: isDarkMode
+            ? Colors.grey.shade800.withValues(alpha: 0.2)
+            : Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
+          color: isDarkMode
+              ? Colors.grey.shade600.withValues(alpha: 0.3)
+              : Colors.white.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -344,7 +359,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                   title,
                   style: theme.titleSmall.override(
                     fontFamily: 'Montserrat',
-                    color: Colors.white,
+                    color: isDarkMode ? Colors.grey.shade200 : Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     height: 1.0,
@@ -355,7 +370,9 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                   description,
                   style: theme.bodySmall.override(
                     fontFamily: 'Inter',
-                    color: Colors.white.withValues(alpha: 0.8),
+                    color: isDarkMode
+                        ? Colors.grey.shade300.withValues(alpha: 0.9)
+                        : Colors.white.withValues(alpha: 0.8),
                     fontSize: 13,
                     height: 1.3,
                   ),
@@ -370,11 +387,13 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
 
   // Step 2: Personal Foundation
   Widget _buildPersonalFoundationStep(FlutterFlowTheme theme) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: isDarkMode ? theme.secondaryBackground : Colors.white,
+        borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(32),
           topRight: Radius.circular(32),
         ),
@@ -685,28 +704,33 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                 ],
               ),
             ),
-            const SizedBox(height: 40),
+            SizedBox(
+                height: MediaQuery.of(context).padding.bottom > 0 ? 24 : 40),
 
             // Continue Button
-            FFButtonWidget(
-              onPressed: _model.canProceedToNextStep() ? _nextStep : null,
-              text: 'Continue',
-              options: FFButtonOptions(
-                width: double.infinity,
-                height: 56,
-                color: _model.canProceedToNextStep()
-                    ? theme.primary
-                    : theme.secondaryText,
-                disabledColor: theme.secondaryText.withValues(alpha: 0.3),
-                textStyle: theme.titleMedium.override(
-                  fontFamily: 'Montserrat',
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  height: 1.0,
+            Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom),
+              child: FFButtonWidget(
+                onPressed: _model.canProceedToNextStep() ? _nextStep : null,
+                text: 'Continue',
+                options: FFButtonOptions(
+                  width: double.infinity,
+                  height: 56,
+                  color: _model.canProceedToNextStep()
+                      ? theme.primary
+                      : theme.secondaryText,
+                  disabledColor: theme.secondaryText.withValues(alpha: 0.3),
+                  textStyle: theme.titleMedium.override(
+                    fontFamily: 'Montserrat',
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    height: 1.0,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  elevation: _model.canProceedToNextStep() ? 3 : 0,
                 ),
-                borderRadius: BorderRadius.circular(16),
-                elevation: _model.canProceedToNextStep() ? 3 : 0,
               ),
             ),
           ],
@@ -751,11 +775,13 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
 
   // Step 3: Golf & Mental Game Profile
   Widget _buildMentalGameProfileStep(FlutterFlowTheme theme) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: isDarkMode ? theme.secondaryBackground : Colors.white,
+        borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(32),
           topRight: Radius.circular(32),
         ),
@@ -997,28 +1023,33 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                 ),
               ],
             ),
-            const SizedBox(height: 40),
+            SizedBox(
+                height: MediaQuery.of(context).padding.bottom > 0 ? 24 : 40),
 
             // Continue Button
-            FFButtonWidget(
-              onPressed: _model.canProceedToNextStep() ? _nextStep : null,
-              text: 'Continue',
-              options: FFButtonOptions(
-                width: double.infinity,
-                height: 56,
-                color: _model.canProceedToNextStep()
-                    ? theme.primary
-                    : theme.secondaryText,
-                disabledColor: theme.secondaryText.withValues(alpha: 0.3),
-                textStyle: theme.titleMedium.override(
-                  fontFamily: 'Montserrat',
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  height: 1.0,
+            Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom),
+              child: FFButtonWidget(
+                onPressed: _model.canProceedToNextStep() ? _nextStep : null,
+                text: 'Continue',
+                options: FFButtonOptions(
+                  width: double.infinity,
+                  height: 56,
+                  color: _model.canProceedToNextStep()
+                      ? theme.primary
+                      : theme.secondaryText,
+                  disabledColor: theme.secondaryText.withValues(alpha: 0.3),
+                  textStyle: theme.titleMedium.override(
+                    fontFamily: 'Montserrat',
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    height: 1.0,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  elevation: _model.canProceedToNextStep() ? 3 : 0,
                 ),
-                borderRadius: BorderRadius.circular(16),
-                elevation: _model.canProceedToNextStep() ? 3 : 0,
               ),
             ),
           ],
@@ -1113,11 +1144,13 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
 
   // Step 4: VARK Assessment
   Widget _buildVARKAssessmentStep(FlutterFlowTheme theme) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: isDarkMode ? theme.secondaryBackground : Colors.white,
+        borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(32),
           topRight: Radius.circular(32),
         ),
@@ -1310,28 +1343,52 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
           ),
 
           // Navigation Buttons
-          if (_model.varkAnswers.length == _model.varkQuestions.length)
-            Container(
-              padding: const EdgeInsets.all(32),
-              child: FFButtonWidget(
-                onPressed: _nextStep,
-                text: 'Continue to Results',
-                options: FFButtonOptions(
-                  width: double.infinity,
-                  height: 56,
-                  color: theme.primary,
-                  textStyle: theme.titleMedium.override(
-                    fontFamily: 'Montserrat',
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    height: 1.0,
+          Container(
+            padding: EdgeInsets.fromLTRB(
+                32, 24, 32, MediaQuery.of(context).padding.bottom + 32),
+            child: Column(
+              children: [
+                if (_model.varkAnswers.length ==
+                    _model.varkQuestions.length) ...[
+                  FFButtonWidget(
+                    onPressed: _nextStep,
+                    text: 'Continue to Results',
+                    options: FFButtonOptions(
+                      width: double.infinity,
+                      height: 56,
+                      color: theme.primary,
+                      textStyle: theme.titleMedium.override(
+                        fontFamily: 'Montserrat',
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        height: 1.0,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      elevation: 3,
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  elevation: 3,
-                ),
-              ),
+                ] else ...[
+                  // Progress indicator when not all questions answered
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      'Answer all questions to continue',
+                      style: theme.bodyMedium.override(
+                        fontFamily: 'Inter',
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : theme.secondaryText,
+                        fontSize: 14,
+                        height: 1.0,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ],
             ),
+          ),
         ],
       ),
     );
@@ -1378,10 +1435,12 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
               }
             });
 
-            // Auto-advance after a short delay
+            // Auto-advance after a short delay, but not on the last question
             if (_model.currentQuestionIndex < _model.varkQuestions.length - 1) {
               Future.delayed(const Duration(milliseconds: 500), () {
-                setState(() => _model.currentQuestionIndex++);
+                if (mounted) {
+                  setState(() => _model.currentQuestionIndex++);
+                }
               });
             }
           },
@@ -1390,10 +1449,18 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: isSelected ? color.withValues(alpha: 0.1) : Colors.white,
+              color: isSelected
+                  ? color.withValues(alpha: 0.1)
+                  : (Theme.of(context).brightness == Brightness.dark
+                      ? FlutterFlowTheme.of(context).primaryBackground
+                      : Colors.white),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isSelected ? color : Colors.grey.shade300,
+                color: isSelected
+                    ? color
+                    : (Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade600
+                        : Colors.grey.shade300),
                 width: isSelected ? 2 : 1,
               ),
               boxShadow: [
@@ -1468,11 +1535,13 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
 
   // Step 5: Mental Performance History
   Widget _buildMentalHistoryStep(FlutterFlowTheme theme) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: isDarkMode ? theme.secondaryBackground : Colors.white,
+        borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(32),
           topRight: Radius.circular(32),
         ),
@@ -1729,28 +1798,33 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
               ),
               style: theme.bodyLarge,
             ),
-            const SizedBox(height: 40),
+            SizedBox(
+                height: MediaQuery.of(context).padding.bottom > 0 ? 24 : 40),
 
             // Continue Button
-            FFButtonWidget(
-              onPressed: _model.canProceedToNextStep() ? _nextStep : null,
-              text: 'Complete Assessment',
-              options: FFButtonOptions(
-                width: double.infinity,
-                height: 56,
-                color: _model.canProceedToNextStep()
-                    ? theme.primary
-                    : theme.secondaryText,
-                disabledColor: theme.secondaryText.withValues(alpha: 0.3),
-                textStyle: theme.titleMedium.override(
-                  fontFamily: 'Montserrat',
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  height: 1.0,
+            Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom),
+              child: FFButtonWidget(
+                onPressed: _model.canProceedToNextStep() ? _nextStep : null,
+                text: 'Complete Assessment',
+                options: FFButtonOptions(
+                  width: double.infinity,
+                  height: 56,
+                  color: _model.canProceedToNextStep()
+                      ? theme.primary
+                      : theme.secondaryText,
+                  disabledColor: theme.secondaryText.withValues(alpha: 0.3),
+                  textStyle: theme.titleMedium.override(
+                    fontFamily: 'Montserrat',
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    height: 1.0,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  elevation: _model.canProceedToNextStep() ? 3 : 0,
                 ),
-                borderRadius: BorderRadius.circular(16),
-                elevation: _model.canProceedToNextStep() ? 3 : 0,
               ),
             ),
           ],
@@ -2220,6 +2294,8 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
 
   // Dialog Methods
   void _showLoadingDialog() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -2229,11 +2305,15 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
           child: Container(
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDarkMode
+                  ? FlutterFlowTheme.of(context).secondaryBackground
+                  : Colors.white,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: isDarkMode
+                      ? Colors.black.withValues(alpha: 0.3)
+                      : Colors.black.withValues(alpha: 0.1),
                   blurRadius: 20,
                   spreadRadius: 5,
                 ),
@@ -2276,6 +2356,8 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
   }
 
   void _showSuccessDialog() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -2284,11 +2366,15 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
           padding: const EdgeInsets.all(32),
           margin: const EdgeInsets.symmetric(horizontal: 32),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDarkMode
+                ? FlutterFlowTheme.of(context).secondaryBackground
+                : Colors.white,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
+                color: isDarkMode
+                    ? Colors.black.withValues(alpha: 0.3)
+                    : Colors.black.withValues(alpha: 0.1),
                 blurRadius: 20,
                 spreadRadius: 5,
               ),
@@ -2339,54 +2425,75 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
   }
 
   void _showErrorDialog(String error) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: Row(
+        backgroundColor: isDarkMode
+            ? FlutterFlowTheme.of(context).secondaryBackground
+            : Colors.white,
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              color: FlutterFlowTheme.of(context).error,
-              size: 28,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Save Failed',
-              style: FlutterFlowTheme.of(context).headlineSmall.override(
-                    fontFamily: 'Montserrat',
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    height: 1.0,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  color: FlutterFlowTheme.of(context).error,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    'Save Failed',
+                    style: FlutterFlowTheme.of(context).headlineSmall.override(
+                          fontFamily: 'Montserrat',
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          height: 1.0,
+                        ),
                   ),
+                ),
+              ],
             ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              error,
-              style: FlutterFlowTheme.of(context).bodyMedium.override(
-                    fontFamily: 'Inter',
-                    fontSize: 14,
-                    height: 1.4,
-                  ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 300,
+            maxHeight: 200,
+          ),
+          child: IntrinsicHeight(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  error,
+                  style: FlutterFlowTheme.of(context).bodyMedium.override(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Your progress has been saved locally. You can try again or continue later.',
+                  style: FlutterFlowTheme.of(context).bodySmall.override(
+                        fontFamily: 'Inter',
+                        color: FlutterFlowTheme.of(context).secondaryText,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Your progress has been saved locally. You can try again or continue later.',
-              style: FlutterFlowTheme.of(context).bodySmall.override(
-                    fontFamily: 'Inter',
-                    color: FlutterFlowTheme.of(context).secondaryText,
-                    fontSize: 12,
-                    height: 1.4,
-                  ),
-            ),
-          ],
+          ),
         ),
         actions: [
           TextButton(
@@ -2451,6 +2558,9 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? FlutterFlowTheme.of(context).secondaryBackground
+            : Colors.white,
         title: Text(
           'Resume Previous Session?',
           style: FlutterFlowTheme.of(context).headlineSmall.override(
@@ -2509,6 +2619,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return PopScope(
       canPop: false,
@@ -2522,6 +2633,8 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
+            backgroundColor:
+                isDarkMode ? theme.secondaryBackground : Colors.white,
             title: Text(
               'Exit Onboarding?',
               style: theme.headlineSmall.override(
@@ -2593,138 +2706,160 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
             height: double.infinity,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF0A2A4E), // FoCoCo Blue
-                  const Color(0xFF1B4E6B),
-                  const Color(0xFF3B7F5F), // FoCoCo Green
-                  const Color(0xFF4A9F7F),
-                ],
+                colors: isDarkMode
+                    ? [
+                        const Color(0xFF1A1A1A), // Dark background
+                        const Color(0xFF2D2D2D),
+                        const Color(0xFF3A3A3A),
+                        const Color(0xFF4A4A4A),
+                      ]
+                    : [
+                        const Color(0xFF0A2A4E), // FoCoCo Blue
+                        const Color(0xFF1B4E6B),
+                        const Color(0xFF3B7F5F), // FoCoCo Green
+                        const Color(0xFF4A9F7F),
+                      ],
                 stops: const [0.0, 0.3, 0.7, 1.0],
                 begin: AlignmentDirectional.topCenter,
                 end: AlignmentDirectional.bottomCenter,
               ),
             ),
-            child: SafeArea(
-              child: Column(
-                children: [
-                  // Enhanced Header with Progress
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 16),
-                    child: Column(
-                      children: [
-                        // Top Navigation
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            if (_model.currentStep > 0)
-                              IconButton(
-                                icon: const Icon(Icons.arrow_back_ios,
-                                    color: Colors.white),
-                                onPressed: _previousStep,
-                              )
-                            else
-                              const SizedBox(width: 48),
+            child: Column(
+              children: [
+                // Enhanced Header with Progress
+                Container(
+                  padding: EdgeInsets.fromLTRB(
+                      24, MediaQuery.of(context).padding.top + 16, 24, 16),
+                  child: Column(
+                    children: [
+                      // Top Navigation
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          if (_model.currentStep > 0)
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back_ios,
+                                  color: Colors.white),
+                              onPressed: _previousStep,
+                            )
+                          else
+                            const SizedBox(width: 48),
 
-                            // Step indicator
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  width: 1,
-                                ),
+                          // Step indicator
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isDarkMode
+                                  ? Colors.grey.shade800.withValues(alpha: 0.3)
+                                  : Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: isDarkMode
+                                    ? Colors.grey.shade600
+                                        .withValues(alpha: 0.4)
+                                    : Colors.white.withValues(alpha: 0.3),
+                                width: 1,
                               ),
+                            ),
+                            child: Text(
+                              'Step ${_model.currentStep + 1} of ${_model.totalSteps}',
+                              style: theme.bodyMedium.override(
+                                fontFamily: 'Inter',
+                                color: isDarkMode
+                                    ? Colors.grey.shade300
+                                    : Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                height: 1.0,
+                              ),
+                            ),
+                          ),
+
+                          // Skip button (only for certain steps)
+                          if (_model.currentStep ==
+                              4) // Mental history can be skipped
+                            TextButton(
+                              onPressed: _nextStep,
                               child: Text(
-                                'Step ${_model.currentStep + 1} of ${_model.totalSteps}',
+                                'Skip',
                                 style: theme.bodyMedium.override(
                                   fontFamily: 'Inter',
-                                  color: Colors.white,
+                                  color: isDarkMode
+                                      ? Colors.grey.shade300
+                                          .withValues(alpha: 0.8)
+                                      : Colors.white.withValues(alpha: 0.8),
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w600,
                                   height: 1.0,
                                 ),
                               ),
-                            ),
+                            )
+                          else
+                            const SizedBox(width: 48),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
 
-                            // Skip button (only for certain steps)
-                            if (_model.currentStep ==
-                                4) // Mental history can be skipped
-                              TextButton(
-                                onPressed: _nextStep,
-                                child: Text(
-                                  'Skip',
-                                  style: theme.bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                    fontSize: 14,
-                                    height: 1.0,
-                                  ),
-                                ),
-                              )
-                            else
-                              const SizedBox(width: 48),
-                          ],
+                      // Progress Bar
+                      Container(
+                        width: double.infinity,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: isDarkMode
+                              ? Colors.grey.shade800.withValues(alpha: 0.3)
+                              : Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        const SizedBox(height: 20),
-
-                        // Progress Bar
-                        Container(
-                          width: double.infinity,
-                          height: 8,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 500),
+                          width: MediaQuery.of(context).size.width *
+                              ((_model.currentStep + 1) / _model.totalSteps),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 500),
-                            width: MediaQuery.of(context).size.width *
-                                ((_model.currentStep + 1) / _model.totalSteps),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  const Color(0xFFE0A800), // FoCoCo Gold
-                                  const Color(0xFFFFD54F),
-                                ],
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                              ),
-                              borderRadius: BorderRadius.circular(4),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFFE0A800)
-                                      .withValues(alpha: 0.5),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
+                            gradient: LinearGradient(
+                              colors: isDarkMode
+                                  ? [
+                                      const Color(0xFFE0A800), // FoCoCo Gold
+                                      const Color(0xFFFFD54F),
+                                    ]
+                                  : [
+                                      const Color(0xFFE0A800), // FoCoCo Gold
+                                      const Color(0xFFFFD54F),
+                                    ],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
                             ),
+                            borderRadius: BorderRadius.circular(4),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFE0A800)
+                                    .withValues(alpha: 0.5),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
+                ),
 
-                  // Main Content Area
-                  Expanded(
-                    child: PageView(
-                      controller: _pageController,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        _buildWelcomeStep(theme),
-                        _buildPersonalFoundationStep(theme),
-                        _buildMentalGameProfileStep(theme),
-                        _buildVARKAssessmentStep(theme),
-                        _buildMentalHistoryStep(theme),
-                        _buildResultsStep(theme),
-                      ],
-                    ),
+                // Main Content Area
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      _buildWelcomeStep(theme),
+                      _buildPersonalFoundationStep(theme),
+                      _buildMentalGameProfileStep(theme),
+                      _buildVARKAssessmentStep(theme),
+                      _buildMentalHistoryStep(theme),
+                      _buildResultsStep(theme),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -2734,6 +2869,8 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
 
   // Step 6: Results & Profile Summary
   Widget _buildResultsStep(FlutterFlowTheme theme) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     // Calculate scores if not already done
     if (_model.varkScores.isEmpty) {
       _model.varkScores = _calculateVARKScores();
@@ -2743,9 +2880,9 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
 
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: isDarkMode ? theme.secondaryBackground : Colors.white,
+        borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(32),
           topRight: Radius.circular(32),
         ),
@@ -3107,37 +3244,42 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
             SizedBox(height: _hasError ? 0 : 16),
 
             // Action Buttons
-            FFButtonWidget(
-              onPressed: _isSaving ? null : _completeOnboarding,
-              text: _isSaving ? 'Saving...' : 'Start Your Journey',
-              icon: _isSaving
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom),
+              child: FFButtonWidget(
+                onPressed: _isSaving ? null : _completeOnboarding,
+                text: _isSaving ? 'Saving...' : 'Start Your Journey',
+                icon: _isSaving
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.arrow_forward,
+                        color: Colors.white,
+                        size: 20,
                       ),
-                    )
-                  : const Icon(
-                      Icons.arrow_forward,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-              options: FFButtonOptions(
-                width: double.infinity,
-                height: 56,
-                color: _isSaving ? theme.secondaryText : theme.primary,
-                disabledColor: theme.secondaryText.withValues(alpha: 0.5),
-                textStyle: theme.titleMedium.override(
-                  fontFamily: 'Montserrat',
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  height: 1.0,
+                options: FFButtonOptions(
+                  width: double.infinity,
+                  height: 56,
+                  color: _isSaving ? theme.secondaryText : theme.primary,
+                  disabledColor: theme.secondaryText.withValues(alpha: 0.5),
+                  textStyle: theme.titleMedium.override(
+                    fontFamily: 'Montserrat',
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    height: 1.0,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  elevation: _isSaving ? 0 : 4,
                 ),
-                borderRadius: BorderRadius.circular(16),
-                elevation: _isSaving ? 0 : 4,
               ),
             ),
           ],

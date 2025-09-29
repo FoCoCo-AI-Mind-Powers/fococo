@@ -2,8 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:apple_maps_flutter/apple_maps_flutter.dart' as apple_maps;
 import 'package:google_maps_flutter/google_maps_flutter.dart' as google_maps;
+import 'package:google_maps_flutter/google_maps_flutter.dart'
+    show BitmapDescriptor;
 import 'package:geolocator/geolocator.dart';
 import '/flutter_flow/lat_lng.dart';
+
+// Export BitmapDescriptor for custom markers
+export 'package:google_maps_flutter/google_maps_flutter.dart'
+    show BitmapDescriptor;
 
 /// Enhanced Platform-aware map widget with clustering and performance optimization
 /// iOS: Native Apple Maps integration with clustering
@@ -522,6 +528,7 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
           markerId: google_maps.MarkerId(marker.markerId),
           position: google_maps.LatLng(
               marker.position.latitude, marker.position.longitude),
+          icon: marker.icon ?? google_maps.BitmapDescriptor.defaultMarker,
           infoWindow: google_maps.InfoWindow(
             title: marker.infoWindow.title,
             snippet: marker.infoWindow.snippet,
@@ -687,12 +694,14 @@ class MapMarker {
   final LatLng position;
   final InfoWindow infoWindow;
   final Color? color;
+  final BitmapDescriptor? icon;
 
   const MapMarker({
     required this.markerId,
     required this.position,
     required this.infoWindow,
     this.color,
+    this.icon,
   });
 }
 

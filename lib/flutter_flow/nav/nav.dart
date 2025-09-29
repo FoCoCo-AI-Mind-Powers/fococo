@@ -146,7 +146,9 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           name: CoachingModulesWidget.routeName,
           path: CoachingModulesWidget.routePath,
           requireAuth: true,
-          builder: (context, params) => CoachingModulesWidget(),
+          builder: (context, params) => CoachingModulesWidget(
+            initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
+          ),
         ),
         FFRoute(
           name: ProgressWidget.routeName,

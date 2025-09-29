@@ -5,7 +5,8 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/services/stripe_service.dart';
 import '/services/biometric_auth_service.dart';
-import '/ai_integration/widgets/navbar_widget.dart';
+import '/ai_integration/widgets/enhanced_navbar_widget.dart';
+import 'dart:ui';
 import 'subscription_management_model.dart';
 export 'subscription_management_model.dart';
 
@@ -23,12 +24,16 @@ class SubscriptionManagementWidget extends StatefulWidget {
 class _SubscriptionManagementWidgetState
     extends State<SubscriptionManagementWidget> with TickerProviderStateMixin {
   late SubscriptionManagementModel _model;
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final StripeService _stripeService = StripeService();
   final BiometricAuthService _biometricService = BiometricAuthService();
+
+  // Animation controllers - matching settings pattern
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   UserSubscriptionInfo? _currentSubscription;
   bool _isLoading = true;
@@ -39,27 +44,34 @@ class _SubscriptionManagementWidgetState
     super.initState();
     _model = createModel(context, () => SubscriptionManagementModel());
 
-    // Initialize animations
+    // Initialize animations - matching settings pattern
     _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+    _slideController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
 
+    // Start animations
     _fadeController.forward();
+    _slideController.forward();
     _loadSubscriptionData();
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
+    _slideController.dispose();
     _model.dispose();
     super.dispose();
   }
@@ -104,37 +116,132 @@ class _SubscriptionManagementWidgetState
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: theme.primaryBackground,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(
-              Icons.arrow_back_ios,
-              color: theme.primaryText,
+        body: Stack(
+          children: [
+            // Main content
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    theme.primaryBackground,
+                    theme.secondaryBackground.withValues(alpha: 0.8),
+                  ],
+                ),
+              ),
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: SafeArea(
+                    child: Column(
+                      children: [
+                        // Custom App Bar
+                        _buildCustomAppBar(theme),
+
+                        // Main Content
+                        Expanded(
+                          child: _isLoading
+                              ? _buildLoadingState(theme)
+                              : _currentSubscription != null
+                                  ? _buildActiveSubscription(theme)
+                                  : _buildNoSubscription(theme),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
-            onPressed: () => context.pop(),
+
+            // Floating Voice Button
+            const FloatingVoiceButton(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomAppBar(FlutterFlowTheme theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          // Back button
+          _buildGlassButton(
+            theme: theme,
+            icon: Icons.arrow_back_ios,
+            onTap: () => context.pop(),
           ),
-          title: Text(
-            'Subscription',
-            style: theme.headlineSmall.copyWith(
-              fontWeight: FontWeight.w700,
-              color: theme.primaryText,
+
+          const SizedBox(width: 16),
+
+          // Title
+          Expanded(
+            child: Text(
+              'Subscription Management',
+              style: theme.headlineSmall.copyWith(
+                color: theme.primaryText,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-          centerTitle: true,
-        ),
-        body: FadeTransition(
-          opacity: _fadeAnimation,
-          child: _isLoading
-              ? _buildLoadingState(theme)
-              : _currentSubscription != null
-                  ? _buildActiveSubscription(theme)
-                  : _buildNoSubscription(theme),
-        ),
-        bottomNavigationBar: FoCoCoNavBar(
-          currentRoute: 'subscription_management',
-          enableVoiceButton: false,
-          onTap: (route) => context.goNamed(route),
+
+          // Settings button
+          _buildGlassButton(
+            theme: theme,
+            icon: Icons.settings_outlined,
+            onTap: () => context.goNamed('settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build glass design button
+  Widget _buildGlassButton({
+    required FlutterFlowTheme theme,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.glassBackground.withValues(alpha: 0.3),
+                  theme.glassTint.withValues(alpha: 0.2),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.glassBorder.withValues(alpha: 0.4),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.glassShadow.withValues(alpha: 0.1),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Icon(
+              icon,
+              color: theme.primaryText,
+              size: icon == Icons.arrow_back_ios ? 20 : 24,
+            ),
+          ),
         ),
       ),
     );
@@ -153,7 +260,7 @@ class _SubscriptionManagementWidgetState
     final plan = StripeService.subscriptionPlans[subscription.membershipTier];
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -180,7 +287,7 @@ class _SubscriptionManagementWidgetState
           // Manage subscription
           _buildManageSubscription(theme, subscription),
 
-          const SizedBox(height: 100),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -189,7 +296,7 @@ class _SubscriptionManagementWidgetState
   /// No subscription view
   Widget _buildNoSubscription(FlutterFlowTheme theme) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           const SizedBox(height: 40),
@@ -277,7 +384,7 @@ class _SubscriptionManagementWidgetState
     SubscriptionPlan? plan,
   ) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [

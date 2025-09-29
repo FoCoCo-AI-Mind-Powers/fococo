@@ -95,12 +95,14 @@ class FoCoMapVoiceService {
 
       await _speechToText.listen(
         onResult: _onSpeechResult,
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 3),
+        listenFor: const Duration(seconds: 45), // Longer listening time
+        pauseFor: const Duration(seconds: 2), // Shorter pause for golf context
         localeId: 'en_US',
         listenOptions: SpeechListenOptions(
           partialResults: true,
-          listenMode: ListenMode.confirmation,
+          listenMode: ListenMode.dictation, // Better for natural speech
+          cancelOnError: false, // Don't cancel on temporary errors
+          autoPunctuation: true, // Help with natural flow
         ),
       );
 
@@ -623,6 +625,43 @@ Focus on: General reflection, goal setting, mental training, course preparation.
     debugPrint('Speech error: $error');
     _isListening = false;
     _listeningController?.add(false);
+
+    // Handle specific error types for better user experience
+    if (error != null) {
+      String errorMessage = 'Voice recognition error';
+      String errorCode = error.toString();
+
+      if (errorCode.contains('error_no_match')) {
+        errorMessage =
+            'No speech detected. Please speak more clearly and try again.';
+        // Auto-retry after a short delay for no_match errors
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (!_isListening && !_isProcessing) {
+            startListening();
+          }
+        });
+      } else if (errorCode.contains('error_network')) {
+        errorMessage = 'Network connection required for voice recognition.';
+      } else if (errorCode.contains('error_audio')) {
+        errorMessage = 'Microphone access issue. Please check permissions.';
+      } else if (errorCode.contains('error_client')) {
+        errorMessage =
+            'Voice recognition service unavailable. Please try again.';
+      } else if (errorCode.contains('error_permission')) {
+        errorMessage =
+            'Microphone permission denied. Please enable in settings.';
+      }
+
+      // Emit error to UI
+      _liveUpdateController?.add({
+        'type': 'speech_error',
+        'message': errorMessage,
+        'errorCode': errorCode,
+        'canRetry': errorCode.contains('error_no_match') ||
+            errorCode.contains('error_network'),
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+    }
   }
 
   void _onSpeechResult(dynamic result) {

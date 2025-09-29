@@ -640,15 +640,15 @@ class GeminiModuleRecommendation {
 
   factory GeminiModuleRecommendation.fromMap(Map<String, dynamic> map) {
     return GeminiModuleRecommendation(
-      moduleId: map['moduleId'] as String,
-      moduleTitle: map['moduleTitle'] as String,
-      priority: map['priority'] as String,
-      estimatedDuration: map['estimatedDuration'] as int,
-      learningStyle: map['learningStyle'] as String,
-      description: map['description'] as String,
-      expectedOutcome: map['expectedOutcome'] as String,
-      prerequisites: List<String>.from(map['prerequisites'] as List),
-      difficulty: map['difficulty'] as String,
+      moduleId: map['moduleId'] as String? ?? '',
+      moduleTitle: map['moduleTitle'] as String? ?? 'Module',
+      priority: map['priority'] as String? ?? 'medium',
+      estimatedDuration: map['estimatedDuration'] as int? ?? 15,
+      learningStyle: map['learningStyle'] as String? ?? 'visual',
+      description: map['description'] as String? ?? '',
+      expectedOutcome: map['expectedOutcome'] as String? ?? '',
+      prerequisites: List<String>.from(map['prerequisites'] as List? ?? []),
+      difficulty: map['difficulty'] as String? ?? 'beginner',
     );
   }
 
@@ -785,10 +785,12 @@ class GeminiContentSection {
 
   factory GeminiContentSection.fromMap(Map<String, dynamic> map) {
     return GeminiContentSection(
-      type: map['type'] as String,
-      title: map['title'] as String,
-      content: map['content'] as String,
-      varkAdaptations: Map<String, String>.from(map['varkAdaptations'] as Map),
+      type: map['type'] as String? ?? 'content',
+      title: map['title'] as String? ?? 'Section',
+      content: map['content'] as String? ?? '',
+      varkAdaptations: map['varkAdaptations'] != null
+          ? Map<String, String>.from(map['varkAdaptations'] as Map)
+          : <String, String>{},
       interactiveElements: (map['interactiveElements'] as List? ?? [])
           .map((e) =>
               GeminiInteractiveElement.fromMap(e as Map<String, dynamic>))
@@ -821,8 +823,8 @@ class GeminiInteractiveElement {
 
   factory GeminiInteractiveElement.fromMap(Map<String, dynamic> map) {
     return GeminiInteractiveElement(
-      type: map['type'] as String,
-      content: map['content'] as String,
+      type: map['type'] as String? ?? 'text',
+      content: map['content'] as String? ?? '',
       expectedResponse: map['expectedResponse'] as String?,
     );
   }

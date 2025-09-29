@@ -1,0 +1,19 @@
+{
+  "name": "fococo-firebase-deployment",
+  "version": "1.0.0",
+  "description": "FoCoCo Firebase deployment scripts",
+  "main": "deploy_production_coaching.js",
+  "scripts": {
+    "deploy": "node deploy_production_coaching.js",
+    "deploy-rules": "firebase deploy --only firestore:rules",
+    "deploy-functions": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "private": true
+}
+

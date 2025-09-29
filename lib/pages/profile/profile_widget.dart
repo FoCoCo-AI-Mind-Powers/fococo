@@ -27,6 +27,15 @@ class _ProfileWidgetState extends State<ProfileWidget>
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
+  // Stream subscription for proper disposal
+  StreamSubscription<UserRecord>? _userStreamSubscription;
+
+  // User data state management
+  UserRecord? _currentUser;
+  bool _isLoading = true;
+  bool _hasError = false;
+  String? _errorMessage;
+
   @override
   void initState() {
     super.initState();
@@ -45,10 +54,56 @@ class _ProfileWidgetState extends State<ProfileWidget>
     ));
 
     _slideController.forward();
+
+    // Initialize user data stream
+    _initializeUserStream();
+  }
+
+  void _initializeUserStream() {
+    if (currentUserUid.isEmpty) {
+      // Handle case where user is not authenticated
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'User not authenticated';
+        });
+      }
+      return;
+    }
+
+    final userStream = UserRecord.getDocument(
+        FirebaseFirestore.instance.collection('user').doc(currentUserUid));
+
+    _userStreamSubscription = userStream.listen((userData) {
+      if (mounted) {
+        setState(() {
+          _currentUser = userData;
+          _isLoading = false;
+          _hasError = false;
+          _errorMessage = null;
+        });
+      }
+    }, onError: (error) {
+      print('❌ Profile Stream Error: $error');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = error.toString();
+          // Create default user when there's an error
+          _currentUser = _createDefaultUserRecord();
+        });
+
+        // Try to create/fix profile in background
+        _createOrFixProfileInBackground();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _userStreamSubscription?.cancel();
     _slideController.dispose();
     super.dispose();
   }
@@ -61,219 +116,192 @@ class _ProfileWidgetState extends State<ProfileWidget>
     print('🔍 Profile Build: currentUserUid = "$currentUserUid"');
     print(
         '🔍 Profile Build: User authenticated = ${currentUserUid.isNotEmpty}');
+    print('🔍 Profile Build: Loading = $_isLoading, HasError = $_hasError');
 
-    return StreamBuilder<UserRecord>(
-      stream: UserRecord.getDocument(
-              FirebaseFirestore.instance.collection('user').doc(currentUserUid))
-          .handleError((error) {
-        print('❌ Profile StreamBuilder Error: $error');
-        return null;
-      }),
-      builder: (context, userSnapshot) {
-        print('🔍 Profile StreamBuilder: hasData = ${userSnapshot.hasData}');
-        print('🔍 Profile StreamBuilder: hasError = ${userSnapshot.hasError}');
-        print(
-            '🔍 Profile StreamBuilder: connectionState = ${userSnapshot.connectionState}');
-
-        // Handle loading state
-        if (userSnapshot.connectionState == ConnectionState.waiting &&
-            !userSnapshot.hasData) {
-          return Scaffold(
-            backgroundColor: theme.primaryBackground,
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: theme.primary),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Loading profile...',
-                    style: theme.bodyMedium.copyWith(
-                      color: theme.secondaryText,
-                    ),
-                  ),
-                ],
+    // Handle loading state
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: theme.primaryBackground,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: theme.primary),
+              const SizedBox(height: 16),
+              Text(
+                'Loading profile...',
+                style: theme.bodyMedium.copyWith(
+                  color: theme.secondaryText,
+                ),
               ),
-            ),
-          );
-        }
+            ],
+          ),
+        ),
+      );
+    }
 
-        // Create default user data if no data or error
-        UserRecord user;
-        bool isDefaultData = false;
+    // Determine user data and if it's default
+    UserRecord user;
+    bool isDefaultData = false;
 
-        if (userSnapshot.hasError || !userSnapshot.hasData) {
-          print('⚠️ Using default profile data - Error: ${userSnapshot.error}');
-          isDefaultData = true;
+    if (_hasError || _currentUser == null) {
+      print('⚠️ Using default profile data - Error: $_errorMessage');
+      isDefaultData = true;
+      user = _currentUser ?? _createDefaultUserRecord();
+    } else {
+      user = _currentUser!;
+    }
 
-          // Create a default user record
-          user = _createDefaultUserRecord();
+    final List<Map<String, dynamic>> achievements = []; // Placeholder for now
 
-          // Silently try to create/fix the profile in the background
-          if (currentUserUid.isNotEmpty) {
-            _createOrFixProfileInBackground();
-          }
-        } else {
-          user = userSnapshot.data!;
-        }
-
-        final List<Map<String, dynamic>> achievements =
-            []; // Placeholder for now
-
-        return Scaffold(
-          key: scaffoldKey,
-          backgroundColor: theme.primaryBackground,
-          body: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  theme.primaryBackground,
-                  theme.secondaryBackground.withValues(alpha: 0.8),
-                ],
-              ),
-            ),
-            child: SlideTransition(
-              position: _slideAnimation,
-              child: CustomScrollView(
-                slivers: [
-                  // Glass App Bar
-                  SliverAppBar(
-                    expandedHeight: 120,
-                    floating: true,
-                    pinned: true,
-                    backgroundColor: Colors.transparent,
-                    elevation: 0,
-                    flexibleSpace: FlexibleSpaceBar(
-                      background: ClipRRect(
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  theme.glassBackground.withValues(alpha: 0.2),
-                                  theme.glassTint.withValues(alpha: 0.1),
-                                ],
-                              ),
-                              border: Border(
-                                bottom: BorderSide(
-                                  color:
-                                      theme.glassBorder.withValues(alpha: 0.3),
-                                  width: 1,
+    return Scaffold(
+      key: scaffoldKey,
+      backgroundColor: theme.primaryBackground,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.primaryBackground,
+              theme.secondaryBackground.withValues(alpha: 0.8),
+            ],
+          ),
+        ),
+        child: SlideTransition(
+          position: _slideAnimation,
+          child: CustomScrollView(
+            slivers: [
+              // Glass App Bar
+              SliverAppBar(
+                expandedHeight: 120,
+                floating: true,
+                pinned: true,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: ClipRRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              theme.glassBackground.withValues(alpha: 0.2),
+                              theme.glassTint.withValues(alpha: 0.1),
+                            ],
+                          ),
+                          border: Border(
+                            bottom: BorderSide(
+                              color: theme.glassBorder.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 60, 20, 16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Profile',
+                                      style: theme.headlineLarge.copyWith(
+                                        color: theme.primaryText,
+                                        fontWeight: FontWeight.w700,
+                                        fontFamily: 'Montserrat',
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      'Manage your FoCoCo experience',
+                                      style: theme.bodyMedium.copyWith(
+                                        color: theme.secondaryText,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(20, 60, 20, 16),
-                              child: Row(
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          'Profile',
-                                          style: theme.headlineLarge.copyWith(
-                                            color: theme.primaryText,
-                                            fontWeight: FontWeight.w700,
-                                            fontFamily: 'Montserrat',
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Text(
-                                          'Manage your FoCoCo experience',
-                                          style: theme.bodyMedium.copyWith(
-                                            color: theme.secondaryText,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
+                                  _buildHeaderButton(
+                                    theme,
+                                    Icons.edit_outlined,
+                                    () => context.goNamed('edit_profile'),
+                                    isSecondary: true,
                                   ),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      _buildHeaderButton(
-                                        theme,
-                                        Icons.edit_outlined,
-                                        () => context.goNamed('edit_profile'),
-                                        isSecondary: true,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      _buildHeaderButton(
-                                        theme,
-                                        Icons.settings_rounded,
-                                        () => _showSettingsModal(
-                                            context, theme, user),
-                                        isSecondary: false,
-                                      ),
-                                    ],
+                                  const SizedBox(width: 12),
+                                  _buildHeaderButton(
+                                    theme,
+                                    Icons.settings_rounded,
+                                    () => _showSettingsModal(
+                                        context, theme, user),
+                                    isSecondary: false,
                                   ),
                                 ],
                               ),
-                            ),
+                            ],
                           ),
                         ),
                       ),
                     ),
                   ),
-
-                  // Profile Content
-                  SliverPadding(
-                    padding: const EdgeInsets.all(20),
-                    sliver: SliverList(
-                      delegate: SliverChildListDelegate([
-                        // Profile Header Card
-                        _buildProfileHeaderCard(theme, user, isDefaultData),
-                        const SizedBox(height: 20),
-
-                        // Mental Performance Index
-                        _buildMentalPerformanceSection(theme, user),
-                        const SizedBox(height: 20),
-
-                        // VARK Learning Preferences
-                        _buildVarkPreferencesSection(theme, user),
-                        const SizedBox(height: 20),
-
-                        // Recent Achievements
-                        _buildAchievementsSection(theme, achievements),
-                        const SizedBox(height: 20),
-
-                        // AI Insights Summary
-                        _buildAIInsightsSection(theme, user),
-                        const SizedBox(height: 20),
-
-                        // Account & Subscription
-                        _buildAccountSection(theme, user),
-                        const SizedBox(
-                            height: 100), // Bottom padding for navbar
-                      ]),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+
+              // Profile Content
+              SliverPadding(
+                padding: const EdgeInsets.all(20),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    // Profile Header Card
+                    _buildProfileHeaderCard(theme, user, isDefaultData),
+                    const SizedBox(height: 20),
+
+                    // Mental Performance Index
+                    _buildMentalPerformanceSection(theme, user),
+                    const SizedBox(height: 20),
+
+                    // VARK Learning Preferences
+                    _buildVarkPreferencesSection(theme, user),
+                    const SizedBox(height: 20),
+
+                    // Recent Achievements
+                    _buildAchievementsSection(theme, achievements),
+                    const SizedBox(height: 20),
+
+                    // AI Insights Summary
+                    _buildAIInsightsSection(theme, user),
+                    const SizedBox(height: 20),
+
+                    // Account & Subscription
+                    _buildAccountSection(theme, user),
+                    const SizedBox(height: 100), // Bottom padding for navbar
+                  ]),
+                ),
+              ),
+            ],
           ),
-          bottomNavigationBar: EnhancedFoCoCoNavBar(
-            currentRoute: 'profile',
-            onTap: (route) {
-              print('🔄 Profile page: Navigation requested to route: $route');
-              context.goNamed(route);
-            },
-            currentUser: null, // Will be handled by the navbar internally
-          ),
-        );
-      },
+        ),
+      ),
+      bottomNavigationBar: EnhancedFoCoCoNavBar(
+        currentRoute: 'profile',
+        onTap: (route) {
+          print('🔄 Profile page: Navigation requested to route: $route');
+          context.goNamed(route);
+        },
+        currentUser: null, // Will be handled by the navbar internally
+      ),
     );
   }
 
@@ -938,7 +966,7 @@ class _ProfileWidgetState extends State<ProfileWidget>
           'Subscription Settings',
           'Manage your FoCoCo membership',
           FontAwesomeIcons.creditCard,
-          () => context.pushNamed('subscription'),
+          () => context.pushNamed('subscription_management'),
         ),
         const SizedBox(height: 8),
         _buildAccountOption(
@@ -962,7 +990,7 @@ class _ProfileWidgetState extends State<ProfileWidget>
           'Progress Tracking',
           'View your improvement journey',
           FontAwesomeIcons.chartLine,
-          () => context.pushNamed('progress'),
+          () => context.pushNamed('coaching_modules', extra: {'initialTab': 2}),
         ),
       ],
     );
@@ -1261,26 +1289,46 @@ class _ProfileWidgetState extends State<ProfileWidget>
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          gradient: isSecondary ? null : theme.primaryBrandGradient,
-          color:
-              isSecondary ? theme.glassBackground.withValues(alpha: 0.2) : null,
-          borderRadius: BorderRadius.circular(16),
-          border: isSecondary
-              ? Border.all(
-                  color: theme.glassBorder.withValues(alpha: 0.3),
-                  width: 1,
-                )
-              : null,
-          boxShadow: isSecondary ? null : theme.glassCardShadows,
-        ),
-        child: Icon(
-          icon,
-          color: isSecondary ? theme.primaryText : Colors.white,
-          size: 24,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: isSecondary
+                  ? LinearGradient(
+                      colors: [
+                        theme.glassBackground.withValues(alpha: 0.3),
+                        theme.glassTint.withValues(alpha: 0.2),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : theme.primaryBrandGradient,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isSecondary
+                    ? theme.glassBorder.withValues(alpha: 0.4)
+                    : theme.primary.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: (isSecondary ? theme.glassShadow : theme.primary)
+                      .withValues(alpha: 0.1),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Icon(
+              icon,
+              color: isSecondary ? theme.primaryText : Colors.white,
+              size: 24,
+            ),
+          ),
         ),
       ),
     );
@@ -1343,6 +1391,8 @@ class _ProfileWidgetState extends State<ProfileWidget>
   void _createOrFixProfileInBackground() {
     // Run in background without blocking UI
     Future.delayed(Duration.zero, () async {
+      if (!mounted) return; // Check if widget is still mounted
+
       try {
         print(
             '🔧 Creating/fixing profile in background for UID: $currentUserUid');
@@ -1352,6 +1402,9 @@ class _ProfileWidgetState extends State<ProfileWidget>
 
         // Check if document exists
         final doc = await userRef.get();
+
+        if (!mounted)
+          return; // Check if widget is still mounted after async operation
 
         if (!doc.exists) {
           // Create new document
@@ -1397,6 +1450,9 @@ class _ProfileWidgetState extends State<ProfileWidget>
             'platform': 'flutter',
             'referralSource': 'direct',
           });
+
+          if (!mounted)
+            return; // Check if widget is still mounted after async operation
           print('✅ Profile created in background');
         } else {
           // Fix existing document structure
@@ -1420,6 +1476,9 @@ class _ProfileWidgetState extends State<ProfileWidget>
             },
             'lastActive': FieldValue.serverTimestamp(),
           });
+
+          if (!mounted)
+            return; // Check if widget is still mounted after async operation
           print('✅ Profile structure fixed in background');
         }
       } catch (e) {
@@ -1430,6 +1489,8 @@ class _ProfileWidgetState extends State<ProfileWidget>
   }
 
   Future<void> _fixProfileData(BuildContext context) async {
+    if (!mounted) return;
+
     try {
       print('🔧 Fixing profile data for UID: $currentUserUid');
 
@@ -1491,13 +1552,16 @@ class _ProfileWidgetState extends State<ProfileWidget>
         'lastActive': FieldValue.serverTimestamp(),
       });
 
+      if (!mounted) return;
       print('✅ Profile data fixed successfully');
 
       // Close loading dialog
       if (context.mounted) {
         Navigator.pop(context);
         // Trigger a rebuild to show the profile
-        setState(() {});
+        if (mounted) {
+          setState(() {});
+        }
       }
     } catch (e) {
       print('❌ Error fixing profile data: $e');
@@ -1515,6 +1579,8 @@ class _ProfileWidgetState extends State<ProfileWidget>
   }
 
   Future<void> _createUserProfile(BuildContext context) async {
+    if (!mounted) return;
+
     try {
       print('🔧 Creating user profile for UID: $currentUserUid');
 
@@ -1597,13 +1663,16 @@ class _ProfileWidgetState extends State<ProfileWidget>
         'referralSource': 'direct',
       });
 
+      if (!mounted) return;
       print('✅ User profile created successfully');
 
       // Close loading dialog
       if (context.mounted) {
         Navigator.pop(context);
         // Trigger a rebuild to show the profile
-        setState(() {});
+        if (mounted) {
+          setState(() {});
+        }
       }
     } catch (e) {
       print('❌ Error creating user profile: $e');
@@ -1621,6 +1690,8 @@ class _ProfileWidgetState extends State<ProfileWidget>
   }
 
   Future<void> _performLogout(BuildContext context) async {
+    if (!mounted) return;
+
     try {
       // Close the confirmation modal
       Navigator.pop(context);
@@ -1661,12 +1732,14 @@ class _ProfileWidgetState extends State<ProfileWidget>
       await Future.delayed(
           const Duration(milliseconds: 500)); // Brief delay for UX
 
+      if (!mounted) return;
+
       GoRouter.of(context).prepareAuthEvent();
       await authManager.signOut();
       GoRouter.of(context).clearRedirectLocation();
 
       // Navigate to login
-      if (context.mounted) {
+      if (context.mounted && mounted) {
         Navigator.pop(context); // Close loading dialog
         context.goNamedAuth('login', context.mounted);
       }

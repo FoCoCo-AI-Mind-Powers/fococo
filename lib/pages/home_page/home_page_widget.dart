@@ -1,5 +1,7 @@
 import '/services/home_data_service.dart';
 import '/services/focomap_tutorial_service.dart';
+import '/services/remote_config_service.dart';
+import '/services/user_session_service.dart';
 import '/ai_integration/widgets/enhanced_navbar_widget.dart';
 
 import '/flutter_flow/flutter_flow_util.dart';
@@ -28,6 +30,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   late HomePageModel _model;
   final HomeDataService _homeDataService = HomeDataService();
   final FoCoMapTutorialService _tutorialService = FoCoMapTutorialService();
+  final RemoteConfigService _remoteConfigService = RemoteConfigService();
+  final UserSessionService _sessionService = UserSessionService();
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -42,7 +46,18 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   void initState() {
     super.initState();
     _model = createModel(context, () => HomePageModel());
+    _initializeServices();
     _checkAndShowTutorial();
+  }
+
+  /// Initialize Remote Config and Session services
+  Future<void> _initializeServices() async {
+    try {
+      await _remoteConfigService.initialize();
+      await _sessionService.initializeSession();
+    } catch (e) {
+      print('❌ Error initializing services: $e');
+    }
   }
 
   /// Check if user needs onboarding tutorial
@@ -94,6 +109,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         key: scaffoldKey,
         backgroundColor: deepOceanBlue,
         extendBody: true,
+        drawer: _buildDrawer(
+            deepOceanBlue, primaryAccent, lightText, mutedText, cardBackground),
         body: StreamBuilder<HomeData>(
           stream: _homeDataService.getHomeDataStream(),
           builder: (context, snapshot) {
@@ -127,6 +144,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                             children: [
                               // Header Section
                               _buildHeader(homeData, lightText, mutedText),
+
+                              // Read Score Section
+                              _buildReadScoreSection(primaryAccent,
+                                  cardBackground, lightText, mutedText),
 
                               // Mental Score Circle
                               Container(
@@ -225,12 +246,37 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Drawer menu button
+          GestureDetector(
+            onTap: () => scaffoldKey.currentState?.openDrawer(),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                Icons.menu_rounded,
+                color: lightText,
+                size: 24,
+              ),
+            ),
+          ),
+
+          // Logo
           FoCoCoLogo(
             size: LogoSize.medium,
             showText: true,
             color: lightText,
             animated: true,
           ),
+
+          // Status bar indicators
           Row(
             children: [
               const Icon(Icons.signal_cellular_alt,
@@ -1418,6 +1464,382 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               size: 16,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Build read score section
+  Widget _buildReadScoreSection(
+    Color primaryAccent,
+    Color cardBackground,
+    Color lightText,
+    Color mutedText,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: _sessionService.getReadScoreDetails(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const SizedBox.shrink();
+          }
+
+          final data = snapshot.data!;
+          final score = data['score'] as int;
+          final level = data['level'] as String;
+          final description = data['description'] as String;
+
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  cardBackground.withValues(alpha: 0.8),
+                  cardBackground.withValues(alpha: 0.6),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: primaryAccent.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                // Read score circle
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        primaryAccent,
+                        primaryAccent.withValues(alpha: 0.8),
+                      ],
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$score',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Montserrat',
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+
+                // Score details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.menu_book_rounded,
+                            color: primaryAccent,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Read Score',
+                            style: TextStyle(
+                              color: lightText,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        level,
+                        style: TextStyle(
+                          color: primaryAccent,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        description,
+                        style: TextStyle(
+                          color: mutedText,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Build navigation drawer
+  Widget _buildDrawer(
+    Color backgroundColor,
+    Color primaryAccent,
+    Color lightText,
+    Color mutedText,
+    Color cardBackground,
+  ) {
+    return Drawer(
+      backgroundColor: backgroundColor,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Drawer header
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  FoCoCoLogo(
+                    size: LogoSize.small,
+                    showText: true,
+                    color: lightText,
+                    animated: true,
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Icon(
+                      Icons.close_rounded,
+                      color: lightText,
+                      size: 24,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Navigation items
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                children: [
+                  _buildDrawerItem(
+                    icon: Icons.dashboard_rounded,
+                    title: 'Dashboard',
+                    subtitle: 'Your mental performance overview',
+                    color: primaryAccent,
+                    lightText: lightText,
+                    mutedText: mutedText,
+                    cardBackground: cardBackground,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.goNamed('home_page');
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.psychology_rounded,
+                    title: 'Coaching Modules',
+                    subtitle: 'Mental performance training',
+                    color: primaryAccent,
+                    lightText: lightText,
+                    mutedText: mutedText,
+                    cardBackground: cardBackground,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.goNamed('coaching_modules');
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: FontAwesomeIcons.golfBallTee,
+                    title: 'Golf Rounds',
+                    subtitle: 'Track your performance',
+                    color: primaryAccent,
+                    lightText: lightText,
+                    mutedText: mutedText,
+                    cardBackground: cardBackground,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.goNamed('golf_rounds');
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.map_rounded,
+                    title: 'FoCoMap',
+                    subtitle: 'Visualize your data',
+                    color: primaryAccent,
+                    lightText: lightText,
+                    mutedText: mutedText,
+                    cardBackground: cardBackground,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.goNamed('focomap');
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: FontAwesomeIcons.brain,
+                    title: 'AI Insights',
+                    subtitle: 'Personalized recommendations',
+                    color: primaryAccent,
+                    lightText: lightText,
+                    mutedText: mutedText,
+                    cardBackground: cardBackground,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.goNamed('ai_insights');
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.person_rounded,
+                    title: 'Profile',
+                    subtitle: 'Your account & settings',
+                    color: primaryAccent,
+                    lightText: lightText,
+                    mutedText: mutedText,
+                    cardBackground: cardBackground,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.goNamed('profile');
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.settings_rounded,
+                    title: 'Settings',
+                    subtitle: 'App preferences',
+                    color: primaryAccent,
+                    lightText: lightText,
+                    mutedText: mutedText,
+                    cardBackground: cardBackground,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.goNamed('settings');
+                    },
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Rate app section
+                  FutureBuilder<bool>(
+                    future: _sessionService.shouldPromptRating(),
+                    builder: (context, snapshot) {
+                      if (snapshot.data == true) {
+                        return _buildDrawerItem(
+                          icon: Icons.star_rounded,
+                          title: 'Rate FoCoCo',
+                          subtitle: 'Help us improve',
+                          color: Colors.amber,
+                          lightText: lightText,
+                          mutedText: mutedText,
+                          cardBackground: cardBackground,
+                          onTap: () async {
+                            Navigator.of(context).pop();
+                            await _remoteConfigService.showRateApp();
+                            await _sessionService.markAppAsRated();
+                          },
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            // Footer
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Text(
+                'FoCoCo - Mental Performance for Golf',
+                style: TextStyle(
+                  color: mutedText,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build drawer item
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required Color lightText,
+    required Color mutedText,
+    required Color cardBackground,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardBackground.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: color.withValues(alpha: 0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: lightText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: mutedText,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: mutedText,
+                size: 16,
+              ),
+            ],
+          ),
         ),
       ),
     );

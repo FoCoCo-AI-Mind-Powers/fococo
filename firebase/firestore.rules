@@ -58,6 +58,57 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
     }
     
+    // ============================================================================
+    // COACHING MODULES - PRODUCTION SECURITY RULES
+    // ============================================================================
+    
+    // Coaching Modules - Public read access for all authenticated users, admin-only writes
+    match /coaching_modules/{document} {
+      allow read: if request.auth != null; // All authenticated users can read coaching modules
+      allow create: if false; // Only admins can create modules (via Admin SDK/Cloud Functions)
+      allow update: if false; // Only admins can update modules (via Admin SDK/Cloud Functions)  
+      allow delete: if false; // Only admins can delete modules (via Admin SDK/Cloud Functions)
+    }
+    
+    // Module Progress Tracking - User-specific progress and completion data
+    match /user_module_progress/{document} {
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     request.auth.uid == resource.data.userId;
+      allow read: if request.auth != null && 
+                   request.auth.uid == resource.data.userId;
+      allow write: if request.auth != null && 
+                    request.auth.token.email_verified && 
+                    request.auth.uid == resource.data.userId;
+      allow delete: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     request.auth.uid == resource.data.userId;
+    }
+    
+    // Module Ratings & Reviews - User feedback on coaching modules
+    match /module_reviews/{document} {
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified &&
+                     request.auth.uid == resource.data.userId;
+      allow read: if request.auth != null; // Anyone can read reviews
+      allow write: if request.auth != null && 
+                    request.auth.token.email_verified && 
+                    request.auth.uid == resource.data.userId;
+      allow delete: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     request.auth.uid == resource.data.userId;
+    }
+    
+    // Content Analytics - Module usage and performance metrics
+    match /module_analytics/{document} {
+      allow read: if false; // Analytics are read via Cloud Functions only
+      allow write: if false; // Analytics are written via Cloud Functions only
+    }
+    
+    // ============================================================================
+    // END COACHING MODULES RULES
+    // ============================================================================
+    
     // FoCoMap Collections - Enhanced security for golf data
     match /round_logs/{document} {
       allow create: if request.auth != null && request.auth.token.email_verified;

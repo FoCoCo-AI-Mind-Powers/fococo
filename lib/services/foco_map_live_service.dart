@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/schema/round_logs_record.dart';
 import '/backend/schema/shot_logs_record.dart';
+import '/backend/schema/golf_rounds_record.dart';
+import '/backend/schema/scorecard_record.dart';
 
 /// Production FoCoMap Live Service
 /// Manages real-time data sync, live updates, and tier-based access
@@ -19,6 +21,10 @@ class FoCoMapLiveService {
       StreamController<List<RoundLogsRecord>>.broadcast();
   final _shotLogsController =
       StreamController<List<ShotLogsRecord>>.broadcast();
+  final _golfRoundsController =
+      StreamController<List<GolfRoundsRecord>>.broadcast();
+  final _scorecardsController =
+      StreamController<List<ScorecardRecord>>.broadcast();
   final _liveUpdateController =
       StreamController<Map<String, dynamic>>.broadcast();
   final _filterUpdateController =
@@ -29,6 +35,8 @@ class FoCoMapLiveService {
   // Firestore listeners
   StreamSubscription? _roundLogsSubscription;
   StreamSubscription? _shotLogsSubscription;
+  StreamSubscription? _golfRoundsSubscription;
+  StreamSubscription? _scorecardsSubscription;
   StreamSubscription? _aiInsightsSubscription;
 
   // State management
@@ -39,6 +47,8 @@ class FoCoMapLiveService {
   // Data caching for performance
   List<RoundLogsRecord> _cachedRoundLogs = [];
   List<ShotLogsRecord> _cachedShotLogs = [];
+  List<GolfRoundsRecord> _cachedGolfRounds = [];
+  List<ScorecardRecord> _cachedScorecards = [];
   List<Map<String, dynamic>> _cachedAIInsights = [];
   Map<String, dynamic> _activeFilters = {};
 
@@ -50,6 +60,10 @@ class FoCoMapLiveService {
   Stream<List<RoundLogsRecord>> get roundLogsStream =>
       _roundLogsController.stream;
   Stream<List<ShotLogsRecord>> get shotLogsStream => _shotLogsController.stream;
+  Stream<List<GolfRoundsRecord>> get golfRoundsStream =>
+      _golfRoundsController.stream;
+  Stream<List<ScorecardRecord>> get scorecardsStream =>
+      _scorecardsController.stream;
   Stream<Map<String, dynamic>> get liveUpdateStream =>
       _liveUpdateController.stream;
   Stream<Map<String, dynamic>> get filterUpdateStream =>
@@ -63,6 +77,8 @@ class FoCoMapLiveService {
   UserTier get userTier => _userTier;
   List<RoundLogsRecord> get cachedRoundLogs => _cachedRoundLogs;
   List<ShotLogsRecord> get cachedShotLogs => _cachedShotLogs;
+  List<GolfRoundsRecord> get cachedGolfRounds => _cachedGolfRounds;
+  List<ScorecardRecord> get cachedScorecards => _cachedScorecards;
   List<Map<String, dynamic>> get cachedAIInsights => _cachedAIInsights;
 
   /// Initialize the live service with user tier detection
@@ -94,9 +110,11 @@ class FoCoMapLiveService {
 
       // Start real-time listeners based on tier
       await _startRoundLogsListener();
+      await _startGolfRoundsListener();
 
       if (_userTier == UserTier.prime) {
         await _startShotLogsListener();
+        await _startScorecardsListener();
         await _startAIInsightsListener();
       }
 
@@ -125,6 +143,8 @@ class FoCoMapLiveService {
       // Cancel all listeners
       await _roundLogsSubscription?.cancel();
       await _shotLogsSubscription?.cancel();
+      await _golfRoundsSubscription?.cancel();
+      await _scorecardsSubscription?.cancel();
       await _aiInsightsSubscription?.cancel();
 
       _liveUpdateController.add({
@@ -166,7 +186,21 @@ class FoCoMapLiveService {
 
       _roundLogsController.add(_getFilteredRoundLogs());
 
-      // Fetch shot logs (Prime tier only)
+      // Fetch golf rounds
+      final golfRoundsQuery = FirebaseFirestore.instance
+          .collection('golf_rounds')
+          .where('userId', isEqualTo: currentUser!.uid)
+          .orderBy('date', descending: true)
+          .limit(30);
+
+      final golfRoundsSnapshot = await golfRoundsQuery.get();
+      _cachedGolfRounds = golfRoundsSnapshot.docs
+          .map((doc) => GolfRoundsRecord.fromSnapshot(doc))
+          .toList();
+
+      _golfRoundsController.add(_cachedGolfRounds);
+
+      // Fetch shot logs and scorecards (Prime tier only)
       if (_userTier == UserTier.prime) {
         final shotLogsQuery = FirebaseFirestore.instance
             .collection('shot_logs')
@@ -181,6 +215,20 @@ class FoCoMapLiveService {
 
         _shotLogsController.add(_getFilteredShotLogs());
 
+        // Fetch scorecards
+        final scorecardsQuery = FirebaseFirestore.instance
+            .collection('scorecards')
+            .where('userId', isEqualTo: currentUser!.uid)
+            .orderBy('roundDate', descending: true)
+            .limit(30);
+
+        final scorecardsSnapshot = await scorecardsQuery.get();
+        _cachedScorecards = scorecardsSnapshot.docs
+            .map((doc) => ScorecardRecord.fromSnapshot(doc))
+            .toList();
+
+        _scorecardsController.add(_cachedScorecards);
+
         // Fetch AI insights
         await _fetchAIInsights();
       }
@@ -189,6 +237,8 @@ class FoCoMapLiveService {
         'type': 'data_refreshed',
         'roundLogs': _cachedRoundLogs.length,
         'shotLogs': _cachedShotLogs.length,
+        'golfRounds': _cachedGolfRounds.length,
+        'scorecards': _cachedScorecards.length,
         'aiInsights': _cachedAIInsights.length,
         'timestamp': DateTime.now().toIso8601String(),
       });
@@ -331,6 +381,92 @@ class FoCoMapLiveService {
         _liveUpdateController.add({
           'type': 'error',
           'message': 'Shot logs sync error: $error',
+        });
+      },
+    );
+  }
+
+  /// Start real-time golf rounds listener
+  Future<void> _startGolfRoundsListener() async {
+    final query = FirebaseFirestore.instance
+        .collection('golf_rounds')
+        .where('userId', isEqualTo: currentUser!.uid)
+        .orderBy('date', descending: true)
+        .limit(30);
+
+    _golfRoundsSubscription = query.snapshots().listen(
+      (snapshot) {
+        try {
+          _cachedGolfRounds = snapshot.docs
+              .map((doc) => GolfRoundsRecord.fromSnapshot(doc))
+              .toList();
+
+          _golfRoundsController.add(_cachedGolfRounds);
+
+          // Check for new entries
+          for (final change in snapshot.docChanges) {
+            if (change.type == DocumentChangeType.added) {
+              final newRecord = GolfRoundsRecord.fromSnapshot(change.doc);
+              _liveUpdateController.add({
+                'type': 'golf_round_added',
+                'data': newRecord,
+                'timestamp': DateTime.now().toIso8601String(),
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Error in golf rounds listener: $e');
+        }
+      },
+      onError: (error) {
+        debugPrint('Golf rounds stream error: $error');
+        _liveUpdateController.add({
+          'type': 'error',
+          'message': 'Golf rounds sync error: $error',
+        });
+      },
+    );
+  }
+
+  /// Start real-time scorecards listener (Prime tier only)
+  Future<void> _startScorecardsListener() async {
+    if (_userTier != UserTier.prime) return;
+
+    final query = FirebaseFirestore.instance
+        .collection('scorecards')
+        .where('userId', isEqualTo: currentUser!.uid)
+        .orderBy('roundDate', descending: true)
+        .limit(30);
+
+    _scorecardsSubscription = query.snapshots().listen(
+      (snapshot) {
+        try {
+          _cachedScorecards = snapshot.docs
+              .map((doc) => ScorecardRecord.fromSnapshot(doc))
+              .toList();
+
+          _scorecardsController.add(_cachedScorecards);
+
+          // Check for new entries
+          for (final change in snapshot.docChanges) {
+            if (change.type == DocumentChangeType.added) {
+              final newRecord = ScorecardRecord.fromSnapshot(change.doc);
+              _liveUpdateController.add({
+                'type': 'scorecard_added',
+                'data': newRecord,
+                'timestamp': DateTime.now().toIso8601String(),
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Error in scorecards listener: $e');
+        }
+      },
+      onError: (error) {
+        debugPrint('Scorecards stream error: $error');
+        _liveUpdateController.add({
+          'type': 'error',
+          'message': 'Scorecards sync error: $error',
         });
       },
     );
@@ -638,12 +774,16 @@ class FoCoMapLiveService {
   void dispose() {
     _roundLogsController.close();
     _shotLogsController.close();
+    _golfRoundsController.close();
+    _scorecardsController.close();
     _liveUpdateController.close();
     _filterUpdateController.close();
     _aiInsightsController.close();
 
     _roundLogsSubscription?.cancel();
     _shotLogsSubscription?.cancel();
+    _golfRoundsSubscription?.cancel();
+    _scorecardsSubscription?.cancel();
     _aiInsightsSubscription?.cancel();
   }
 }

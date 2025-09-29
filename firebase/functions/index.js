@@ -4,7 +4,12 @@ const stripe = require("stripe")(functions.config().stripe?.secret_key || "sk_te
 
 admin.initializeApp();
 
-// Stripe Subscription Management Functions
+// Import coaching admin functions
+const coachingAdmin = require('./coaching_admin');
+
+// ============================================================================
+// STRIPE SUBSCRIPTION MANAGEMENT FUNCTIONS
+// ============================================================================
 
 /**
  * Create a new subscription with payment intent
@@ -266,7 +271,22 @@ exports.processStripeWebhook = functions.https.onCall(async (data, context) => {
   return { success: true, message: 'Webhook processor ready' };
 });
 
-// Webhook event handlers
+// ============================================================================
+// COACHING MODULES ADMIN FUNCTIONS
+// ============================================================================
+
+// Export coaching admin functions
+exports.createCoachingModule = coachingAdmin.createCoachingModule;
+exports.updateCoachingModule = coachingAdmin.updateCoachingModule;
+exports.deleteCoachingModule = coachingAdmin.deleteCoachingModule;
+exports.listCoachingModules = coachingAdmin.listCoachingModules;
+exports.bulkImportModules = coachingAdmin.bulkImportModules;
+exports.updateModuleAnalytics = coachingAdmin.updateModuleAnalytics;
+exports.getModuleStatistics = coachingAdmin.getModuleStatistics;
+
+// ============================================================================
+// STRIPE WEBHOOK EVENT HANDLERS
+// ============================================================================
 
 async function handlePaymentSucceeded(invoice) {
   console.log(`Payment succeeded for invoice: ${invoice.id}`);

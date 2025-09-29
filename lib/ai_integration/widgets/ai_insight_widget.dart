@@ -8,6 +8,7 @@ import 'dart:ui';
 
 /// Enhanced AI Insight Widget with dashboard-like features
 /// Displays comprehensive AI insights with visual elements and interactions
+/// For full conversation features, use EnhancedAIInsightWidget
 class AIInsightWidget extends StatefulWidget {
   const AIInsightWidget({
     Key? key,
@@ -124,6 +125,11 @@ class _AIInsightWidgetState extends State<AIInsightWidget>
                     _buildInsightMetrics(theme),
                     const SizedBox(height: 16),
                     _buildInsightActions(theme),
+                    // Conversation section available in EnhancedAIInsightWidget
+                    // if (widget.enableConversation) ...[
+                    //   const SizedBox(height: 16),
+                    //   _buildConversationSection(theme),
+                    // ],
                   ],
                 ),
               ),

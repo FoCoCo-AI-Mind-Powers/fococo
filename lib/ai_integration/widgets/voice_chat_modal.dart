@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown/markdown.dart' as md;
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:math' as math;
 
 import '../../flutter_flow/flutter_flow_theme.dart';
@@ -10,6 +13,9 @@ import '../services/cartesia_api_service.dart';
 import '../services/permission_service.dart';
 import '../services/ai_memory_service.dart';
 import '../services/gemini_live_service_simple.dart';
+import '../services/gemini_native_audio_service.dart';
+import '../services/voice_chat_database_service.dart';
+import '../services/enhanced_ai_coaching_service.dart';
 
 import '/backend/schema/structs/vark_preferences_struct.dart';
 
@@ -65,11 +71,14 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _textController = TextEditingController();
 
-  // Streamlined voice services - Gemini for responses, Cartesia for speech
+  // Enhanced voice services - Native Audio + Cartesia for speech + Database
   final UnifiedAIService _aiService = UnifiedAIService();
   final CartesiaAPIService _cartesiaService = CartesiaAPIService.instance;
   final PermissionService _permissionService = PermissionService();
   final AIMemoryService _memoryService = AIMemoryService();
+  final GeminiNativeAudioService _nativeAudioService =
+      GeminiNativeAudioService();
+  final VoiceChatDatabaseService _databaseService = VoiceChatDatabaseService();
 
   GeminiLiveServiceState _voiceState = GeminiLiveServiceState.disconnected;
   List<ChatMessage> _messages = [];
@@ -78,17 +87,18 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
   bool _isDeepThinking = false;
   PermissionServiceState _microphonePermission = PermissionServiceState.unknown;
 
+  // Database session management
+  VoiceChatSession? _currentSession;
+  String? _currentSessionId;
+
   // Streamlined service status
   bool _isAISpeaking = false;
   bool _isListening = false;
 
-  // Voice selection - only two male voices
-  static const Map<String, String> _availableVoices = {
-    'Voice 1 (Male)': 'da3224fe-d8d1-4774-8902-e6a7115f5132',
-    'Voice 2 (Male)': 'c7c1f6e5-cf61-4c16-b13b-ca4b0e34c423',
-  };
-  String _selectedVoiceName = 'Voice 1 (Male)';
-  String get _selectedVoiceId => _availableVoices[_selectedVoiceName]!;
+  // Voice selection - hardcoded to Cartesia Custom Voice 3 (sonic-2 model)
+  static const String _voiceId = '7442d6b8-ff51-4477-bd30-0c0d16df84eb';
+  static const String _voiceName = 'FoCoCo AI Coach Voice';
+  String get _selectedVoiceId => _voiceId;
 
   // VARK preferences with default values
   late VarkPreferencesStruct _varkPrefs;
@@ -145,7 +155,30 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
     _waveController.dispose();
     _scrollController.dispose();
     _textController.dispose();
+
+    // Clean up voice services
+    _nativeAudioService.dispose();
+
+    // End database session
+    _endCurrentSession();
+
     super.dispose();
+  }
+
+  /// End the current database session
+  Future<void> _endCurrentSession() async {
+    if (_currentSessionId != null) {
+      try {
+        await _databaseService.endSession(_currentSessionId!);
+        if (kDebugMode) {
+          print('📊 Ended database session: $_currentSessionId');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('❌ Error ending database session: $e');
+        }
+      }
+    }
   }
 
   Future<void> _initializeVoiceServices() async {
@@ -156,10 +189,33 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
       // Initialize AI memory service
       await _memoryService.initialize();
 
+      // Initialize database service and start session
+      await _databaseService.initialize();
+      await _startNewSession();
+
       // Initialize unified AI service for generating responses
       await _aiService.initialize();
       if (kDebugMode) {
         print('✅ Unified AI service initialized');
+      }
+
+      // Initialize Enhanced AI Coaching service (uses Firebase AI Logic)
+      final _enhancedCoachingService = EnhancedAICoachingService();
+      try {
+        await _enhancedCoachingService.initialize();
+        if (kDebugMode) {
+          print('✅ Enhanced AI Coaching service initialized');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ Enhanced AI Coaching service failed: $e');
+        }
+      }
+
+      // Note: Gemini Native Audio requires direct API access
+      // For now, we'll use Firebase AI Logic with enhanced structured responses
+      if (kDebugMode) {
+        print('ℹ️ Using Firebase AI Logic for enhanced coaching features');
       }
 
       // Initialize Cartesia for speech synthesis with selected voice
@@ -168,7 +224,7 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
         _cartesiaService.setVoiceId(_selectedVoiceId);
         if (kDebugMode) {
           print(
-              '✅ Cartesia voice service initialized with $_selectedVoiceName ($_selectedVoiceId)');
+              '✅ Cartesia voice service initialized with $_voiceName ($_selectedVoiceId)');
         }
       } catch (e) {
         if (kDebugMode) {
@@ -187,29 +243,18 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
         _microphonePermission = micState;
       });
 
-      String welcomeMessage;
-      if (_cartesiaService.isInitialized) {
-        welcomeMessage = micState == PermissionServiceState.granted
-            ? '🎤 FoCoCo AI Coach ready! Using $_selectedVoiceName. Speak or type your message.'
-            : '📝 FoCoCo AI Coach ready! Using $_selectedVoiceName. Type your message or tap microphone to enable voice.';
-      } else {
-        welcomeMessage = micState == PermissionServiceState.granted
-            ? '🎤 FoCoCo AI Coach ready! Voice features limited. Speak or type your message.'
-            : '📝 FoCoCo AI Coach ready! Text chat available. Type your message.';
+      // Voice services initialized - chat is ready but starts clean
+      if (kDebugMode) {
+        final status = _cartesiaService.isInitialized
+            ? 'Voice ready with $_voiceName'
+            : 'Text chat ready';
+        print('✅ FoCoCo AI Coach: $status');
       }
 
-      // Add some sample conversation to show functionality
-      _addSampleConversation();
+      // Clean chat - no sample conversation
 
-      _addMessage(
-        ChatMessage(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          content: welcomeMessage,
-          isUser: false,
-          timestamp: DateTime.now(),
-          isSystem: true,
-        ),
-      );
+      // Start with clean chat - no automatic messages
+      // Welcome message will be shown only in empty state
     } catch (e) {
       setState(() {
         _voiceState = GeminiLiveServiceState.error;
@@ -232,23 +277,50 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
   }
 
   void _setupVoiceListeners() {
-    // Simplified voice state management
-    setState(() {
-      _voiceState = GeminiLiveServiceState.connected;
-    });
-
-    // Listen to Cartesia speaking state
-    _cartesiaService.speakingStream.listen((isSpeaking) {
+    // Listen to Native Audio service state changes
+    _nativeAudioService.stateStream.listen((state) {
       if (mounted) {
         setState(() {
-          _isAISpeaking = isSpeaking;
-          _voiceState = isSpeaking
-              ? GeminiLiveServiceState.speaking
-              : GeminiLiveServiceState.connected;
+          switch (state) {
+            case GeminiNativeAudioState.listening:
+              _voiceState = GeminiLiveServiceState.listening;
+              _isListening = true;
+              _isAISpeaking = false;
+              break;
+            case GeminiNativeAudioState.speaking:
+              _voiceState = GeminiLiveServiceState.speaking;
+              _isListening = false;
+              _isAISpeaking = true;
+              break;
+            case GeminiNativeAudioState.thinking:
+              _voiceState = GeminiLiveServiceState.speaking;
+              _isListening = false;
+              _isAISpeaking = true;
+              break;
+            case GeminiNativeAudioState.connected:
+              _voiceState = GeminiLiveServiceState.connected;
+              _isListening = false;
+              _isAISpeaking = false;
+              break;
+            case GeminiNativeAudioState.disconnected:
+              _voiceState = GeminiLiveServiceState.disconnected;
+              _isListening = false;
+              _isAISpeaking = false;
+              break;
+            case GeminiNativeAudioState.error:
+              _voiceState = GeminiLiveServiceState.error;
+              _isListening = false;
+              _isAISpeaking = false;
+              break;
+            default:
+              break;
+          }
         });
 
-        // Update wave animation
-        if (isSpeaking) {
+        // Update wave animation based on state
+        if (state == GeminiNativeAudioState.listening ||
+            state == GeminiNativeAudioState.speaking ||
+            state == GeminiNativeAudioState.thinking) {
           _waveController.repeat(reverse: true);
         } else {
           _waveController.stop();
@@ -256,7 +328,66 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
       }
     });
 
-    // Voice listeners are now simplified and handled by Cartesia service
+    // Listen to Native Audio responses
+    _nativeAudioService.responseStream.listen((response) {
+      if (mounted && response.text.isNotEmpty) {
+        // Add AI response to chat
+        final aiMessage = ChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          content: response.text,
+          isUser: false,
+          timestamp: DateTime.now(),
+        );
+        _addMessage(aiMessage);
+
+        // Store in memory
+        _memoryService.addConversationTurn(
+          userMessage: '', // Previous user message already stored
+          aiResponse: response.text,
+          messageType: 'native_audio',
+        );
+
+        // Show thinking process if available
+        if (response.isThinking && response.thinkingProcess != null) {
+          final thinkingMessage = ChatMessage(
+            id: '${DateTime.now().millisecondsSinceEpoch}_thinking',
+            content: '🧠 **Thinking Process:** ${response.thinkingProcess}',
+            isUser: false,
+            timestamp: DateTime.now(),
+            isSystem: true,
+          );
+          _addMessage(thinkingMessage);
+        }
+      }
+    });
+
+    // Listen to Native Audio transcripts
+    _nativeAudioService.transcriptStream.listen((transcript) {
+      if (mounted && transcript.isNotEmpty) {
+        if (kDebugMode) {
+          print('📝 Native Audio Transcript: $transcript');
+        }
+      }
+    });
+
+    // Listen to Cartesia speaking state (fallback TTS)
+    _cartesiaService.speakingStream.listen((isSpeaking) {
+      if (mounted && !_nativeAudioService.isConnected) {
+        setState(() {
+          _isAISpeaking = isSpeaking;
+          _voiceState = isSpeaking
+              ? GeminiLiveServiceState.speaking
+              : GeminiLiveServiceState.connected;
+        });
+
+        // Update wave animation for fallback TTS
+        if (isSpeaking) {
+          _waveController.repeat(reverse: true);
+        } else {
+          _waveController.stop();
+        }
+      }
+    });
   }
 
   void _scrollToBottom() {
@@ -276,6 +407,81 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
       _messages.add(message);
     });
     _scrollToBottom();
+
+    // Save message to database
+    _saveMessageToDatabase(message);
+  }
+
+  /// Start a new voice chat session in the database
+  Future<void> _startNewSession() async {
+    try {
+      final session = await _databaseService.startSession(
+        title: widget.initialRoom ?? 'Voice Chat Session',
+        varkPreferences: _varkPrefs,
+        isDeepThinking: _isDeepThinking,
+        metadata: {
+          'voiceService': 'FoCoCo Native Audio + Cartesia',
+          'startedAt': DateTime.now().toIso8601String(),
+          'platform': defaultTargetPlatform.toString(),
+        },
+      );
+
+      _currentSession = session;
+      _currentSessionId = session.id;
+
+      if (kDebugMode) {
+        print('📊 Started database session: ${session.id}');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error starting database session: $e');
+      }
+    }
+  }
+
+  /// Save message to database
+  Future<void> _saveMessageToDatabase(ChatMessage message) async {
+    if (_currentSessionId == null) return;
+
+    try {
+      final dbMessage = VoiceChatMessage(
+        id: message.id,
+        userId: '', // Will be set by the database service
+        sessionId: _currentSessionId!,
+        content: message.content,
+        isUser: message.isUser,
+        timestamp: message.timestamp,
+        isSystem: message.isSystem,
+        audioUrl: message.audioUrl,
+        messageType: _determineMessageType(message),
+        metadata: {
+          'interactionType': _interactionType,
+          'isDeepThinking': _isDeepThinking,
+          'voiceState': _voiceState.toString(),
+        },
+      );
+
+      await _databaseService.saveMessage(dbMessage);
+
+      if (kDebugMode) {
+        print('💾 Saved message to database: ${message.id}');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error saving message to database: $e');
+      }
+    }
+  }
+
+  /// Determine message type for database classification
+  String _determineMessageType(ChatMessage message) {
+    if (message.isSystem == true) return 'system';
+    if (message.audioUrl != null) return 'audio';
+    if (message.content.contains('![') && message.content.contains(']('))
+      return 'image';
+    if (_nativeAudioService.isConnected && !message.isUser)
+      return 'native_audio';
+    return 'text';
   }
 
   Future<String> _generateAIResponse(String userInput) async {
@@ -290,8 +496,17 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
       final fullContext =
           _buildEnhancedContext(conversationContext, personalizedPrompt);
 
-      // Generate response using unified AI service with enhanced context
-      final response = await _aiService.generateResponse(
+      // Check if user is requesting image generation
+      if (_shouldGenerateImage(userInput)) {
+        return await _generateResponseWithImage(
+          userInput: userInput,
+          conversationContext: fullContext,
+          userInsights: userInsights,
+        );
+      }
+
+      // Generate regular text response using unified AI service with enhanced context
+      final response = await _generateEnhancedAIResponse(
         userMessage: userInput,
         conversationContext: fullContext,
         varkPreferences: _varkPrefs,
@@ -347,6 +562,177 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
     }
   }
 
+  /// Generate enhanced AI response with rich formatting and context
+  Future<String> _generateEnhancedAIResponse({
+    required String userMessage,
+    String? conversationContext,
+    VarkPreferencesStruct? varkPreferences,
+    String interactionType = 'quickChat',
+    Map<String, dynamic>? userInsights,
+  }) async {
+    // Enhanced prompt that encourages rich formatting
+    final enhancedPrompt = '''
+$conversationContext
+
+You are an AI mental performance coach for golf. Respond with rich markdown formatting including:
+- Use **bold** for key points
+- Use *italics* for emphasis
+- Use headers (## for main topics, ### for subtopics)
+- Use bullet points and numbered lists
+- Use > blockquotes for important insights
+- Use tables when presenting data or comparisons
+- Use `code blocks` for specific techniques or exercises
+
+${_isDeepThinking ? 'DEEP THINKING MODE: Provide thorough analysis with detailed explanations, structured content, and actionable insights.' : 'QUICK CHAT MODE: Provide concise, focused advice with key highlights.'}
+
+VARK Learning Style: ${_getVarkDescription()}
+
+User Message: $userMessage
+
+Respond as a professional golf mental coach with expertise in sports psychology:''';
+
+    final response = await _aiService.generateResponse(
+      userMessage: enhancedPrompt,
+      conversationContext: conversationContext,
+      varkPreferences: varkPreferences,
+      interactionType: interactionType,
+      userInsights: userInsights,
+    );
+
+    return response;
+  }
+
+  /// Check if user input suggests they want an image generated
+  bool _shouldGenerateImage(String input) {
+    final imageKeywords = [
+      'draw',
+      'picture',
+      'image',
+      'visual',
+      'diagram',
+      'chart',
+      'graph',
+      'illustration',
+      'sketch',
+      'show me',
+      'visualize',
+      'create image',
+      'generate picture',
+      'make diagram'
+    ];
+
+    final lowercaseInput = input.toLowerCase();
+    return imageKeywords.any((keyword) => lowercaseInput.contains(keyword));
+  }
+
+  /// Generate response with image using Gemini 2.5 Flash Image Preview
+  Future<String> _generateResponseWithImage({
+    required String userInput,
+    required String conversationContext,
+    required Map<String, dynamic>? userInsights,
+  }) async {
+    try {
+      // First, generate a text response with image description
+      final textResponse = await _generateEnhancedAIResponse(
+        userMessage: userInput,
+        conversationContext: conversationContext,
+        varkPreferences: _varkPrefs,
+        interactionType: _interactionType,
+        userInsights: userInsights,
+      );
+
+      // Generate image using Gemini 2.5 Flash Image Preview
+      final imagePrompt = _extractImagePromptFromInput(userInput);
+      final imageUrl = await _generateImageWithGemini(imagePrompt);
+
+      if (imageUrl != null) {
+        // Combine text response with image in markdown format
+        return '''$textResponse
+
+## Visual Illustration
+
+![Generated coaching visualization]($imageUrl)
+
+*This image was generated to help visualize the concept based on your request.*''';
+      } else {
+        // If image generation fails, return text response with explanation
+        return '''$textResponse
+
+> *I'd love to create a visual illustration for you, but I'm having some technical difficulties with image generation right now. The detailed explanation above should still be very helpful!*''';
+      }
+    } catch (e) {
+      debugPrint('Error generating response with image: $e');
+      // Fallback to regular text response
+      return await _generateEnhancedAIResponse(
+        userMessage: userInput,
+        conversationContext: conversationContext,
+        varkPreferences: _varkPrefs,
+        interactionType: _interactionType,
+        userInsights: userInsights,
+      );
+    }
+  }
+
+  /// Extract image prompt from user input
+  String _extractImagePromptFromInput(String input) {
+    // Create a focused prompt for image generation based on golf coaching context
+    final basePrompt =
+        '''Create a professional golf mental training illustration showing ''';
+
+    final cleanInput = input
+        .toLowerCase()
+        .replaceAll(
+            RegExp(
+                r'\b(draw|picture|image|visual|diagram|show me|visualize|create|generate)\b'),
+            '')
+        .trim();
+
+    if (cleanInput.contains('putting')) {
+      return '$basePrompt a golfer in proper putting stance with mental focus visualization, showing confidence and concentration techniques';
+    } else if (cleanInput.contains('swing')) {
+      return '$basePrompt a golfer mid-swing with mental imagery overlay showing focus points and confidence building elements';
+    } else if (cleanInput.contains('pressure') ||
+        cleanInput.contains('nerves')) {
+      return '$basePrompt breathing techniques and mental calmness strategies for golf, with visual representations of relaxation and focus';
+    } else if (cleanInput.contains('routine') ||
+        cleanInput.contains('pre-shot')) {
+      return '$basePrompt a step-by-step pre-shot routine with mental checkpoints and visualization elements for golf';
+    } else {
+      return '$basePrompt mental performance techniques for golf including visualization, focus, and confidence building strategies';
+    }
+  }
+
+  /// Generate image using Gemini 2.5 Flash Image Preview
+  Future<String?> _generateImageWithGemini(String prompt) async {
+    try {
+      // This would integrate with Gemini 2.5 Flash Image Preview API
+      // For now, return a placeholder that indicates image generation capability
+      // In a real implementation, you would call the Gemini Image API here
+
+      // Placeholder implementation - replace with actual Gemini Image API call
+      debugPrint('🎨 Generating image with prompt: $prompt');
+
+      // Return null for now - actual implementation would return the generated image URL
+      return null;
+    } catch (e) {
+      debugPrint('Error generating image: $e');
+      return null;
+    }
+  }
+
+  /// Get VARK learning style description for prompts
+  String _getVarkDescription() {
+    if (_varkPrefs.visual)
+      return 'Visual learner - prefer diagrams, charts, and visual explanations';
+    if (_varkPrefs.aural)
+      return 'Auditory learner - prefer spoken explanations and sound-based learning';
+    if (_varkPrefs.readWrite)
+      return 'Read/Write learner - prefer text, lists, and written instructions';
+    if (_varkPrefs.kinesthetic)
+      return 'Kinesthetic learner - prefer hands-on practice and physical demonstrations';
+    return 'Balanced learning style - appreciate multiple learning approaches';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
@@ -381,7 +767,6 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
           children: [
             _buildHeader(theme),
             _buildServiceIndicator(theme),
-            _buildVoiceSelector(theme),
             _buildDeepThinkingToggle(theme),
             Expanded(child: _buildChatInterface(theme)),
             _buildVoiceVisualization(theme),
@@ -435,7 +820,7 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
                   ),
                 ),
                 Text(
-                  'Using $_selectedVoiceName',
+                  'Using $_voiceName',
                   style: theme.bodySmall.copyWith(
                     color: theme.primary,
                     fontSize: 11,
@@ -505,92 +890,6 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
             child: CircularProgressIndicator(
               strokeWidth: 2,
               valueColor: AlwaysStoppedAnimation<Color>(indicatorColor),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVoiceSelector(FlutterFlowTheme theme) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: theme.accent4.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.accent4.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: theme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              FontAwesomeIcons.userTie,
-              color: theme.primary,
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'AI Voice Selection',
-                  style: theme.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.primaryText,
-                  ),
-                ),
-                Text(
-                  'Choose your preferred male coach voice',
-                  style: theme.bodySmall.copyWith(
-                    color: theme.secondaryText,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: theme.primaryBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: theme.accent4.withValues(alpha: 0.3),
-                width: 1,
-              ),
-            ),
-            child: DropdownButton<String>(
-              value: _selectedVoiceName,
-              underline: const SizedBox.shrink(),
-              isDense: true,
-              style: theme.bodySmall.copyWith(
-                color: theme.primaryText,
-                fontSize: 12,
-              ),
-              items: _availableVoices.keys.map((String voiceName) {
-                return DropdownMenuItem<String>(
-                  value: voiceName,
-                  child: Text(
-                    voiceName,
-                    style: theme.bodySmall.copyWith(
-                      fontSize: 12,
-                    ),
-                  ),
-                );
-              }).toList(),
-              onChanged: _changeVoice,
             ),
           ),
         ],
@@ -803,7 +1102,7 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              message.content,
+              _cleanMarkdownText(message.content),
               style: theme.bodySmall.copyWith(
                 color: theme.secondaryText,
                 fontSize: 12,
@@ -846,12 +1145,14 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
                           : const Radius.circular(20),
                     ),
                   ),
-                  child: Text(
-                    message.content,
-                    style: theme.bodyMedium.copyWith(
-                      color: isUser ? Colors.white : theme.primaryText,
-                    ),
-                  ),
+                  child: !isUser
+                      ? _buildRichMarkdownText(theme, message.content)
+                      : Text(
+                          _cleanMarkdownText(message.content),
+                          style: theme.bodyMedium.copyWith(
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -1045,50 +1346,6 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
   // ACTION METHODS
   // ============================================================================
 
-  /// Change voice selection
-  void _changeVoice(String? newVoiceName) async {
-    if (newVoiceName == null || newVoiceName == _selectedVoiceName) return;
-
-    setState(() {
-      _selectedVoiceName = newVoiceName;
-    });
-
-    // Update Cartesia service with new voice
-    _cartesiaService.setVoiceId(_selectedVoiceId);
-
-    HapticFeedback.selectionClick();
-
-    // Add system message about voice change
-    final voiceMessage = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      content:
-          '🎭 Voice changed to $_selectedVoiceName. Your AI coach will now use this voice for responses.',
-      isUser: false,
-      timestamp: DateTime.now(),
-      isSystem: true,
-    );
-    _addMessage(voiceMessage);
-
-    // Play a sample message with the new voice
-    if (_cartesiaService.isInitialized) {
-      try {
-        await _cartesiaService.speakText(
-          text:
-              "Hello! I'm your AI mental performance coach speaking with the new voice. How can I help you today?",
-          voiceId: _selectedVoiceId,
-          contentType: 'coaching',
-          varkPreferences: _varkPrefs,
-        );
-      } catch (e) {
-        debugPrint('Error playing voice sample: $e');
-      }
-    }
-
-    if (kDebugMode) {
-      print('🎭 Voice changed to $_selectedVoiceName ($_selectedVoiceId)');
-    }
-  }
-
   /// Toggle deep thinking mode
   void _toggleDeepThinking() async {
     setState(() {
@@ -1098,12 +1355,24 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
 
     HapticFeedback.selectionClick();
 
+    // Update native audio service thinking mode
+    try {
+      await _nativeAudioService.setThinkingMode(_isDeepThinking);
+      if (kDebugMode) {
+        print('🧠 Native Audio thinking mode: $_isDeepThinking');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ Error updating native audio thinking mode: $e');
+      }
+    }
+
     // Add system message about mode change
     final modeMessage = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       content: _isDeepThinking
-          ? '🧠 Deep thinking mode enabled - AI will analyze more thoroughly'
-          : '⚡ Quick chat mode enabled - AI will respond faster',
+          ? '🧠 Deep thinking mode enabled - AI will analyze more thoroughly with internal reasoning'
+          : '⚡ Quick chat mode enabled - AI will respond faster with direct answers',
       isUser: false,
       timestamp: DateTime.now(),
       isSystem: true,
@@ -1120,33 +1389,72 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
       return;
     }
 
-    // Simplified listening - just show listening state
-    setState(() {
-      _isListening = true;
-      _voiceState = GeminiLiveServiceState.listening;
-    });
+    try {
+      // Use native audio service for speech-to-speech if available
+      if (_nativeAudioService.isConnected ||
+          await _nativeAudioService.connect()) {
+        await _nativeAudioService.startListening();
 
-    _waveController.repeat(reverse: true);
+        // Add native listening indicator
+        _addMessage(
+          ChatMessage(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            content:
+                '🎤 **Native Audio Listening** - Speak your question for direct speech-to-speech conversation!',
+            isUser: false,
+            timestamp: DateTime.now(),
+            isSystem: true,
+          ),
+        );
 
-    // Add listening indicator
-    _addMessage(
-      ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        content:
-            '🎤 Listening... Speak your question and I\'ll respond with voice!',
-        isUser: false,
-        timestamp: DateTime.now(),
-        isSystem: true,
-      ),
-    );
+        if (kDebugMode) {
+          print('🎤 Started native audio listening');
+        }
+      } else {
+        // Fallback to simulated listening
+        setState(() {
+          _isListening = true;
+          _voiceState = GeminiLiveServiceState.listening;
+        });
 
-    // Simulate listening for demo (in real app, this would be actual voice recognition)
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted && _isListening) {
-        _stopListening();
-        _simulateVoiceInput();
+        _waveController.repeat(reverse: true);
+
+        // Add listening indicator
+        _addMessage(
+          ChatMessage(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            content:
+                '🎤 Listening... Speak your question and I\'ll respond with voice!',
+            isUser: false,
+            timestamp: DateTime.now(),
+            isSystem: true,
+          ),
+        );
+
+        // Simulate listening for demo (in real app, this would be actual voice recognition)
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted && _isListening) {
+            _stopListening();
+            _simulateVoiceInput();
+          }
+        });
       }
-    });
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error starting voice listening: $e');
+      }
+
+      _addMessage(
+        ChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          content:
+              '⚠️ Voice recognition not available right now. Please use text input.',
+          isUser: false,
+          timestamp: DateTime.now(),
+          isSystem: true,
+        ),
+      );
+    }
   }
 
   /// Request microphone permission with enhanced user feedback
@@ -1256,6 +1564,21 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
   void _stopListening() async {
     HapticFeedback.lightImpact();
 
+    try {
+      // Stop native audio service listening if active
+      if (_nativeAudioService.isListening) {
+        _nativeAudioService.stopListening();
+
+        if (kDebugMode) {
+          print('🛑 Stopped native audio listening');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error stopping native audio listening: $e');
+      }
+    }
+
     setState(() {
       _isListening = false;
       _voiceState = GeminiLiveServiceState.connected;
@@ -1343,6 +1666,249 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
     }
 
     _scrollToBottom();
+  }
+
+  // ============================================================================
+  // TEXT FORMATTING METHODS
+  // ============================================================================
+
+  /// Clean markdown text by removing common formatting symbols
+  String _cleanMarkdownText(String text) {
+    if (text.isEmpty) return text;
+
+    // Remove bold formatting (**text** and ***text***)
+    String cleaned = text.replaceAll(RegExp(r'\*{2,3}([^*]+)\*{2,3}'), r'$1');
+
+    // Remove italic formatting (*text*)
+    cleaned = cleaned.replaceAll(RegExp(r'(?<!\*)\*([^*]+)\*(?!\*)'), r'$1');
+
+    // Remove code formatting (`text`)
+    cleaned = cleaned.replaceAll(RegExp(r'`([^`]+)`'), r'$1');
+
+    // Remove heading symbols (# ## ###)
+    cleaned = cleaned.replaceAll(RegExp(r'^#{1,6}\s*', multiLine: true), '');
+
+    // Clean up extra spaces and line breaks
+    cleaned = cleaned.replaceAll(RegExp(r'\n\s*\n'), '\n\n');
+    cleaned = cleaned.replaceAll(RegExp(r'[ \t]+'), ' ');
+
+    return cleaned.trim();
+  }
+
+  /// Build rich markdown text with advanced formatting, colors, tables, and images
+  Widget _buildRichMarkdownText(FlutterFlowTheme theme, String text) {
+    if (text.isEmpty) {
+      return Text(
+        text,
+        style: theme.bodyMedium.copyWith(color: theme.primaryText),
+      );
+    }
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 500),
+      child: Markdown(
+        data: text,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        styleSheet: MarkdownStyleSheet(
+          // Paragraph styling
+          p: theme.bodyMedium.copyWith(
+            color: theme.primaryText,
+            height: 1.5,
+            fontSize: 14,
+          ),
+
+          // Headers
+          h1: theme.headlineLarge.copyWith(
+            color: theme.primary,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
+          h2: theme.headlineMedium.copyWith(
+            color: theme.primary,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+          h3: theme.headlineSmall.copyWith(
+            color: theme.primary,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+
+          // Lists
+          listBullet: theme.bodyMedium.copyWith(
+            color: theme.accent1,
+            fontSize: 14,
+          ),
+
+          // Code
+          code: theme.bodyMedium.copyWith(
+            backgroundColor: theme.accent4.withValues(alpha: 0.1),
+            color: theme.accent1,
+            fontFamily: 'monospace',
+            fontSize: 13,
+          ),
+          codeblockDecoration: BoxDecoration(
+            color: theme.accent4.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: theme.accent4.withValues(alpha: 0.2),
+            ),
+          ),
+
+          // Links
+          a: theme.bodyMedium.copyWith(
+            color: theme.primary,
+            decoration: TextDecoration.underline,
+          ),
+
+          // Tables
+          tableHead: theme.bodyMedium.copyWith(
+            color: theme.primaryText,
+            fontWeight: FontWeight.bold,
+            backgroundColor: theme.accent4.withValues(alpha: 0.1),
+          ),
+          tableBody: theme.bodyMedium.copyWith(
+            color: theme.primaryText,
+          ),
+          tableBorder: TableBorder.all(
+            color: theme.accent4.withValues(alpha: 0.3),
+            width: 1,
+          ),
+
+          // Blockquotes
+          blockquote: theme.bodyMedium.copyWith(
+            color: theme.secondaryText,
+            fontStyle: FontStyle.italic,
+          ),
+          blockquoteDecoration: BoxDecoration(
+            color: theme.accent4.withValues(alpha: 0.05),
+            border: Border(
+              left: BorderSide(
+                color: theme.primary,
+                width: 4,
+              ),
+            ),
+          ),
+
+          // Strong/Bold
+          strong: theme.bodyMedium.copyWith(
+            color: theme.primaryText,
+            fontWeight: FontWeight.bold,
+          ),
+
+          // Emphasis/Italic
+          em: theme.bodyMedium.copyWith(
+            color: theme.primaryText,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+
+        // Handle link taps
+        onTapLink: (text, href, title) async {
+          if (href != null) {
+            final uri = Uri.parse(href);
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri);
+            }
+          }
+        },
+
+        // Image builder for AI-generated images
+        imageBuilder: (uri, title, alt) {
+          return _buildImageWidget(theme, uri, title, alt);
+        },
+
+        // Extension support
+        extensionSet: md.ExtensionSet(
+          md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+          [
+            md.EmojiSyntax(),
+            ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build image widget for AI-generated or embedded images
+  Widget _buildImageWidget(
+      FlutterFlowTheme theme, Uri uri, String? title, String? alt) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          uri.toString(),
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              height: 200,
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                        : null,
+                    color: theme.primary,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Loading image...',
+                    style: theme.bodySmall.copyWith(
+                      color: theme.secondaryText,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              height: 100,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: theme.accent4.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.broken_image,
+                    color: theme.secondaryText,
+                    size: 32,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    alt ?? 'Failed to load image',
+                    style: theme.bodySmall.copyWith(
+                      color: theme.secondaryText,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   // ============================================================================
@@ -1471,36 +2037,7 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
     return "I'm here to help you develop your mental game and unlock your potential on the course. While I'm experiencing some technical difficulties with my advanced features, I can still provide guidance on focus, confidence, and control. What specific aspect of your golf psychology would you like to work on?";
   }
 
-  /// Add sample conversation to demonstrate functionality
-  void _addSampleConversation() {
-    // Add a sample conversation to show how it works
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        _addMessage(
-          ChatMessage(
-            id: 'sample_user_1',
-            content: 'I struggle with putting under pressure',
-            isUser: true,
-            timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
-          ),
-        );
-      }
-    });
-
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      if (mounted) {
-        _addMessage(
-          ChatMessage(
-            id: 'sample_ai_1',
-            content:
-                "I understand that pressure putting can be challenging! Here's what I recommend:\n\n1. **Develop a consistent pre-putt routine** - This gives you something to focus on instead of the pressure\n2. **Use the 4-7-8 breathing technique** - Inhale for 4, hold for 7, exhale for 8 to calm your nerves\n3. **Visualize success** - See the ball going in before you putt\n\nWhat specific situations make you feel the most pressure when putting?",
-            isUser: false,
-            timestamp: DateTime.now().subtract(const Duration(minutes: 1)),
-          ),
-        );
-      }
-    });
-  }
+  // Sample conversation method removed - chat starts clean
 
   /// Simulate voice input for demonstration
   void _simulateVoiceInput() {

@@ -10,12 +10,12 @@ import 'services/gemini_cost_tracker.dart';
 class GeminiAIClient {
   final String _apiKey;
   final GeminiCostTracker _costTracker;
-  
+
   GeminiAIClient({
     required String apiKey,
     GeminiCostTracker? costTracker,
-  }) : _apiKey = apiKey,
-       _costTracker = costTracker ?? GeminiCostTracker.instance;
+  })  : _apiKey = apiKey,
+        _costTracker = costTracker ?? GeminiCostTracker.instance;
 
   // Add getter to use the _apiKey field
   String get apiKey => _apiKey;
@@ -33,7 +33,7 @@ class GeminiAIClient {
     Map<String, dynamic>? contextualFactors,
   }) async {
     final startTime = DateTime.now();
-    
+
     try {
       // Create model for insights
       final model = FirebaseAI.googleAI().generativeModel(
@@ -61,23 +61,38 @@ class GeminiAIClient {
 
       // Parse JSON response directly
       final jsonResponse = json.decode(responseText);
-      
-      // Create insight response manually
+
+      // Create insight response manually with null safety
       final insightResponse = GeminiInsightResponse(
-        insightTitle: jsonResponse['insightTitle'] as String,
-        category: jsonResponse['category'] as String,
-        priority: jsonResponse['priority'] as String,
-        keyPoints: List<String>.from(jsonResponse['keyPoints'] as List),
-        recommendations: (jsonResponse['recommendations'] as List)
-            .map((r) => GeminiRecommendation.fromMap(r as Map<String, dynamic>))
-            .toList(),
-        personalizedElements: List<String>.from(jsonResponse['personalizedElements'] as List),
-        summaryText: jsonResponse['summaryText'] as String,
-        sentimentAnalysis: GeminiSentimentAnalysis.fromMap(
-          jsonResponse['sentimentAnalysis'] as Map<String, dynamic>
-        ),
-        contextualFactors: List<String>.from(jsonResponse['contextualFactors'] as List? ?? []),
-        followUpQuestions: List<String>.from(jsonResponse['followUpQuestions'] as List? ?? []),
+        insightTitle: jsonResponse['insightTitle'] as String? ??
+            'Golf Performance Insight',
+        category: jsonResponse['category'] as String? ?? 'performance',
+        priority: jsonResponse['priority'] as String? ?? 'medium',
+        keyPoints: List<String>.from(jsonResponse['keyPoints'] as List? ??
+            ['Continue working on your game']),
+        recommendations: (jsonResponse['recommendations'] as List?)
+                ?.map((r) =>
+                    GeminiRecommendation.fromMap(r as Map<String, dynamic>))
+                .toList() ??
+            [],
+        personalizedElements: List<String>.from(
+            jsonResponse['personalizedElements'] as List? ??
+                ['Focus on fundamentals']),
+        summaryText: jsonResponse['summaryText'] as String? ??
+            'Keep practicing and stay consistent',
+        sentimentAnalysis: jsonResponse['sentimentAnalysis'] != null
+            ? GeminiSentimentAnalysis.fromMap(
+                jsonResponse['sentimentAnalysis'] as Map<String, dynamic>)
+            : GeminiSentimentAnalysis(
+                overallSentiment: 'positive',
+                confidenceLevel: 0.7,
+                emotionalIndicators: ['determined'],
+                moodProgression: 'stable',
+              ),
+        contextualFactors:
+            List<String>.from(jsonResponse['contextualFactors'] as List? ?? []),
+        followUpQuestions:
+            List<String>.from(jsonResponse['followUpQuestions'] as List? ?? []),
         sourceId: 'golf_round_analysis',
         sourceType: 'golf_round',
         timestamp: DateTime.now(),
@@ -119,14 +134,15 @@ class GeminiAIClient {
     Map<String, dynamic>? performancePatterns,
   }) async {
     final startTime = DateTime.now();
-    
+
     try {
       // Create model for coaching
       final model = FirebaseAI.googleAI().generativeModel(
         model: GeminiConfig.coachingModel,
         generationConfig: GeminiConfig.coachingGenerationConfig,
         safetySettings: GeminiConfig.defaultSafetySettings,
-        systemInstruction: Content.text(GeminiConfig.mentalCoachingSystemPrompt),
+        systemInstruction:
+            Content.text(GeminiConfig.mentalCoachingSystemPrompt),
       );
 
       // Prepare the prompt
@@ -149,26 +165,45 @@ class GeminiAIClient {
 
       // Parse JSON response directly
       final jsonResponse = json.decode(responseText);
-      
-      // Create coaching response manually
+
+      // Create coaching response manually with null safety
       final coachingResponse = GeminiCoachingResponse(
-        recommendationType: jsonResponse['recommendationType'] as String,
-        primaryFocus: jsonResponse['primaryFocus'] as String,
-        userTier: jsonResponse['userTier'] as String,
-        varkAdaptation: GeminiVarkAdaptation.fromMap(
-          jsonResponse['varkAdaptation'] as Map<String, dynamic>
-        ),
-        recommendations: (jsonResponse['recommendations'] as List)
-            .map((r) => GeminiModuleRecommendation.fromMap(r as Map<String, dynamic>))
-            .toList(),
-        weeklyPlan: GeminiWeeklyPlan.fromMap(
-          jsonResponse['weeklyPlan'] as Map<String, dynamic>
-        ),
-        motivationalMessage: jsonResponse['motivationalMessage'] as String,
-        contextualInsights: List<String>.from(jsonResponse['contextualInsights'] as List),
-        adaptiveStrategies: (jsonResponse['adaptiveStrategies'] as List)
-            .map((s) => GeminiAdaptiveStrategy.fromMap(s as Map<String, dynamic>))
-            .toList(),
+        recommendationType: jsonResponse['recommendationType'] as String? ??
+            'coaching_recommendations',
+        primaryFocus: jsonResponse['primaryFocus'] as String? ??
+            'Mental Game Development',
+        userTier: jsonResponse['userTier'] as String? ?? 'FREE',
+        varkAdaptation: jsonResponse['varkAdaptation'] != null
+            ? GeminiVarkAdaptation.fromMap(
+                jsonResponse['varkAdaptation'] as Map<String, dynamic>)
+            : GeminiVarkAdaptation(
+                primaryStyle: 'visual',
+                adaptationStrategies: ['Focus', 'Practice', 'Improve'],
+              ),
+        recommendations: (jsonResponse['recommendations'] as List?)
+                ?.map((r) => GeminiModuleRecommendation.fromMap(
+                    r as Map<String, dynamic>))
+                .toList() ??
+            [],
+        weeklyPlan: jsonResponse['weeklyPlan'] != null
+            ? GeminiWeeklyPlan.fromMap(
+                jsonResponse['weeklyPlan'] as Map<String, dynamic>)
+            : GeminiWeeklyPlan(
+                sessionsPerWeek: 3,
+                totalDuration: 45,
+                focusAreas: ['Focus', 'Confidence', 'Control'],
+                progressMilestones: ['Complete first session'],
+              ),
+        motivationalMessage: jsonResponse['motivationalMessage'] as String? ??
+            'Let\'s strengthen your mental game!',
+        contextualInsights: List<String>.from(
+            jsonResponse['contextualInsights'] as List? ??
+                ['Build consistency in your mental training']),
+        adaptiveStrategies: (jsonResponse['adaptiveStrategies'] as List?)
+                ?.map((s) =>
+                    GeminiAdaptiveStrategy.fromMap(s as Map<String, dynamic>))
+                .toList() ??
+            [],
         timestamp: DateTime.now(),
         model: GeminiConfig.coachingModel,
         userId: userId,
@@ -209,14 +244,15 @@ class GeminiAIClient {
     List<String>? learningObjectives,
   }) async {
     final startTime = DateTime.now();
-    
+
     try {
       // Create model for content generation
       final model = FirebaseAI.googleAI().generativeModel(
         model: GeminiConfig.contentModel,
         generationConfig: GeminiConfig.contentGenerationConfig,
         safetySettings: GeminiConfig.defaultSafetySettings,
-        systemInstruction: Content.text(GeminiConfig.personalizedContentSystemPrompt),
+        systemInstruction:
+            Content.text(GeminiConfig.personalizedContentSystemPrompt),
       );
 
       // Prepare the prompt
@@ -240,18 +276,22 @@ class GeminiAIClient {
 
       // Parse JSON response directly
       final jsonResponse = json.decode(responseText);
-      
-      // Create content response manually
+
+      // Create content response manually with null safety
       final contentResponse = GeminiContentResponse(
-        contentType: jsonResponse['contentType'] as String,
-        title: jsonResponse['title'] as String,
-        adaptedFor: List<String>.from(jsonResponse['adaptedFor'] as List),
-        duration: jsonResponse['duration'] as int,
-        difficulty: jsonResponse['difficulty'] as String,
-        sections: (jsonResponse['sections'] as List)
-            .map((s) => GeminiContentSection.fromMap(s as Map<String, dynamic>))
-            .toList(),
-        takeaways: List<String>.from(jsonResponse['takeaways'] as List),
+        contentType: jsonResponse['contentType'] as String? ?? 'module',
+        title: jsonResponse['title'] as String? ?? 'Generated Content',
+        adaptedFor: List<String>.from(
+            jsonResponse['adaptedFor'] as List? ?? ['visual']),
+        duration: jsonResponse['duration'] as int? ?? 15,
+        difficulty: jsonResponse['difficulty'] as String? ?? 'intermediate',
+        sections: (jsonResponse['sections'] as List?)
+                ?.map((s) =>
+                    GeminiContentSection.fromMap(s as Map<String, dynamic>))
+                .toList() ??
+            [],
+        takeaways: List<String>.from(
+            jsonResponse['takeaways'] as List? ?? ['Generated takeaway']),
         timestamp: DateTime.now(),
         model: GeminiConfig.contentModel,
         userId: userId,
@@ -290,14 +330,15 @@ class GeminiAIClient {
     List<String>? previousFeedback,
   }) async {
     final startTime = DateTime.now();
-    
+
     try {
       // Create model for feedback
       final model = FirebaseAI.googleAI().generativeModel(
         model: GeminiConfig.feedbackModel,
         generationConfig: GeminiConfig.feedbackGenerationConfig,
         safetySettings: GeminiConfig.defaultSafetySettings,
-        systemInstruction: Content.text(GeminiConfig.sessionFeedbackSystemPrompt),
+        systemInstruction:
+            Content.text(GeminiConfig.sessionFeedbackSystemPrompt),
       );
 
       // Prepare the prompt
@@ -319,14 +360,19 @@ class GeminiAIClient {
 
       // Parse JSON response directly
       final jsonResponse = json.decode(responseText);
-      
-      // Create feedback response manually
+
+      // Create feedback response manually with null safety
       final feedbackResponse = GeminiSessionFeedbackResponse(
-        feedbackType: jsonResponse['feedbackType'] as String,
-        overallAssessment: jsonResponse['overallAssessment'] as String,
-        strengths: List<String>.from(jsonResponse['strengths'] as List),
-        improvements: List<String>.from(jsonResponse['improvements'] as List),
-        motivationalMessage: jsonResponse['motivationalMessage'] as String,
+        feedbackType:
+            jsonResponse['feedbackType'] as String? ?? 'session_feedback',
+        overallAssessment: jsonResponse['overallAssessment'] as String? ??
+            'Good progress in your mental training',
+        strengths: List<String>.from(
+            jsonResponse['strengths'] as List? ?? ['Consistent effort']),
+        improvements: List<String>.from(
+            jsonResponse['improvements'] as List? ?? ['Continue practicing']),
+        motivationalMessage: jsonResponse['motivationalMessage'] as String? ??
+            'Keep up the great work!',
         timestamp: DateTime.now(),
         model: GeminiConfig.feedbackModel,
         userId: userId,
@@ -365,7 +411,7 @@ class GeminiAIClient {
     Map<String, dynamic>? userProfile,
   }) async {
     final startTime = DateTime.now();
-    
+
     try {
       // Create model for conversation
       final model = FirebaseAI.googleAI().generativeModel(
@@ -446,18 +492,19 @@ class GeminiAIClient {
     Map<String, dynamic>? contextualFactors,
   }) {
     final buffer = StringBuffer();
-    
-    buffer.writeln('Analyze this golf round data and provide mental performance insights:');
+
+    buffer.writeln(
+        'Analyze this golf round data and provide mental performance insights:');
     buffer.writeln();
     buffer.writeln('Round Data:');
     buffer.writeln(json.encode(roundData));
-    
+
     if (userNotes != null && userNotes.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('User Notes:');
       buffer.writeln(userNotes);
     }
-    
+
     if (previousInsights != null && previousInsights.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('Previous Insights:');
@@ -465,17 +512,19 @@ class GeminiAIClient {
         buffer.writeln('- $insight');
       }
     }
-    
+
     if (contextualFactors != null && contextualFactors.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('Contextual Factors:');
       buffer.writeln(json.encode(contextualFactors));
     }
-    
+
     buffer.writeln();
-    buffer.writeln('Please provide a structured JSON response following the insight schema.');
-    buffer.writeln('Include sentiment analysis of any text inputs and personalized recommendations.');
-    
+    buffer.writeln(
+        'Please provide a structured JSON response following the insight schema.');
+    buffer.writeln(
+        'Include sentiment analysis of any text inputs and personalized recommendations.');
+
     return buffer.toString();
   }
 
@@ -489,7 +538,7 @@ class GeminiAIClient {
     Map<String, dynamic>? performancePatterns,
   }) {
     final buffer = StringBuffer();
-    
+
     buffer.writeln('Generate personalized mental coaching recommendations:');
     buffer.writeln();
     buffer.writeln('User Profile:');
@@ -499,13 +548,13 @@ class GeminiAIClient {
     buffer.writeln();
     buffer.writeln('VARK Preferences:');
     buffer.writeln(json.encode(varkPreferences));
-    
+
     if (recentRounds != null && recentRounds.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('Recent Rounds:');
       buffer.writeln(json.encode(recentRounds));
     }
-    
+
     if (completedModules != null && completedModules.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('Completed Modules:');
@@ -513,17 +562,19 @@ class GeminiAIClient {
         buffer.writeln('- $module');
       }
     }
-    
+
     if (performancePatterns != null && performancePatterns.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('Performance Patterns:');
       buffer.writeln(json.encode(performancePatterns));
     }
-    
+
     buffer.writeln();
-    buffer.writeln('Please provide a structured JSON response with coaching recommendations.');
-    buffer.writeln('Adapt all recommendations to the user\'s VARK preferences and subscription tier.');
-    
+    buffer.writeln(
+        'Please provide a structured JSON response with coaching recommendations.');
+    buffer.writeln(
+        'Adapt all recommendations to the user\'s VARK preferences and subscription tier.');
+
     return buffer.toString();
   }
 
@@ -538,7 +589,7 @@ class GeminiAIClient {
     List<String>? learningObjectives,
   }) {
     final buffer = StringBuffer();
-    
+
     buffer.writeln('Generate personalized learning content:');
     buffer.writeln();
     buffer.writeln('Content Type: $contentType');
@@ -546,20 +597,20 @@ class GeminiAIClient {
     buffer.writeln();
     buffer.writeln('VARK Preferences:');
     buffer.writeln(json.encode(varkPreferences));
-    
+
     if (specificTopic != null) {
       buffer.writeln();
       buffer.writeln('Specific Topic: $specificTopic');
     }
-    
+
     if (difficultyLevel != null) {
       buffer.writeln('Difficulty Level: $difficultyLevel');
     }
-    
+
     if (targetDuration != null) {
       buffer.writeln('Target Duration: $targetDuration minutes');
     }
-    
+
     if (learningObjectives != null && learningObjectives.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('Learning Objectives:');
@@ -567,11 +618,13 @@ class GeminiAIClient {
         buffer.writeln('- $objective');
       }
     }
-    
+
     buffer.writeln();
-    buffer.writeln('Please provide a structured JSON response with personalized content.');
-    buffer.writeln('Include specific VARK adaptations and interactive elements.');
-    
+    buffer.writeln(
+        'Please provide a structured JSON response with personalized content.');
+    buffer
+        .writeln('Include specific VARK adaptations and interactive elements.');
+
     return buffer.toString();
   }
 
@@ -584,26 +637,26 @@ class GeminiAIClient {
     List<String>? previousFeedback,
   }) {
     final buffer = StringBuffer();
-    
+
     buffer.writeln('Provide feedback on this mental coaching session:');
     buffer.writeln();
     buffer.writeln('Session Type: $sessionType');
     buffer.writeln();
     buffer.writeln('Session Data:');
     buffer.writeln(json.encode(sessionData));
-    
+
     if (userProgress != null) {
       buffer.writeln();
       buffer.writeln('User Progress:');
       buffer.writeln(json.encode(userProgress));
     }
-    
+
     if (userInput != null && userInput.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('User Input:');
       buffer.writeln(userInput);
     }
-    
+
     if (previousFeedback != null && previousFeedback.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('Previous Feedback:');
@@ -611,11 +664,12 @@ class GeminiAIClient {
         buffer.writeln('- $feedback');
       }
     }
-    
+
     buffer.writeln();
-    buffer.writeln('Please provide a structured JSON response with comprehensive feedback.');
+    buffer.writeln(
+        'Please provide a structured JSON response with comprehensive feedback.');
     buffer.writeln('Include sentiment analysis and specific next steps.');
-    
+
     return buffer.toString();
   }
 
@@ -627,33 +681,34 @@ class GeminiAIClient {
     Map<String, dynamic>? userProfile,
   }) {
     final contentList = <Content>[];
-    
+
     // Add context if provided
     if (context != null && context.isNotEmpty) {
       contentList.add(Content.text('Context: $context'));
     }
-    
+
     // Add user profile if provided
     if (userProfile != null) {
-      contentList.add(Content.text('User Profile: ${json.encode(userProfile)}'));
+      contentList
+          .add(Content.text('User Profile: ${json.encode(userProfile)}'));
     }
-    
+
     // Add conversation history
     for (final message in conversationHistory) {
       final role = message['role'] as String? ?? 'user';
       final content = message['content'] as String? ?? '';
-      
+
       if (role == 'user') {
         contentList.add(Content.text('User: $content'));
       } else {
         contentList.add(Content.text('Assistant: $content'));
       }
     }
-    
+
     // Add current user message
     contentList.add(Content.text('User: $userMessage'));
     contentList.add(Content.text('Assistant:'));
-    
+
     return contentList;
   }
 
@@ -671,7 +726,7 @@ class GeminiAIClient {
         inputTokens: inputTokens,
         outputTokens: outputTokens,
       );
-      
+
       await _costTracker.trackInsightGeneration(
         userId: userId,
         tokensUsed: totalTokens,
@@ -699,7 +754,7 @@ class GeminiAIClient {
         inputTokens: inputTokens,
         outputTokens: outputTokens,
       );
-      
+
       await _costTracker.trackRecommendationGeneration(
         userId: userId,
         tokensUsed: totalTokens,
@@ -727,7 +782,7 @@ class GeminiAIClient {
         inputTokens: inputTokens,
         outputTokens: outputTokens,
       );
-      
+
       await _costTracker.trackContentGeneration(
         userId: userId,
         tokensUsed: totalTokens,
@@ -755,7 +810,7 @@ class GeminiAIClient {
         inputTokens: inputTokens,
         outputTokens: outputTokens,
       );
-      
+
       await _costTracker.trackConversationUsage(
         userId: userId,
         tokensUsed: totalTokens,
@@ -794,5 +849,6 @@ class GeminiException implements Exception {
   });
 
   @override
-  String toString() => 'GeminiException: $message (Status: $statusCode, Type: $errorType)';
-} 
+  String toString() =>
+      'GeminiException: $message (Status: $statusCode, Type: $errorType)';
+}

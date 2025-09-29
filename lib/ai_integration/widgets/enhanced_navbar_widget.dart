@@ -473,7 +473,7 @@ class FloatingVoiceButton extends StatefulWidget {
   const FloatingVoiceButton({
     Key? key,
     this.onPressed,
-    this.bottom = 120.0,
+    this.bottom = 80.0,
     this.right = 20.0,
   }) : super(key: key);
 

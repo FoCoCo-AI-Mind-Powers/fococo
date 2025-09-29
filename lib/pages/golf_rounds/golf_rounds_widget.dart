@@ -87,10 +87,25 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget>
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
 
+    // Safety check for user authentication
+    if (currentUserUid.isEmpty) {
+      return _buildAuthErrorScaffold(theme);
+    }
+
     return StreamBuilder<UserRecord>(
       stream: UserRecord.getDocument(
-          FirebaseFirestore.instance.collection('users').doc(currentUserUid)),
+          FirebaseFirestore.instance.doc('user/$currentUserUid')),
       builder: (context, userSnapshot) {
+        // Handle loading state
+        if (userSnapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingScaffold(theme, null);
+        }
+
+        // Handle error state
+        if (userSnapshot.hasError) {
+          return _buildErrorScaffold(theme, null, 'Error loading user data');
+        }
+
         final user = userSnapshot.data;
 
         return StreamBuilder<List<GolfRoundsRecord>>(
@@ -100,229 +115,381 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget>
                 .orderBy('date', descending: true),
           ),
           builder: (context, roundsSnapshot) {
+            // Handle loading state for rounds
+            if (roundsSnapshot.connectionState == ConnectionState.waiting) {
+              return _buildLoadingScaffold(theme, user);
+            }
+
+            // Handle error state for rounds
+            if (roundsSnapshot.hasError) {
+              return _buildErrorScaffold(
+                  theme, user, 'Error loading golf rounds');
+            }
+
             final rounds = roundsSnapshot.data ?? [];
 
-            return Scaffold(
-              key: scaffoldKey,
-              backgroundColor: theme.primaryBackground,
-              body: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      theme.primaryBackground,
-                      theme.secondaryBackground.withValues(alpha: 0.8),
-                    ],
-                  ),
-                ),
-                child: SafeArea(
-                  child: SlideTransition(
-                    position: _slideAnimation,
-                    child: CustomScrollView(
-                      slivers: [
-                        // Enhanced Glass App Bar
-                        SliverAppBar(
-                          expandedHeight: 120,
-                          floating: false,
-                          pinned: true,
-                          backgroundColor: Colors.transparent,
-                          elevation: 0,
-                          automaticallyImplyLeading: false,
-                          flexibleSpace: FlexibleSpaceBar(
-                            background: ClipRRect(
-                              child: BackdropFilter(
-                                filter:
-                                    ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: theme.glassBackground
-                                        .withValues(alpha: 0.85),
-                                    border: Border(
-                                      bottom: BorderSide(
-                                        color: theme.glassBorder
-                                            .withValues(alpha: 0.15),
-                                        width: 0.5,
-                                      ),
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black
-                                            .withValues(alpha: 0.03),
-                                        blurRadius: 15,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: SafeArea(
-                                    child: Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                          24, 16, 24, 16),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.end,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              // Title section (expanded to take more space)
-                                              Expanded(
-                                                child: Column(
-                                                  key: _titleKey,
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      'Golf Rounds',
-                                                      style: theme.headlineLarge
-                                                          .copyWith(
-                                                        color:
-                                                            theme.primaryText,
-                                                        fontWeight:
-                                                            FontWeight.w800,
-                                                        fontFamily:
-                                                            'Montserrat',
-                                                        fontSize: 32,
-                                                        letterSpacing: -0.8,
-                                                        height: 1.1,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      '${rounds.length} rounds tracked',
-                                                      style: theme.bodyMedium
-                                                          .copyWith(
-                                                        color:
-                                                            theme.secondaryText,
-                                                        fontSize: 15,
-                                                        fontWeight:
-                                                            FontWeight.w500,
-                                                        letterSpacing: 0.1,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              // Glass Add button
-                                              GestureDetector(
-                                                key: _addButtonKey,
-                                                onTap: () => _showAddRoundModal(
-                                                    context, theme),
-                                                child: ClipRRect(
-                                                  borderRadius:
-                                                      BorderRadius.circular(20),
-                                                  child: BackdropFilter(
-                                                    filter: ImageFilter.blur(
-                                                        sigmaX: 15, sigmaY: 15),
-                                                    child: Container(
-                                                      padding:
-                                                          const EdgeInsets.all(
-                                                              16),
-                                                      decoration: BoxDecoration(
-                                                        color: theme.glassTint
-                                                            .withValues(
-                                                                alpha: 0.2),
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(20),
-                                                        border: Border.all(
-                                                          color: theme
-                                                              .glassBorder
-                                                              .withValues(
-                                                                  alpha: 0.3),
-                                                          width: 1.5,
-                                                        ),
-                                                        boxShadow: [
-                                                          BoxShadow(
-                                                            color: Colors.black
-                                                                .withValues(
-                                                                    alpha: 0.1),
-                                                            blurRadius: 20,
-                                                            offset:
-                                                                const Offset(
-                                                                    0, 8),
-                                                          ),
-                                                          BoxShadow(
-                                                            color: Colors.white
-                                                                .withValues(
-                                                                    alpha: 0.1),
-                                                            blurRadius: 10,
-                                                            offset:
-                                                                const Offset(
-                                                                    -2, -2),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                      child: Icon(
-                                                        Icons.add_rounded,
-                                                        color: theme.primary,
-                                                        size: 28,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // Rounds Content
-                        SliverPadding(
-                          padding: const EdgeInsets.all(20),
-                          sliver: SliverList(
-                            delegate: SliverChildListDelegate([
-                              // Quick Stats with tutorial key
-                              Container(
-                                key: _statsKey,
-                                child: _buildQuickStatsSection(theme, rounds),
-                              ),
-                              const SizedBox(height: 20),
-
-                              // Recent Rounds with tutorial key
-                              Container(
-                                key: _roundsListKey,
-                                child: _buildRecentRoundsSection(theme, rounds),
-                              ),
-                              const SizedBox(
-                                  height: 100), // Bottom padding for navbar
-                            ]),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              bottomNavigationBar: EnhancedFoCoCoNavBar(
-                currentRoute: 'golf_rounds',
-                currentUser: user,
-                onTap: (route) {
-                  if (route == 'dashboard') {
-                    context.go('/dashboard');
-                  } else if (route == 'golf_rounds') {
-                    // Already on this page
-                  } else if (route == 'coaching_modules') {
-                    context.go('/coaching_modules');
-                  } else if (route == 'profile') {
-                    context.go('/profile');
-                  }
-                },
-                showLabels: true,
-                enableVoiceButton: true,
-                useGlassEffect: true,
-              ),
-            );
+            return _buildMainScaffold(theme, user, rounds);
           },
         );
       },
     );
+  }
+
+  Widget _buildLoadingScaffold(FlutterFlowTheme theme, UserRecord? user) {
+    return Scaffold(
+      backgroundColor: theme.primaryBackground,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.primaryBackground,
+              theme.secondaryBackground.withValues(alpha: 0.8),
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(theme.primary),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Loading your golf rounds...',
+                style: theme.bodyLarge.copyWith(
+                  color: theme.primaryText,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: EnhancedFoCoCoNavBar(
+        currentRoute: 'golf_rounds',
+        currentUser: user,
+        onTap: (route) => _handleNavigation(route),
+        showLabels: true,
+        enableVoiceButton: true,
+        useGlassEffect: true,
+      ),
+    );
+  }
+
+  Widget _buildErrorScaffold(
+      FlutterFlowTheme theme, UserRecord? user, String errorMessage) {
+    return Scaffold(
+      backgroundColor: theme.primaryBackground,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.primaryBackground,
+              theme.secondaryBackground.withValues(alpha: 0.8),
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                color: theme.error,
+                size: 48,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                errorMessage,
+                style: theme.titleMedium.copyWith(color: theme.error),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Please check your connection and try again',
+                style: theme.bodyMedium.copyWith(color: theme.secondaryText),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              GlassDesignSystem.glassButton(
+                text: 'Retry',
+                onPressed: () {
+                  setState(() {
+                    // Trigger rebuild
+                  });
+                },
+                theme: theme,
+              ),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: EnhancedFoCoCoNavBar(
+        currentRoute: 'golf_rounds',
+        currentUser: user,
+        onTap: (route) => _handleNavigation(route),
+        showLabels: true,
+        enableVoiceButton: true,
+        useGlassEffect: true,
+      ),
+    );
+  }
+
+  Widget _buildMainScaffold(
+      FlutterFlowTheme theme, UserRecord? user, List<GolfRoundsRecord> rounds) {
+    return Scaffold(
+      key: scaffoldKey,
+      backgroundColor: theme.primaryBackground,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.primaryBackground,
+              theme.secondaryBackground.withValues(alpha: 0.8),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: CustomScrollView(
+              slivers: [
+                // Enhanced Glass App Bar
+                SliverAppBar(
+                  expandedHeight: 120,
+                  floating: false,
+                  pinned: true,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  automaticallyImplyLeading: false,
+                  flexibleSpace: FlexibleSpaceBar(
+                    background: ClipRRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color:
+                                theme.glassBackground.withValues(alpha: 0.85),
+                            border: Border(
+                              bottom: BorderSide(
+                                color:
+                                    theme.glassBorder.withValues(alpha: 0.15),
+                                width: 0.5,
+                              ),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 15,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: SafeArea(
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Row(
+                                    children: [
+                                      // Title section (expanded to take more space)
+                                      Expanded(
+                                        child: Column(
+                                          key: _titleKey,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Golf Rounds',
+                                              style:
+                                                  theme.headlineLarge.copyWith(
+                                                color: theme.primaryText,
+                                                fontWeight: FontWeight.w800,
+                                                fontFamily: 'Montserrat',
+                                                fontSize: 32,
+                                                letterSpacing: -0.8,
+                                                height: 1.1,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '${rounds.length} rounds tracked',
+                                              style: theme.bodyMedium.copyWith(
+                                                color: theme.secondaryText,
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w500,
+                                                letterSpacing: 0.1,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      // Glass Add button
+                                      GestureDetector(
+                                        key: _addButtonKey,
+                                        onTap: () =>
+                                            _showAddRoundModal(context, theme),
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                          child: BackdropFilter(
+                                            filter: ImageFilter.blur(
+                                                sigmaX: 15, sigmaY: 15),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(16),
+                                              decoration: BoxDecoration(
+                                                color: theme.glassTint
+                                                    .withValues(alpha: 0.2),
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                                border: Border.all(
+                                                  color: theme.glassBorder
+                                                      .withValues(alpha: 0.3),
+                                                  width: 1.5,
+                                                ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black
+                                                        .withValues(alpha: 0.1),
+                                                    blurRadius: 20,
+                                                    offset: const Offset(0, 8),
+                                                  ),
+                                                  BoxShadow(
+                                                    color: Colors.white
+                                                        .withValues(alpha: 0.1),
+                                                    blurRadius: 10,
+                                                    offset:
+                                                        const Offset(-2, -2),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Icon(
+                                                Icons.add_rounded,
+                                                color: theme.primary,
+                                                size: 28,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Rounds Content
+                SliverPadding(
+                  padding: const EdgeInsets.all(20),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      // Quick Stats with tutorial key
+                      _buildQuickStatsSection(theme, rounds),
+                      const SizedBox(height: 20),
+
+                      // Recent Rounds with tutorial key
+                      _buildRecentRoundsSection(theme, rounds),
+                      const SizedBox(height: 100), // Bottom padding for navbar
+                    ]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: EnhancedFoCoCoNavBar(
+        currentRoute: 'golf_rounds',
+        currentUser: user,
+        onTap: (route) => _handleNavigation(route),
+        showLabels: true,
+        enableVoiceButton: true,
+        useGlassEffect: true,
+      ),
+    );
+  }
+
+  Widget _buildAuthErrorScaffold(FlutterFlowTheme theme) {
+    return Scaffold(
+      backgroundColor: theme.primaryBackground,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.primaryBackground,
+              theme.secondaryBackground.withValues(alpha: 0.8),
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.person_off_outlined,
+                color: theme.error,
+                size: 48,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Authentication Required',
+                style: theme.titleMedium.copyWith(color: theme.error),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Please log in to view your golf rounds',
+                style: theme.bodyMedium.copyWith(color: theme.secondaryText),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              GlassDesignSystem.glassButton(
+                text: 'Go to Login',
+                onPressed: () {
+                  context.go('/auth');
+                },
+                theme: theme,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _handleNavigation(String route) {
+    if (!mounted) return;
+
+    switch (route) {
+      case 'dashboard':
+        context.go('/dashboard');
+        break;
+      case 'golf_rounds':
+        // Already on this page
+        break;
+      case 'coaching_modules':
+        context.go('/coaching_modules');
+        break;
+      case 'profile':
+        context.go('/profile');
+        break;
+      default:
+        break;
+    }
   }
 
   /// Quick Stats Section with AI Popup

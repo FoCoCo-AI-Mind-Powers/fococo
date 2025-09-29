@@ -3,8 +3,9 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/flutter_flow/glass_components.dart';
 import '/services/biometric_auth_service.dart';
-import '/ai_integration/widgets/navbar_widget.dart';
+import 'dart:ui';
 import 'face_id_settings_model.dart';
 export 'face_id_settings_model.dart';
 
@@ -21,11 +22,15 @@ class FaceIdSettingsWidget extends StatefulWidget {
 class _FaceIdSettingsWidgetState extends State<FaceIdSettingsWidget>
     with TickerProviderStateMixin {
   late FaceIdSettingsModel _model;
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final BiometricAuthService _biometricService = BiometricAuthService();
+
+  // Animation controllers - matching settings pattern
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   bool _isBiometricAvailable = false;
   String _biometricName = 'Biometric Authentication';
@@ -40,27 +45,34 @@ class _FaceIdSettingsWidgetState extends State<FaceIdSettingsWidget>
     super.initState();
     _model = createModel(context, () => FaceIdSettingsModel());
 
-    // Initialize animations
+    // Initialize animations - matching settings pattern
     _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+    _slideController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
 
+    // Start animations
     _fadeController.forward();
+    _slideController.forward();
     _loadBiometricSettings();
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
+    _slideController.dispose();
     _model.dispose();
     super.dispose();
   }
@@ -103,37 +115,129 @@ class _FaceIdSettingsWidgetState extends State<FaceIdSettingsWidget>
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: theme.primaryBackground,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(
-              Icons.arrow_back_ios,
-              color: theme.primaryText,
+        body: Stack(
+          children: [
+            // Main content
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    theme.primaryBackground,
+                    theme.secondaryBackground.withValues(alpha: 0.8),
+                  ],
+                ),
+              ),
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: SafeArea(
+                    child: Column(
+                      children: [
+                        // Custom App Bar
+                        _buildCustomAppBar(theme),
+
+                        // Main Content
+                        Expanded(
+                          child: _isLoading
+                              ? const Center(child: CircularProgressIndicator())
+                              : _isBiometricAvailable
+                                  ? _buildBiometricSettings(theme)
+                                  : _buildNotAvailableView(theme),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
-            onPressed: () => context.pop(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomAppBar(FlutterFlowTheme theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          // Back button
+          _buildGlassButton(
+            theme: theme,
+            icon: Icons.arrow_back_ios,
+            onTap: () => context.pop(),
           ),
-          title: Text(
-            '$_biometricName & Security',
-            style: theme.headlineSmall.copyWith(
-              fontWeight: FontWeight.w700,
-              color: theme.primaryText,
+
+          const SizedBox(width: 16),
+
+          // Title
+          Expanded(
+            child: Text(
+              '$_biometricName & Security',
+              style: theme.headlineSmall.copyWith(
+                color: theme.primaryText,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-          centerTitle: true,
-        ),
-        body: FadeTransition(
-          opacity: _fadeAnimation,
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _isBiometricAvailable
-                  ? _buildBiometricSettings(theme)
-                  : _buildNotAvailableView(theme),
-        ),
-        bottomNavigationBar: FoCoCoNavBar(
-          currentRoute: 'face_id_settings',
-          enableVoiceButton: false,
-          onTap: (route) => context.goNamed(route),
+
+          // Settings button
+          _buildGlassButton(
+            theme: theme,
+            icon: Icons.settings_outlined,
+            onTap: () => context.goNamed('settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build glass design button
+  Widget _buildGlassButton({
+    required FlutterFlowTheme theme,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.glassBackground.withValues(alpha: 0.3),
+                  theme.glassTint.withValues(alpha: 0.2),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.glassBorder.withValues(alpha: 0.4),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.glassShadow.withValues(alpha: 0.1),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Icon(
+              icon,
+              color: theme.primaryText,
+              size: icon == Icons.arrow_back_ios ? 20 : 24,
+            ),
+          ),
         ),
       ),
     );
@@ -142,322 +246,226 @@ class _FaceIdSettingsWidgetState extends State<FaceIdSettingsWidget>
   /// Biometric settings view
   Widget _buildBiometricSettings(FlutterFlowTheme theme) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header card
-          _buildHeaderCard(theme),
+          // Header section with biometric info
+          _buildBiometricHeaderSection(theme),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
 
-          // Main biometric toggle
-          _buildMainBiometricToggle(theme),
+          // Main biometric control
+          _buildBiometricControlSection(theme),
 
           const SizedBox(height: 24),
 
           // Security features
-          if (_isBiometricEnabled) _buildSecurityFeatures(theme),
+          if (_isBiometricEnabled) _buildSecurityFeaturesSection(theme),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
 
           // Security tips
-          _buildSecurityTips(theme),
+          _buildSecurityTipsSection(theme),
 
-          const SizedBox(height: 100),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  /// Header card with biometric icon
-  Widget _buildHeaderCard(FlutterFlowTheme theme) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.primary.withValues(alpha: 0.1),
-            theme.secondary.withValues(alpha: 0.1),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: theme.primary.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [theme.primary, theme.secondary],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              _getBiometricIcon(),
-              color: Colors.white,
-              size: 40,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _biometricName,
-            style: theme.titleLarge.copyWith(
-              fontWeight: FontWeight.w700,
-              color: theme.primaryText,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Secure your FoCoCo experience with biometric authentication',
-            textAlign: TextAlign.center,
-            style: theme.bodyMedium.copyWith(
-              color: theme.secondaryText,
-              height: 1.4,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Main biometric toggle
-  Widget _buildMainBiometricToggle(FlutterFlowTheme theme) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.secondaryBackground,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: theme.secondaryText.withValues(alpha: 0.1),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: _isBiometricEnabled
-                  ? theme.performanceExcellent.withValues(alpha: 0.1)
-                  : theme.secondaryText.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              _getBiometricIcon(),
-              color: _isBiometricEnabled
-                  ? theme.performanceExcellent
-                  : theme.secondaryText,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Enable $_biometricName',
-                  style: theme.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.primaryText,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Use $_biometricName for secure authentication',
-                  style: theme.bodySmall.copyWith(
-                    color: theme.secondaryText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: _isBiometricEnabled,
-            onChanged: _toggleBiometric,
-            activeColor: theme.performanceExcellent,
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Security features section
-  Widget _buildSecurityFeatures(FlutterFlowTheme theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildBiometricHeaderSection(FlutterFlowTheme theme) {
+    return GlassDashboardCard(
+      title: _biometricName,
+      subtitle: 'Secure your FoCoCo experience with biometric authentication',
       children: [
-        Text(
-          'Security Features',
-          style: theme.titleMedium.copyWith(
-            fontWeight: FontWeight.w700,
-            color: theme.primaryText,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // App lock
-        _buildSecurityToggle(
-          theme: theme,
-          title: 'App Lock',
-          subtitle: 'Require $_biometricName to open FoCoCo',
-          icon: Icons.lock,
-          value: _isAppLockEnabled,
-          onChanged: _toggleAppLock,
-        ),
-
-        const SizedBox(height: 12),
-
-        // Subscription protection
-        _buildSecurityToggle(
-          theme: theme,
-          title: 'Subscription Protection',
-          subtitle: 'Require $_biometricName to manage subscriptions',
-          icon: Icons.workspace_premium,
-          value: _isSubscriptionProtectionEnabled,
-          onChanged: _toggleSubscriptionProtection,
-        ),
-
-        const SizedBox(height: 12),
-
-        // Payment protection
-        _buildSecurityToggle(
-          theme: theme,
-          title: 'Payment Protection',
-          subtitle: 'Require $_biometricName for payments',
-          icon: Icons.payment,
-          value: _isPaymentProtectionEnabled,
-          onChanged: _togglePaymentProtection,
-        ),
+        Column(
+          children: [
+            const SizedBox(height: 16),
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [theme.primary, theme.secondary],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _getBiometricIcon(),
+                color: Colors.white,
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: _isBiometricEnabled
+                    ? theme.performanceExcellent.withValues(alpha: 0.1)
+                    : theme.secondaryText.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                _isBiometricEnabled ? 'Active' : 'Inactive',
+                style: theme.bodySmall.copyWith(
+                  color: _isBiometricEnabled
+                      ? theme.performanceExcellent
+                      : theme.secondaryText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        )
       ],
     );
   }
 
-  /// Security toggle widget
-  Widget _buildSecurityToggle({
-    required FlutterFlowTheme theme,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required bool value,
-    required Function(bool) onChanged,
-  }) {
+  Widget _buildBiometricControlSection(FlutterFlowTheme theme) {
+    return GlassDashboardCard(
+      title: 'Biometric Authentication',
+      subtitle: 'Control your biometric security settings',
+      children: [
+        Column(
+          children: [
+            const SizedBox(height: 16),
+            _buildSwitchItem(
+              theme,
+              _getBiometricIcon(),
+              'Enable $_biometricName',
+              'Use $_biometricName for secure authentication',
+              _isBiometricEnabled,
+              _toggleBiometric,
+            ),
+          ],
+        )
+      ],
+    );
+  }
+
+  Widget _buildSecurityFeaturesSection(FlutterFlowTheme theme) {
+    return GlassDashboardCard(
+      title: 'Security Features',
+      subtitle: 'Configure additional security protections',
+      children: [
+        Column(
+          children: [
+            const SizedBox(height: 16),
+
+            // App lock
+            _buildSwitchItem(
+              theme,
+              Icons.lock,
+              'App Lock',
+              'Require $_biometricName to open FoCoCo',
+              _isAppLockEnabled,
+              _toggleAppLock,
+            ),
+
+            // Subscription protection
+            _buildSwitchItem(
+              theme,
+              Icons.workspace_premium,
+              'Subscription Protection',
+              'Require $_biometricName to manage subscriptions',
+              _isSubscriptionProtectionEnabled,
+              _toggleSubscriptionProtection,
+            ),
+
+            // Payment protection
+            _buildSwitchItem(
+              theme,
+              Icons.payment,
+              'Payment Protection',
+              'Require $_biometricName for payments',
+              _isPaymentProtectionEnabled,
+              _togglePaymentProtection,
+            ),
+          ],
+        )
+      ],
+    );
+  }
+
+  Widget _buildSwitchItem(
+    FlutterFlowTheme theme,
+    IconData icon,
+    String title,
+    String subtitle,
+    bool value,
+    Function(bool) onChanged,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.secondaryBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.secondaryText.withValues(alpha: 0.1),
-          width: 1,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: theme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            color: theme.primary,
+            size: 22,
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: value
-                  ? theme.performanceExcellent.withValues(alpha: 0.1)
-                  : theme.secondaryText.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: value ? theme.performanceExcellent : theme.secondaryText,
-              size: 20,
-            ),
+        title: Text(
+          title,
+          style: theme.bodyMedium.copyWith(
+            color: theme.primaryText,
+            fontWeight: FontWeight.w500,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: theme.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.primaryText,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: theme.bodySmall.copyWith(
-                    color: theme.secondaryText,
-                  ),
-                ),
-              ],
-            ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: theme.labelSmall.copyWith(
+            color: theme.secondaryText,
           ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: theme.performanceExcellent,
-          ),
-        ],
+        ),
+        trailing: Switch(
+          value: value,
+          onChanged: onChanged,
+          activeColor: theme.primary,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
       ),
     );
   }
 
-  /// Security tips section
-  Widget _buildSecurityTips(FlutterFlowTheme theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSecurityTipsSection(FlutterFlowTheme theme) {
+    return GlassDashboardCard(
+      title: 'Security Tips',
+      subtitle: 'Important information about biometric security',
       children: [
-        Text(
-          'Security Tips',
-          style: theme.titleMedium.copyWith(
-            fontWeight: FontWeight.w700,
-            color: theme.primaryText,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: theme.aiPrimary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: theme.aiPrimary.withValues(alpha: 0.2),
-              width: 1,
+        Column(
+          children: [
+            const SizedBox(height: 16),
+            _buildTipItem(
+              theme: theme,
+              icon: Icons.security,
+              text:
+                  'Biometric data is stored securely on your device and never shared',
             ),
-          ),
-          child: Column(
-            children: [
-              _buildTipItem(
-                theme: theme,
-                icon: Icons.security,
-                text:
-                    'Biometric data is stored securely on your device and never shared',
-              ),
-              const SizedBox(height: 12),
-              _buildTipItem(
-                theme: theme,
-                icon: Icons.fingerprint,
-                text: 'You can always use your device passcode as a backup',
-              ),
-              const SizedBox(height: 12),
-              _buildTipItem(
-                theme: theme,
-                icon: Icons.settings,
-                text: 'Manage biometric settings in your device Settings app',
-              ),
-            ],
-          ),
-        ),
+            const SizedBox(height: 12),
+            _buildTipItem(
+              theme: theme,
+              icon: Icons.fingerprint,
+              text: 'You can always use your device passcode as a backup',
+            ),
+            const SizedBox(height: 12),
+            _buildTipItem(
+              theme: theme,
+              icon: Icons.settings,
+              text: 'Manage biometric settings in your device Settings app',
+            ),
+          ],
+        )
       ],
     );
   }
@@ -468,82 +476,105 @@ class _FaceIdSettingsWidgetState extends State<FaceIdSettingsWidget>
     required IconData icon,
     required String text,
   }) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          color: theme.aiPrimary,
-          size: 20,
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.primary.withValues(alpha: 0.1),
+          width: 1,
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: theme.bodySmall.copyWith(
-              color: theme.primaryText,
-              height: 1.4,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: theme.primary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: theme.primary,
+              size: 16,
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.bodySmall.copyWith(
+                color: theme.primaryText,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   /// Not available view
   Widget _buildNotAvailableView(FlutterFlowTheme theme) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: theme.secondaryText.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.security,
-              color: theme.secondaryText,
-              size: 60,
-            ),
-          ),
-          const SizedBox(height: 32),
-          Text(
-            'Biometric Authentication Unavailable',
-            textAlign: TextAlign.center,
-            style: theme.headlineMedium.copyWith(
-              fontWeight: FontWeight.w700,
-              color: theme.primaryText,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Your device doesn\'t support biometric authentication or it\'s not set up. Please set up Face ID, Touch ID, or fingerprint in your device settings.',
-            textAlign: TextAlign.center,
-            style: theme.bodyLarge.copyWith(
-              color: theme.secondaryText,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 32),
-          FFButtonWidget(
-            onPressed: () => context.pop(),
-            text: 'Go Back',
-            options: FFButtonOptions(
-              width: double.infinity,
-              height: 56,
-              padding: EdgeInsets.zero,
-              iconPadding: EdgeInsets.zero,
-              color: theme.primary,
-              textStyle: theme.titleMedium.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
+          GlassDashboardCard(
+            title: 'Biometric Authentication Unavailable',
+            subtitle:
+                'Your device doesn\'t support biometric authentication or it\'s not set up',
+            children: [
+              Column(
+                children: [
+                  const SizedBox(height: 24),
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: theme.secondaryText.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.security,
+                      color: theme.secondaryText,
+                      size: 60,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Please set up Face ID, Touch ID, or fingerprint in your device settings to enable biometric authentication in FoCoCo.',
+                    textAlign: TextAlign.center,
+                    style: theme.bodyLarge.copyWith(
+                      color: theme.secondaryText,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FFButtonWidget(
+                      onPressed: () => context.pop(),
+                      text: 'Go Back to Settings',
+                      options: FFButtonOptions(
+                        height: 56,
+                        padding: EdgeInsets.zero,
+                        iconPadding: EdgeInsets.zero,
+                        color: theme.primary,
+                        textStyle: theme.titleMedium.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        elevation: 0,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              elevation: 0,
-              borderRadius: BorderRadius.circular(16),
-            ),
+            ],
           ),
         ],
       ),

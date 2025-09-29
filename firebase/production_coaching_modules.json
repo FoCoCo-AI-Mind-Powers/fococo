@@ -1,0 +1,526 @@
+{
+  "modules": [
+    {
+      "moduleId": "focus_fundamentals",
+      "title": "Mental Focus Fundamentals",
+      "description": "Master the foundational principles of mental focus and concentration that elite golfers use to maintain peak performance under pressure.",
+      "category": "mental_training",
+      "pillar": "focus",
+      "difficulty": "beginner",
+      "duration": 12,
+      "varkTags": ["visual", "aural"],
+      "primaryVarkStyle": "visual",
+      "tierRequirement": "FREE",
+      "contentVersions": {
+        "visual": {
+          "contentUrl": "gs://fococo-content/modules/focus_fundamentals_visual.mp4",
+          "format": "video",
+          "duration": 12,
+          "transcript": "Learn the core principles of mental focus through visual demonstrations and on-course examples.",
+          "sections": ["introduction", "focus-basics", "practical-application"],
+          "thumbnailUrl": "gs://fococo-content/thumbnails/focus_fundamentals.jpg"
+        },
+        "aural": {
+          "contentUrl": "gs://fococo-content/modules/focus_fundamentals_audio.mp3",
+          "format": "audio",
+          "duration": 15,
+          "transcript": "Audio guide to understanding and developing mental focus for golf performance.",
+          "sections": ["introduction", "focus-principles", "listening-exercises"]
+        },
+        "readWrite": {
+          "contentUrl": "gs://fococo-content/modules/focus_fundamentals_article.html",
+          "format": "article",
+          "duration": 10,
+          "sections": ["overview", "key-concepts", "practice-exercises", "reflection"]
+        },
+        "kinesthetic": {
+          "contentUrl": "gs://fococo-content/modules/focus_fundamentals_interactive.json",
+          "format": "interactive",
+          "duration": 18,
+          "sections": ["warm-up", "focus-drills", "on-course-practice", "feedback"]
+        }
+      },
+      "prerequisites": [],
+      "learningObjectives": [
+        "Understand the neuroscience of attention and focus",
+        "Identify your personal focus triggers and distractors",
+        "Apply basic focus techniques during practice rounds"
+      ],
+      "tags": ["beginner", "fundamentals", "attention", "concentration"],
+      "thumbnailUrl": "gs://fococo-content/thumbnails/focus_fundamentals.jpg",
+      "isActive": true,
+      "order": 1,
+      "completionCount": 0,
+      "averageRating": 0.0
+    },
+    {
+      "moduleId": "pre_shot_routine_focus",
+      "title": "Pre-Shot Routine & Focus",
+      "description": "Develop a bulletproof pre-shot routine that consistently triggers your optimal focus state before every shot.",
+      "category": "mental_training",
+      "pillar": "focus",
+      "difficulty": "beginner",
+      "duration": 15,
+      "varkTags": ["kinesthetic", "visual"],
+      "primaryVarkStyle": "kinesthetic",
+      "tierRequirement": "FREE",
+      "contentVersions": {
+        "visual": {
+          "contentUrl": "gs://fococo-content/modules/pre_shot_routine_visual.mp4",
+          "format": "video",
+          "duration": 15,
+          "transcript": "Watch professional golfers demonstrate effective pre-shot routines and learn to build your own.",
+          "sections": ["routine-components", "timing", "mental-triggers", "practice-methods"]
+        },
+        "aural": {
+          "contentUrl": "gs://fococo-content/modules/pre_shot_routine_audio.mp3",
+          "format": "audio",
+          "duration": 18,
+          "transcript": "Audio instructions for developing and practicing your personal pre-shot routine.",
+          "sections": ["routine-structure", "verbal-cues", "breathing-patterns"]
+        },
+        "readWrite": {
+          "contentUrl": "gs://fococo-content/modules/pre_shot_routine_article.html",
+          "format": "article",
+          "duration": 12,
+          "sections": ["routine-checklist", "customization-guide", "practice-log"]
+        },
+        "kinesthetic": {
+          "contentUrl": "gs://fococo-content/modules/pre_shot_routine_interactive.json",
+          "format": "interactive",
+          "duration": 22,
+          "sections": ["physical-setup", "practice-session", "timing-drill", "course-application"]
+        }
+      },
+      "prerequisites": ["focus_fundamentals"],
+      "learningObjectives": [
+        "Design a personalized pre-shot routine",
+        "Execute consistent timing and physical movements",
+        "Integrate mental focus triggers into your routine"
+      ],
+      "tags": ["routine", "consistency", "preparation", "timing"],
+      "thumbnailUrl": "gs://fococo-content/thumbnails/pre_shot_routine.jpg",
+      "isActive": true,
+      "order": 2,
+      "completionCount": 0,
+      "averageRating": 0.0
+    },
+    {
+      "moduleId": "pressure_focus_advanced",
+      "title": "Focus Under Pressure",
+      "description": "Advanced techniques for maintaining laser-sharp focus during high-pressure situations, tournaments, and crucial shots.",
+      "category": "mental_training",
+      "pillar": "focus",
+      "difficulty": "advanced",
+      "duration": 25,
+      "varkTags": ["visual", "kinesthetic", "aural"],
+      "primaryVarkStyle": "kinesthetic",
+      "tierRequirement": "PREMIUM",
+      "contentVersions": {
+        "visual": {
+          "contentUrl": "gs://fococo-content/modules/pressure_focus_visual.mp4",
+          "format": "video",
+          "duration": 25,
+          "transcript": "Advanced visualization and focus techniques used by tour professionals in high-pressure situations.",
+          "sections": ["pressure-psychology", "advanced-visualization", "competition-focus", "recovery-techniques"]
+        },
+        "aural": {
+          "contentUrl": "gs://fococo-content/modules/pressure_focus_audio.mp3",
+          "format": "audio",
+          "duration": 30,
+          "transcript": "Advanced audio training for maintaining focus under extreme pressure.",
+          "sections": ["mental-rehearsal", "pressure-breathing", "self-talk-mastery"]
+        },
+        "readWrite": {
+          "contentUrl": "gs://fococo-content/modules/pressure_focus_article.html",
+          "format": "article",
+          "duration": 20,
+          "sections": ["pressure-analysis", "technique-breakdown", "tournament-preparation", "case-studies"]
+        },
+        "kinesthetic": {
+          "contentUrl": "gs://fococo-content/modules/pressure_focus_interactive.json",
+          "format": "interactive",
+          "duration": 35,
+          "sections": ["pressure-simulation", "advanced-drills", "competition-practice", "performance-review"]
+        }
+      },
+      "prerequisites": ["focus_fundamentals", "pre_shot_routine_focus"],
+      "learningObjectives": [
+        "Execute advanced pressure management techniques",
+        "Maintain focus clarity in tournament conditions",
+        "Develop mental resilience for crucial shots"
+      ],
+      "tags": ["advanced", "pressure", "competition", "tournament", "mental-toughness"],
+      "thumbnailUrl": "gs://fococo-content/thumbnails/pressure_focus.jpg",
+      "isActive": true,
+      "order": 3,
+      "completionCount": 0,
+      "averageRating": 0.0
+    },
+    {
+      "moduleId": "confidence_building_basics",
+      "title": "Building Unshakeable Confidence",
+      "description": "Develop rock-solid confidence in your golf abilities through proven psychological techniques and practical exercises.",
+      "category": "mental_training",
+      "pillar": "confidence",
+      "difficulty": "beginner",
+      "duration": 14,
+      "varkTags": ["visual", "readwrite"],
+      "primaryVarkStyle": "visual",
+      "tierRequirement": "FREE",
+      "contentVersions": {
+        "visual": {
+          "contentUrl": "gs://fococo-content/modules/confidence_building_visual.mp4",
+          "format": "video",
+          "duration": 14,
+          "transcript": "Visual guide to building and maintaining confidence through positive mental imagery and success visualization.",
+          "sections": ["confidence-psychology", "visualization-techniques", "success-imagery", "daily-practice"]
+        },
+        "aural": {
+          "contentUrl": "gs://fococo-content/modules/confidence_building_audio.mp3",
+          "format": "audio",
+          "duration": 16,
+          "transcript": "Audio coaching for developing internal confidence and positive self-talk patterns.",
+          "sections": ["confidence-affirmations", "internal-dialogue", "success-stories"]
+        },
+        "readWrite": {
+          "contentUrl": "gs://fococo-content/modules/confidence_building_article.html",
+          "format": "article",
+          "duration": 12,
+          "sections": ["confidence-foundation", "self-assessment", "daily-exercises", "progress-tracking"]
+        },
+        "kinesthetic": {
+          "contentUrl": "gs://fococo-content/modules/confidence_building_interactive.json",
+          "format": "interactive",
+          "duration": 20,
+          "sections": ["confidence-assessment", "power-poses", "success-rehearsal", "confidence-anchoring"]
+        }
+      },
+      "prerequisites": [],
+      "learningObjectives": [
+        "Understand the psychology of sporting confidence",
+        "Practice confidence-building visualization techniques",
+        "Develop positive self-talk patterns"
+      ],
+      "tags": ["confidence", "visualization", "self-talk", "psychology"],
+      "thumbnailUrl": "gs://fococo-content/thumbnails/confidence_building.jpg",
+      "isActive": true,
+      "order": 1,
+      "completionCount": 0,
+      "averageRating": 0.0
+    },
+    {
+      "moduleId": "shot_confidence_mastery",
+      "title": "Shot-Specific Confidence",
+      "description": "Build targeted confidence for different shot types, from drives to putts, using specialized mental training techniques.",
+      "category": "mental_training",
+      "pillar": "confidence",
+      "difficulty": "intermediate",
+      "duration": 18,
+      "varkTags": ["kinesthetic", "visual"],
+      "primaryVarkStyle": "kinesthetic",
+      "tierRequirement": "FREE",
+      "contentVersions": {
+        "visual": {
+          "contentUrl": "gs://fococo-content/modules/shot_confidence_visual.mp4",
+          "format": "video",
+          "duration": 18,
+          "transcript": "Visual demonstration of building confidence for specific shots through mental rehearsal and technique visualization.",
+          "sections": ["driving-confidence", "iron-play-confidence", "short-game-confidence", "putting-confidence"]
+        },
+        "aural": {
+          "contentUrl": "gs://fococo-content/modules/shot_confidence_audio.mp3",
+          "format": "audio",
+          "duration": 22,
+          "transcript": "Audio guide to developing shot-specific confidence through mental preparation and positive reinforcement.",
+          "sections": ["pre-shot-confidence", "execution-mindset", "post-shot-reinforcement"]
+        },
+        "readWrite": {
+          "contentUrl": "gs://fococo-content/modules/shot_confidence_article.html",
+          "format": "article",
+          "duration": 15,
+          "sections": ["shot-analysis", "confidence-strategies", "practice-protocols", "performance-tracking"]
+        },
+        "kinesthetic": {
+          "contentUrl": "gs://fococo-content/modules/shot_confidence_interactive.json",
+          "format": "interactive",
+          "duration": 25,
+          "sections": ["shot-rehearsal", "confidence-drills", "on-course-application", "feedback-integration"]
+        }
+      },
+      "prerequisites": ["confidence_building_basics"],
+      "learningObjectives": [
+        "Develop targeted confidence for each type of golf shot",
+        "Apply shot-specific mental preparation techniques",
+        "Build positive associations with challenging shots"
+      ],
+      "tags": ["shot-confidence", "technique", "mental-preparation", "performance"],
+      "thumbnailUrl": "gs://fococo-content/thumbnails/shot_confidence.jpg",
+      "isActive": true,
+      "order": 2,
+      "completionCount": 0,
+      "averageRating": 0.0
+    },
+    {
+      "moduleId": "comeback_confidence",
+      "title": "Confidence After Setbacks",
+      "description": "Master the art of bouncing back from bad shots and poor rounds with enhanced confidence and mental resilience.",
+      "category": "mental_training",
+      "pillar": "confidence",
+      "difficulty": "advanced",
+      "duration": 22,
+      "varkTags": ["aural", "readwrite"],
+      "primaryVarkStyle": "readwrite",
+      "tierRequirement": "PREMIUM",
+      "contentVersions": {
+        "visual": {
+          "contentUrl": "gs://fococo-content/modules/comeback_confidence_visual.mp4",
+          "format": "video",
+          "duration": 22,
+          "transcript": "Visual strategies for rebuilding confidence after mistakes and maintaining positive momentum.",
+          "sections": ["setback-psychology", "confidence-recovery", "momentum-building", "resilience-training"]
+        },
+        "aural": {
+          "contentUrl": "gs://fococo-content/modules/comeback_confidence_audio.mp3",
+          "format": "audio",
+          "duration": 25,
+          "transcript": "Audio coaching for developing mental resilience and confidence recovery strategies.",
+          "sections": ["internal-dialogue-reset", "confidence-affirmations", "resilience-building"]
+        },
+        "readWrite": {
+          "contentUrl": "gs://fococo-content/modules/comeback_confidence_article.html",
+          "format": "article",
+          "duration": 18,
+          "sections": ["resilience-psychology", "recovery-strategies", "confidence-rebuilding", "case-studies"]
+        },
+        "kinesthetic": {
+          "contentUrl": "gs://fococo-content/modules/comeback_confidence_interactive.json",
+          "format": "interactive",
+          "duration": 28,
+          "sections": ["setback-simulation", "recovery-drills", "resilience-practice", "confidence-rebuilding"]
+        }
+      },
+      "prerequisites": ["confidence_building_basics", "shot_confidence_mastery"],
+      "learningObjectives": [
+        "Develop rapid confidence recovery techniques",
+        "Build mental resilience against setbacks",
+        "Maintain positive momentum after mistakes"
+      ],
+      "tags": ["resilience", "recovery", "setbacks", "mental-toughness", "comeback"],
+      "thumbnailUrl": "gs://fococo-content/thumbnails/comeback_confidence.jpg",
+      "isActive": true,
+      "order": 3,
+      "completionCount": 0,
+      "averageRating": 0.0
+    },
+    {
+      "moduleId": "emotional_control_fundamentals",
+      "title": "Emotional Control Basics",
+      "description": "Learn to recognize, understand, and manage your emotions on the golf course for consistent performance.",
+      "category": "mental_training",
+      "pillar": "control",
+      "difficulty": "beginner",
+      "duration": 16,
+      "varkTags": ["aural", "readwrite"],
+      "primaryVarkStyle": "aural",
+      "tierRequirement": "FREE",
+      "contentVersions": {
+        "visual": {
+          "contentUrl": "gs://fococo-content/modules/emotional_control_visual.mp4",
+          "format": "video",
+          "duration": 16,
+          "transcript": "Visual guide to understanding emotions and their impact on golf performance.",
+          "sections": ["emotion-awareness", "physiological-responses", "control-techniques", "practice-methods"]
+        },
+        "aural": {
+          "contentUrl": "gs://fococo-content/modules/emotional_control_audio.mp3",
+          "format": "audio",
+          "duration": 20,
+          "transcript": "Audio training for developing emotional awareness and control strategies.",
+          "sections": ["emotional-intelligence", "breathing-techniques", "mental-centering"]
+        },
+        "readWrite": {
+          "contentUrl": "gs://fococo-content/modules/emotional_control_article.html",
+          "format": "article",
+          "duration": 14,
+          "sections": ["emotion-psychology", "control-strategies", "daily-practices", "progress-monitoring"]
+        },
+        "kinesthetic": {
+          "contentUrl": "gs://fococo-content/modules/emotional_control_interactive.json",
+          "format": "interactive",
+          "duration": 22,
+          "sections": ["emotion-identification", "control-exercises", "breathing-practice", "on-course-application"]
+        }
+      },
+      "prerequisites": [],
+      "learningObjectives": [
+        "Develop emotional awareness and recognition skills",
+        "Learn basic emotion regulation techniques",
+        "Apply emotional control strategies during play"
+      ],
+      "tags": ["emotional-control", "awareness", "regulation", "breathing"],
+      "thumbnailUrl": "gs://fococo-content/thumbnails/emotional_control.jpg",
+      "isActive": true,
+      "order": 1,
+      "completionCount": 0,
+      "averageRating": 0.0
+    },
+    {
+      "moduleId": "anger_management_golf",
+      "title": "Managing Anger & Frustration",
+      "description": "Specialized techniques for controlling anger and frustration that commonly arise during challenging golf rounds.",
+      "category": "mental_training",
+      "pillar": "control",
+      "difficulty": "intermediate",
+      "duration": 19,
+      "varkTags": ["kinesthetic", "aural"],
+      "primaryVarkStyle": "kinesthetic",
+      "tierRequirement": "FREE",
+      "contentVersions": {
+        "visual": {
+          "contentUrl": "gs://fococo-content/modules/anger_management_visual.mp4",
+          "format": "video",
+          "duration": 19,
+          "transcript": "Visual techniques for managing anger and frustration on the golf course.",
+          "sections": ["anger-triggers", "physiological-control", "quick-reset-techniques", "long-term-strategies"]
+        },
+        "aural": {
+          "contentUrl": "gs://fococo-content/modules/anger_management_audio.mp3",
+          "format": "audio",
+          "duration": 23,
+          "transcript": "Audio coaching for anger management and emotional reset techniques.",
+          "sections": ["anger-awareness", "cooling-techniques", "positive-self-talk"]
+        },
+        "readWrite": {
+          "contentUrl": "gs://fococo-content/modules/anger_management_article.html",
+          "format": "article",
+          "duration": 16,
+          "sections": ["anger-psychology", "trigger-identification", "management-strategies", "prevention-techniques"]
+        },
+        "kinesthetic": {
+          "contentUrl": "gs://fococo-content/modules/anger_management_interactive.json",
+          "format": "interactive",
+          "duration": 26,
+          "sections": ["trigger-simulation", "physical-release", "reset-drills", "course-management"]
+        }
+      },
+      "prerequisites": ["emotional_control_fundamentals"],
+      "learningObjectives": [
+        "Identify personal anger and frustration triggers",
+        "Apply immediate anger management techniques",
+        "Develop long-term emotional regulation strategies"
+      ],
+      "tags": ["anger-management", "frustration", "emotional-regulation", "quick-reset"],
+      "thumbnailUrl": "gs://fococo-content/thumbnails/anger_management.jpg",
+      "isActive": true,
+      "order": 2,
+      "completionCount": 0,
+      "averageRating": 0.0
+    },
+    {
+      "moduleId": "elite_emotional_mastery",
+      "title": "Elite Emotional Mastery",
+      "description": "Advanced emotional control techniques used by tour professionals to maintain peak performance under any conditions.",
+      "category": "mental_training",
+      "pillar": "control",
+      "difficulty": "advanced",
+      "duration": 28,
+      "varkTags": ["visual", "kinesthetic", "aural"],
+      "primaryVarkStyle": "kinesthetic",
+      "tierRequirement": "PREMIUM",
+      "contentVersions": {
+        "visual": {
+          "contentUrl": "gs://fococo-content/modules/elite_emotional_visual.mp4",
+          "format": "video",
+          "duration": 28,
+          "transcript": "Advanced emotional mastery techniques demonstrated by elite golf professionals.",
+          "sections": ["elite-mindset", "advanced-regulation", "performance-optimization", "mastery-integration"]
+        },
+        "aural": {
+          "contentUrl": "gs://fococo-content/modules/elite_emotional_audio.mp3",
+          "format": "audio",
+          "duration": 32,
+          "transcript": "Advanced audio training for elite-level emotional control and performance optimization.",
+          "sections": ["mastery-psychology", "advanced-techniques", "performance-integration"]
+        },
+        "readWrite": {
+          "contentUrl": "gs://fococo-content/modules/elite_emotional_article.html",
+          "format": "article",
+          "duration": 24,
+          "sections": ["mastery-framework", "advanced-strategies", "performance-psychology", "elite-case-studies"]
+        },
+        "kinesthetic": {
+          "contentUrl": "gs://fococo-content/modules/elite_emotional_interactive.json",
+          "format": "interactive",
+          "duration": 35,
+          "sections": ["mastery-assessment", "advanced-drills", "performance-simulation", "elite-integration"]
+        }
+      },
+      "prerequisites": ["emotional_control_fundamentals", "anger_management_golf"],
+      "learningObjectives": [
+        "Master advanced emotional regulation techniques",
+        "Optimize emotional states for peak performance",
+        "Integrate elite-level emotional control into competitive play"
+      ],
+      "tags": ["elite", "mastery", "advanced", "performance-optimization", "tour-level"],
+      "thumbnailUrl": "gs://fococo-content/thumbnails/elite_emotional.jpg",
+      "isActive": true,
+      "order": 3,
+      "completionCount": 0,
+      "averageRating": 0.0
+    },
+    {
+      "moduleId": "integrated_mental_game",
+      "title": "Integrated Mental Game Mastery",
+      "description": "Advanced integration module combining focus, confidence, and control into a complete mental game system.",
+      "category": "mental_training",
+      "pillar": "focus",
+      "difficulty": "advanced",
+      "duration": 35,
+      "varkTags": ["visual", "kinesthetic", "aural", "readwrite"],
+      "primaryVarkStyle": "kinesthetic",
+      "tierRequirement": "ELITE",
+      "contentVersions": {
+        "visual": {
+          "contentUrl": "gs://fococo-content/modules/integrated_mental_visual.mp4",
+          "format": "video",
+          "duration": 35,
+          "transcript": "Comprehensive visual guide to integrating all mental game components for tournament-level performance.",
+          "sections": ["integration-theory", "complete-system", "tournament-application", "mastery-assessment"]
+        },
+        "aural": {
+          "contentUrl": "gs://fococo-content/modules/integrated_mental_audio.mp3",
+          "format": "audio",
+          "duration": 40,
+          "transcript": "Complete audio system for integrated mental game mastery and peak performance achievement.",
+          "sections": ["holistic-approach", "system-integration", "performance-optimization"]
+        },
+        "readWrite": {
+          "contentUrl": "gs://fococo-content/modules/integrated_mental_article.html",
+          "format": "article",
+          "duration": 30,
+          "sections": ["integration-framework", "complete-system", "advanced-strategies", "mastery-roadmap"]
+        },
+        "kinesthetic": {
+          "contentUrl": "gs://fococo-content/modules/integrated_mental_interactive.json",
+          "format": "interactive",
+          "duration": 45,
+          "sections": ["system-assessment", "integration-practice", "tournament-simulation", "mastery-certification"]
+        }
+      },
+      "prerequisites": ["pressure_focus_advanced", "comeback_confidence", "elite_emotional_mastery"],
+      "learningObjectives": [
+        "Integrate all three mental game pillars seamlessly",
+        "Apply complete mental game system in tournament conditions",
+        "Achieve consistent peak performance through mental mastery"
+      ],
+      "tags": ["integration", "mastery", "tournament", "peak-performance", "complete-system"],
+      "thumbnailUrl": "gs://fococo-content/thumbnails/integrated_mental.jpg",
+      "isActive": true,
+      "order": 4,
+      "completionCount": 0,
+      "averageRating": 0.0
+    }
+  ]
+}
+

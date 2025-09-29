@@ -1,5 +1,7 @@
 import 'package:fo_co_co/backend/schema/round_logs_record.dart';
 import 'package:fo_co_co/backend/schema/shot_logs_record.dart';
+import 'package:fo_co_co/backend/schema/golf_rounds_record.dart';
+import 'package:fo_co_co/backend/schema/scorecard_record.dart';
 
 import '/flutter_flow/flutter_flow_util.dart';
 import 'foco_map_widget.dart' show FoCoMapWidget;
@@ -74,12 +76,22 @@ class FoCoMapModel extends FlutterFlowModel<FoCoMapWidget> with ChangeNotifier {
   /// Data streams - Enhanced for performance
   List<RoundLogsRecord> roundLogs = [];
   List<ShotLogsRecord> shotLogs = [];
+  List<GolfRoundsRecord> golfRounds = [];
+  List<ScorecardRecord> scorecards = [];
   List<RoundLogsRecord> _filteredRoundLogs = [];
   List<ShotLogsRecord> _filteredShotLogs = [];
+  List<GolfRoundsRecord> _filteredGolfRounds = [];
+  List<ScorecardRecord> _filteredScorecards = [];
 
   /// Date range filtering
   DateTime? filterStartDate;
   DateTime? filterEndDate;
+
+  /// Data type visibility toggles
+  bool showRoundLogs = true;
+  bool showShotLogs = true;
+  bool showGolfRounds = true;
+  bool showScorecards = true;
 
   /// Selected round for replay
   String? selectedRoundId;

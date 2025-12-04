@@ -8,7 +8,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
-import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -89,7 +88,7 @@ class GeminiLiveAPIService {
   WebSocketChannel? _channel;
 
   // Audio components
-  final Record _audioRecorder = Record();
+  final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
   final PermissionService _permissionService = PermissionService();
 
@@ -210,7 +209,13 @@ class GeminiLiveAPIService {
       _updateState(GeminiLiveState.listening);
 
       // Start audio recording (simplified for now)
-      await _audioRecorder.start();
+      await _audioRecorder.startStream(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+      );
 
       _isRecording = true;
 

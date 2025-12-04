@@ -11,12 +11,13 @@ import '/flutter_flow/flutter_flow_util.dart';
 
 import '/index.dart';
 
+import '/pages/dashboard/dashboard_widget.dart';
+import '/pages/login/login_widget.dart';
 import '/pages/vark_onboarding/vark_onboarding_widget.dart';
 import '/pages/subscription/subscription_onboarding_widget.dart';
 import '/pages/onboarding/comprehensive_onboarding_widget.dart';
 import '/pages/subscription/subscription_management_widget.dart';
 import '/pages/foco_map/foco_map_conditional_widget.dart';
-import '/pages/splash/splash_widget.dart';
 import '/pages/splash/enhanced_splash_widget.dart';
 import '/pages/security/face_id_settings_widget.dart';
 import '/pages/edit_profile/edit_profile_widget.dart';
@@ -90,22 +91,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
       errorBuilder: (context, state) =>
-          appStateNotifier.loggedIn ? DashboardWidget() : HomePageWidget(),
+          appStateNotifier.loggedIn ? DashboardWidget() : LoginWidget(),
       routes: [
         FFRoute(
           name: '_initialize',
           path: '/',
           builder: (context, _) => const EnhancedSplashWidget(),
-        ),
-        FFRoute(
-          name: SplashWidget.routeName,
-          path: SplashWidget.routePath,
-          builder: (context, params) => const SplashWidget(),
-        ),
-        FFRoute(
-          name: HomePageWidget.routeName,
-          path: HomePageWidget.routePath,
-          builder: (context, params) => HomePageWidget(),
         ),
         FFRoute(
           name: LoginWidget.routeName,

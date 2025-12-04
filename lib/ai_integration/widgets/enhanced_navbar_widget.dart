@@ -9,8 +9,7 @@ import '../../flutter_flow/glass_design_system.dart';
 import '../../flutter_flow/flutter_flow_util.dart';
 import '../../backend/backend.dart';
 import '../../auth/firebase_auth/auth_util.dart';
-import '../services/fococo_voice_service.dart';
-import 'voice_chat_modal.dart';
+import 'floating_audio_player.dart';
 
 /// Enhanced Navigation Item with Performance Data
 class EnhancedNavigationItem {
@@ -81,39 +80,38 @@ class _EnhancedFoCoCoNavBarState extends State<EnhancedFoCoCoNavBar>
   // Enhanced navigation items matching the image design
   final List<EnhancedNavigationItem> _navItems = [
     EnhancedNavigationItem(
-      icon: Icons.dashboard_outlined,
-      activeIcon: Icons.dashboard_rounded,
-      label: 'Dashboard',
+      icon: Icons.access_time_outlined,
+      activeIcon: Icons.access_time_rounded,
+      label: 'Today',
       route: 'dashboard',
       color: const Color(0xFF0A3669), // Brand navy
     ),
     EnhancedNavigationItem(
-      icon: Icons.analytics_outlined,
-      activeIcon: Icons.analytics_rounded,
-      label: 'Performance',
-      route: 'golf_rounds',
+      icon: Icons.people_outline_rounded,
+      activeIcon: Icons.people_rounded,
+      label: 'MindCoach',
+      route: 'coaching_modules',
       color: const Color(0xFF017B3D), // Brand green
-      hasNotification: true,
     ),
     EnhancedNavigationItem(
-      icon: Icons.map_outlined,
-      activeIcon: Icons.map_rounded,
-      label: 'FocoMap',
-      route: 'foco_map',
+      icon: Icons.auto_awesome_outlined,
+      activeIcon: Icons.auto_awesome_rounded,
+      label: 'Insights',
+      route: 'ai_insights',
       color: const Color(0xFF7C3AED), // Purple - mindfulness/meditation color
     ),
     EnhancedNavigationItem(
-      icon: Icons.psychology_outlined,
-      activeIcon: Icons.psychology,
-      label: 'Coaching',
-      route: 'coaching_modules',
+      icon: Icons.location_on_outlined,
+      activeIcon: Icons.location_on_rounded,
+      label: 'FoCoMap',
+      route: 'foco_map',
       color: const Color(0xFFFEA400), // Brand orange
     ),
     EnhancedNavigationItem(
-      icon: Icons.person_outline_rounded,
-      activeIcon: Icons.person_rounded,
-      label: 'Profile',
-      route: 'profile',
+      icon: FontAwesomeIcons.flag,
+      activeIcon: FontAwesomeIcons.flag,
+      label: 'GolfSync',
+      route: 'golf_rounds',
       color: const Color(0xFF0EA5E9), // Calm blue - different from navy
     ),
   ];
@@ -250,9 +248,9 @@ class _EnhancedFoCoCoNavBarState extends State<EnhancedFoCoCoNavBar>
                 end: Alignment.bottomCenter,
                 colors: [
                   theme.glassBackground
-                      .withValues(alpha: GlassDesignSystem.glassOpacity + 0.15),
-                  theme.glassTint
                       .withValues(alpha: GlassDesignSystem.glassOpacity + 0.1),
+                  theme.glassTint
+                      .withValues(alpha: GlassDesignSystem.glassOpacity),
                 ],
               ),
               border: Border(
@@ -317,16 +315,30 @@ class _EnhancedFoCoCoNavBarState extends State<EnhancedFoCoCoNavBar>
   /// Build the navigation bar content
   Widget _buildNavBarContent(
       FlutterFlowTheme theme, double screenWidth, bool isGlassMode) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: _navItems.asMap().entries.map((entry) {
-            return _buildNavItem(entry.key, theme, isGlassMode);
-          }).toList(),
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
+      children: [
+        // Navigation items - centered
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: _navItems.asMap().entries.map((entry) {
+                return _buildNavItem(entry.key, theme, isGlassMode);
+              }).toList(),
+            ),
+          ),
         ),
-      ),
+
+        // Floating Audio Player - centered above nav items (overlay)
+        Positioned(
+          top: -45,
+          child: const FloatingAudioPlayer(),
+        ),
+      ],
     );
   }
 
@@ -335,7 +347,9 @@ class _EnhancedFoCoCoNavBarState extends State<EnhancedFoCoCoNavBar>
     final item = _navItems[index];
     final isActive = _currentIndex == index;
 
-    return Expanded(
+    return Padding(
+      padding: EdgeInsets.symmetric(
+          horizontal: index < _navItems.length - 1 ? 8.0 : 0),
       child: GestureDetector(
         onTap: () => _onItemTapped(index),
         behavior: HitTestBehavior.opaque,
@@ -459,177 +473,6 @@ class _EnhancedFoCoCoNavBarState extends State<EnhancedFoCoCoNavBar>
             );
           },
         ),
-      ),
-    );
-  }
-}
-
-/// Floating Voice Assistant Button
-class FloatingVoiceButton extends StatefulWidget {
-  final VoidCallback? onPressed;
-  final double? bottom;
-  final double? right;
-
-  const FloatingVoiceButton({
-    Key? key,
-    this.onPressed,
-    this.bottom = 80.0,
-    this.right = 20.0,
-  }) : super(key: key);
-
-  @override
-  State<FloatingVoiceButton> createState() => _FloatingVoiceButtonState();
-}
-
-class _FloatingVoiceButtonState extends State<FloatingVoiceButton>
-    with TickerProviderStateMixin {
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-  VoiceServiceState _voiceState = VoiceServiceState.uninitialized;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    );
-    _pulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.15,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
-
-    _pulseController.repeat(reverse: true);
-
-    // Initialize voice service listener
-    FoCoCoVoiceService().stateStream.listen((state) {
-      if (mounted) {
-        setState(() {
-          _voiceState = state;
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  Color _getVoiceButtonColor(FlutterFlowTheme theme) {
-    switch (_voiceState) {
-      case VoiceServiceState.listening:
-        return const Color(0xFF4CAF50); // Green
-      case VoiceServiceState.thinking:
-        return const Color(0xFFFF9800); // Orange
-      case VoiceServiceState.speaking:
-        return const Color(0xFF2196F3); // Blue
-      case VoiceServiceState.error:
-        return const Color(0xFFF44336); // Red
-      case VoiceServiceState.connecting:
-        return const Color(0xFF9C27B0); // Purple
-      default:
-        return theme.primary;
-    }
-  }
-
-  IconData _getVoiceIcon() {
-    switch (_voiceState) {
-      case VoiceServiceState.listening:
-        return Icons.mic;
-      case VoiceServiceState.thinking:
-      case VoiceServiceState.connecting:
-        return Icons.more_horiz;
-      case VoiceServiceState.speaking:
-        return Icons.volume_up;
-      case VoiceServiceState.error:
-        return Icons.error_outline;
-      default:
-        return Icons.mic_rounded;
-    }
-  }
-
-  void _onPressed() async {
-    HapticFeedback.mediumImpact();
-
-    if (widget.onPressed != null) {
-      widget.onPressed!();
-      return;
-    }
-
-    // Default behavior: Show voice chat modal
-    if (mounted) {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        barrierColor: Colors.black.withValues(alpha: 0.6),
-        enableDrag: true,
-        isDismissible: true,
-        builder: (context) => const FoCoCoVoiceChatModal(),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = FlutterFlowTheme.of(context);
-
-    return Positioned(
-      bottom: widget.bottom,
-      right: widget.right,
-      child: AnimatedBuilder(
-        animation: _pulseAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _pulseAnimation.value,
-            child: Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    _getVoiceButtonColor(theme),
-                    _getVoiceButtonColor(theme).withValues(alpha: 0.8),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(32),
-                boxShadow: [
-                  BoxShadow(
-                    color: _getVoiceButtonColor(theme).withValues(alpha: 0.4),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(32),
-                  onTap: _onPressed,
-                  child: Center(
-                    child: Icon(
-                      _getVoiceIcon(),
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
       ),
     );
   }

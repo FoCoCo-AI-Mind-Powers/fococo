@@ -11,7 +11,8 @@ import '/backend/schema/shot_logs_record.dart';
 import '/pages/foco_map/platform_map_widget.dart';
 
 /// AI-powered spatial analysis and embeddings for FoCo Map
-/// Integrates Gemini Embedding and Robotics models for enhanced map intelligence
+/// Integrates Gemini Embedding and Robotics-ER 1.5 models for enhanced map intelligence
+/// Uses embeddings for similarity search and Robotics-ER 1.5 for spatial reasoning and real-time guidance
 class FoCoMapAIService {
   static const String _embeddingModel = 'gemini-embedding-001';
   static const String _roboticsModel = 'gemini-robotics-er-1.5-preview';
@@ -32,9 +33,14 @@ class FoCoMapAIService {
   final StreamController<PatternInsight> _patternController =
       StreamController<PatternInsight>.broadcast();
 
+  // Real-time guidance stream
+  final StreamController<RealtimeGuidance> _guidanceController =
+      StreamController<RealtimeGuidance>.broadcast();
+
   Stream<SpatialAnalysis> get spatialAnalysisStream =>
       _spatialAnalysisController.stream;
   Stream<PatternInsight> get patternStream => _patternController.stream;
+  Stream<RealtimeGuidance> get guidanceStream => _guidanceController.stream;
 
   FoCoMapAIService({required String apiKey}) : _apiKey = apiKey;
 
@@ -50,6 +56,13 @@ class FoCoMapAIService {
     String taskType = 'SEMANTIC_SIMILARITY',
     int outputDimensionality = 768,
   }) async {
+    // Skip if API key is not set
+    if (_apiKey.isEmpty) {
+      debugPrint(
+          '⚠️ FoCoMapAIService: API key not set, skipping embedding generation');
+      return [];
+    }
+
     // Check cache first
     final cacheKey = '$text-$taskType-$outputDimensionality';
     if (_embeddingCache.containsKey(cacheKey)) {
@@ -102,6 +115,13 @@ class FoCoMapAIService {
     required List<LatLng> positions,
     required Map<String, dynamic> contextData,
   }) async {
+    // Skip if API key is not set
+    if (_apiKey.isEmpty) {
+      debugPrint(
+          '⚠️ FoCoMapAIService: API key not set, skipping spatial analysis');
+      return RoboticsAnalysis.empty();
+    }
+
     try {
       // Prepare spatial data for robotics model
       final spatialPrompt = _buildSpatialPrompt(positions, contextData);
@@ -524,9 +544,211 @@ class FoCoMapAIService {
     );
   }
 
+  /// Generate real-time guidance based on user's last activity and current map context
+  /// Uses Robotics-ER 1.5 for spatial reasoning and embeddings for context similarity
+  Future<RealtimeGuidance> generateRealtimeGuidance({
+    required List<RoundLogsRecord> recentRounds,
+    required List<ShotLogsRecord> recentShots,
+    required LatLng? currentPosition,
+    required Map<String, dynamic> mapContext,
+  }) async {
+    if (_apiKey.isEmpty) {
+      // Silently skip guidance generation if API key is not configured
+      // This is expected behavior for users without API key setup
+      return RealtimeGuidance.empty();
+    }
+
+    try {
+      // Build context from last activity using embeddings
+      final lastActivityContext = await _buildLastActivityContext(
+        recentRounds: recentRounds,
+        recentShots: recentShots,
+      );
+
+      // Build spatial prompt for Robotics-ER 1.5
+      final guidancePrompt = _buildGuidancePrompt(
+        lastActivityContext: lastActivityContext,
+        currentPosition: currentPosition,
+        mapContext: mapContext,
+        recentRounds: recentRounds,
+        recentShots: recentShots,
+      );
+
+      // Call Robotics-ER 1.5 for spatial reasoning and guidance
+      final response = await http.post(
+        Uri.parse('$_baseUrl/$_roboticsModel:generateContent'),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': _apiKey,
+        },
+        body: jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {'text': guidancePrompt}
+              ]
+            }
+          ],
+          'generationConfig': {
+            'temperature': 0.3,
+            'maxOutputTokens': 1024,
+            'thinkingConfig': {
+              'thinkingBudget': 1000, // Use thinking for better reasoning
+            }
+          }
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final guidance = _parseGuidanceResponse(data, lastActivityContext);
+
+        // Emit guidance
+        _guidanceController.add(guidance);
+
+        return guidance;
+      } else {
+        throw Exception('Guidance generation failed: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error generating real-time guidance: $e');
+      return RealtimeGuidance.empty();
+    }
+  }
+
+  /// Build context from last activity using embeddings for similarity
+  Future<String> _buildLastActivityContext({
+    required List<RoundLogsRecord> recentRounds,
+    required List<ShotLogsRecord> recentShots,
+  }) async {
+    if (recentRounds.isEmpty && recentShots.isEmpty) {
+      return 'No recent activity data available.';
+    }
+
+    final contextParts = <String>[];
+
+    // Analyze last round (embeddings used for similarity in other methods)
+    if (recentRounds.isNotEmpty) {
+      final lastRound = recentRounds.first;
+
+      contextParts.add('Last Round Analysis:');
+      contextParts.add('- Course: ${lastRound.courseName}');
+      contextParts.add('- Date: ${lastRound.date}');
+      contextParts.add(
+          '- Mental State: Focus ${lastRound.mindsetFocus}/10, Confidence ${lastRound.mindsetConfidence}/10, Control ${lastRound.mindsetControl}/10');
+      contextParts.add('- Overall Mindset: ${lastRound.overallMindsetEmoji}');
+      contextParts.add('- Best Cue: ${lastRound.bestCue}');
+
+      if (lastRound.aiRoundSummary.isNotEmpty) {
+        contextParts.add('- AI Insights: ${lastRound.aiRoundSummary}');
+      }
+    }
+
+    // Analyze recent shots (embeddings used for similarity in other methods)
+    if (recentShots.isNotEmpty) {
+      contextParts.add('\nRecent Shots Pattern:');
+      final clubsUsed = recentShots.map((s) => s.clubUsed).toSet().toList();
+      final outcomes = recentShots.map((s) => s.shotOutcome).toList();
+      contextParts.add('- Clubs Used: ${clubsUsed.join(", ")}');
+      contextParts.add('- Common Outcomes: ${outcomes.join(", ")}');
+
+      // Find patterns
+      if (recentShots.length > 3) {
+        final avgConfidence =
+            recentShots.map((s) => s.confidenceLevel).reduce((a, b) => a + b) /
+                recentShots.length;
+        contextParts.add(
+            '- Average Confidence: ${avgConfidence.toStringAsFixed(1)}/10');
+      }
+    }
+
+    return contextParts.join('\n');
+  }
+
+  /// Build guidance prompt for Robotics-ER 1.5
+  String _buildGuidancePrompt({
+    required String lastActivityContext,
+    required LatLng? currentPosition,
+    required Map<String, dynamic> mapContext,
+    required List<RoundLogsRecord> recentRounds,
+    required List<ShotLogsRecord> recentShots,
+  }) {
+    return '''
+You are FoCoCo's AI golf mental performance coach analyzing a golfer's activity on the map.
+
+**Last Activity Context:**
+$lastActivityContext
+
+**Current Map Context:**
+- Current Position: ${currentPosition != null ? 'Lat ${currentPosition.latitude}, Lng ${currentPosition.longitude}' : 'Unknown'}
+- Total Rounds on Map: ${recentRounds.length}
+- Total Shots on Map: ${recentShots.length}
+- Map Context: ${mapContext.toString()}
+
+**Your Task:**
+Based on the golfer's last activity and spatial patterns on the map, provide:
+
+1. **Immediate Guidance** (2-3 sentences): What should they focus on right now based on their recent performance?
+
+2. **Spatial Insights** (if applicable): Are there patterns in where they play best/worst? Any location-specific recommendations?
+
+3. **Mental Game Focus**: Based on their mindset scores, what mental skill needs the most attention?
+
+4. **Actionable Recommendation**: One specific, actionable tip they can apply in their next round or practice session.
+
+**Response Format (JSON):**
+{
+  "immediateGuidance": "Your immediate guidance here",
+  "spatialInsight": "Spatial pattern or location insight",
+  "mentalFocus": "What mental skill to focus on",
+  "actionableTip": "One specific actionable tip",
+  "confidence": 0.0-1.0
+}
+
+Be specific, encouraging, and golf-focused. Reference their actual data when possible.
+''';
+  }
+
+  /// Parse guidance response from Robotics-ER 1.5
+  RealtimeGuidance _parseGuidanceResponse(
+      Map<String, dynamic> data, String context) {
+    try {
+      final content = data['candidates'][0]['content']['parts'][0]['text'];
+
+      // Try to parse as JSON first
+      try {
+        final parsed = jsonDecode(content);
+        return RealtimeGuidance(
+          timestamp: DateTime.now(),
+          immediateGuidance: parsed['immediateGuidance'] ?? '',
+          spatialInsight: parsed['spatialInsight'] ?? '',
+          mentalFocus: parsed['mentalFocus'] ?? '',
+          actionableTip: parsed['actionableTip'] ?? '',
+          confidence: (parsed['confidence'] ?? 0.8).toDouble(),
+          context: context,
+        );
+      } catch (e) {
+        // If not JSON, parse as text
+        return RealtimeGuidance(
+          timestamp: DateTime.now(),
+          immediateGuidance: content,
+          spatialInsight: '',
+          mentalFocus: '',
+          actionableTip: '',
+          confidence: 0.7,
+          context: context,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error parsing guidance response: $e');
+      return RealtimeGuidance.empty();
+    }
+  }
+
   void dispose() {
     _spatialAnalysisController.close();
     _patternController.close();
+    _guidanceController.close();
     _embeddingCache.clear();
   }
 }
@@ -637,4 +859,36 @@ class MarkerCluster {
     required this.markers,
     required this.center,
   });
+}
+
+class RealtimeGuidance {
+  final DateTime timestamp;
+  final String immediateGuidance;
+  final String spatialInsight;
+  final String mentalFocus;
+  final String actionableTip;
+  final double confidence;
+  final String context;
+
+  RealtimeGuidance({
+    required this.timestamp,
+    required this.immediateGuidance,
+    required this.spatialInsight,
+    required this.mentalFocus,
+    required this.actionableTip,
+    required this.confidence,
+    required this.context,
+  });
+
+  factory RealtimeGuidance.empty() => RealtimeGuidance(
+        timestamp: DateTime.now(),
+        immediateGuidance: '',
+        spatialInsight: '',
+        mentalFocus: '',
+        actionableTip: '',
+        confidence: 0.0,
+        context: '',
+      );
+
+  bool get isEmpty => immediateGuidance.isEmpty && actionableTip.isEmpty;
 }

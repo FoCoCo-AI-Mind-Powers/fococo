@@ -146,6 +146,31 @@ class MentalSessionsRecord extends FirestoreRecord {
   DateTime? get updatedTime => _updatedTime;
   bool hasUpdatedTime() => _updatedTime != null;
 
+  // "adaptiveMode" field.
+  String? _adaptiveMode;
+  String get adaptiveMode => _adaptiveMode ?? '';
+  bool hasAdaptiveMode() => _adaptiveMode != null;
+
+  // "rebalanceTriggered" field.
+  bool? _rebalanceTriggered;
+  bool get rebalanceTriggered => _rebalanceTriggered ?? false;
+  bool hasRebalanceTriggered() => _rebalanceTriggered != null;
+
+  // "pillar" field.
+  String? _pillar;
+  String get pillar => _pillar ?? '';
+  bool hasPillar() => _pillar != null;
+
+  // "isCompleted" field.
+  bool? _isCompleted;
+  bool get isCompleted => _isCompleted ?? false;
+  bool hasIsCompleted() => _isCompleted != null;
+
+  // "trainingPlanId" field.
+  String? _trainingPlanId;
+  String get trainingPlanId => _trainingPlanId ?? '';
+  bool hasTrainingPlanId() => _trainingPlanId != null;
+
   void _initializeFields() {
     _userId = snapshotData['userId'] as String?;
     _moduleId = snapshotData['moduleId'] as String?;
@@ -173,6 +198,11 @@ class MentalSessionsRecord extends FirestoreRecord {
     _streakDay = castToType<int>(snapshotData['streakDay']);
     _createdTime = snapshotData['createdTime'] as DateTime?;
     _updatedTime = snapshotData['updatedTime'] as DateTime?;
+    _adaptiveMode = snapshotData['adaptiveMode'] as String?;
+    _rebalanceTriggered = snapshotData['rebalanceTriggered'] as bool?;
+    _pillar = snapshotData['pillar'] as String?;
+    _isCompleted = snapshotData['isCompleted'] as bool?;
+    _trainingPlanId = snapshotData['trainingPlanId'] as String?;
   }
 
   static CollectionReference get collection =>

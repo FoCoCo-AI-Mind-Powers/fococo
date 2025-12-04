@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:math';
 import 'package:flutter/material.dart';
 // Audio recording will be implemented with platform-specific packages
 // import 'package:record/record.dart';
@@ -12,10 +11,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '/flutter_flow/flutter_flow_util.dart';
 import '/auth/firebase_auth/auth_util.dart';
-import '/backend/schema/round_logs_record.dart';
-import '/backend/schema/shot_logs_record.dart';
-import '/backend/schema/golf_rounds_record.dart';
-import '/backend/schema/scorecard_record.dart';
 
 /// Advanced FoCo Map Voice Service using only Gemini models
 /// Implements the 4-stage pipeline: Audio Capture → STT → NLU → Instruction Generation

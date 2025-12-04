@@ -10,6 +10,8 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_components.dart';
 import '/ai_integration/widgets/enhanced_navbar_widget.dart';
+import '/widgets/floating_voice_button.dart';
+import '/main.dart';
 import 'settings_model.dart';
 export 'settings_model.dart';
 
@@ -319,14 +321,19 @@ class _SettingsWidgetState extends State<SettingsWidget>
 
     FlutterFlowTheme.saveThemeMode(mode);
 
-    // Trigger app restart to apply theme
+    // Update the app theme immediately
+    try {
+      MyApp.of(context).setThemeMode(mode);
+    } catch (e) {
+      debugPrint('Error updating theme: $e');
+    }
+
     if (mounted) {
       setState(() {});
-      // Show restart hint
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('🎨 Theme updated! Restart app to see full changes'),
-          duration: Duration(seconds: 3),
+          content: Text('🎨 Theme updated!'),
+          duration: Duration(seconds: 2),
         ),
       );
     }

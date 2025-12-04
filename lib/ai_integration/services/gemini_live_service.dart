@@ -59,7 +59,7 @@ class GeminiLiveService {
   WebSocketChannel? _channel;
 
   // Audio components
-  final Record _audioRecorder = Record();
+  final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   // State management
@@ -154,11 +154,12 @@ class GeminiLiveService {
       _updateState(GeminiLiveServiceState.listening);
 
       // Start audio recording
-      await _audioRecorder.start(
-        path: 'temp_audio_recording.wav', // Temporary file path
-        encoder: AudioEncoder.aacLc, // Use AAC instead of PCM for compatibility
-        bitRate: 128000,
-        samplingRate: 16000,
+      await _audioRecorder.startStream(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
       );
 
       _isRecording = true;

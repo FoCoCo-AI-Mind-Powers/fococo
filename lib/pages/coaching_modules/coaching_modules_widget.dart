@@ -2,13 +2,16 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_components.dart';
 import '/ai_integration/widgets/enhanced_navbar_widget.dart';
+import '/widgets/floating_voice_button.dart';
 import '/ai_integration/services/ai_coaching_service.dart';
 import '/ai_integration/models/gemini_models.dart';
 import '/backend/backend.dart';
 import '/backend/schema/coaching_modules_record.dart';
 import '/backend/schema/mental_sessions_record.dart';
+import '/backend/schema/training_plans_record.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/services/app_tutorial_service.dart';
+import '/services/training_plan_service.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -55,6 +58,7 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
 
   // AI Coaching Services
   final AICoachingService _aiCoachingService = AICoachingService.instance;
+  final TrainingPlanService _trainingPlanService = TrainingPlanService();
   bool _isLoadingAIRecommendations = false;
   String? _aiRecommendationError;
 
@@ -78,10 +82,10 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
     super.initState();
     _model = createModel(context, () => CoachingModulesModel());
     _tabController = TabController(
-      length: 3,
+      length: 4,
       vsync: this,
       initialIndex:
-          widget.initialTabIndex.clamp(0, 2), // Ensure valid tab index
+          widget.initialTabIndex.clamp(0, 3), // Ensure valid tab index
     );
 
     // Initialize animations - matching dashboard style
@@ -128,7 +132,7 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
 
   /// Initialize shared streams to avoid duplicate subscriptions
   void _initializeSharedStreams() {
-    if (loggedIn) {
+    if (currentUser != null) {
       // Create broadcast streams to avoid "Stream has already been listened to" errors
       _userRecordStream = UserRecord.getDocument(
               FirebaseFirestore.instance.doc('user/${currentUserUid}'))
@@ -247,7 +251,7 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: theme.primaryBackground,
-        drawer: loggedIn && _userRecordStream != null
+        drawer: currentUser != null && _userRecordStream != null
             ? StreamBuilder<UserRecord>(
                 stream: _userRecordStream,
                 builder: (context, snapshot) {
@@ -292,14 +296,17 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
                           child: TabBarView(
                             controller: _tabController,
                             children: [
-                              // Coaching Library Tab
-                              _buildCoachingLibraryTab(theme),
+                              // Tab 0: Studio Tab (NEW)
+                              _buildStudioTab(theme),
 
-                              // Today's Training Tab
-                              _buildTodayTrainingTab(theme),
+                              // Tab 1: Learn Tab (renamed from Library)
+                              _buildLearnTab(theme),
 
-                              // Progress & Analytics Tab
-                              _buildProgressAnalyticsTab(theme),
+                              // Tab 2: Train Tab (renamed from Training)
+                              _buildTrainTab(theme),
+
+                              // Tab 3: Journey Tab (renamed from Progress)
+                              _buildJourneyTab(theme),
                             ],
                           ),
                         ),
@@ -326,7 +333,7 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
   /// Custom App Bar matching dashboard design
   Widget _buildCustomAppBar(FlutterFlowTheme theme) {
     return StreamBuilder<UserRecord>(
-      stream: loggedIn ? _userRecordStream : null,
+      stream: currentUser != null ? _userRecordStream : null,
       builder: (context, userSnapshot) {
         // final user = userSnapshot.data; // Removed unused variable
 
@@ -364,14 +371,14 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Mental Training',
+                      'MindCoach',
                       style: theme.headlineSmall.copyWith(
                         color: theme.primaryText,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
-                      'Strengthen your mental game',
+                      'Where Focus, Confidence, and Control are built.',
                       style: theme.bodyMedium.copyWith(
                         color: theme.secondaryText,
                         fontSize: 14,
@@ -381,26 +388,41 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
                 ),
               ),
 
-              // VARK filter button
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: theme.glassBackground.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: theme.glassBorder.withValues(alpha: 0.2),
-                    width: 1,
+              // VARK filter button with FILTER text
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: theme.glassBackground.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: theme.glassBorder.withValues(alpha: 0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: IconButton(
+                      onPressed: () => _showVarkFilterDialog(theme),
+                      icon: Icon(
+                        Icons.tune,
+                        color: theme.primaryText,
+                        size: 24,
+                      ),
+                    ),
                   ),
-                ),
-                child: IconButton(
-                  onPressed: () => _showVarkFilterDialog(theme),
-                  icon: Icon(
-                    Icons.tune,
-                    color: theme.primaryText,
-                    size: 24,
+                  const SizedBox(height: 2),
+                  Text(
+                    'FILTER',
+                    style: theme.bodySmall.copyWith(
+                      color: theme.secondaryText,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
@@ -422,53 +444,129 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
           width: 1,
         ),
       ),
-      child: TabBar(
-        controller: _tabController,
-        indicator: BoxDecoration(
-          color: theme.primary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        labelColor: theme.primary,
-        unselectedLabelColor: theme.secondaryText,
-        labelStyle: theme.bodyMedium.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
-        unselectedLabelStyle: theme.bodyMedium.copyWith(
-          fontWeight: FontWeight.w400,
-        ),
-        tabs: const [
-          Tab(text: 'Library'),
-          Tab(text: 'Training'),
-          Tab(text: 'Progress'),
-        ],
+      child: AnimatedBuilder(
+        animation: _tabController,
+        builder: (context, child) {
+          return TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            indicator: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: Colors
+                  .transparent, // No indicator, tabs handle their own background
+            ),
+            indicatorSize: TabBarIndicatorSize.tab,
+            dividerColor: Colors.transparent,
+            labelStyle: theme.bodyMedium.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+            unselectedLabelStyle: theme.bodyMedium.copyWith(
+              fontWeight: FontWeight.w400,
+            ),
+            tabs: [
+              _buildFilledTab(
+                'Studio',
+                Icons.dashboard,
+                theme.aiPrimary,
+                _tabController.index == 0,
+              ),
+              _buildFilledTab(
+                'Learn',
+                Icons.library_books,
+                theme.info,
+                _tabController.index == 1,
+              ),
+              _buildFilledTab(
+                'Train',
+                Icons.play_circle_filled,
+                theme.success,
+                _tabController.index == 2,
+              ),
+              _buildFilledTab(
+                'Journey',
+                Icons.trending_up,
+                theme.warning,
+                _tabController.index == 3,
+              ),
+            ],
+            labelColor: Colors.white,
+            unselectedLabelColor: theme.secondaryText,
+          );
+        },
       ),
     );
   }
 
-  /// Coaching Library Tab - Dynamic content from backend
-  Widget _buildCoachingLibraryTab(FlutterFlowTheme theme) {
+  /// Build filled tab with background color
+  Widget _buildFilledTab(
+    String text,
+    IconData icon,
+    Color color,
+    bool isSelected,
+  ) {
+    return Tab(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? Colors.white : color,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              text,
+              style: TextStyle(
+                color: isSelected ? Colors.white : color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Studio Tab (NEW Landing Page)
+  Widget _buildStudioTab(FlutterFlowTheme theme) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          // AI-Powered Coaching Recommendations
-          _buildAICoachingRecommendations(theme),
+          // Section 1: Personalized Greeting
+          _buildPersonalizedGreeting(theme),
 
           const SizedBox(height: 24),
 
-          // VARK-Based Module Recommendations
-          _buildVarkRecommendations(theme),
+          // Section 2: Your MindCoach Journey
+          _buildMindCoachJourney(theme),
 
           const SizedBox(height: 24),
 
-          // Coaching Pillars
-          _buildCoachingPillars(theme),
+          // Section 3: AI Insights
+          _buildAIInsightsSection(theme),
 
           const SizedBox(height: 24),
 
-          // All Modules
-          _buildAllModules(theme),
+          // Section 4: Your Mind in Balance
+          _buildMindInBalance(theme),
+
+          const SizedBox(height: 24),
+
+          // Section 5: Recent Training Sessions
+          _buildRecentTrainingSessions(theme),
+
+          const SizedBox(height: 24),
+
+          // Section 6: Recommended Next Steps
+          _buildRecommendedNextSteps(theme),
 
           const SizedBox(height: 100), // Space for navbar
         ],
@@ -476,193 +574,472 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
     );
   }
 
-  /// AI-Powered Coaching Recommendations - Integrated AI Services
-  Widget _buildAICoachingRecommendations(FlutterFlowTheme theme) {
+  /// Learn Tab (Renamed from Library)
+  Widget _buildLearnTab(FlutterFlowTheme theme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          // Section 1: Your Learning Path
+          _buildLearningPath(theme),
+
+          const SizedBox(height: 24),
+
+          // Section 2: Your Current Plan
+          _buildCurrentPlan(theme),
+
+          const SizedBox(height: 24),
+
+          // Section 3: Recommended for Your Learning Style
+          _buildVarkRecommendations(theme),
+
+          const SizedBox(height: 24),
+
+          // Section 4: Master the Three Performance Pillars
+          _buildPerformancePillars(theme),
+
+          const SizedBox(height: 100), // Space for navbar
+        ],
+      ),
+    );
+  }
+
+  /// Build Learning Path section
+  Widget _buildLearningPath(FlutterFlowTheme theme) {
     return GlassDashboardCard(
-      title: 'AI Coaching Recommendations',
-      subtitle: 'Personalized mental training insights',
+      title: 'Your Learning Path',
+      subtitle: 'Personalized lessons based on performance & mindset trends',
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+        StreamBuilder<List<CoachingModulesRecord>>(
+          stream: _getFilteredModulesStream(),
+          builder: (context, snapshot) {
+            final modules = snapshot.data ?? [];
+
+            // Get top modules for each pillar
+            final focusModules =
+                modules.where((m) => m.pillar == 'focus').take(1).toList();
+            final confidenceModules =
+                modules.where((m) => m.pillar == 'confidence').take(1).toList();
+            final controlModules =
+                modules.where((m) => m.pillar == 'control').take(1).toList();
+
+            return Column(
               children: [
-                Icon(
-                  Icons.auto_awesome,
-                  size: 20,
-                  color: theme.aiPrimary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'AI Coaching Recommendations',
-                    style: theme.titleMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: theme.primaryText,
-                    ),
-                  ),
-                ),
-                if (_isLoadingAIRecommendations)
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(theme.aiPrimary),
-                    ),
-                  ),
+                if (focusModules.isNotEmpty)
+                  _buildLearningPathCard(
+                      theme, focusModules.first, 'Focus', theme.mentalFocus),
+                if (confidenceModules.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _buildLearningPathCard(theme, confidenceModules.first,
+                      'Confidence', theme.mentalStrength),
+                ],
+                if (controlModules.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _buildLearningPathCard(
+                      theme, controlModules.first, 'Control', theme.mentalCalm),
+                ],
               ],
-            ),
-            const SizedBox(height: 16),
-            if (_aiRecommendationError != null)
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Build learning path card
+  Widget _buildLearningPathCard(
+    FlutterFlowTheme theme,
+    CoachingModulesRecord module,
+    String pillar,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.1),
+            color.withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: theme.error.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.error.withValues(alpha: 0.2)),
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Row(
+                child: Icon(
+                  _getPillarIcon(pillar.toLowerCase()),
+                  color: color,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.warning_rounded, color: theme.error, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Unable to load AI recommendations. Please try again later.',
-                        style: theme.bodySmall.copyWith(color: theme.error),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            module.title,
+                            style: theme.titleSmall.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: theme.primaryText,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: theme.error.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'HIGH',
+                            style: theme.bodySmall.copyWith(
+                              color: theme.error,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    TextButton(
-                      onPressed: _loadAIRecommendations,
-                      child:
-                          Text('Retry', style: TextStyle(color: theme.error)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'AI Summary: Perfect for ${pillar.toLowerCase()} development based on your recent progress',
+                      style: theme.bodySmall.copyWith(
+                        color: theme.secondaryText,
+                      ),
                     ),
                   ],
                 ),
-              )
-            else ...[
-              // AI recommendation cards - Dynamic from Gemini
-              StreamBuilder<List<GeminiModuleRecommendation>>(
-                stream: _getAIRecommendationsStream(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(
-                      child: CircularProgressIndicator(
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(theme.aiPrimary),
-                      ),
-                    );
-                  }
-
-                  final recommendations =
-                      snapshot.data ?? _getDefaultAIRecommendations(theme);
-
-                  return Column(
-                    children: recommendations
-                        .take(3)
-                        .map(
-                          (rec) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildAIRecommendationCard(
-                              theme,
-                              rec.moduleTitle,
-                              rec.description,
-                              '${rec.priority.toUpperCase()} Priority',
-                              _getPillarIcon(rec.learningStyle),
-                              _getPillarColor(theme, rec.learningStyle),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  );
-                },
               ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _startModuleSession(module),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              icon: Icon(Icons.play_arrow, size: 16),
+              label: Text('Start Learning'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-              const SizedBox(height: 16),
+  /// Build Current Plan section
+  Widget _buildCurrentPlan(FlutterFlowTheme theme) {
+    if (!loggedIn) {
+      return const SizedBox.shrink();
+    }
 
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed:
-                          _isLoadingAIRecommendations || _isGeneratingContent
-                              ? null
-                              : () => _generatePersonalizedContent(theme),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: (_isLoadingAIRecommendations ||
-                                _isGeneratingContent)
-                            ? theme.aiPrimary.withValues(alpha: 0.6)
-                            : theme.aiPrimary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      icon: (_isLoadingAIRecommendations ||
-                              _isGeneratingContent)
-                          ? SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : Icon(Icons.auto_awesome, size: 18),
-                      label: Text(
-                          (_isLoadingAIRecommendations || _isGeneratingContent)
-                              ? 'Generating...'
-                              : 'Generate Plan'),
+    return GlassDashboardCard(
+      title: 'Your Current Plan',
+      subtitle: 'Structured lessons tailored to your progress',
+      children: [
+        StreamBuilder<TrainingPlansRecord?>(
+          stream: _trainingPlanService.getCurrentPlanStream(currentUserUid),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Container(
+                padding: const EdgeInsets.all(24),
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(theme.aiPrimary),
+                ),
+              );
+            }
+
+            final plan = snapshot.data;
+
+            if (plan == null) {
+              return Container(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.assignment_outlined,
+                      size: 48,
+                      color: theme.secondaryText.withValues(alpha: 0.5),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoadingAIRecommendations
-                          ? null
-                          : () => _refreshAIRecommendations(),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No active plan',
+                      style: theme.titleMedium.copyWith(
+                        color: theme.primaryText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Generate a personalized training plan to get started',
+                      style: theme.bodyMedium.copyWith(
+                        color: theme.secondaryText,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () => _generateNewPlan(theme),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _isLoadingAIRecommendations
-                            ? theme.secondary.withValues(alpha: 0.6)
-                            : theme.secondary,
+                        backgroundColor: theme.aiPrimary,
+                        foregroundColor: Colors.white,
+                      ),
+                      icon: Icon(Icons.auto_awesome, size: 18),
+                      label: Text('Generate Plan'),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.success.withValues(alpha: 0.1),
+                    theme.success.withValues(alpha: 0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: theme.success.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              plan.title,
+                              style: theme.titleMedium.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: theme.primaryText,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${plan.completedModules.length}/${plan.totalModules} modules completed',
+                              style: theme.bodySmall.copyWith(
+                                color: theme.secondaryText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => _refreshPlan(theme),
+                        icon: Icon(
+                          Icons.refresh,
+                          color: theme.primary,
+                          size: 20,
+                        ),
+                        tooltip: 'Refresh Plan',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  LinearProgressIndicator(
+                    value: plan.completedModules.length / plan.totalModules,
+                    backgroundColor: theme.alternate.withValues(alpha: 0.2),
+                    valueColor: AlwaysStoppedAnimation<Color>(theme.success),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _continuePlan(plan),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.success,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      icon: _isLoadingAIRecommendations
-                          ? SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : Icon(Icons.refresh, size: 18),
-                      label: Text(_isLoadingAIRecommendations
-                          ? 'Loading...'
-                          : 'Refresh'),
+                      icon: Icon(Icons.play_arrow, size: 20),
+                      label: Text('Continue Plan'),
                     ),
                   ),
                 ],
               ),
-            ],
+            );
+          },
+        ),
+      ],
+    );
+  }
 
-            // Show Generated Content Card if available
-            if (_showGeneratedContent && _generatedContentText != null) ...[
-              const SizedBox(height: 24),
-              _buildGeneratedContentCard(theme),
-            ],
+  /// Build Performance Pillars section (updated from Coaching Pillars)
+  Widget _buildPerformancePillars(FlutterFlowTheme theme) {
+    return GlassDashboardCard(
+      title: 'Master the Three Performance Pillars',
+      subtitle: '',
+      children: [
+        Column(
+          children: [
+            _buildEnhancedPillarCard(
+              theme,
+              'Focus',
+              Icons.center_focus_strong,
+              theme.mentalFocus,
+              'Deeper attention, clarity, pre-shot presence',
+              [
+                '• Pre-shot routines',
+                '• Visualization techniques',
+                '• Attention control drills',
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildEnhancedPillarCard(
+              theme,
+              'Confidence',
+              Icons.psychology,
+              theme.mentalStrength,
+              'Trust, self-belief, preparation',
+              [
+                '• Positive self-talk',
+                '• Success visualization',
+                '• Achievement tracking',
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildEnhancedPillarCard(
+              theme,
+              'Control',
+              Icons.self_improvement,
+              theme.mentalCalm,
+              'Recovery, emotional balance, pressure response',
+              [
+                '• Breathing exercises',
+                '• Pressure management',
+                '• Recovery techniques',
+              ],
+            ),
           ],
         ),
       ],
     );
+  }
+
+  /// Generate new training plan
+  Future<void> _generateNewPlan(FlutterFlowTheme theme) async {
+    try {
+      setState(() {
+        _isLoadingAIRecommendations = true;
+      });
+
+      await _trainingPlanService.generateNewPlan(
+        userId: currentUserUid,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text('Training plan generated successfully!'),
+              ],
+            ),
+            backgroundColor: theme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating plan: $e'),
+            backgroundColor: theme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingAIRecommendations = false;
+        });
+      }
+    }
+  }
+
+  /// Refresh training plan
+  Future<void> _refreshPlan(FlutterFlowTheme theme) async {
+    try {
+      await _trainingPlanService.refreshPlan(currentUserUid);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Plan refreshed successfully!'),
+            backgroundColor: theme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error refreshing plan: $e'),
+            backgroundColor: theme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Continue with current plan
+  Future<void> _continuePlan(TrainingPlansRecord plan) async {
+    try {
+      final nextModule = await _trainingPlanService.getNextModuleInPlan(plan);
+      if (nextModule != null) {
+        await _startModuleSession(nextModule);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Plan completed! Generate a new plan to continue.'),
+            backgroundColor: FlutterFlowTheme.of(context).success,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error continuing plan: $e'),
+          backgroundColor: FlutterFlowTheme.of(context).error,
+        ),
+      );
+    }
   }
 
   /// Build Generated Content Card
@@ -916,7 +1293,7 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
   /// VARK-Based Module Recommendations
   Widget _buildVarkRecommendations(FlutterFlowTheme theme) {
     return StreamBuilder<UserRecord>(
-      stream: loggedIn ? _userRecordStream : null,
+      stream: currentUser != null ? _userRecordStream : null,
       builder: (context, userSnapshot) {
         final user = userSnapshot.data;
         final varkPrefs = user?.varkPreferences;
@@ -931,263 +1308,6 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
               _buildVarkModulesList(theme, varkPrefs)
             else
               _buildVarkAssessmentPrompt(theme),
-          ],
-        );
-      },
-    );
-  }
-
-  /// Enhanced Mental Game Pillars Section
-  Widget _buildCoachingPillars(FlutterFlowTheme theme) {
-    return GlassDashboardCard(
-      title: 'Master the three foundations of mental performance',
-      subtitle: '',
-      children: [
-        // Enhanced pillars layout matching the design
-        Column(
-          children: [
-            // First pillar - Focus
-            _buildEnhancedPillarCard(
-              theme,
-              'Focus',
-              Icons.center_focus_strong,
-              theme.mentalFocus,
-              'Enhance concentration and clarity',
-              [
-                '• Pre-shot routines',
-                '• Visualization techniques',
-                '• Attention control drills',
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Second pillar - Confidence
-            _buildEnhancedPillarCard(
-              theme,
-              'Confidence',
-              Icons.psychology,
-              theme.mentalStrength,
-              'Build unshakeable self-belief',
-              [
-                '• Positive self-talk',
-                '• Success visualization',
-                '• Achievement tracking',
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Third pillar - Control
-            _buildEnhancedPillarCard(
-              theme,
-              'Control',
-              Icons.self_improvement,
-              theme.mentalCalm,
-              'Master emotional regulation',
-              [
-                '• Breathing exercises',
-                '• Pressure management',
-                '• Recovery techniques',
-              ],
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// All Modules Section with Enhanced Dynamic Data
-  Widget _buildAllModules(FlutterFlowTheme theme) {
-    return StreamBuilder<List<CoachingModulesRecord>>(
-      stream: _getFilteredModulesStream(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return GlassDashboardCard(
-            title: 'Coaching Modules',
-            subtitle: 'Loading modules...',
-            children: [
-              Container(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  children: [
-                    CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(theme.aiPrimary),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Fetching coaching modules from library...',
-                      style: theme.bodyMedium.copyWith(
-                        color: theme.secondaryText,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        }
-
-        if (snapshot.hasError) {
-          return GlassDashboardCard(
-            title: 'Coaching Modules',
-            subtitle: 'Error loading modules',
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 48,
-                      color: theme.error.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Unable to load modules',
-                      style: theme.titleMedium.copyWith(
-                        color: theme.error,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Check your internet connection and try again.',
-                      style: theme.bodyMedium.copyWith(
-                        color: theme.secondaryText,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _refreshModules,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.primary,
-                        foregroundColor: Colors.white,
-                      ),
-                      icon: Icon(Icons.refresh, size: 16),
-                      label: Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        }
-
-        final modules = snapshot.data ?? [];
-
-        if (modules.isEmpty) {
-          return GlassDashboardCard(
-            title: 'Coaching Modules',
-            subtitle: 'No modules found with current filters',
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.library_books_outlined,
-                      size: 48,
-                      color: theme.secondaryText.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No modules found',
-                      style: theme.titleMedium.copyWith(
-                        color: theme.primaryText,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Try adjusting your filters or check back later for new content.',
-                      style: theme.bodyMedium.copyWith(
-                        color: theme.secondaryText,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _selectedVarkFilter = 'all';
-                          _selectedPillar = 'all';
-                          _selectedDifficulty = 'all';
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.primary,
-                        foregroundColor: Colors.white,
-                      ),
-                      icon: Icon(Icons.clear_all, size: 16),
-                      label: Text('Clear Filters'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        }
-
-        return GlassDashboardCard(
-          title: 'Coaching Library',
-          subtitle:
-              '${modules.length} module${modules.length != 1 ? 's' : ''} available',
-          children: [
-            // Filter summary
-            if (_selectedPillar != 'all' ||
-                _selectedVarkFilter != 'all' ||
-                _selectedDifficulty != 'all') ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: theme.info.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: theme.info.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.filter_list, color: theme.info, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Filtered by: ${_getActiveFiltersDescription()}',
-                        style: theme.bodySmall.copyWith(
-                          color: theme.info,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedVarkFilter = 'all';
-                          _selectedPillar = 'all';
-                          _selectedDifficulty = 'all';
-                        });
-                      },
-                      child: Text(
-                        'Clear',
-                        style: TextStyle(
-                          color: theme.info,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            // Modules list
-            Column(
-              children: modules
-                  .map((module) => _buildEnhancedModuleCard(theme, module))
-                  .toList(),
-            ),
           ],
         );
       },
@@ -1211,29 +1331,29 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
     return activeFilters.join(' • ');
   }
 
-  /// Today's Training Tab
-  Widget _buildTodayTrainingTab(FlutterFlowTheme theme) {
+  /// Train Tab (Renamed from Training)
+  Widget _buildTrainTab(FlutterFlowTheme theme) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          // Daily Mental Training Goal
-          _buildDailyGoal(theme),
+          // Section 1: Your Smart Training Session
+          _buildSmartTrainingSession(theme),
 
           const SizedBox(height: 24),
 
-          // Recommended Session for Today
-          _buildTodayRecommendation(theme),
+          // Section 2: Additional Recommendations
+          _buildAdditionalRecommendations(theme),
 
           const SizedBox(height: 24),
 
-          // Quick Training Tools
-          _buildQuickTools(theme),
+          // Section 3: Quick Mind Tools
+          _buildQuickMindTools(theme),
 
           const SizedBox(height: 24),
 
-          // Recent Sessions
-          _buildRecentSessions(theme),
+          // Section 4: Adaptive Mode
+          _buildAdaptiveMode(theme),
 
           const SizedBox(height: 100), // Space for navbar
         ],
@@ -1241,28 +1361,748 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
     );
   }
 
-  /// Progress & Analytics Tab
-  Widget _buildProgressAnalyticsTab(FlutterFlowTheme theme) {
+  /// Build Smart Training Session section
+  Widget _buildSmartTrainingSession(FlutterFlowTheme theme) {
+    return GlassDashboardCard(
+      title: 'Your Smart Training Session',
+      subtitle: 'Adaptive AI-crafted routine',
+      children: [
+        StreamBuilder<GeminiRecommendationResponse?>(
+          stream: _getTodayRecommendationStream(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Container(
+                padding: const EdgeInsets.all(24),
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(theme.aiPrimary),
+                ),
+              );
+            }
+
+            final recommendation = snapshot.data;
+            if (recommendation != null &&
+                recommendation.recommendations.isNotEmpty) {
+              final session = recommendation.recommendations.first;
+              return Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      theme.aiPrimary.withValues(alpha: 0.15),
+                      theme.aiSecondary.withValues(alpha: 0.08),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: theme.aiPrimary.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            gradient: theme.aiGradient,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.auto_awesome,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${session.estimatedDuration}-minute routine',
+                                style: theme.titleMedium.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.primaryText,
+                                ),
+                              ),
+                              Text(
+                                'Centering & rhythm',
+                                style: theme.bodyMedium.copyWith(
+                                  color: theme.secondaryText,
+                                ),
+                              ),
+                              Text(
+                                'Based on last two sessions',
+                                style: theme.bodySmall.copyWith(
+                                  color: theme.aiPrimary,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () =>
+                            _startTrainingSessionFromRecommendation(session),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.aiPrimary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        icon: Icon(Icons.play_arrow, size: 20),
+                        label: Text('Start Session'),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return _buildDefaultTodayRecommendation(theme);
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Build Additional Recommendations section
+  Widget _buildAdditionalRecommendations(FlutterFlowTheme theme) {
+    return GlassDashboardCard(
+      title: 'Additional Recommendations',
+      subtitle: 'More training options for you',
+      children: [
+        StreamBuilder<GeminiRecommendationResponse?>(
+          stream: _getTodayRecommendationStream(),
+          builder: (context, snapshot) {
+            final recommendations = snapshot.data?.recommendations ?? [];
+
+            if (recommendations.isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            return Column(
+              children: recommendations.skip(1).take(3).map((rec) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.glassBackground.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: theme.glassBorder.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                rec.moduleTitle,
+                                style: theme.titleSmall.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.primaryText,
+                                ),
+                              ),
+                              Text(
+                                '${rec.estimatedDuration} min',
+                                style: theme.bodySmall.copyWith(
+                                  color: theme.secondaryText,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () =>
+                              _startTrainingSessionFromRecommendation(rec),
+                          icon: Icon(
+                            Icons.play_arrow,
+                            color: theme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Build Quick Mind Tools section (renamed and updated)
+  Widget _buildQuickMindTools(FlutterFlowTheme theme) {
+    return GlassDashboardCard(
+      title: 'Quick Mind Tools',
+      subtitle: 'Fast mental exercises for immediate use',
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildQuickToolCard(
+                theme,
+                'Breathing',
+                Icons.air,
+                theme.breathingActive,
+                '2 min',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickToolCard(
+                theme,
+                'Visualize',
+                Icons.visibility,
+                theme.mentalFocus,
+                '5 min',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickToolCard(
+                theme,
+                'Reset',
+                Icons.refresh,
+                theme.mentalCalm,
+                '3 min',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickToolCard(
+                theme,
+                'Rebalance',
+                Icons.balance,
+                theme.warning,
+                'Adaptive',
+                onTap: () => _triggerRebalance(theme),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Build Adaptive Mode section
+  Widget _buildAdaptiveMode(FlutterFlowTheme theme) {
+    return StreamBuilder<UserRecord>(
+      stream: currentUser != null ? _userRecordStream : null,
+      builder: (context, userSnapshot) {
+        final user = userSnapshot.data;
+        final currentMode = user?.currentAdaptiveMode ?? 'AI-Reactive';
+
+        return GlassDashboardCard(
+          title: 'Adaptive Mode',
+          subtitle: 'Choose your training context',
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildAdaptiveModeChip(
+                  theme,
+                  'Pre-Round',
+                  Icons.golf_course,
+                  currentMode == 'Pre-Round',
+                  () => _setAdaptiveMode('Pre-Round'),
+                ),
+                _buildAdaptiveModeChip(
+                  theme,
+                  'Post-Round',
+                  Icons.flag,
+                  currentMode == 'Post-Round',
+                  () => _setAdaptiveMode('Post-Round'),
+                ),
+                _buildAdaptiveModeChip(
+                  theme,
+                  'Off-Day',
+                  Icons.spa,
+                  currentMode == 'Off-Day',
+                  () => _setAdaptiveMode('Off-Day'),
+                ),
+                _buildAdaptiveModeChip(
+                  theme,
+                  'AI-Reactive',
+                  Icons.auto_awesome,
+                  currentMode == 'AI-Reactive',
+                  () => _setAdaptiveMode('AI-Reactive'),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Build adaptive mode chip
+  Widget _buildAdaptiveModeChip(
+    FlutterFlowTheme theme,
+    String label,
+    IconData icon,
+    bool isSelected,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+                  colors: [
+                    theme.primary.withValues(alpha: 0.3),
+                    theme.primary.withValues(alpha: 0.1),
+                  ],
+                )
+              : null,
+          color:
+              isSelected ? null : theme.glassBackground.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? theme.primary
+                : theme.glassBorder.withValues(alpha: 0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? theme.primary : theme.secondaryText,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: theme.bodyMedium.copyWith(
+                color: isSelected ? theme.primary : theme.primaryText,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Set adaptive mode
+  Future<void> _setAdaptiveMode(String mode) async {
+    try {
+      await UserRecord.collection.doc(currentUserUid).update({
+        'currentAdaptiveMode': mode,
+      });
+      setState(() {});
+    } catch (e) {
+      print('❌ Error setting adaptive mode: $e');
+    }
+  }
+
+  /// Trigger rebalance tool
+  Future<void> _triggerRebalance(FlutterFlowTheme theme) async {
+    try {
+      // Check for stress indicators
+      final recentSessions = await MentalSessionsRecord.collection
+          .where('userId', isEqualTo: currentUserUid)
+          .orderBy('dateCompleted', descending: true)
+          .limit(5)
+          .get();
+
+      bool stressDetected = false;
+      if (recentSessions.docs.isNotEmpty) {
+        // Simple stress detection logic
+        final sessions = recentSessions.docs
+            .map((doc) => MentalSessionsRecord.fromSnapshot(doc))
+            .toList();
+
+        // Check for low perceived value or negative mood changes
+        stressDetected = sessions.any((s) =>
+            (s.perceivedValue < 3) ||
+            (s.userMoodAfter.isNotEmpty &&
+                s.userMoodBefore.isNotEmpty &&
+                s.userMoodAfter.contains('stress')));
+      }
+
+      // Create rebalance session
+      await MentalSessionsRecord.collection.add({
+        'userId': currentUserUid,
+        'moduleTitle': 'Rebalance Drill',
+        'moduleId': 'rebalance_adaptive',
+        'sessionType': 'rebalance',
+        'dateStarted': FieldValue.serverTimestamp(),
+        'isCompleted': false,
+        'pillar': 'control',
+        'adaptiveMode': 'AI-Reactive',
+        'rebalanceTriggered': true,
+        'estimatedDuration': 5,
+        'difficulty': 'beginner',
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.balance, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text(stressDetected
+                    ? 'Stress detected. Starting rebalance drill...'
+                    : 'Starting rebalance drill...'),
+              ],
+            ),
+            backgroundColor: theme.warning,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error triggering rebalance: $e'),
+            backgroundColor: theme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Journey Tab (Renamed from Progress)
+  Widget _buildJourneyTab(FlutterFlowTheme theme) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          // Mental Performance Overview
-          _buildMentalPerformanceOverview(theme),
+          // Section 1: Mind Power Index
+          _buildMindPowerIndex(theme),
 
           const SizedBox(height: 24),
 
-          // Learning Progress
-          _buildLearningProgress(theme),
+          // Section 2: Learning Progress (with pillar breakdown)
+          _buildLearningProgressWithPillars(theme),
 
           const SizedBox(height: 24),
 
-          // Achievements
+          // Section 3: Achievements
           _buildAchievements(theme),
 
           const SizedBox(height: 100), // Space for navbar
         ],
       ),
+    );
+  }
+
+  /// Build Mind Power Index section
+  Widget _buildMindPowerIndex(FlutterFlowTheme theme) {
+    return StreamBuilder<UserRecord>(
+      stream: currentUser != null ? _userRecordStream : null,
+      builder: (context, userSnapshot) {
+        final user = userSnapshot.data;
+        final mpi = _calculateMPI(user);
+        final mpiColor = _getMPIColor(theme, mpi);
+
+        // Generate dynamic AI phrase
+        String aiPhrase = 'Confidence rising steadily. Focus dipped slightly.';
+        if (mpi >= 85) {
+          aiPhrase = 'Excellent mental performance! You\'re in the zone.';
+        } else if (mpi >= 70) {
+          aiPhrase = 'Good mental game. Keep building consistency.';
+        }
+
+        return GlassDashboardCard(
+          title: 'Mind Power Index',
+          subtitle: 'Track your mental game development',
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          mpiColor,
+                          mpiColor.withValues(alpha: 0.7),
+                        ],
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        mpi.toString(),
+                        style: theme.headlineMedium.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Mental Performance Index',
+                    style: theme.titleMedium.copyWith(
+                      color: theme.primaryText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.aiPrimary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: theme.aiPrimary.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.auto_awesome,
+                          size: 16,
+                          color: theme.aiPrimary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            aiPhrase,
+                            style: theme.bodySmall.copyWith(
+                              color: theme.primaryText,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildMPIComponent(theme, 'Focus',
+                          _calculateFocusScore(user), theme.mentalFocus),
+                      _buildMPIComponent(
+                          theme,
+                          'Confidence',
+                          _calculateConfidenceScore(user),
+                          theme.mentalStrength),
+                      _buildMPIComponent(theme, 'Control',
+                          _calculateControlScore(user), theme.mentalCalm),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Build Learning Progress with Pillar Breakdown
+  Widget _buildLearningProgressWithPillars(FlutterFlowTheme theme) {
+    return StreamBuilder<List<MentalSessionsRecord>>(
+      stream: _userSessionsStream,
+      builder: (context, sessionsSnapshot) {
+        final sessions = sessionsSnapshot.data ?? [];
+        final completedSessions = sessions.where((s) => s.isCompleted).toList();
+
+        // Calculate pillar progress
+        final focusCompleted = completedSessions
+            .where((s) => s.pillar == 'focus')
+            .map((s) => s.moduleId)
+            .toSet()
+            .length;
+        final confidenceCompleted = completedSessions
+            .where((s) => s.pillar == 'confidence')
+            .map((s) => s.moduleId)
+            .toSet()
+            .length;
+        final controlCompleted = completedSessions
+            .where((s) => s.pillar == 'control')
+            .map((s) => s.moduleId)
+            .toSet()
+            .length;
+
+        final totalModules = 24; // Total modules available
+        final completedModules =
+            completedSessions.map((s) => s.moduleId).toSet().length;
+        final progressPercentage =
+            (completedModules / totalModules * 100).clamp(0, 100);
+
+        // Generate AI phrase
+        String aiPhrase = 'Start your first lesson';
+        if (completedModules > 0) {
+          aiPhrase = 'You\'re building a balanced foundation';
+        }
+
+        return GlassDashboardCard(
+          title: 'Learning Progress',
+          subtitle: 'Your journey through the mental training modules',
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              theme.success,
+                              theme.success.withValues(alpha: 0.7),
+                            ],
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${progressPercentage.toInt()}%',
+                            style: theme.titleSmall.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Modules Completed: $completedModules/$totalModules',
+                              style: theme.titleMedium.copyWith(
+                                color: theme.primaryText,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            LinearProgressIndicator(
+                              value: progressPercentage / 100,
+                              backgroundColor: theme.alternate,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(theme.success),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Pillar progress breakdown
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.glassBackground.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildPillarProgressRow(theme, 'Focus', focusCompleted,
+                            8, theme.mentalFocus),
+                        const SizedBox(height: 12),
+                        _buildPillarProgressRow(theme, 'Confidence',
+                            confidenceCompleted, 8, theme.mentalStrength),
+                        const SizedBox(height: 12),
+                        _buildPillarProgressRow(theme, 'Control',
+                            controlCompleted, 8, theme.mentalCalm),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.aiPrimary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: theme.aiPrimary.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.auto_awesome,
+                          size: 16,
+                          color: theme.aiPrimary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            aiPhrase,
+                            style: theme.bodySmall.copyWith(
+                              color: theme.primaryText,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Build pillar progress row
+  Widget _buildPillarProgressRow(
+    FlutterFlowTheme theme,
+    String pillar,
+    int completed,
+    int total,
+    Color color,
+  ) {
+    return Row(
+      children: [
+        Icon(
+          _getPillarIcon(pillar.toLowerCase()),
+          size: 20,
+          color: color,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            pillar,
+            style: theme.bodyMedium.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.primaryText,
+            ),
+          ),
+        ),
+        Text(
+          '$completed/$total',
+          style: theme.bodyMedium.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 
@@ -1330,303 +2170,612 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
 
   /// Show enhanced filter dialog with improved UI
   void _showVarkFilterDialog(FlutterFlowTheme theme) {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+        builder: (context, setDialogState) => Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
           ),
-          backgroundColor: theme.glassBackground,
-          elevation: 0,
-          title: Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  theme.primary.withValues(alpha: 0.1),
-                  theme.secondary.withValues(alpha: 0.05),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [theme.primary, theme.secondary],
-                    ),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.tune,
-                    color: Colors.white,
-                    size: 20,
-                  ),
+          decoration: BoxDecoration(
+            color: theme.glassBackground,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.secondaryText.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Filter Modules',
-                        style: theme.titleMedium.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: theme.primaryText,
-                        ),
-                      ),
-                      Text(
-                        'Customize your learning experience',
-                        style: theme.bodySmall.copyWith(
-                          color: theme.secondaryText,
-                        ),
-                      ),
+              ),
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      theme.primary.withValues(alpha: 0.1),
+                      theme.secondary.withValues(alpha: 0.05),
                     ],
                   ),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(24)),
                 ),
-              ],
-            ),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Learning Style Section
-                Text(
-                  'Learning Style',
-                  style: theme.titleSmall.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.primaryText,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
+                child: Row(
                   children: [
-                    _buildFilterChip(
-                      theme,
-                      'All',
-                      _selectedVarkFilter == 'all',
-                      () => setDialogState(() => _selectedVarkFilter = 'all'),
-                      theme.primary,
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [theme.primary, theme.secondary],
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.tune,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ),
-                    _buildFilterChip(
-                      theme,
-                      'Visual',
-                      _selectedVarkFilter == 'visual',
-                      () =>
-                          setDialogState(() => _selectedVarkFilter = 'visual'),
-                      theme.info,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Filter Modules',
+                            style: theme.titleMedium.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: theme.primaryText,
+                            ),
+                          ),
+                          Text(
+                            'Customize your MindCoach experience',
+                            style: theme.bodySmall.copyWith(
+                              color: theme.secondaryText,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    _buildFilterChip(
-                      theme,
-                      'Auditory',
-                      _selectedVarkFilter == 'aural',
-                      () => setDialogState(() => _selectedVarkFilter = 'aural'),
-                      theme.success,
-                    ),
-                    _buildFilterChip(
-                      theme,
-                      'Reading',
-                      _selectedVarkFilter == 'readwrite',
-                      () => setDialogState(
-                          () => _selectedVarkFilter = 'readwrite'),
-                      theme.warning,
-                    ),
-                    _buildFilterChip(
-                      theme,
-                      'Kinesthetic',
-                      _selectedVarkFilter == 'kinesthetic',
-                      () => setDialogState(
-                          () => _selectedVarkFilter = 'kinesthetic'),
-                      theme.error,
+                    IconButton(
+                      icon: Icon(Icons.close, color: theme.primaryText),
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 20),
-
-                // Mental Game Pillars Section
-                Text(
-                  'Mental Game Pillars',
-                  style: theme.titleSmall.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.primaryText,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    _buildFilterChip(
-                      theme,
-                      'All Pillars',
-                      _selectedPillar == 'all',
-                      () => setDialogState(() => _selectedPillar = 'all'),
-                      theme.primary,
-                    ),
-                    _buildFilterChip(
-                      theme,
-                      '🎯 Focus',
-                      _selectedPillar == 'focus',
-                      () => setDialogState(() => _selectedPillar = 'focus'),
-                      theme.mentalFocus,
-                    ),
-                    _buildFilterChip(
-                      theme,
-                      '💪 Confidence',
-                      _selectedPillar == 'confidence',
-                      () =>
-                          setDialogState(() => _selectedPillar = 'confidence'),
-                      theme.mentalStrength,
-                    ),
-                    _buildFilterChip(
-                      theme,
-                      '🧘 Control',
-                      _selectedPillar == 'control',
-                      () => setDialogState(() => _selectedPillar = 'control'),
-                      theme.mentalCalm,
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // Difficulty Level Section
-                Text(
-                  'Difficulty Level',
-                  style: theme.titleSmall.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.primaryText,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    _buildFilterChip(
-                      theme,
-                      'All Levels',
-                      _selectedDifficulty == 'all',
-                      () => setDialogState(() => _selectedDifficulty = 'all'),
-                      theme.primary,
-                    ),
-                    _buildFilterChip(
-                      theme,
-                      '⭐ Beginner',
-                      _selectedDifficulty == 'beginner',
-                      () => setDialogState(
-                          () => _selectedDifficulty = 'beginner'),
-                      theme.success,
-                    ),
-                    _buildFilterChip(
-                      theme,
-                      '⭐⭐ Intermediate',
-                      _selectedDifficulty == 'intermediate',
-                      () => setDialogState(
-                          () => _selectedDifficulty = 'intermediate'),
-                      theme.warning,
-                    ),
-                    _buildFilterChip(
-                      theme,
-                      '⭐⭐⭐ Advanced',
-                      _selectedDifficulty == 'advanced',
-                      () => setDialogState(
-                          () => _selectedDifficulty = 'advanced'),
-                      theme.error,
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // Current Filter Summary
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: theme.alternate.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+              ),
+              // Content
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // AI Suggestions Section
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              theme.aiPrimary.withValues(alpha: 0.1),
+                              theme.aiSecondary.withValues(alpha: 0.05),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: theme.aiPrimary.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome,
+                                  size: 20,
+                                  color: theme.aiPrimary,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'AI generated smart suggestions based on history',
+                                  style: theme.titleSmall.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.primaryText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Confidence routines worked great last time. Now explore the Control modules.',
+                              style: theme.bodyMedium.copyWith(
+                                color: theme.secondaryText,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      // Apply AI suggestions
+                                      setDialogState(() {
+                                        _selectedPillar = 'control';
+                                        _selectedVarkFilter = 'all';
+                                        _selectedDifficulty = 'all';
+                                      });
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: theme.aiPrimary,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: Text('Apply Suggestions'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () {
+                                      // User will select manually
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: theme.aiPrimary,
+                                      side: BorderSide(color: theme.aiPrimary),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: Text('Select manually'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Learning Style Section
                       Text(
-                        'Current Filters:',
-                        style: theme.bodySmall.copyWith(
+                        'VARK Learning Style',
+                        style: theme.titleSmall.copyWith(
                           fontWeight: FontWeight.w600,
                           color: theme.primaryText,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          _buildFilterChip(
+                            theme,
+                            'All',
+                            _selectedVarkFilter == 'all',
+                            () => setDialogState(
+                                () => _selectedVarkFilter = 'all'),
+                            theme.primary,
+                          ),
+                          _buildFilterChip(
+                            theme,
+                            'Visual',
+                            _selectedVarkFilter == 'visual',
+                            () => setDialogState(
+                                () => _selectedVarkFilter = 'visual'),
+                            theme.info,
+                          ),
+                          _buildFilterChip(
+                            theme,
+                            'Auditory',
+                            _selectedVarkFilter == 'aural',
+                            () => setDialogState(
+                                () => _selectedVarkFilter = 'aural'),
+                            theme.success,
+                          ),
+                          _buildFilterChip(
+                            theme,
+                            'Reading',
+                            _selectedVarkFilter == 'readwrite',
+                            () => setDialogState(
+                                () => _selectedVarkFilter = 'readwrite'),
+                            theme.warning,
+                          ),
+                          _buildFilterChip(
+                            theme,
+                            'Kinesthetic',
+                            _selectedVarkFilter == 'kinesthetic',
+                            () => setDialogState(
+                                () => _selectedVarkFilter = 'kinesthetic'),
+                            theme.error,
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Performance Pillars Section
                       Text(
-                        '• Learning Style: ${_selectedVarkFilter.toUpperCase()}\n'
-                        '• Pillar: ${_selectedPillar.toUpperCase()}\n'
-                        '• Difficulty: ${_selectedDifficulty.toUpperCase()}',
-                        style: theme.bodySmall.copyWith(
-                          color: theme.secondaryText,
+                        'Performance Pillars',
+                        style: theme.titleSmall.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: theme.primaryText,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          _buildFilterChip(
+                            theme,
+                            'All Pillars',
+                            _selectedPillar == 'all',
+                            () => setDialogState(() => _selectedPillar = 'all'),
+                            theme.primary,
+                          ),
+                          _buildFilterChip(
+                            theme,
+                            '🎯 Focus',
+                            _selectedPillar == 'focus',
+                            () =>
+                                setDialogState(() => _selectedPillar = 'focus'),
+                            theme.mentalFocus,
+                          ),
+                          _buildFilterChip(
+                            theme,
+                            '💪 Confidence',
+                            _selectedPillar == 'confidence',
+                            () => setDialogState(
+                                () => _selectedPillar = 'confidence'),
+                            theme.mentalStrength,
+                          ),
+                          _buildFilterChip(
+                            theme,
+                            '🧘 Control',
+                            _selectedPillar == 'control',
+                            () => setDialogState(
+                                () => _selectedPillar = 'control'),
+                            theme.mentalCalm,
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Difficulty Level Section
+                      Text(
+                        'Difficulty Level',
+                        style: theme.titleSmall.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: theme.primaryText,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          _buildFilterChip(
+                            theme,
+                            'All Levels',
+                            _selectedDifficulty == 'all',
+                            () => setDialogState(
+                                () => _selectedDifficulty = 'all'),
+                            theme.primary,
+                          ),
+                          _buildFilterChip(
+                            theme,
+                            '⭐ Beginner',
+                            _selectedDifficulty == 'beginner',
+                            () => setDialogState(
+                                () => _selectedDifficulty = 'beginner'),
+                            theme.success,
+                          ),
+                          _buildFilterChip(
+                            theme,
+                            '⭐⭐ Intermediate',
+                            _selectedDifficulty == 'intermediate',
+                            () => setDialogState(
+                                () => _selectedDifficulty = 'intermediate'),
+                            theme.warning,
+                          ),
+                          _buildFilterChip(
+                            theme,
+                            '⭐⭐ Intermediate',
+                            _selectedDifficulty == 'intermediate',
+                            () => setDialogState(
+                                () => _selectedDifficulty = 'intermediate'),
+                            theme.warning,
+                          ),
+                          _buildFilterChip(
+                            theme,
+                            '⭐⭐⭐ Advanced',
+                            _selectedDifficulty == 'advanced',
+                            () => setDialogState(
+                                () => _selectedDifficulty = 'advanced'),
+                            theme.error,
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Current Filter Summary
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.alternate.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Current Filters:',
+                              style: theme.bodySmall.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: theme.primaryText,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '• VARK Learning Style: ${_selectedVarkFilter.toUpperCase()}\n'
+                              '• Performance Pillar: ${_selectedPillar.toUpperCase()}\n'
+                              '• Difficulty: ${_selectedDifficulty.toUpperCase()}',
+                              style: theme.bodySmall.copyWith(
+                                color: theme.secondaryText,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                // Reset filters
-                setDialogState(() {
-                  _selectedVarkFilter = 'all';
-                  _selectedPillar = 'all';
-                  _selectedDifficulty = 'all';
-                });
-              },
-              child: Text(
-                'Reset',
-                style: TextStyle(color: theme.secondaryText),
               ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: theme.secondaryText),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {}); // Apply filters
-                Navigator.pop(context);
+              // Bottom actions
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: theme.glassBorder.withValues(alpha: 0.2),
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setDialogState(() {
+                            _selectedVarkFilter = 'all';
+                            _selectedPillar = 'all';
+                            _selectedDifficulty = 'all';
+                          });
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: theme.secondaryText,
+                          side: BorderSide(color: theme.glassBorder),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Text('Reset'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {}); // Apply filters
+                          Navigator.pop(context);
 
-                // Show feedback
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Row(
+                          // Show feedback
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  Icon(Icons.filter_alt,
+                                      color: Colors.white, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text('Filters applied successfully!'),
+                                ],
+                              ),
+                              backgroundColor: theme.success,
+                              duration: const Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Text(
+                          'Apply Filters',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Show Quick Mind Tools bottom sheet after session preparation
+  void _showQuickMindToolsSheet(FlutterFlowTheme theme) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
+        decoration: BoxDecoration(
+          color: theme.glassBackground,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.secondaryText.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.aiPrimary.withValues(alpha: 0.15),
+                    theme.aiSecondary.withValues(alpha: 0.08),
+                  ],
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: theme.aiGradient,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.psychology,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.filter_alt, color: Colors.white, size: 20),
-                        const SizedBox(width: 8),
-                        Text('Filters applied successfully!'),
+                        Text(
+                          'Quick Mind Tools',
+                          style: theme.titleLarge.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: theme.primaryText,
+                          ),
+                        ),
+                        Text(
+                          'Fast mental exercises for immediate use',
+                          style: theme.bodySmall.copyWith(
+                            color: theme.secondaryText,
+                          ),
+                        ),
                       ],
                     ),
-                    backgroundColor: theme.success,
-                    duration: const Duration(seconds: 2),
-                    behavior: SnackBarBehavior.floating,
                   ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.primary,
-                foregroundColor: Colors.white,
+                  IconButton(
+                    icon: Icon(Icons.close, color: theme.primaryText),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
               ),
-              child: Text('Apply Filters'),
             ),
+            // Tools Grid
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildQuickToolCard(
+                        theme,
+                        'Breathing',
+                        Icons.air,
+                        theme.breathingActive,
+                        '2 min',
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          // TODO: Navigate to breathing exercise
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildQuickToolCard(
+                        theme,
+                        'Visualize',
+                        Icons.visibility,
+                        theme.mentalFocus,
+                        '5 min',
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          // TODO: Navigate to visualization exercise
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildQuickToolCard(
+                        theme,
+                        'Reset',
+                        Icons.refresh,
+                        theme.mentalCalm,
+                        '3 min',
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          // TODO: Navigate to reset exercise
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildQuickToolCard(
+                        theme,
+                        'Rebalance',
+                        Icons.balance,
+                        theme.warning,
+                        'Adaptive',
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _triggerRebalance(theme);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -2284,14 +3433,34 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
         ),
       );
 
+      // Get user's adaptive mode preference and active training plan
+      final userDoc = await UserRecord.collection.doc(currentUserUid).get();
+      final user = userDoc.exists ? UserRecord.fromSnapshot(userDoc) : null;
+      final adaptiveMode = user?.currentAdaptiveMode ?? 'standard';
+
+      // Check for active training plan
+      final activePlan =
+          await _trainingPlanService.getCurrentPlan(currentUserUid);
+      String? trainingPlanId;
+
+      if (activePlan != null) {
+        // Verify this module is part of the active plan
+        final isPartOfPlan = activePlan.modules.contains(module.moduleId);
+        if (isPartOfPlan) {
+          trainingPlanId = activePlan.planId;
+        }
+        // If module not in plan, trainingPlanId remains null
+        // User might be exploring outside their plan
+      }
+
       // Simulate session preparation
       await Future.delayed(const Duration(seconds: 2));
 
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
 
-        // Create a mental session record
-        await MentalSessionsRecord.collection.add({
+        // Create a mental session record with training plan sync and adaptive mode
+        final sessionData = {
           'userId': currentUserUid,
           'moduleTitle': module.title,
           'moduleId': module.moduleId,
@@ -2302,12 +3471,23 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
           'estimatedDuration': module.duration,
           'difficulty': module.difficulty,
           'varkStyle': module.primaryVarkStyle,
-        });
+          'adaptiveMode': adaptiveMode,
+          if (trainingPlanId != null) 'trainingPlanId': trainingPlanId,
+        };
+
+        await MentalSessionsRecord.collection.add(sessionData);
 
         // Update module completion count
         await CoachingModulesRecord.collection.doc(module.reference.id).update({
           'completionCount': FieldValue.increment(1),
         });
+
+        // Store session reference for potential completion tracking
+        // If session is part of a training plan, plan progress will be updated
+        // when the session is marked as completed (handled separately)
+
+        // Show Quick Mind Tools after session preparation
+        _showQuickMindToolsSheet(theme);
 
         // Show success feedback
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2881,260 +4061,97 @@ class _CoachingModulesWidgetState extends State<CoachingModulesWidget>
     }
   }
 
-  /// Build daily goal
-  Widget _buildDailyGoal(FlutterFlowTheme theme) {
-    return GlassDashboardCard(
-      title: 'Today\'s Mental Training Goal',
-      subtitle: 'Stay consistent with your mental game development',
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                theme.primary.withValues(alpha: 0.1),
-                theme.primary.withValues(alpha: 0.05),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: theme.primary,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.flag,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '15 minutes of focused practice',
-                      style: theme.titleMedium.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: theme.primaryText,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Complete one mental training module today',
-                      style: theme.bodyMedium.copyWith(
-                        color: theme.secondaryText,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Build today's recommendation
-  Widget _buildTodayRecommendation(FlutterFlowTheme theme) {
-    return GlassDashboardCard(
-      title: 'Recommended for Today',
-      subtitle: 'AI-selected based on your recent performance',
-      children: [
-        // AI-powered daily recommendation
-        StreamBuilder<GeminiRecommendationResponse?>(
-          stream: _getTodayRecommendationStream(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return Container(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(theme.aiPrimary),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Generating personalized recommendation...',
-                      style: theme.bodyMedium.copyWith(
-                        color: theme.secondaryText,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            final recommendation = snapshot.data;
-            if (recommendation != null &&
-                recommendation.recommendations.isNotEmpty) {
-              final todayModule = recommendation.recommendations.first;
-              return _buildTodayModuleCard(theme, todayModule);
-            }
-
-            return _buildDefaultTodayRecommendation(theme);
-          },
-        ),
-      ],
-    );
-  }
-
-  /// Build quick tools
-  Widget _buildQuickTools(FlutterFlowTheme theme) {
-    return GlassDashboardCard(
-      title: 'Quick Training Tools',
-      subtitle: 'Fast mental exercises for immediate use',
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildQuickToolCard(
-                theme,
-                'Breathing',
-                Icons.air,
-                theme.breathingActive,
-                '2 min',
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildQuickToolCard(
-                theme,
-                'Visualization',
-                Icons.visibility,
-                theme.mentalFocus,
-                '5 min',
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildQuickToolCard(
-                theme,
-                'Affirmations',
-                Icons.record_voice_over,
-                theme.mentalStrength,
-                '3 min',
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
   /// Build quick tool card
   Widget _buildQuickToolCard(
     FlutterFlowTheme theme,
     String title,
     IconData icon,
     Color color,
-    String duration,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.glassBackground.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.glassBorder.withValues(alpha: 0.1),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
+    String duration, {
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              color.withValues(alpha: 0.15),
+              color.withValues(alpha: 0.05),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: color.withValues(alpha: 0.3),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
               color: color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 20,
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [color, color.withValues(alpha: 0.7)],
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(
+                icon,
+                color: Colors.white,
+                size: 28,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: theme.bodySmall.copyWith(
-              fontWeight: FontWeight.w600,
-              color: theme.primaryText,
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: theme.bodyMedium.copyWith(
+                fontWeight: FontWeight.w700,
+                color: theme.primaryText,
+                fontSize: 13,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          Text(
-            duration,
-            style: theme.bodySmall.copyWith(
-              color: theme.secondaryText,
-              fontSize: 10,
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                duration,
+                style: theme.bodySmall.copyWith(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    );
-  }
-
-  /// Build recent sessions
-  Widget _buildRecentSessions(FlutterFlowTheme theme) {
-    return GlassDashboardCard(
-      title: 'Recent Sessions',
-      subtitle: 'Your latest mental training activities',
-      children: [
-        // Dynamic Recent Sessions
-        StreamBuilder<List<MentalSessionsRecord>>(
-          stream: _getRecentSessionsStream(),
-          builder: (context, sessionsSnapshot) {
-            final sessions = sessionsSnapshot.data ?? <MentalSessionsRecord>[];
-            return _buildDynamicRecentSessions(theme, sessions);
-          },
-        ),
-      ],
-    );
-  }
-
-  /// Build mental performance overview
-  Widget _buildMentalPerformanceOverview(FlutterFlowTheme theme) {
-    return GlassDashboardCard(
-      title: 'Mental Performance Overview',
-      subtitle: 'Track your mental game development',
-      children: [
-        // Dynamic Mental Performance Overview
-        StreamBuilder<UserRecord>(
-          stream: loggedIn ? _userRecordStream : null,
-          builder: (context, userSnapshot) {
-            final user = userSnapshot.data;
-            return _buildDynamicMentalPerformanceOverview(theme, user);
-          },
-        ),
-      ],
-    );
-  }
-
-  /// Build learning progress
-  Widget _buildLearningProgress(FlutterFlowTheme theme) {
-    return GlassDashboardCard(
-      title: 'Learning Progress',
-      subtitle: 'Your journey through the mental training modules',
-      children: [
-        // Dynamic Learning Progress
-        StreamBuilder<List<MentalSessionsRecord>>(
-          stream: _userSessionsStream,
-          builder: (context, sessionsSnapshot) {
-            final sessions = sessionsSnapshot.data ?? <MentalSessionsRecord>[];
-            return _buildDynamicLearningProgress(theme, sessions);
-          },
-        ),
-      ],
     );
   }
 
@@ -4074,6 +5091,19 @@ Keep practicing consistently and trust the process! Your mental game will streng
   Widget _buildDynamicAchievements(
       FlutterFlowTheme theme, List<MentalSessionsRecord> sessions) {
     final achievements = _calculateAchievements(sessions);
+    final completedSessions = sessions.where((s) => s.isCompleted).length;
+
+    // Generate AI phrase
+    String aiPhrase = '';
+    if (completedSessions >= 25) {
+      aiPhrase = 'Mental mastery achieved! Outstanding dedication.';
+    } else if (completedSessions >= 10) {
+      aiPhrase = 'Momentum unlocked. Your consistency is paying off.';
+    } else if (completedSessions >= 5) {
+      aiPhrase = 'Consistency building. Great progress!';
+    } else if (completedSessions >= 1) {
+      aiPhrase = 'Great start! Your mental game journey begins.';
+    }
 
     if (achievements.isEmpty) {
       return Container(
@@ -4087,7 +5117,7 @@ Keep practicing consistently and trust the process! Your mental game will streng
             ),
             const SizedBox(height: 16),
             Text(
-              'No achievements yet',
+              completedSessions == 0 ? 'No achievements yet' : 'Great start!',
               style: theme.titleMedium.copyWith(
                 color: theme.primaryText,
                 fontWeight: FontWeight.w600,
@@ -4095,12 +5125,46 @@ Keep practicing consistently and trust the process! Your mental game will streng
             ),
             const SizedBox(height: 8),
             Text(
-              'Complete your first session to earn achievements',
+              completedSessions == 0
+                  ? 'Complete your first session to earn achievements'
+                  : 'Keep training to unlock more milestones',
               style: theme.bodyMedium.copyWith(
                 color: theme.secondaryText,
               ),
               textAlign: TextAlign.center,
             ),
+            if (aiPhrase.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.aiPrimary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: theme.aiPrimary.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.auto_awesome,
+                      size: 16,
+                      color: theme.aiPrimary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        aiPhrase,
+                        style: theme.bodySmall.copyWith(
+                          color: theme.primaryText,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       );
@@ -4456,6 +5520,11 @@ Keep practicing consistently and trust the process! Your mental game will streng
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
 
+        // Get user's adaptive mode preference
+        final userDoc = await UserRecord.collection.doc(currentUserUid).get();
+        final user = userDoc.exists ? UserRecord.fromSnapshot(userDoc) : null;
+        final adaptiveMode = user?.currentAdaptiveMode ?? 'AI-Reactive';
+
         // Create a comprehensive mental session record
         await MentalSessionsRecord.collection.add({
           'userId': currentUserUid,
@@ -4471,6 +5540,8 @@ Keep practicing consistently and trust the process! Your mental game will streng
           'expectedOutcome': module.expectedOutcome,
           'aiGenerated': true,
           'sessionSource': 'daily_recommendation',
+          'adaptiveMode': adaptiveMode,
+          'rebalanceTriggered': false,
         });
 
         // Enhanced success feedback
@@ -4770,6 +5841,970 @@ Keep practicing consistently and trust the process! Your mental game will streng
                   ),
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================================
+  // STUDIO TAB HELPER METHODS
+  // ============================================================================
+
+  /// Build personalized greeting section
+  Widget _buildPersonalizedGreeting(FlutterFlowTheme theme) {
+    return StreamBuilder<UserRecord>(
+      stream: currentUser != null ? _userRecordStream : null,
+      builder: (context, snapshot) {
+        final user = snapshot.data;
+        final displayName = user?.displayName ?? 'Golfer';
+        final now = DateTime.now();
+        final hour = now.hour;
+        String greeting;
+        if (hour < 12) {
+          greeting = 'Good morning';
+        } else if (hour < 17) {
+          greeting = 'Good afternoon';
+        } else {
+          greeting = 'Good evening';
+        }
+
+        return GlassDashboardCard(
+          title: '$greeting, $displayName',
+          subtitle: 'Ready to strengthen your mind?',
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.primary.withValues(alpha: 0.1),
+                    theme.secondary.withValues(alpha: 0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [theme.primary, theme.secondary],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.psychology,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Your mental game journey continues today',
+                          style: theme.titleMedium.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: theme.primaryText,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Updates daily based on your progress',
+                          style: theme.bodySmall.copyWith(
+                            color: theme.secondaryText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Build MindCoach Journey section
+  Widget _buildMindCoachJourney(FlutterFlowTheme theme) {
+    return StreamBuilder<UserRecord>(
+      stream: currentUser != null ? _userRecordStream : null,
+      builder: (context, userSnapshot) {
+        final user = userSnapshot.data;
+        final streak = user?.coachingStreak ?? 0;
+
+        // Calculate sessions this week
+        return StreamBuilder<List<MentalSessionsRecord>>(
+          stream: _getUserSessionsStream(),
+          builder: (context, sessionsSnapshot) {
+            final sessions = sessionsSnapshot.data ?? [];
+            final now = DateTime.now();
+            final weekStart = now.subtract(Duration(days: now.weekday - 1));
+            final thisWeekSessions = sessions.where((s) {
+              if (s.dateCompleted == null) return false;
+              return s.dateCompleted!.isAfter(weekStart);
+            }).length;
+
+            // Determine current pillar being worked on
+            String currentPillar = 'Confidence';
+            if (sessions.isNotEmpty) {
+              final lastSession = sessions.first;
+              currentPillar = lastSession.pillar.isNotEmpty
+                  ? lastSession.pillar
+                  : 'Confidence';
+            }
+
+            return GlassDashboardCard(
+              title: 'Your MindCoach Journey',
+              subtitle: 'Strengthening the mindset behind your game',
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        _getPillarColor(theme, currentPillar.toLowerCase())
+                            .withValues(alpha: 0.1),
+                        _getPillarColor(theme, currentPillar.toLowerCase())
+                            .withValues(alpha: 0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _getPillarColor(theme, currentPillar.toLowerCase())
+                          .withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Working on: $currentPillar',
+                                  style: theme.titleSmall.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.primaryText,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.local_fire_department,
+                                      size: 20,
+                                      color: theme.warning,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Training streak: $streak days',
+                                      style: theme.bodyMedium.copyWith(
+                                        color: theme.primaryText,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Circular progress ring
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              SizedBox(
+                                width: 80,
+                                height: 80,
+                                child: CircularProgressIndicator(
+                                  value: thisWeekSessions / 7,
+                                  strokeWidth: 8,
+                                  backgroundColor:
+                                      theme.alternate.withValues(alpha: 0.2),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    _getPillarColor(
+                                        theme, currentPillar.toLowerCase()),
+                                  ),
+                                ),
+                              ),
+                              Column(
+                                children: [
+                                  Text(
+                                    '$thisWeekSessions',
+                                    style: theme.titleLarge.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: theme.primaryText,
+                                    ),
+                                  ),
+                                  Text(
+                                    '/7',
+                                    style: theme.bodySmall.copyWith(
+                                      color: theme.secondaryText,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            _tabController.animateTo(2); // Switch to Train tab
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _getPillarColor(
+                                theme, currentPillar.toLowerCase()),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          icon: Icon(Icons.play_arrow, size: 20),
+                          label: Text(
+                            'Continue Training',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Build AI Insights section
+  Widget _buildAIInsightsSection(FlutterFlowTheme theme) {
+    return GlassDashboardCard(
+      title: '✨ AI Insights',
+      subtitle:
+          'Personalized coaching that adapts to your routines and progress',
+      children: [
+        StreamBuilder<UserRecord>(
+          stream: currentUser != null ? _userRecordStream : null,
+          builder: (context, userSnapshot) {
+            final user = userSnapshot.data;
+            // Generate AI insight based on user data
+            String insightText =
+                'Focus consistency is improving. Recommended resets between rounds.';
+            if (user != null && user.coachingStreak > 5) {
+              insightText =
+                  'Strong training streak! Your mental game foundation is building well.';
+            }
+
+            return Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.aiPrimary.withValues(alpha: 0.1),
+                    theme.aiSecondary.withValues(alpha: 0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: theme.aiPrimary.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          gradient: theme.aiGradient,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.auto_awesome,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          insightText,
+                          style: theme.bodyMedium.copyWith(
+                            color: theme.primaryText,
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        _tabController.animateTo(2); // Switch to Train tab
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.aiPrimary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: Icon(Icons.play_arrow, size: 18),
+                      label: Text('Continue Training'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Build Mind in Balance section
+  Widget _buildMindInBalance(FlutterFlowTheme theme) {
+    return StreamBuilder<List<MentalSessionsRecord>>(
+      stream: _getUserSessionsStream(),
+      builder: (context, sessionsSnapshot) {
+        final sessions = sessionsSnapshot.data ?? [];
+
+        // Calculate pillar scores
+        final focusSessions = sessions.where((s) => s.pillar == 'focus').length;
+        final confidenceSessions =
+            sessions.where((s) => s.pillar == 'confidence').length;
+        final controlSessions =
+            sessions.where((s) => s.pillar == 'control').length;
+
+        // Determine status for each pillar
+        String getFocusStatus() {
+          if (focusSessions > confidenceSessions &&
+              focusSessions > controlSessions) {
+            return 'Getting sharper';
+          }
+          return 'Needs attention';
+        }
+
+        String getConfidenceStatus() {
+          if (confidenceSessions > focusSessions &&
+              confidenceSessions > controlSessions) {
+            return 'Strongest area this week';
+          }
+          return 'Building';
+        }
+
+        String getControlStatus() {
+          if (controlSessions < focusSessions &&
+              controlSessions < confidenceSessions) {
+            return 'Needs attention';
+          }
+          return 'Developing';
+        }
+
+        return GlassDashboardCard(
+          title: 'Your Mind in Balance',
+          subtitle: 'Current state across all three pillars',
+          children: [
+            Column(
+              children: [
+                _buildPillarBalanceItem(theme, 'Focus', getFocusStatus(),
+                    focusSessions, theme.mentalFocus),
+                const SizedBox(height: 12),
+                _buildPillarBalanceItem(
+                    theme,
+                    'Confidence',
+                    getConfidenceStatus(),
+                    confidenceSessions,
+                    theme.mentalStrength),
+                const SizedBox(height: 12),
+                _buildPillarBalanceItem(theme, 'Control', getControlStatus(),
+                    controlSessions, theme.mentalCalm),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Build individual pillar balance item
+  Widget _buildPillarBalanceItem(
+    FlutterFlowTheme theme,
+    String pillar,
+    String status,
+    int sessionCount,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _getPillarIcon(pillar.toLowerCase()),
+              color: color,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  pillar,
+                  style: theme.titleSmall.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.primaryText,
+                  ),
+                ),
+                Text(
+                  status,
+                  style: theme.bodySmall.copyWith(
+                    color: theme.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '$sessionCount sessions',
+            style: theme.bodySmall.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build Recent Training Sessions section
+  Widget _buildRecentTrainingSessions(FlutterFlowTheme theme) {
+    return GlassDashboardCard(
+      title: 'Recent Training Sessions',
+      subtitle: 'Your latest mental training activities',
+      children: [
+        StreamBuilder<List<MentalSessionsRecord>>(
+          stream: _getRecentSessionsStream(),
+          builder: (context, snapshot) {
+            final sessions = snapshot.data ?? [];
+
+            if (sessions.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.history,
+                      size: 48,
+                      color: theme.secondaryText.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No recent sessions',
+                      style: theme.bodyMedium.copyWith(
+                        color: theme.secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return Column(
+              children: sessions.take(3).map((session) {
+                final progress = session.progressPercentage;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.glassBackground.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: theme.glassBorder.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                session.moduleTitle,
+                                style: theme.titleSmall.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.primaryText,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  if (progress > 0)
+                                    Container(
+                                      width: 60,
+                                      height: 4,
+                                      decoration: BoxDecoration(
+                                        color: theme.alternate
+                                            .withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                      child: FractionallySizedBox(
+                                        alignment: Alignment.centerLeft,
+                                        widthFactor: progress / 100,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: theme.success,
+                                            borderRadius:
+                                                BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  if (progress > 0) const SizedBox(width: 8),
+                                  Text(
+                                    progress > 0
+                                        ? '${progress.toInt()}%'
+                                        : session.dateCompleted != null
+                                            ? _formatSessionDate(
+                                                session.dateCompleted!)
+                                            : 'In progress',
+                                    style: theme.bodySmall.copyWith(
+                                      color: theme.secondaryText,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (session.dateCompleted != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: theme.success.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _formatSessionDate(session.dateCompleted!),
+                              style: theme.bodySmall.copyWith(
+                                color: theme.success,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Build Recommended Next Steps section
+  Widget _buildRecommendedNextSteps(FlutterFlowTheme theme) {
+    return GlassDashboardCard(
+      title: 'Recommended Next Steps',
+      subtitle:
+          'Personalized actions to accelerate your mental game development',
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Enhanced header with progress indicator
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  theme.aiPrimary,
+                                  theme.aiPrimary.withValues(alpha: 0.7),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.auto_awesome,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'AI-Powered Recommendations',
+                            style: theme.bodySmall.copyWith(
+                              color: theme.aiPrimary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Based on your recent activity and performance patterns',
+                        style: theme.bodySmall.copyWith(
+                          color: theme.secondaryText,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Enhanced next step cards
+            Row(
+              children: [
+                Expanded(
+                  child: _buildEnhancedNextStepCard(
+                    theme,
+                    'Explore Library',
+                    'Discover new mental training modules',
+                    '12+ modules available',
+                    Icons.library_books,
+                    theme.primary,
+                    () => _tabController.animateTo(1),
+                    badge: 'New',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildEnhancedNextStepCard(
+                    theme,
+                    'Start Training',
+                    'Begin your next guided session',
+                    'Recommended for you',
+                    Icons.play_circle_filled,
+                    theme.success,
+                    () => _tabController.animateTo(2),
+                    badge: 'Hot',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildEnhancedNextStepCard(
+                    theme,
+                    'Track Progress',
+                    'Review your mental game journey',
+                    'See improvements',
+                    Icons.trending_up,
+                    theme.warning,
+                    () => _tabController.animateTo(3),
+                    badge: null,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Additional quick action button
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    theme.aiPrimary.withValues(alpha: 0.1),
+                    theme.aiPrimary.withValues(alpha: 0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.aiPrimary.withValues(alpha: 0.2),
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          theme.aiPrimary,
+                          theme.aiPrimary.withValues(alpha: 0.8)
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.psychology,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Get Personalized AI Insights',
+                          style: theme.titleSmall.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: theme.primaryText,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Receive tailored recommendations based on your progress',
+                          style: theme.bodySmall.copyWith(
+                            color: theme.secondaryText,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: theme.aiPrimary,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Build enhanced next step card
+  Widget _buildEnhancedNextStepCard(
+    FlutterFlowTheme theme,
+    String title,
+    String subtitle,
+    String info,
+    IconData icon,
+    Color color,
+    VoidCallback onTap, {
+    String? badge,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              color.withValues(alpha: 0.08),
+              color.withValues(alpha: 0.03),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: color.withValues(alpha: 0.25),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with icon and badge
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        color,
+                        color.withValues(alpha: 0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    icon,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                if (badge != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: color.withValues(alpha: 0.4),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      badge,
+                      style: theme.bodySmall.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 9,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Title
+            Text(
+              title,
+              style: theme.titleSmall.copyWith(
+                fontWeight: FontWeight.w700,
+                color: theme.primaryText,
+                fontSize: 14,
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            // Subtitle
+            Text(
+              subtitle,
+              style: theme.bodySmall.copyWith(
+                color: theme.secondaryText,
+                fontSize: 11,
+                height: 1.3,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+
+            const SizedBox(height: 12),
+
+            // Info badge
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 12,
+                    color: color,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    info,
+                    style: theme.bodySmall.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Arrow indicator
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward,
+                    color: color,
+                    size: 14,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

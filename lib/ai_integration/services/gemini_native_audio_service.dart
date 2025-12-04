@@ -1,9 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:firebase_ai/firebase_ai.dart';
 
 import '/backend/schema/structs/vark_preferences_struct.dart';
 

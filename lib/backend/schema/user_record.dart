@@ -157,6 +157,16 @@ class UserRecord extends FirestoreRecord {
   String get referralSource => _referralSource ?? '';
   bool hasReferralSource() => _referralSource != null;
 
+  // "currentAdaptiveMode" field.
+  String? _currentAdaptiveMode;
+  String get currentAdaptiveMode => _currentAdaptiveMode ?? '';
+  bool hasCurrentAdaptiveMode() => _currentAdaptiveMode != null;
+
+  // "lastTrainingPlanId" field.
+  String? _lastTrainingPlanId;
+  String get lastTrainingPlanId => _lastTrainingPlanId ?? '';
+  bool hasLastTrainingPlanId() => _lastTrainingPlanId != null;
+
   void _initializeFields() {
     _email = snapshotData['email'] as String?;
     _displayName = snapshotData['displayName'] as String?;
@@ -227,6 +237,8 @@ class UserRecord extends FirestoreRecord {
     _appVersion = snapshotData['appVersion'] as String?;
     _platform = snapshotData['platform'] as String?;
     _referralSource = snapshotData['referralSource'] as String?;
+    _currentAdaptiveMode = snapshotData['currentAdaptiveMode'] as String?;
+    _lastTrainingPlanId = snapshotData['lastTrainingPlanId'] as String?;
   }
 
   static CollectionReference get collection =>

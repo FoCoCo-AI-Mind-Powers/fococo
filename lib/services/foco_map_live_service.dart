@@ -486,7 +486,7 @@ class FoCoMapLiveService {
       (snapshot) {
         try {
           _cachedAIInsights = snapshot.docs
-              .map((doc) => doc.data() as Map<String, dynamic>)
+              .map((doc) => doc.data())
               .toList();
 
           _aiInsightsController.add(_cachedAIInsights);
@@ -523,7 +523,7 @@ class FoCoMapLiveService {
 
       final snapshot = await query.get();
       _cachedAIInsights = snapshot.docs
-          .map((doc) => doc.data() as Map<String, dynamic>)
+          .map((doc) => doc.data())
           .toList();
 
       _aiInsightsController.add(_cachedAIInsights);

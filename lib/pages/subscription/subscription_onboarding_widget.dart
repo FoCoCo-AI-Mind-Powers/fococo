@@ -4,7 +4,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
-import '/services/stripe_service.dart';
+import '/data/store_subscription_plans.dart';
+// import '/services/stripe_service.dart';
 import 'subscription_onboarding_model.dart';
 export 'subscription_onboarding_model.dart';
 
@@ -33,7 +34,7 @@ class _SubscriptionOnboardingWidgetState
   late Animation<Offset> _slideAnimation;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
-  final StripeService _stripeService = StripeService();
+  // final StripeService _stripeService = StripeService();
 
   String? _selectedPlan;
   bool _isLoading = false;
@@ -73,9 +74,6 @@ class _SubscriptionOnboardingWidgetState
     // Start animations
     _fadeController.forward();
     _slideController.forward();
-
-    // Initialize Stripe
-    _initializeStripe();
   }
 
   @override
@@ -84,14 +82,6 @@ class _SubscriptionOnboardingWidgetState
     _slideController.dispose();
     _model.dispose();
     super.dispose();
-  }
-
-  Future<void> _initializeStripe() async {
-    try {
-      await _stripeService.initialize();
-    } catch (e) {
-      debugPrint('Failed to initialize Stripe: $e');
-    }
   }
 
   @override
@@ -238,7 +228,7 @@ class _SubscriptionOnboardingWidgetState
         const SizedBox(height: 20),
 
         // Plans
-        ...StripeService.subscriptionPlans.entries.map((entry) {
+        ...storeSubscriptionPlans.entries.map((entry) {
           final plan = entry.value;
           final isSelected = _selectedPlan == plan.id;
           final isPopular = plan.id == 'plus';
@@ -261,7 +251,7 @@ class _SubscriptionOnboardingWidgetState
   /// Individual plan card
   Widget _buildPlanCard({
     required FlutterFlowTheme theme,
-    required SubscriptionPlan plan,
+    required StoreSubscriptionPlan plan,
     required bool isSelected,
     required bool isPopular,
     required VoidCallback onTap,
@@ -399,7 +389,7 @@ class _SubscriptionOnboardingWidgetState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Choose Payment Method',
+          'Subscribe with your store',
           style: theme.titleLarge.copyWith(
             fontWeight: FontWeight.w700,
             color: theme.primaryText,
@@ -407,35 +397,40 @@ class _SubscriptionOnboardingWidgetState
         ),
         const SizedBox(height: 20),
 
-        // Credit Card
-        _buildPaymentMethodButton(
-          theme: theme,
-          title: 'Credit Card',
-          subtitle: 'Visa, Mastercard, American Express',
-          icon: FontAwesomeIcons.creditCard,
-          onTap: () => _handleCreditCardPayment(),
-        ),
-
-        const SizedBox(height: 12),
-
-        // Apple Pay (iOS only)
         if (Platform.isIOS)
           _buildPaymentMethodButton(
             theme: theme,
-            title: 'Apple Pay',
-            subtitle: 'Pay with Touch ID or Face ID',
+            title: 'App Store Subscription',
+            subtitle: 'Secure purchase with Touch ID / Face ID',
             icon: FontAwesomeIcons.apple,
-            onTap: () => _handleApplePayPayment(),
+            onTap: () => _handleAppStoreSubscription(),
           ),
 
         // Google Pay (Android only)
         if (Platform.isAndroid)
           _buildPaymentMethodButton(
             theme: theme,
-            title: 'Google Pay',
-            subtitle: 'Pay with your Google account',
+            title: 'Google Play Subscription',
+            subtitle: 'Use your Google account for billing',
             icon: FontAwesomeIcons.google,
-            onTap: () => _handleGooglePayPayment(),
+            onTap: () => _handleGooglePlaySubscription(),
+          ),
+        if (!Platform.isIOS && !Platform.isAndroid)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.secondaryBackground,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: theme.secondaryText.withValues(alpha: 0.1),
+              ),
+            ),
+            child: Text(
+              'Native subscriptions are currently available only on iOS and Android builds.',
+              style: theme.bodyMedium.copyWith(
+                color: theme.secondaryText,
+              ),
+            ),
           ),
       ],
     );
@@ -531,70 +526,51 @@ class _SubscriptionOnboardingWidgetState
 
   // Payment handlers
 
-  Future<void> _handleCreditCardPayment() async {
-    if (_selectedPlan == null) return;
+  Future<void> _handleAppStoreSubscription() async {
+    if (!Platform.isIOS) {
+      _showErrorDialog('App Store subscriptions are only available on iOS.');
+      return;
+    }
+
+    if (_selectedPlan == null) {
+      _showErrorDialog('Please select a plan to continue.');
+      return;
+    }
 
     setState(() => _isLoading = true);
 
     try {
-      final result = await _stripeService.createSubscription(
-        planId: _selectedPlan!,
-        context: context,
-      );
-
-      if (result.success) {
-        _showSuccessDialog();
-      } else {
-        _showErrorDialog(result.error ?? 'Payment failed');
-      }
+      // TODO: Integrate StoreKit purchase flow
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      _showSuccessDialog();
     } catch (e) {
-      _showErrorDialog('Payment failed: $e');
+      _showErrorDialog('App Store subscription failed: $e');
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _handleApplePayPayment() async {
-    if (_selectedPlan == null) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      final result = await _stripeService.presentApplePay(
-        planId: _selectedPlan!,
-        context: context,
+  Future<void> _handleGooglePlaySubscription() async {
+    if (!Platform.isAndroid) {
+      _showErrorDialog(
+        'Google Play subscriptions are only available on Android.',
       );
-
-      if (result.success) {
-        _showSuccessDialog();
-      } else {
-        _showErrorDialog(result.error ?? 'Apple Pay failed');
-      }
-    } catch (e) {
-      _showErrorDialog('Apple Pay failed: $e');
-    } finally {
-      setState(() => _isLoading = false);
+      return;
     }
-  }
 
-  Future<void> _handleGooglePayPayment() async {
-    if (_selectedPlan == null) return;
+    if (_selectedPlan == null) {
+      _showErrorDialog('Please select a plan to continue.');
+      return;
+    }
 
     setState(() => _isLoading = true);
 
     try {
-      final result = await _stripeService.presentGooglePay(
-        planId: _selectedPlan!,
-        context: context,
-      );
-
-      if (result.success) {
-        _showSuccessDialog();
-      } else {
-        _showErrorDialog(result.error ?? 'Google Pay failed');
-      }
+      // TODO: Integrate Google Play Billing flow
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      _showSuccessDialog();
     } catch (e) {
-      _showErrorDialog('Google Pay failed: $e');
+      _showErrorDialog('Google Play subscription failed: $e');
     } finally {
       setState(() => _isLoading = false);
     }

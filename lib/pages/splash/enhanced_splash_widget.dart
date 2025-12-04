@@ -31,7 +31,7 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
   void _initializeAnimations() {
     // Initialize animation controllers
     _rotationController = AnimationController(
-      duration: const Duration(seconds: 3),
+      duration: const Duration(seconds: 6), // Doubled for 2 rotations
       vsync: this,
     );
 
@@ -48,7 +48,7 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
     // Create animations
     _rotationAnimation = Tween<double>(
       begin: 0,
-      end: 2 * math.pi,
+      end: 4 * math.pi, // Two full rotations
     ).animate(CurvedAnimation(
       parent: _rotationController,
       curve: Curves.easeInOutCubic,
@@ -82,8 +82,8 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
     await Future.delayed(const Duration(milliseconds: 300));
     _scaleController.forward();
 
-    // Start continuous rotation (wind power effect)
-    _rotationController.repeat();
+    // Start rotation animation (2 full rotations)
+    _rotationController.forward();
   }
 
   @override
@@ -101,17 +101,8 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
     return Container(
       width: double.infinity,
       height: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            theme.primary,
-            theme.secondary,
-            theme.tertiary,
-          ],
-          stops: const [0.0, 0.5, 1.0],
-        ),
+      decoration: const BoxDecoration(
+        color: Colors.black,
       ),
       child: Stack(
         children: [
@@ -133,55 +124,59 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
                     scale: _scaleAnimation.value,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // Rotating logo container
-                        Container(
-                          width: 200,
-                          height: 200,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.white.withValues(alpha: 0.3),
-                                blurRadius: 30,
-                                spreadRadius: 10,
-                              ),
-                            ],
-                          ),
-                          child: Transform.rotate(
-                            angle: _rotationAnimation.value,
-                            child: Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white.withValues(alpha: 0.1),
-                                border: Border.all(
+                        Center(
+                          child: Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
                                   color: Colors.white.withValues(alpha: 0.3),
-                                  width: 2,
+                                  blurRadius: 20,
+                                  spreadRadius: 6,
                                 ),
-                              ),
-                              child: ClipOval(
-                                child: Image.asset(
-                                  'assets/images/logo/FoCoCo Logo Wihtout Title.png',
-                                  width: 160,
-                                  height: 160,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      width: 160,
-                                      height: 160,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color:
-                                            Colors.white.withValues(alpha: 0.2),
-                                      ),
-                                      child: const Icon(
-                                        Icons.golf_course,
-                                        size: 80,
-                                        color: Colors.white,
-                                      ),
-                                    );
-                                  },
+                              ],
+                            ),
+                            child: Transform.rotate(
+                              angle: _rotationAnimation.value,
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.3),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: ClipOval(
+                                  child: Image.asset(
+                                    'assets/images/logo/Logo.png',
+                                    width: 96,
+                                    height: 96,
+                                    fit: BoxFit.contain,
+                                    alignment: Alignment.center,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        width: 96,
+                                        height: 96,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Colors.white
+                                              .withValues(alpha: 0.2),
+                                        ),
+                                        child: const Icon(
+                                          Icons.golf_course,
+                                          size: 56,
+                                          color: Colors.white,
+                                        ),
+                                      );
+                                    },
+                                  ),
                                 ),
                               ),
                             ),
@@ -192,7 +187,7 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
 
                         // App tagline
                         Text(
-                          'Focus. Confidence. Control.',
+                          'FoCoCo',
                           style: theme.headlineMedium.override(
                             fontFamily: 'Montserrat',
                             color: Colors.white,
@@ -205,7 +200,7 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
                         const SizedBox(height: 16),
 
                         Text(
-                          'Master Your Mental Game',
+                          'Your Mind Powers the Game',
                           style: theme.bodyLarge.override(
                             fontFamily: 'Inter',
                             color: Colors.white.withValues(alpha: 0.9),
@@ -310,7 +305,7 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
     return FlutterSplashScreen(
       // Duration must be null when using asyncNavigationCallback
       duration: null,
-      backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+      backgroundColor: Colors.black,
       splashScreenBody: _buildCustomSplashBody(),
       asyncNavigationCallback: _handleNavigation,
       onInit: () {

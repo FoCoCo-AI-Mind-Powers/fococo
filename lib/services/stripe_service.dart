@@ -326,22 +326,24 @@ class StripeService {
     }
   }
 
-  /// Get current user subscription
+  /// Get current user subscription (checks all platforms: Stripe, App Store, Google Play)
   Future<UserSubscriptionInfo?> getCurrentSubscription() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return null;
 
-      final subscriptionDoc = await FirebaseFirestore.instance
+      // Check for active or trialing subscriptions (includes trial periods)
+      final subscriptionQuery = await FirebaseFirestore.instance
           .collection('user_subscriptions')
           .where('userId', isEqualTo: user.uid)
-          .where('status', isEqualTo: 'active')
+          .where('status', whereIn: ['active', 'trialing'])
+          .orderBy('currentPeriodEnd', descending: true)
           .limit(1)
           .get();
 
-      if (subscriptionDoc.docs.isEmpty) return null;
+      if (subscriptionQuery.docs.isEmpty) return null;
 
-      final data = subscriptionDoc.docs.first.data();
+      final data = subscriptionQuery.docs.first.data();
       return UserSubscriptionInfo.fromMap(data);
     } catch (e) {
       debugPrint('❌ Failed to get current subscription: $e');
@@ -356,9 +358,71 @@ class StripeService {
   }
 
   /// Get subscription tier for user
+  /// Checks subscription collection first, then falls back to user.currentMembershipTier
   Future<String> getUserTier() async {
-    final subscription = await getCurrentSubscription();
-    return subscription?.membershipTier ?? 'junior';
+    try {
+      // First check active subscription
+      final subscription = await getCurrentSubscription();
+      if (subscription != null && subscription.isActive) {
+        return subscription.membershipTier;
+      }
+      
+      // Fallback: check user document for currentMembershipTier
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('user')
+            .doc(user.uid)
+            .get();
+        
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          final tier = userData?['currentMembershipTier'] as String?;
+          if (tier != null && tier.isNotEmpty && tier != 'junior') {
+            return tier;
+          }
+        }
+      }
+      
+      return 'junior';
+    } catch (e) {
+      debugPrint('❌ Error getting user tier: $e');
+      return 'junior';
+    }
+  }
+
+  /// Comprehensive subscription state check
+  /// Returns detailed subscription information
+  Future<Map<String, dynamic>> getSubscriptionState() async {
+    try {
+      final subscription = await getCurrentSubscription();
+      final tier = await getUserTier();
+      final hasActive = await hasActiveSubscription();
+      
+      return {
+        'hasActiveSubscription': hasActive,
+        'subscription': subscription != null ? {
+          'id': subscription.subscriptionId,
+          'tier': subscription.membershipTier,
+          'status': subscription.status,
+          'isActive': subscription.isActive,
+          'currentPeriodStart': subscription.currentPeriodStart.toIso8601String(),
+          'currentPeriodEnd': subscription.currentPeriodEnd.toIso8601String(),
+          'cancelAtPeriodEnd': subscription.cancelAtPeriodEnd,
+          'autoRenewing': subscription.autoRenewing,
+        } : null,
+        'userTier': tier,
+        'isTrial': subscription?.status == 'trialing',
+      };
+    } catch (e) {
+      debugPrint('❌ Error getting subscription state: $e');
+      return {
+        'hasActiveSubscription': false,
+        'subscription': null,
+        'userTier': 'junior',
+        'isTrial': false,
+      };
+    }
   }
 
   // Private helper methods
@@ -530,19 +594,75 @@ class UserSubscriptionInfo {
     required this.autoRenewing,
   });
 
-  bool get isActive =>
-      status == 'active' && DateTime.now().isBefore(currentPeriodEnd);
+  bool get isActive {
+    // Check if status is active or trialing, and period hasn't ended
+    final isValidStatus = status == 'active' || status == 'trialing';
+    final isWithinPeriod = DateTime.now().isBefore(currentPeriodEnd);
+    final notCancelled = !cancelAtPeriodEnd || DateTime.now().isBefore(currentPeriodEnd);
+    return isValidStatus && isWithinPeriod && notCancelled;
+  }
 
   factory UserSubscriptionInfo.fromMap(Map<String, dynamic> map) {
+    // Handle different subscription platforms (Stripe, App Store, Google Play)
+    final platform = map['platform'] as String? ?? 'stripe';
+    
+    // Get subscription ID based on platform
+    String subscriptionId = '';
+    if (platform == 'stripe') {
+      subscriptionId = map['stripeSubscriptionId'] as String? ?? 
+                       map['subscriptionId'] as String? ?? '';
+    } else if (platform == 'app_store') {
+      subscriptionId = map['originalTransactionId'] as String? ?? '';
+    } else if (platform == 'google_play') {
+      subscriptionId = map['purchaseToken'] as String? ?? 
+                       map['originalTransactionId'] as String? ?? '';
+    }
+    
+    // Get customer ID based on platform
+    String customerId = '';
+    if (platform == 'stripe') {
+      customerId = map['stripeCustomerId'] as String? ?? 
+                   map['customerId'] as String? ?? '';
+    } else {
+      customerId = map['userId'] as String? ?? '';
+    }
+    
+    // Handle Timestamp conversion safely
+    DateTime currentPeriodStart;
+    DateTime currentPeriodEnd;
+    
+    try {
+      if (map['currentPeriodStart'] is Timestamp) {
+        currentPeriodStart = (map['currentPeriodStart'] as Timestamp).toDate();
+      } else if (map['currentPeriodStart'] is DateTime) {
+        currentPeriodStart = map['currentPeriodStart'] as DateTime;
+      } else {
+        currentPeriodStart = DateTime.now();
+      }
+      
+      if (map['currentPeriodEnd'] is Timestamp) {
+        currentPeriodEnd = (map['currentPeriodEnd'] as Timestamp).toDate();
+      } else if (map['currentPeriodEnd'] is DateTime) {
+        currentPeriodEnd = map['currentPeriodEnd'] as DateTime;
+      } else {
+        // Default to 30 days from now if not set
+        currentPeriodEnd = DateTime.now().add(const Duration(days: 30));
+      }
+    } catch (e) {
+      debugPrint('❌ Error parsing subscription dates: $e');
+      currentPeriodStart = DateTime.now();
+      currentPeriodEnd = DateTime.now().add(const Duration(days: 30));
+    }
+    
     return UserSubscriptionInfo(
-      subscriptionId: map['subscriptionId'] ?? '',
-      customerId: map['customerId'] ?? '',
-      status: map['status'] ?? '',
-      membershipTier: map['membershipTier'] ?? '',
-      currentPeriodStart: (map['currentPeriodStart'] as Timestamp).toDate(),
-      currentPeriodEnd: (map['currentPeriodEnd'] as Timestamp).toDate(),
-      cancelAtPeriodEnd: map['cancelAtPeriodEnd'] ?? false,
-      autoRenewing: map['autoRenewing'] ?? false,
+      subscriptionId: subscriptionId,
+      customerId: customerId,
+      status: map['status'] as String? ?? 'inactive',
+      membershipTier: map['membershipTier'] as String? ?? 'junior',
+      currentPeriodStart: currentPeriodStart,
+      currentPeriodEnd: currentPeriodEnd,
+      cancelAtPeriodEnd: map['cancelAtPeriodEnd'] as bool? ?? false,
+      autoRenewing: map['autoRenewing'] as bool? ?? true,
     );
   }
 }

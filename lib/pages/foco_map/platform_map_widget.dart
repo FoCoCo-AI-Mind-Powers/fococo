@@ -46,6 +46,14 @@ class PlatformMapWidget extends StatefulWidget {
 
   @override
   State<PlatformMapWidget> createState() => _PlatformMapWidgetState();
+  
+  /// Public method to animate to a location
+  static Future<void> animateToLocationFromKey(GlobalKey key, LatLng location, {double? zoom}) async {
+    final state = key.currentState;
+    if (state is _PlatformMapWidgetState) {
+      await state.animateToLocation(location, zoom: zoom);
+    }
+  }
 }
 
 class _PlatformMapWidgetState extends State<PlatformMapWidget> {
@@ -54,6 +62,7 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
   LatLng? _currentLocation;
   bool _isLoading = true;
   bool _platformViewFailed = false;
+  bool _isMapCreated = false;
 
   // Enhanced state management for clustering and performance
   double _currentZoom = 14.0;
@@ -73,13 +82,67 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
   }
 
   @override
+  void dispose() {
+    // Clear controller references (controllers don't have dispose methods)
+    // The platform will handle cleanup automatically
+    _appleMapController = null;
+    _googleMapController = null;
+    super.dispose();
+  }
+
+  @override
   void didUpdateWidget(PlatformMapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    // Update location/zoom without recreating the map
+    if (widget.initialLocation != oldWidget.initialLocation ||
+        widget.initialZoom != oldWidget.initialZoom) {
+      _updateCameraPosition();
+    }
 
     // Check if markers changed and need clustering update
     if (widget.markers != oldWidget.markers) {
       _needsClusterUpdate = true;
-      _updateClustering();
+      if (_isMapCreated) {
+        _updateClustering();
+      }
+    }
+  }
+
+  /// Update camera position without recreating the map
+  Future<void> _updateCameraPosition() async {
+    if (!_isMapCreated) return;
+
+    final newLocation = widget.initialLocation ?? _currentLocation;
+    if (newLocation == null) return;
+
+    try {
+      if (Platform.isIOS && _appleMapController != null) {
+        await _appleMapController!.animateCamera(
+          apple_maps.CameraUpdate.newCameraPosition(
+            apple_maps.CameraPosition(
+              target: apple_maps.LatLng(newLocation.latitude, newLocation.longitude),
+              zoom: widget.initialZoom,
+            ),
+          ),
+        );
+      } else if (!Platform.isIOS && _googleMapController != null) {
+        await _googleMapController!.animateCamera(
+          google_maps.CameraUpdate.newLatLngZoom(
+            google_maps.LatLng(newLocation.latitude, newLocation.longitude),
+            widget.initialZoom,
+          ),
+        );
+      }
+      
+      if (mounted) {
+        setState(() {
+          _currentLocation = newLocation;
+          _currentZoom = widget.initialZoom;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error updating camera position: $e');
     }
   }
 
@@ -275,6 +338,13 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
       ),
       onMapCreated: (apple_maps.AppleMapController controller) {
         _appleMapController = controller;
+        _isMapCreated = true;
+        // Update markers after map is created
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _needsClusterUpdate) {
+            _updateClustering();
+          }
+        });
       },
       annotations: _convertToAppleAnnotations(),
       mapType: _convertToAppleMapType(widget.mapType),
@@ -305,6 +375,13 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
       ),
       onMapCreated: (google_maps.GoogleMapController controller) {
         _googleMapController = controller;
+        _isMapCreated = true;
+        // Update markers after map is created
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _needsClusterUpdate) {
+            _updateClustering();
+          }
+        });
       },
       markers: _convertToGoogleMarkers(),
       mapType: _convertToGoogleMapType(widget.mapType),

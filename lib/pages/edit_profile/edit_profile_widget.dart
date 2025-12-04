@@ -3,6 +3,7 @@ import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/ai_integration/widgets/enhanced_navbar_widget.dart';
+import '/widgets/floating_voice_button.dart';
 import '/services/profile_service.dart';
 import 'edit_profile_model.dart';
 export 'edit_profile_model.dart';

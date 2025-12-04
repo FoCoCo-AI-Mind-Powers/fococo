@@ -11,6 +11,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:ui';
 import 'dart:io';
+import 'golf_round_modal_grint_style.dart';
 
 class GolfRoundsWidget extends StatefulWidget {
   const GolfRoundsWidget({super.key});
@@ -861,7 +862,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.6),
-      builder: (context) => _AddRoundModal(theme: theme),
+      builder: (context) => GolfRoundModalGrintStyle(theme: theme),
     );
   }
 
@@ -1324,7 +1325,7 @@ class _GolfRoundsWidgetState extends State<GolfRoundsWidget>
   }
 }
 
-/// Add Round Modal Widget
+/// Add Round Modal Widget - Grint Style Design
 class _AddRoundModal extends StatefulWidget {
   final FlutterFlowTheme theme;
 
@@ -1337,22 +1338,22 @@ class _AddRoundModal extends StatefulWidget {
 class _AddRoundModalState extends State<_AddRoundModal> {
   final _formKey = GlobalKey<FormState>();
   final _courseNameController = TextEditingController();
+  
+  // Score and Putts controllers
   final _scoreController = TextEditingController();
   final _parTotalController = TextEditingController();
   final _puttsController = TextEditingController();
+  
+  // Statistics controllers
   final _fairwaysHitController = TextEditingController();
   final _fairwaysTotalController = TextEditingController();
   final _girController = TextEditingController();
   final _girTotalController = TextEditingController();
+  
+  // AI notes controller
   final _aiNotesController = TextEditingController();
-
-  DateTime _selectedDate = DateTime.now();
-  String _selectedTeeBox = 'White';
-  bool _isSubmitting = false;
-  bool _isAiProcessing = false;
-  String _aiSuggestion = '';
-
-  // Focus nodes for better UX
+  
+  // Focus nodes
   final _courseNameFocus = FocusNode();
   final _scoreFocus = FocusNode();
   final _parTotalFocus = FocusNode();
@@ -1362,6 +1363,41 @@ class _AddRoundModalState extends State<_AddRoundModal> {
   final _girFocus = FocusNode();
   final _girTotalFocus = FocusNode();
   final _aiNotesFocus = FocusNode();
+  
+  // AI processing state
+  bool _isAiProcessing = false;
+  String _aiSuggestion = '';
+  
+  // Score and Putts
+  int _score = 5;
+  int _putts = 2;
+  
+  // Tee Shot
+  String _teeShotDirection = 'center';
+  String _teeShotClub = 'Driver';
+  bool _teeShotMisHit = false;
+  
+  // Putt Distance
+  int? _firstPuttDistance;
+  
+  // Bunkers
+  bool _fairwayBunker = false;
+  bool _greenSideBunker = false;
+  
+  // Penalties
+  bool _hazardWater = false;
+  bool _dropShot = false;
+  bool _outOfBounds = false;
+  
+  // Drinks
+  bool _drinksOnHole = false;
+  
+  // Mode
+  bool _isAdvancedMode = true;
+  
+  DateTime _selectedDate = DateTime.now();
+  String _selectedTeeBox = 'White';
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -1374,7 +1410,7 @@ class _AddRoundModalState extends State<_AddRoundModal> {
     _girController.dispose();
     _girTotalController.dispose();
     _aiNotesController.dispose();
-
+    
     _courseNameFocus.dispose();
     _scoreFocus.dispose();
     _parTotalFocus.dispose();
@@ -1384,6 +1420,7 @@ class _AddRoundModalState extends State<_AddRoundModal> {
     _girFocus.dispose();
     _girTotalFocus.dispose();
     _aiNotesFocus.dispose();
+    
     super.dispose();
   }
 

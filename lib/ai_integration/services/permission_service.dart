@@ -1,10 +1,13 @@
 /// Enhanced Permission Service for FoCoCo
 /// Handles microphone and other permissions with proper fallback and retry mechanisms
+/// Uses AudioRecorder's permission check as primary source of truth (more reliable than permission_handler)
+/// Based on pattern from coelle project and issue #574: https://github.com/Baseflow/flutter-permission-handler/issues/574
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:permission_handler/permission_handler.dart' as ph;
+import 'package:record/record.dart';
 
 /// Permission service states
 enum PermissionServiceState {
@@ -27,6 +30,24 @@ class PermissionService {
       StreamController<PermissionServiceState>.broadcast();
 
   PermissionServiceState _microphoneState = PermissionServiceState.unknown;
+  
+  // AudioRecorder instance for reliable permission checking
+  // Using recorder's permission check as primary source of truth
+  AudioRecorder? _audioRecorder;
+  
+  /// Initialize audio recorder for permission checking
+  Future<void> _ensureRecorderInitialized() async {
+    if (_audioRecorder == null) {
+      try {
+        _audioRecorder = AudioRecorder();
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ Could not initialize AudioRecorder for permission check: $e');
+        }
+        // Continue without recorder - will use permission_handler only
+      }
+    }
+  }
 
   // Getters
   Stream<PermissionServiceState> get microphoneStateStream =>
@@ -45,17 +66,54 @@ class PermissionService {
   }
 
   /// Check current microphone permission status
+  /// Uses AudioRecorder's permission check as PRIMARY source of truth (more reliable)
+  /// Falls back to permission_handler if recorder is unavailable
+  /// Based on pattern from coelle project - fixes issue #574 where permission_handler incorrectly reports denied
   Future<PermissionServiceState> checkMicrophonePermission() async {
     try {
       _updateMicrophoneState(PermissionServiceState.checking);
+      
+      await _ensureRecorderInitialized();
 
-      final status = await Permission.microphone.status;
+      // PRIMARY CHECK: Use AudioRecorder's permission check as it's more reliable
+      // This fixes the issue where permission_handler incorrectly reports denied
+      // even when permission is actually granted (issue #574)
+      if (_audioRecorder != null) {
+        try {
+          final recorderHasPermission = await _audioRecorder!.hasPermission();
+          if (recorderHasPermission) {
+            _updateMicrophoneState(PermissionServiceState.granted);
+            if (kDebugMode) {
+              print('✅ Microphone permission granted (verified by AudioRecorder)');
+            }
+            return PermissionServiceState.granted;
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('⚠️ Error checking AudioRecorder permission: $e');
+          }
+        }
+      }
+
+      // SECONDARY CHECK: Use permission_handler as fallback
+      // Only trust it if it says granted - don't trust denied status
+      final status = await ph.Permission.microphone.status;
+      
+      // Return granted only if explicitly granted or limited
+      if (status.isGranted || status.isLimited) {
+        _updateMicrophoneState(PermissionServiceState.granted);
+        if (kDebugMode) {
+          print('✅ Microphone permission granted (verified by permission_handler)');
+        }
+        return PermissionServiceState.granted;
+      }
+
+      // Convert to our internal state for denied/permanentlyDenied cases
       final state = _convertPermissionStatus(status);
-
       _updateMicrophoneState(state);
 
       if (kDebugMode) {
-        print('🎤 Microphone permission status: $status');
+        print('🎤 Microphone permission status: $status (isGranted: ${status.isGranted})');
       }
 
       return state;
@@ -67,36 +125,95 @@ class PermissionService {
       return PermissionServiceState.denied;
     }
   }
+  
+  /// Refresh microphone permission status (useful when returning from settings)
+  Future<PermissionServiceState> refreshMicrophonePermission() async {
+    if (kDebugMode) {
+      print('🔄 Refreshing microphone permission status...');
+    }
+    return await checkMicrophonePermission();
+  }
 
   /// Request microphone permission with enhanced handling
+  /// Fixed based on https://github.com/Baseflow/flutter-permission-handler/issues/574
+  /// Uses AudioRecorder's permission check as primary verification
   Future<PermissionServiceState> requestMicrophonePermission({
     bool showRationale = true,
   }) async {
     try {
       _updateMicrophoneState(PermissionServiceState.checking);
+      
+      await _ensureRecorderInitialized();
 
-      // Check current status first
-      final currentStatus = await Permission.microphone.status;
+      // PRIMARY CHECK: Use AudioRecorder's permission check first
+      if (_audioRecorder != null) {
+        try {
+          final recorderHasPermission = await _audioRecorder!.hasPermission();
+          if (recorderHasPermission) {
+            _updateMicrophoneState(PermissionServiceState.granted);
+            if (kDebugMode) {
+              print('✅ Microphone permission already granted (verified by AudioRecorder)');
+            }
+            return PermissionServiceState.granted;
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('⚠️ Error checking AudioRecorder permission: $e');
+          }
+        }
+      }
 
-      if (currentStatus == PermissionStatus.granted) {
+      // Check current status using permission_handler
+      final currentStatus = await ph.Permission.microphone.status;
+
+      // If already granted, return granted
+      if (currentStatus.isGranted) {
         _updateMicrophoneState(PermissionServiceState.granted);
+        if (kDebugMode) {
+          print('✅ Microphone permission already granted');
+        }
         return PermissionServiceState.granted;
       }
 
-      // If permanently denied, guide user to settings
-      if (currentStatus == PermissionStatus.permanentlyDenied) {
+      // If permanently denied, we cannot request again - user must go to settings
+      if (currentStatus.isPermanentlyDenied) {
         _updateMicrophoneState(PermissionServiceState.permanentlyDenied);
+        if (kDebugMode) {
+          print('⚠️ Microphone permission permanently denied. User needs to enable in settings.');
+        }
         return PermissionServiceState.permanentlyDenied;
       }
 
-      // Request permission
-      final status = await Permission.microphone.request();
-      final state = _convertPermissionStatus(status);
+      // If denied but not permanently, request permission
+      ph.PermissionStatus status = currentStatus;
+      if (currentStatus.isDenied) {
+        status = await ph.Permission.microphone.request();
+      }
 
+      // Verify with AudioRecorder after request
+      if (_audioRecorder != null) {
+        try {
+          final recorderHasPermission = await _audioRecorder!.hasPermission();
+          if (recorderHasPermission) {
+            _updateMicrophoneState(PermissionServiceState.granted);
+            if (kDebugMode) {
+              print('✅ Microphone permission granted (verified by AudioRecorder after request)');
+            }
+            return PermissionServiceState.granted;
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('⚠️ Error verifying AudioRecorder permission after request: $e');
+          }
+        }
+      }
+
+      // Convert permission_handler result
+      final state = _convertPermissionStatus(status);
       _updateMicrophoneState(state);
 
       if (kDebugMode) {
-        print('🎤 Microphone permission requested: $status');
+        print('🎤 Microphone permission requested: $status (isGranted: ${status.isGranted})');
       }
 
       return state;
@@ -106,6 +223,44 @@ class PermissionService {
       }
       _updateMicrophoneState(PermissionServiceState.denied);
       return PermissionServiceState.denied;
+    }
+  }
+  
+  /// Check if permission is permanently denied
+  /// IMPORTANT: Only check this AFTER verifying permission is NOT granted via checkMicrophonePermission()
+  /// Fixed based on issue #574 - don't assume denied = permanently denied
+  Future<bool> isPermanentlyDenied() async {
+    try {
+      await _ensureRecorderInitialized();
+
+      // FIRST: Check if we actually have permission using recorder (more reliable)
+      // If recorder says we have permission, then it's NOT permanently denied
+      if (_audioRecorder != null) {
+        try {
+          final recorderHasPermission = await _audioRecorder!.hasPermission();
+          if (recorderHasPermission) {
+            // We have permission, so it's definitely not permanently denied
+            return false;
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('⚠️ Error checking recorder permission in isPermanentlyDenied: $e');
+          }
+        }
+      }
+
+      // SECOND: Check permission_handler status
+      // Only check permanently denied if recorder confirmed we don't have permission
+      final status = await ph.Permission.microphone.status;
+
+      // Only return true if explicitly permanently denied
+      // Don't assume denied = permanently denied (that's the bug from issue #574)
+      return status.isPermanentlyDenied;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error checking if permission is permanently denied: $e');
+      }
+      return false;
     }
   }
 
@@ -147,7 +302,7 @@ class PermissionService {
   /// Open app settings for permission management
   Future<bool> openAppSettings() async {
     try {
-      final opened = await openAppSettings();
+      final opened = await ph.openAppSettings();
 
       if (kDebugMode) {
         print('⚙️ App settings opened: $opened');
@@ -213,19 +368,19 @@ class PermissionService {
   }
 
   /// Convert PermissionStatus to PermissionServiceState
-  PermissionServiceState _convertPermissionStatus(PermissionStatus status) {
+  PermissionServiceState _convertPermissionStatus(ph.PermissionStatus status) {
     switch (status) {
-      case PermissionStatus.granted:
+      case ph.PermissionStatus.granted:
         return PermissionServiceState.granted;
-      case PermissionStatus.denied:
+      case ph.PermissionStatus.denied:
         return PermissionServiceState.denied;
-      case PermissionStatus.permanentlyDenied:
+      case ph.PermissionStatus.permanentlyDenied:
         return PermissionServiceState.permanentlyDenied;
-      case PermissionStatus.restricted:
+      case ph.PermissionStatus.restricted:
         return PermissionServiceState.restricted;
-      case PermissionStatus.limited:
+      case ph.PermissionStatus.limited:
         return PermissionServiceState.granted; // Treat limited as granted
-      case PermissionStatus.provisional:
+      case ph.PermissionStatus.provisional:
         return PermissionServiceState.granted; // Treat provisional as granted
     }
   }
@@ -248,5 +403,7 @@ class PermissionService {
   /// Dispose of resources
   void dispose() {
     _microphoneStateController.close();
+    _audioRecorder?.dispose();
+    _audioRecorder = null;
   }
 }

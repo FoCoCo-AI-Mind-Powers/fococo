@@ -13,8 +13,11 @@ import 'backend/push_notifications/push_notifications_handler.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import '/services/stripe_service.dart';
+import '/services/store_subscription_service.dart';
+import '/services/subscription_state_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,6 +52,30 @@ void main() async {
     }
   }
 
+  // Initialize Store Subscription Service
+  try {
+    await StoreSubscriptionService().initialize();
+    if (kDebugMode) {
+      print('✅ Store Subscription Service initialized');
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      print('❌ Failed to initialize Store Subscription Service: $e');
+    }
+  }
+
+  // Initialize Subscription State Provider
+  try {
+    await SubscriptionStateProvider().initialize();
+    if (kDebugMode) {
+      print('✅ Subscription State Provider initialized');
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      print('❌ Failed to initialize Subscription State Provider: $e');
+    }
+  }
+
   if (!kIsWeb) {
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
   }
@@ -66,7 +93,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  ThemeMode _themeMode = FlutterFlowTheme.themeMode;
+  late ThemeMode _themeMode;
 
   late AppStateNotifier _appStateNotifier;
   late GoRouter _router;
@@ -92,6 +119,9 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+
+    // Initialize theme mode after SharedPreferences is loaded
+    _themeMode = FlutterFlowTheme.themeMode;
 
     _appStateNotifier = AppStateNotifier.instance;
     _router = createRouter(_appStateNotifier);
@@ -197,49 +227,101 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      debugShowCheckedModeBanner: false,
-      title: 'FoCoCo',
-      localizationsDelegates: [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [Locale('en', '')],
-      theme: ThemeData(
-        brightness: Brightness.light,
-        scrollbarTheme: ScrollbarThemeData(
-          thumbVisibility: WidgetStateProperty.all(true),
-          interactive: true,
-          thumbColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.dragged)) {
-              return Color(4282089311);
-            }
-            if (states.contains(WidgetState.hovered)) {
-              return Color(1275734606);
-            }
-            return Color(4278856270);
-          }),
+    return ChangeNotifierProvider<SubscriptionStateProvider>.value(
+      value: SubscriptionStateProvider(),
+      child: MaterialApp.router(
+        debugShowCheckedModeBanner: false,
+        title: 'FoCoCo',
+        localizationsDelegates: [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('en', '')],
+        theme: ThemeData(
+          brightness: Brightness.light,
+          scaffoldBackgroundColor:
+              const Color(0xFFFFFFFF), // White background for light mode
+          colorScheme: const ColorScheme.light(
+            brightness: Brightness.light,
+            primary: Color(0xFFFEA400), // FoCoCo orange
+            onPrimary: Colors.white,
+            secondary: Color(0xFF0A3669), // Navy blue
+            onSecondary: Colors.white,
+            surface: Color(0xFFFFFFFF), // White surface
+            onSurface: Color(0xFF0F172A), // Dark text on light surface
+            onSurfaceVariant: Color(0xFF475569), // Grey text for secondary
+            background: Color(0xFFFFFFFF), // White background
+            onBackground: Color(0xFF0F172A), // Dark text on background
+            error: Color(0xFFDC2626),
+            onError: Colors.white,
+          ),
+          scrollbarTheme: ScrollbarThemeData(
+            thumbVisibility: WidgetStateProperty.all(true),
+            interactive: true,
+            thumbColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.dragged)) {
+                return Color(4282089311);
+              }
+              if (states.contains(WidgetState.hovered)) {
+                return Color(1275734606);
+              }
+              return Color(4278856270);
+            }),
+          ),
         ),
-      ),
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        scrollbarTheme: ScrollbarThemeData(
-          thumbVisibility: WidgetStateProperty.all(true),
-          interactive: true,
-          thumbColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.dragged)) {
-              return Color(4282089311);
-            }
-            if (states.contains(WidgetState.hovered)) {
-              return Color(1275734606);
-            }
-            return Color(4278856270);
-          }),
+        darkTheme: ThemeData(
+          brightness: Brightness.dark,
+          scaffoldBackgroundColor: const Color(0xFF111827), // Dark background
+          colorScheme: const ColorScheme.dark(
+            brightness: Brightness.dark,
+            primary: Color(0xFFFEA400), // FoCoCo orange
+            onPrimary: Colors.white,
+            secondary: Color(0xFF1E40AF), // Navy blue
+            onSecondary: Colors.white,
+            surface: Color(0xFF1F2937), // Dark surface
+            onSurface: Colors.white, // White text on dark surface
+            onSurfaceVariant: Color(0xFF94A3B8), // Grey text for secondary
+            background: Color(0xFF111827), // Dark background
+            onBackground: Colors.white, // White text on background
+            error: Color(0xFFEF4444),
+            onError: Colors.white,
+          ),
+          textTheme: const TextTheme(
+            displayLarge: TextStyle(color: Colors.white),
+            displayMedium: TextStyle(color: Colors.white),
+            displaySmall: TextStyle(color: Colors.white),
+            headlineLarge: TextStyle(color: Colors.white),
+            headlineMedium: TextStyle(color: Colors.white),
+            headlineSmall: TextStyle(color: Colors.white),
+            titleLarge: TextStyle(color: Colors.white),
+            titleMedium: TextStyle(color: Colors.white),
+            titleSmall: TextStyle(color: Colors.white),
+            bodyLarge: TextStyle(color: Colors.white),
+            bodyMedium: TextStyle(color: Colors.white),
+            bodySmall:
+                TextStyle(color: Color(0xFF94A3B8)), // Grey for secondary text
+            labelLarge: TextStyle(color: Colors.white),
+            labelMedium: TextStyle(color: Colors.white),
+            labelSmall: TextStyle(color: Color(0xFF94A3B8)),
+          ),
+          scrollbarTheme: ScrollbarThemeData(
+            thumbVisibility: WidgetStateProperty.all(true),
+            interactive: true,
+            thumbColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.dragged)) {
+                return Color(4282089311);
+              }
+              if (states.contains(WidgetState.hovered)) {
+                return Color(1275734606);
+              }
+              return Color(4278856270);
+            }),
+          ),
         ),
+        themeMode: _themeMode,
+        routerConfig: _router,
       ),
-      themeMode: _themeMode,
-      routerConfig: _router,
     );
   }
 }

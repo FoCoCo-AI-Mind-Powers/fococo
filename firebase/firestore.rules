@@ -58,6 +58,30 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
     }
     
+    // Voice Chat Sessions - For voice chat conversation management
+    match /voice_chat_sessions/{document} {
+      allow create: if request.auth != null && request.auth.token.email_verified && request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+    }
+    
+    // Voice Chat Messages - For individual voice chat messages
+    match /voice_chat_messages/{document} {
+      allow create: if request.auth != null && request.auth.token.email_verified && request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+    }
+    
+    // User Voice Chat Stats - For voice chat analytics
+    match /user_voice_chat_stats/{document} {
+      allow create: if request.auth != null && request.auth.token.email_verified && request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+    }
+    
     // ============================================================================
     // COACHING MODULES - PRODUCTION SECURITY RULES
     // ============================================================================

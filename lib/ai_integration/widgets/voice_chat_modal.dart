@@ -5,9 +5,15 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shimmer/shimmer.dart';
 import 'dart:math' as math;
 
 import '../../flutter_flow/flutter_flow_theme.dart';
+import '../../flutter_flow/glass_design_system.dart';
+import '../../flutter_flow/flutter_flow_util.dart';
+import 'dart:ui';
 import '../services/unified_ai_service.dart';
 import '../services/cartesia_api_service.dart';
 import '../services/permission_service.dart';
@@ -16,6 +22,7 @@ import '../services/gemini_live_service_simple.dart';
 import '../services/gemini_native_audio_service.dart';
 import '../services/voice_chat_database_service.dart';
 import '../services/enhanced_ai_coaching_service.dart';
+import '../services/vertex_ai_gemini_live_service.dart';
 
 import '/backend/schema/structs/vark_preferences_struct.dart';
 
@@ -44,11 +51,13 @@ class ChatMessage {
 class FoCoCoVoiceChatModal extends StatefulWidget {
   final VarkPreferencesStruct? varkPreferences;
   final String? initialRoom;
+  final bool initialVoiceMode;
 
   const FoCoCoVoiceChatModal({
     Key? key,
     this.varkPreferences,
     this.initialRoom,
+    this.initialVoiceMode = false, // Default to text mode
   }) : super(key: key);
 
   @override
@@ -62,7 +71,7 @@ class VoiceChatModal extends FoCoCoVoiceChatModal {
 }
 
 class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _slideController;
   late AnimationController _waveController;
   late Animation<Offset> _slideAnimation;
@@ -90,10 +99,22 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
   // Database session management
   VoiceChatSession? _currentSession;
   String? _currentSessionId;
+  List<VoiceChatSession> _conversationHistory = [];
+  bool _isLoadingHistory = false;
+  bool _showHistoryDrawer = false;
 
   // Streamlined service status
   bool _isAISpeaking = false;
   bool _isListening = false;
+  bool _isVoiceEnabled = true; // Voice toggle state
+  bool _isAutoReadEnabled =
+      false; // Auto-read toggle state (disabled by default)
+  bool _isVoiceMode = false; // Speech-to-speech mode (Gemini Live)
+  bool _isLocationEnabled = false; // Location toggle state
+
+  // Vertex AI Gemini Live service for speech-to-speech
+  final VertexAIGeminiLiveService _vertexAILiveService =
+      VertexAIGeminiLiveService();
 
   // Voice selection - hardcoded to Cartesia Custom Voice 3 (sonic-2 model)
   static const String _voiceId = '7442d6b8-ff51-4477-bd30-0c0d16df84eb';
@@ -115,6 +136,9 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
           readWrite: false,
           kinesthetic: false,
         );
+
+    // Initialize voice mode from widget parameter
+    _isVoiceMode = widget.initialVoiceMode;
 
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -138,6 +162,9 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
       CurvedAnimation(parent: _waveController, curve: Curves.easeInOut),
     );
 
+    // Add lifecycle observer to refresh permissions when app resumes
+    WidgetsBinding.instance.addObserver(this);
+
     // Initialize voice services and start animations
     _initializeVoiceServices();
     _slideController.forward();
@@ -147,10 +174,109 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
 
     // Listen to permission changes
     _setupPermissionListeners();
+
+    // Load preferences
+    _loadVoicePreference();
+    _loadAutoReadPreference();
+
+    // Initialize Vertex AI Live service if voice mode is enabled
+    if (_isVoiceMode) {
+      _initializeVertexAILiveService();
+    }
+  }
+
+  Future<void> _loadVoicePreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final voiceEnabled = prefs.getBool('voice_chat_voice_enabled') ?? true;
+      if (mounted) {
+        setState(() {
+          _isVoiceEnabled = voiceEnabled;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading voice preference: $e');
+    }
+  }
+
+  Future<void> _saveVoicePreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('voice_chat_voice_enabled', _isVoiceEnabled);
+    } catch (e) {
+      debugPrint('Error saving voice preference: $e');
+    }
+  }
+
+  Future<void> _loadAutoReadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final autoReadEnabled =
+          prefs.getBool('voice_chat_auto_read_enabled') ?? false;
+      if (mounted) {
+        setState(() {
+          _isAutoReadEnabled = autoReadEnabled;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading auto-read preference: $e');
+    }
+  }
+
+  Future<void> _saveAutoReadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('voice_chat_auto_read_enabled', _isAutoReadEnabled);
+    } catch (e) {
+      debugPrint('Error saving auto-read preference: $e');
+    }
+  }
+
+  @override
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    // When app resumes, refresh microphone permission status
+    // This handles the case where user grants permission in Settings and returns
+    if (state == AppLifecycleState.resumed) {
+      if (kDebugMode) {
+        print('🔄 App resumed - refreshing microphone permission status');
+      }
+
+      // Store previous state to detect changes
+      final previousState = _microphonePermission;
+
+      _permissionService.refreshMicrophonePermission().then((permissionState) {
+        if (mounted) {
+          setState(() {
+            _microphonePermission = permissionState;
+          });
+
+          // If permission was just granted (changed from denied/permanentlyDenied to granted)
+          if (permissionState == PermissionServiceState.granted &&
+              previousState != PermissionServiceState.granted) {
+            _addMessage(
+              ChatMessage(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                content:
+                    '✅ Microphone permission granted! Voice features are now available.',
+                isUser: false,
+                timestamp: DateTime.now(),
+                isSystem: true,
+              ),
+            );
+          }
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
+    // Remove lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
+
     _slideController.dispose();
     _waveController.dispose();
     _scrollController.dispose();
@@ -158,6 +284,7 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
 
     // Clean up voice services
     _nativeAudioService.dispose();
+    _vertexAILiveService.dispose();
 
     // End database session
     _endCurrentSession();
@@ -189,8 +316,9 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
       // Initialize AI memory service
       await _memoryService.initialize();
 
-      // Initialize database service and start session
+      // Initialize database service and load conversation history
       await _databaseService.initialize();
+      await _loadConversationHistory();
       await _startNewSession();
 
       // Initialize unified AI service for generating responses
@@ -273,6 +401,152 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
           isSystem: true,
         ),
       );
+    }
+  }
+
+  /// Initialize Vertex AI Gemini Live service for speech-to-speech
+  Future<void> _initializeVertexAILiveService() async {
+    try {
+      await _vertexAILiveService.initialize(
+        varkPreferences: _varkPrefs,
+      );
+
+      // Listen to Vertex AI Live service state changes
+      _vertexAILiveService.stateStream.listen((state) {
+        if (mounted) {
+          setState(() {
+            switch (state) {
+              case VertexAIGeminiLiveState.listening:
+                _voiceState = GeminiLiveServiceState.listening;
+                _isListening = true;
+                _isAISpeaking = false;
+                break;
+              case VertexAIGeminiLiveState.speaking:
+                _voiceState = GeminiLiveServiceState.speaking;
+                _isListening = false;
+                _isAISpeaking = true;
+                break;
+              case VertexAIGeminiLiveState.thinking:
+                _voiceState = GeminiLiveServiceState.speaking;
+                _isListening = false;
+                _isAISpeaking = true;
+                break;
+              case VertexAIGeminiLiveState.connected:
+                _voiceState = GeminiLiveServiceState.connected;
+                _isListening = false;
+                _isAISpeaking = false;
+                break;
+              case VertexAIGeminiLiveState.disconnected:
+                _voiceState = GeminiLiveServiceState.disconnected;
+                _isListening = false;
+                _isAISpeaking = false;
+                break;
+              case VertexAIGeminiLiveState.error:
+                _voiceState = GeminiLiveServiceState.error;
+                _isListening = false;
+                _isAISpeaking = false;
+                break;
+              default:
+                break;
+            }
+          });
+
+          // Update wave animation based on state
+          if (state == VertexAIGeminiLiveState.listening ||
+              state == VertexAIGeminiLiveState.speaking ||
+              state == VertexAIGeminiLiveState.thinking) {
+            _waveController.repeat(reverse: true);
+          } else {
+            _waveController.stop();
+          }
+        }
+      });
+
+      // Listen to Vertex AI Live responses
+      _vertexAILiveService.responseStream.listen((response) async {
+        if (mounted && response.text != null && response.text!.isNotEmpty) {
+          // Add AI response to chat
+          final aiMessage = ChatMessage(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            content: response.text!,
+            isUser: false,
+            timestamp: DateTime.now(),
+          );
+          _addMessage(aiMessage);
+
+          // Store in memory
+          _memoryService.addConversationTurn(
+            userMessage: '',
+            aiResponse: response.text!,
+            messageType: 'vertex_ai_live',
+          );
+
+          // Show thinking process if available
+          if (response.isThinking && response.thinkingProcess != null) {
+            final thinkingMessage = ChatMessage(
+              id: '${DateTime.now().millisecondsSinceEpoch}_thinking',
+              content: '🧠 **Thinking Process:** ${response.thinkingProcess}',
+              isUser: false,
+              timestamp: DateTime.now(),
+              isSystem: true,
+            );
+            _addMessage(thinkingMessage);
+          }
+
+          // Convert text response to speech using Cartesia TTS
+          if (_isVoiceEnabled &&
+              _isAutoReadEnabled &&
+              _cartesiaService.isInitialized) {
+            setState(() {
+              _isAISpeaking = true;
+            });
+
+            // Strip markdown for TTS
+            final cleanTextForTTS = _stripMarkdownForTTS(response.text!);
+
+            // Use Cartesia to speak the response
+            _cartesiaService
+                .speakText(
+              text: cleanTextForTTS,
+              voiceId: _selectedVoiceId,
+              contentType: 'coaching',
+              varkPreferences: _varkPrefs,
+            )
+                .then((_) {
+              // Update state when TTS completes
+              if (mounted) {
+                setState(() {
+                  _isAISpeaking = false;
+                });
+              }
+            }).catchError((e) {
+              debugPrint('Cartesia TTS error: $e');
+              if (mounted) {
+                setState(() {
+                  _isAISpeaking = false;
+                });
+              }
+            });
+          }
+        }
+      });
+
+      // Listen to transcripts
+      _vertexAILiveService.transcriptStream.listen((transcript) {
+        if (mounted && transcript.isNotEmpty) {
+          if (kDebugMode) {
+            print('📝 Vertex AI Live Transcript: $transcript');
+          }
+        }
+      });
+
+      if (kDebugMode) {
+        print('✅ Vertex AI Gemini Live service initialized');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ Vertex AI Gemini Live service failed: $e');
+      }
     }
   }
 
@@ -412,9 +686,45 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
     _saveMessageToDatabase(message);
   }
 
+  /// Load conversation history
+  Future<void> _loadConversationHistory() async {
+    setState(() {
+      _isLoadingHistory = true;
+    });
+
+    try {
+      final sessions = await _databaseService.getUserSessions(limit: 20);
+      if (mounted) {
+        setState(() {
+          _conversationHistory = sessions;
+          _isLoadingHistory = false;
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error loading conversation history: $e');
+      }
+      if (mounted) {
+        setState(() {
+          _isLoadingHistory = false;
+        });
+      }
+    }
+  }
+
   /// Start a new voice chat session in the database
   Future<void> _startNewSession() async {
     try {
+      // End current session if exists
+      if (_currentSessionId != null) {
+        await _endCurrentSession();
+      }
+
+      // Clear current messages for new session
+      setState(() {
+        _messages.clear();
+      });
+
       final session = await _databaseService.startSession(
         title: widget.initialRoom ?? 'Voice Chat Session',
         varkPreferences: _varkPrefs,
@@ -429,6 +739,9 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
       _currentSession = session;
       _currentSessionId = session.id;
 
+      // Reload history to include new session
+      await _loadConversationHistory();
+
       if (kDebugMode) {
         print('📊 Started database session: ${session.id}');
       }
@@ -439,14 +752,83 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
     }
   }
 
+  /// Load messages for a specific session
+  Future<void> _loadSessionMessages(String sessionId) async {
+    try {
+      setState(() {
+        _isLoadingHistory = true;
+      });
+
+      // End current session
+      if (_currentSessionId != null && _currentSessionId != sessionId) {
+        await _endCurrentSession();
+      }
+
+      // Load messages for selected session
+      final messages = await _databaseService.getSessionMessages(
+        sessionId: sessionId,
+        limit: 100,
+      );
+
+      // Convert VoiceChatMessage to ChatMessage
+      final chatMessages = messages.map((msg) {
+        return ChatMessage(
+          id: msg.id,
+          content: msg.content,
+          isUser: msg.isUser,
+          timestamp: msg.timestamp,
+          isSystem: msg.isSystem,
+          audioUrl: msg.audioUrl,
+        );
+      }).toList();
+
+      // Find session details
+      final session = _conversationHistory.firstWhere(
+        (s) => s.id == sessionId,
+        orElse: () => _currentSession!,
+      );
+
+      if (mounted) {
+        setState(() {
+          _messages = chatMessages;
+          _currentSession = session;
+          _currentSessionId = sessionId;
+          _isDeepThinking = session.isDeepThinking;
+          _isLoadingHistory = false;
+          _showHistoryDrawer = false;
+        });
+      }
+
+      _scrollToBottom();
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error loading session messages: $e');
+      }
+      if (mounted) {
+        setState(() {
+          _isLoadingHistory = false;
+        });
+      }
+    }
+  }
+
   /// Save message to database
   Future<void> _saveMessageToDatabase(ChatMessage message) async {
     if (_currentSessionId == null) return;
 
     try {
+      // Get current user ID from Firebase Auth
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        if (kDebugMode) {
+          print('⚠️ User not authenticated, skipping database save');
+        }
+        return;
+      }
+
       final dbMessage = VoiceChatMessage(
         id: message.id,
-        userId: '', // Will be set by the database service
+        userId: userId,
         sessionId: _currentSessionId!,
         content: message.content,
         isUser: message.isUser,
@@ -733,53 +1115,247 @@ Respond as a professional golf mental coach with expertise in sports psychology:
     return 'Balanced learning style - appreciate multiple learning approaches';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = FlutterFlowTheme.of(context);
-    final screenHeight = MediaQuery.of(context).size.height;
+  Widget _buildHistoryDrawer(FlutterFlowTheme theme) {
+    if (!_showHistoryDrawer) return const SizedBox.shrink();
 
-    return SlideTransition(
-      position: _slideAnimation,
-      child: Container(
-        height: screenHeight * 0.85,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.primaryBackground,
-              theme.secondaryBackground,
-            ],
-          ),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(28),
-            topRight: Radius.circular(28),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _showHistoryDrawer = false;
+          });
+        },
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.5),
+          child: Align(
+            alignment: Alignment.topRight,
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.8,
+              height: MediaQuery.of(context).size.height * 0.6,
+              margin: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    theme.glassBackground.withValues(
+                        alpha: GlassDesignSystem.glassOpacity + 0.2),
+                    theme.glassTint.withValues(
+                        alpha: GlassDesignSystem.glassOpacity + 0.15),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: theme.glassBorder.withValues(
+                      alpha: GlassDesignSystem.glassBorderOpacity + 0.2),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(
+                    sigmaX: GlassDesignSystem.glassBlur,
+                    sigmaY: GlassDesignSystem.glassBlur,
+                  ),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'Conversation History',
+                                style: theme.titleLarge.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _showHistoryDrawer = false;
+                                });
+                              },
+                              icon: const Icon(Icons.close),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                            IconButton(
+                              onPressed: _startNewSession,
+                              icon: const Icon(Icons.add),
+                              tooltip: 'New Conversation',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: _isLoadingHistory
+                            ? const Center(child: CircularProgressIndicator())
+                            : _conversationHistory.isEmpty
+                                ? Center(
+                                    child: Text(
+                                      'No previous conversations',
+                                      style: theme.bodyMedium.copyWith(
+                                        color: theme.secondaryText,
+                                      ),
+                                    ),
+                                  )
+                                : ListView.builder(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16),
+                                    itemCount: _conversationHistory.length,
+                                    itemBuilder: (context, index) {
+                                      final session =
+                                          _conversationHistory[index];
+                                      final isActive =
+                                          session.id == _currentSessionId;
+                                      return Container(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 8),
+                                        decoration: BoxDecoration(
+                                          color: isActive
+                                              ? theme.primary
+                                                  .withValues(alpha: 0.1)
+                                              : theme.accent4
+                                                  .withValues(alpha: 0.05),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: isActive
+                                                ? theme.primary
+                                                    .withValues(alpha: 0.3)
+                                                : theme.accent4
+                                                    .withValues(alpha: 0.2),
+                                            width: isActive ? 2 : 1,
+                                          ),
+                                        ),
+                                        child: ListTile(
+                                          title: Text(
+                                            session.title,
+                                            style: theme.bodyMedium.copyWith(
+                                              fontWeight: isActive
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w500,
+                                              color: isActive
+                                                  ? theme.primary
+                                                  : theme.primaryText,
+                                            ),
+                                          ),
+                                          subtitle: Text(
+                                            '${session.messageCount} messages • ${_formatSessionDate(session.startTime)}',
+                                            style: theme.bodySmall.copyWith(
+                                              color: theme.secondaryText,
+                                            ),
+                                          ),
+                                          trailing: isActive
+                                              ? Icon(
+                                                  Icons.check_circle,
+                                                  color: theme.primary,
+                                                  size: 20,
+                                                )
+                                              : null,
+                                          onTap: () {
+                                            _loadSessionMessages(session.id);
+                                          },
+                                        ),
+                                      );
+                                    },
+                                  ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ],
-        ),
-        child: Column(
-          children: [
-            _buildHeader(theme),
-            _buildServiceIndicator(theme),
-            _buildDeepThinkingToggle(theme),
-            Expanded(child: _buildChatInterface(theme)),
-            _buildVoiceVisualization(theme),
-            _buildInputArea(theme),
-          ],
+          ),
         ),
       ),
     );
   }
 
+  String _formatSessionDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = FlutterFlowTheme.of(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return Stack(
+      children: [
+        SlideTransition(
+          position: _slideAnimation,
+          child: Container(
+            height: screenHeight * 0.85,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  theme.primaryBackground,
+                  theme.secondaryBackground,
+                ],
+              ),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(28),
+                topRight: Radius.circular(28),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, -5),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                _buildHeader(theme),
+                _buildServiceIndicator(theme),
+                _buildDeepThinkingToggle(theme),
+                Expanded(child: _buildChatInterface(theme)),
+                _buildVoiceVisualization(theme),
+                _buildBottomInput(theme),
+              ],
+            ),
+          ),
+        ),
+        _buildHistoryDrawer(theme),
+      ],
+    );
+  }
+
   Widget _buildHeader(FlutterFlowTheme theme) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
@@ -788,52 +1364,368 @@ Respond as a professional golf mental coach with expertise in sports psychology:
           ),
         ),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              FontAwesomeIcons.brain,
-              color: theme.primary,
-              size: 24,
-            ),
+          // First row: Logo + Title/Subtitle on left, Close button on right
+          Row(
+            children: [
+              // Logo
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.asset(
+                    'assets/images/logo/Logo.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: theme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          FontAwesomeIcons.brain,
+                          color: theme.primary,
+                          size: 24,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Title and Subtitle
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildShimmerTitle(theme),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Featuring Carter, your AI Coach',
+                      style: theme.bodySmall.copyWith(
+                        color: theme.secondaryText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Ready to help strengthen your mind and game.',
+                      style: theme.bodySmall.copyWith(
+                        color: theme.secondaryText.withValues(alpha: 0.8),
+                        fontSize: 11,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              // Close button
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Icon(
+                  Icons.close,
+                  color: theme.secondaryText,
+                  size: 24,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Close',
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 12),
+          // Second row: Voice mode toggle, Auto-read toggle, Voice toggle, and History button
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'AI Mental Coach',
-                  style: theme.headlineSmall.copyWith(
-                    fontWeight: FontWeight.bold,
+                // Voice Mode toggle (Speech-to-Speech)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _isVoiceMode
+                        ? theme.primary.withValues(alpha: 0.1)
+                        : theme.accent4.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _isVoiceMode
+                          ? theme.primary.withValues(alpha: 0.3)
+                          : theme.accent4.withValues(alpha: 0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.mic_external_on,
+                        color:
+                            _isVoiceMode ? theme.primary : theme.secondaryText,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Live',
+                        style: theme.bodySmall.copyWith(
+                          color: _isVoiceMode
+                              ? theme.primary
+                              : theme.secondaryText,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: () async {
+                          setState(() {
+                            _isVoiceMode = !_isVoiceMode;
+                          });
+                          HapticFeedback.selectionClick();
+
+                          // Initialize or disconnect Vertex AI Live based on mode
+                          if (_isVoiceMode) {
+                            await _initializeVertexAILiveService();
+                            _addMessage(
+                              ChatMessage(
+                                id: DateTime.now()
+                                    .millisecondsSinceEpoch
+                                    .toString(),
+                                content:
+                                    '🎤 **Voice Mode Enabled** - Speak your question!',
+                                isUser: false,
+                                timestamp: DateTime.now(),
+                                isSystem: true,
+                              ),
+                            );
+                          } else {
+                            await _vertexAILiveService.disconnect();
+                            _addMessage(
+                              ChatMessage(
+                                id: DateTime.now()
+                                    .millisecondsSinceEpoch
+                                    .toString(),
+                                content: '📝 **Text Mode Enabled**',
+                                isUser: false,
+                                timestamp: DateTime.now(),
+                                isSystem: true,
+                              ),
+                            );
+                          }
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 32,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(9),
+                            color: _isVoiceMode
+                                ? theme.primary
+                                : theme.accent4.withValues(alpha: 0.3),
+                          ),
+                          child: AnimatedAlign(
+                            duration: const Duration(milliseconds: 200),
+                            alignment: _isVoiceMode
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              margin: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  _getStateDescription(),
-                  style: theme.bodyMedium.copyWith(
+                const SizedBox(width: 8),
+                // Auto-read toggle
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _isAutoReadEnabled
+                        ? theme.primary.withValues(alpha: 0.1)
+                        : theme.accent4.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _isAutoReadEnabled
+                          ? theme.primary.withValues(alpha: 0.3)
+                          : theme.accent4.withValues(alpha: 0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.play_circle_outline,
+                        color: _isAutoReadEnabled
+                            ? theme.primary
+                            : theme.secondaryText,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Auto-read',
+                        style: theme.bodySmall.copyWith(
+                          color: _isAutoReadEnabled
+                              ? theme.primary
+                              : theme.secondaryText,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isAutoReadEnabled = !_isAutoReadEnabled;
+                          });
+                          HapticFeedback.selectionClick();
+                          _saveAutoReadPreference();
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 32,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(9),
+                            color: _isAutoReadEnabled
+                                ? theme.primary
+                                : theme.accent4.withValues(alpha: 0.3),
+                          ),
+                          child: AnimatedAlign(
+                            duration: const Duration(milliseconds: 200),
+                            alignment: _isAutoReadEnabled
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              margin: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Voice toggle
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _isVoiceEnabled
+                        ? theme.primary.withValues(alpha: 0.1)
+                        : theme.accent4.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _isVoiceEnabled
+                          ? theme.primary.withValues(alpha: 0.3)
+                          : theme.accent4.withValues(alpha: 0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _isVoiceEnabled ? Icons.volume_up : Icons.volume_off,
+                        color: _isVoiceEnabled
+                            ? theme.primary
+                            : theme.secondaryText,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Voice',
+                        style: theme.bodySmall.copyWith(
+                          color: _isVoiceEnabled
+                              ? theme.primary
+                              : theme.secondaryText,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isVoiceEnabled = !_isVoiceEnabled;
+                          });
+                          HapticFeedback.selectionClick();
+                          _saveVoicePreference();
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 32,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(9),
+                            color: _isVoiceEnabled
+                                ? theme.primary
+                                : theme.accent4.withValues(alpha: 0.3),
+                          ),
+                          child: AnimatedAlign(
+                            duration: const Duration(milliseconds: 200),
+                            alignment: _isVoiceEnabled
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              margin: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // More icon button (moved to right side)
+                IconButton(
+                  onPressed: () {
+                    _showQuickActionsMenu(theme);
+                  },
+                  icon: Icon(
+                    Icons.more_horiz,
                     color: theme.secondaryText,
+                    size: 20,
                   ),
-                ),
-                Text(
-                  'Using $_voiceName',
-                  style: theme.bodySmall.copyWith(
-                    color: theme.primary,
-                    fontSize: 11,
-                  ),
+                  padding: const EdgeInsets.all(8),
+                  constraints: const BoxConstraints(),
+                  tooltip: 'More Options',
                 ),
               ],
-            ),
-          ),
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: Icon(
-              Icons.close,
-              color: theme.secondaryText,
             ),
           ),
         ],
@@ -852,8 +1744,7 @@ Respond as a professional golf mental coach with expertise in sports psychology:
         : const Color(0xFF6366F1); // Indigo for speaking
     final indicatorIcon =
         isListening ? FontAwesomeIcons.microphone : FontAwesomeIcons.waveSquare;
-    final statusText =
-        isListening ? 'Listening...' : 'Speaking via Cartesia Voice';
+    final statusText = isListening ? 'Listening...' : 'Speaking...';
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -897,90 +1788,209 @@ Respond as a professional golf mental coach with expertise in sports psychology:
     );
   }
 
-  Widget _buildDeepThinkingToggle(FlutterFlowTheme theme) {
-    return Container(
-      height: 60,
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.accent4.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.accent4.withValues(alpha: 0.2),
-          width: 1,
+  /// Build shimmer gradient title
+  Widget _buildShimmerTitle(FlutterFlowTheme theme) {
+    return Shimmer.fromColors(
+      baseColor: theme.primary.withValues(alpha: 0.5),
+      highlightColor: theme.primary,
+      period: const Duration(milliseconds: 1500),
+      child: ShaderMask(
+        shaderCallback: (bounds) => LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            theme.primary,
+            theme.primary.withValues(alpha: 0.8),
+            theme.secondary,
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ).createShader(bounds),
+        child: Text(
+          'JustTalk',
+          style: theme.headlineSmall.copyWith(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            color: Colors.white,
+            letterSpacing: 0.5,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ),
+    );
+  }
+
+  Widget _buildDeepThinkingToggle(FlutterFlowTheme theme) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: _isDeepThinking
+              ? [
+                  theme.primary.withValues(alpha: 0.15),
+                  theme.primary.withValues(alpha: 0.08),
+                ]
+              : [
+                  theme.accent4.withValues(alpha: 0.08),
+                  theme.accent4.withValues(alpha: 0.04),
+                ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _isDeepThinking
+              ? theme.primary.withValues(alpha: 0.4)
+              : theme.accent4.withValues(alpha: 0.3),
+          width: _isDeepThinking ? 2 : 1.5,
+        ),
+        boxShadow: _isDeepThinking
+            ? [
+                BoxShadow(
+                  color: theme.primary.withValues(alpha: 0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                  spreadRadius: 0,
+                ),
+                BoxShadow(
+                  color: theme.primary.withValues(alpha: 0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                  spreadRadius: 2,
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: _isDeepThinking
-                  ? theme.primary.withValues(alpha: 0.1)
-                  : theme.accent4.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(8),
+                  ? theme.primary.withValues(alpha: 0.2)
+                  : theme.accent4.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: _isDeepThinking
+                  ? [
+                      BoxShadow(
+                        color: theme.primary.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
             ),
-            child: Icon(
-              FontAwesomeIcons.brain,
-              color: _isDeepThinking ? theme.primary : theme.secondaryText,
-              size: 16,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (child, animation) {
+                return ScaleTransition(
+                  scale: animation,
+                  child: child,
+                );
+              },
+              child: Icon(
+                FontAwesomeIcons.brain,
+                key: ValueKey(_isDeepThinking),
+                color: _isDeepThinking ? theme.primary : theme.secondaryText,
+                size: 18,
+              ),
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(
+          Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   'Deep Thinking Mode',
-                  style: theme.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.primaryText,
+                  style: theme.titleSmall.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: _isDeepThinking ? theme.primary : theme.primaryText,
+                    fontSize: 14,
+                    letterSpacing: 0.1,
+                    height: 1.2,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 2),
                 Text(
                   _isDeepThinking
-                      ? 'AI will think deeply before responding'
-                      : 'Quick responses for faster conversation',
+                      ? 'Takes longer, uses more data'
+                      : 'Quick responses',
                   style: theme.bodySmall.copyWith(
-                    color: theme.secondaryText,
-                    fontSize: 11,
+                    color: _isDeepThinking
+                        ? theme.primary.withValues(alpha: 0.9)
+                        : theme.secondaryText,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    height: 1.1,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
           GestureDetector(
             onTap: _toggleDeepThinking,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 44,
-              height: 24,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOutCubic,
+              width: 52,
+              height: 28,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 color: _isDeepThinking
                     ? theme.primary
-                    : theme.accent4.withValues(alpha: 0.3),
+                    : theme.accent4.withValues(alpha: 0.4),
+                boxShadow: _isDeepThinking
+                    ? [
+                        BoxShadow(
+                          color: theme.primary.withValues(alpha: 0.5),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
               child: AnimatedAlign(
-                duration: const Duration(milliseconds: 200),
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOutCubic,
                 alignment: _isDeepThinking
                     ? Alignment.centerRight
                     : Alignment.centerLeft,
                 child: Container(
-                  width: 20,
-                  height: 20,
+                  width: 24,
+                  height: 24,
                   margin: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 2,
-                        offset: const Offset(0, 1),
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
@@ -1041,48 +2051,8 @@ Respond as a professional golf mental coach with expertise in sports psychology:
               color: theme.secondaryText,
             ),
           ),
-          const SizedBox(height: 24),
-          _buildSamplePrompts(theme),
         ],
       ),
-    );
-  }
-
-  Widget _buildSamplePrompts(FlutterFlowTheme theme) {
-    final prompts = [
-      'Help me with pre-shot routine',
-      'I struggle with pressure putts',
-      'How to recover from bad shots',
-      'Building confidence on course',
-    ];
-
-    return Column(
-      children: prompts
-          .map((prompt) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: GestureDetector(
-                  onTap: () => _sendTextMessage(prompt),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: theme.accent4.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: theme.accent4.withValues(alpha: 0.2),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      prompt,
-                      style: theme.bodySmall.copyWith(
-                        color: theme.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ))
-          .toList(),
     );
   }
 
@@ -1226,9 +2196,9 @@ Respond as a professional golf mental coach with expertise in sports psychology:
     );
   }
 
-  Widget _buildInputArea(FlutterFlowTheme theme) {
+  Widget _buildBottomInput(FlutterFlowTheme theme) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: theme.primaryBackground,
         border: Border(
@@ -1239,10 +2209,13 @@ Respond as a professional golf mental coach with expertise in sports psychology:
         ),
       ),
       child: SafeArea(
+        top: false,
         child: Row(
           children: [
+            // TextField
             Expanded(
               child: Container(
+                constraints: const BoxConstraints(maxHeight: 100),
                 decoration: BoxDecoration(
                   color: theme.accent4.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(24),
@@ -1251,92 +2224,157 @@ Respond as a professional golf mental coach with expertise in sports psychology:
                     width: 1,
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _textController,
-                        decoration: InputDecoration(
-                          hintText: _isListening
-                              ? 'Listening...'
-                              : 'Type your message...',
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                        ),
-                        style: theme.bodyMedium,
-                        onChanged: (value) {
-                          setState(() {
-                            _isTyping = value.isNotEmpty;
-                          });
-                        },
-                        onSubmitted: _sendTextMessage,
-                      ),
+                child: TextField(
+                  controller: _textController,
+                  maxLines: null,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (text) {
+                    if (text.trim().isNotEmpty) {
+                      _sendTextMessage(text.trim());
+                    }
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Type your message...',
+                    hintStyle: theme.bodyMedium.copyWith(
+                      color: theme.secondaryText.withValues(alpha: 0.5),
                     ),
-                    if (_isTyping)
-                      IconButton(
-                        onPressed: () => _sendTextMessage(_textController.text),
-                        icon: Icon(
-                          Icons.send,
-                          color: theme.primary,
-                        ),
-                      ),
-                  ],
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  style: theme.bodyMedium,
                 ),
               ),
             ),
             const SizedBox(width: 12),
-            _buildVoiceActionButton(theme),
+            // Audio/Voice button
+            GestureDetector(
+              onTap: () {
+                if (_microphonePermission == PermissionServiceState.granted) {
+                  if (_isListening) {
+                    _stopListening();
+                  } else {
+                    _startListening();
+                  }
+                } else {
+                  _requestMicrophonePermission();
+                }
+              },
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: _isListening
+                      ? theme.primary
+                      : theme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: _isListening
+                        ? theme.primary
+                        : theme.primary.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Icon(
+                  _isListening
+                      ? FontAwesomeIcons.stop
+                      : FontAwesomeIcons.microphone,
+                  color: _isListening ? Colors.white : theme.primary,
+                  size: 20,
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildVoiceActionButton(FlutterFlowTheme theme) {
-    IconData icon;
-    Color color;
-    VoidCallback? onPressed;
-
-    if (_isListening) {
-      icon = FontAwesomeIcons.stop;
-      color = Colors.red;
-      onPressed = _stopListening;
-    } else if (_isAISpeaking) {
-      icon = FontAwesomeIcons.volumeXmark;
-      color = Colors.orange;
-      onPressed = _stopSpeaking;
-    } else {
-      icon = FontAwesomeIcons.microphone;
-      color = theme.primary;
-      onPressed = _startListening;
-    }
-
-    return Container(
-      width: 56,
-      height: 56,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-          width: 2,
+  void _showTextInputDialog(FlutterFlowTheme theme) {
+    final textController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.primaryBackground,
+        title: Text(
+          'Send Message',
+          style: theme.headlineSmall,
         ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(28),
-          child: Center(
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          maxLines: 5,
+          decoration: InputDecoration(
+            hintText: 'Type your message...',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (textController.text.trim().isNotEmpty) {
+                _sendTextMessage(textController.text.trim());
+                Navigator.of(context).pop();
+              }
+            },
+            child: Text('Send'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQuickActionsMenu(FlutterFlowTheme theme) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: theme.primaryBackground,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.history, color: theme.primary),
+              title: Text('Conversation History'),
+              onTap: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _showHistoryDrawer = !_showHistoryDrawer;
+                });
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.settings, color: theme.primary),
+              title: Text('Settings'),
+              onTap: () {
+                Navigator.of(context).pop();
+                // Show settings
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.help_outline, color: theme.primary),
+              title: Text('Help'),
+              onTap: () {
+                Navigator.of(context).pop();
+                // Show help
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -1390,7 +2428,31 @@ Respond as a professional golf mental coach with expertise in sports psychology:
     }
 
     try {
-      // Use native audio service for speech-to-speech if available
+      // Use Vertex AI Live for speech-to-speech if voice mode is enabled
+      if (_isVoiceMode) {
+        if (!_vertexAILiveService.isConnected) {
+          await _vertexAILiveService.connect();
+        }
+        await _vertexAILiveService.startListening();
+
+        // Add Vertex AI Live listening indicator
+        _addMessage(
+          ChatMessage(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            content: '🎤 **Voice Mode Active** - Speak your question!',
+            isUser: false,
+            timestamp: DateTime.now(),
+            isSystem: true,
+          ),
+        );
+
+        if (kDebugMode) {
+          print('🎤 Started Vertex AI Live listening');
+        }
+        return;
+      }
+
+      // Fallback to native audio service for speech-to-speech if available
       if (_nativeAudioService.isConnected ||
           await _nativeAudioService.connect()) {
         await _nativeAudioService.startListening();
@@ -1431,13 +2493,7 @@ Respond as a professional golf mental coach with expertise in sports psychology:
           ),
         );
 
-        // Simulate listening for demo (in real app, this would be actual voice recognition)
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted && _isListening) {
-            _stopListening();
-            _simulateVoiceInput();
-          }
-        });
+        // Voice recognition would be handled by native audio service
       }
     } catch (e) {
       if (kDebugMode) {
@@ -1503,7 +2559,58 @@ Respond as a professional golf mental coach with expertise in sports psychology:
         });
 
         if (state == PermissionServiceState.permanentlyDenied) {
-          _showPermissionSettingsDialog();
+          // Show dialog asking if user wants to open settings (better UX)
+          final dialogTheme = FlutterFlowTheme.of(context);
+          final shouldOpen = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text(
+                'Microphone Permission Required',
+                style: dialogTheme.headlineSmall,
+              ),
+              content: Text(
+                'Microphone access is required for voice input. Please enable it in your device settings.\n\nAfter enabling, return to the app and try again.',
+                style: dialogTheme.bodyMedium,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(
+                    'Cancel',
+                    style: dialogTheme.bodyMedium.copyWith(
+                      color: dialogTheme.secondaryText,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text(
+                    'Open Settings',
+                    style: dialogTheme.bodyMedium.copyWith(
+                      color: dialogTheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+
+          if (shouldOpen == true) {
+            final opened = await _permissionService.openAppSettings();
+            if (opened && mounted) {
+              _addMessage(
+                ChatMessage(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  content:
+                      '⚙️ Opening Settings... Please enable Microphone permission for FoCoCo, then return to the app.',
+                  isUser: false,
+                  timestamp: DateTime.now(),
+                  isSystem: true,
+                ),
+              );
+            }
+          }
         } else {
           _addMessage(
             ChatMessage(
@@ -1565,6 +2672,15 @@ Respond as a professional golf mental coach with expertise in sports psychology:
     HapticFeedback.lightImpact();
 
     try {
+      // Stop Vertex AI Live listening if active
+      if (_isVoiceMode && _vertexAILiveService.isListening) {
+        await _vertexAILiveService.stopListening();
+
+        if (kDebugMode) {
+          print('🛑 Stopped Vertex AI Live listening');
+        }
+      }
+
       // Stop native audio service listening if active
       if (_nativeAudioService.isListening) {
         _nativeAudioService.stopListening();
@@ -1575,7 +2691,7 @@ Respond as a professional golf mental coach with expertise in sports psychology:
       }
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Error stopping native audio listening: $e');
+        print('❌ Error stopping listening: $e');
       }
     }
 
@@ -1615,7 +2731,7 @@ Respond as a professional golf mental coach with expertise in sports psychology:
       // Generate AI response using Gemini
       final aiResponse = await _generateAIResponse(message.trim());
 
-      // Add AI response to chat first
+      // Add AI response to chat immediately (text appears instantly)
       final aiMessage = ChatMessage(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         content: aiResponse,
@@ -1624,35 +2740,69 @@ Respond as a professional golf mental coach with expertise in sports psychology:
       );
       _addMessage(aiMessage);
 
-      // Speak the response using Cartesia if available
-      if (_cartesiaService.isInitialized) {
-        try {
-          setState(() {
-            _isAISpeaking = true;
-          });
+      // Start TTS generation in parallel (don't wait for it)
+      // This makes text and voice work simultaneously
+      // Only auto-read if toggle is enabled
+      if (_isVoiceEnabled &&
+          _isAutoReadEnabled &&
+          _cartesiaService.isInitialized) {
+        // Set speaking state immediately
+        setState(() {
+          _isAISpeaking = true;
+        });
 
-          await _cartesiaService.speakText(
-            text: aiResponse,
-            voiceId: _selectedVoiceId,
-            contentType: 'coaching',
-            varkPreferences: _varkPrefs,
-          );
-        } catch (e) {
+        // Strip markdown for TTS
+        final cleanTextForTTS = _stripMarkdownForTTS(aiResponse);
+
+        // Start TTS in background (don't await)
+        _cartesiaService
+            .speakText(
+          text: cleanTextForTTS,
+          voiceId: _selectedVoiceId,
+          contentType: 'coaching',
+          varkPreferences: _varkPrefs,
+        )
+            .then((_) {
+          // Update state when TTS completes
+          if (mounted) {
+            setState(() {
+              _isAISpeaking = false;
+            });
+          }
+        }).catchError((e) {
           debugPrint('Cartesia TTS error: $e');
           // Fallback to system TTS
-          try {
-            await _aiService.speak(aiResponse);
-          } catch (e2) {
-            debugPrint('System TTS error: $e2');
+          if (_isVoiceEnabled && _isAutoReadEnabled) {
+            _aiService.speak(cleanTextForTTS).catchError((e2) {
+              debugPrint('System TTS error: $e2');
+            });
           }
-        }
-      } else {
-        // Fallback to system TTS
-        try {
-          await _aiService.speak(aiResponse);
-        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _isAISpeaking = false;
+            });
+          }
+        });
+      } else if (_isVoiceEnabled && _isAutoReadEnabled) {
+        // Fallback to system TTS (also in parallel)
+        final cleanTextForTTS = _stripMarkdownForTTS(aiResponse);
+        setState(() {
+          _isAISpeaking = true;
+        });
+        _aiService.speak(cleanTextForTTS).then((_) {
+          if (mounted) {
+            setState(() {
+              _isAISpeaking = false;
+            });
+          }
+        }).catchError((e) {
           debugPrint('System TTS error: $e');
-        }
+          if (mounted) {
+            setState(() {
+              _isAISpeaking = false;
+            });
+          }
+        });
       }
     } catch (e) {
       final errorMessage = ChatMessage(
@@ -1691,6 +2841,57 @@ Respond as a professional golf mental coach with expertise in sports psychology:
     // Clean up extra spaces and line breaks
     cleaned = cleaned.replaceAll(RegExp(r'\n\s*\n'), '\n\n');
     cleaned = cleaned.replaceAll(RegExp(r'[ \t]+'), ' ');
+
+    return cleaned.trim();
+  }
+
+  /// Strip all markdown formatting for TTS (more aggressive than _cleanMarkdownText)
+  /// Removes all formatting that could cause TTS to say "asterisks" or other unwanted words
+  String _stripMarkdownForTTS(String text) {
+    if (text.isEmpty) return text;
+
+    String cleaned = text;
+
+    // Remove all bold formatting (**text**, ***text***, __text__)
+    cleaned = cleaned.replaceAll(RegExp(r'\*{2,3}([^*]+)\*{2,3}'), r'$1');
+    cleaned = cleaned.replaceAll(RegExp(r'_{2}([^_]+)_{2}'), r'$1');
+
+    // Remove all italic formatting (*text*, _text_)
+    cleaned = cleaned.replaceAll(RegExp(r'(?<!\*)\*([^*\n]+)\*(?!\*)'), r'$1');
+    cleaned = cleaned.replaceAll(RegExp(r'(?<!_)_([^_\n]+)_(?!_)'), r'$1');
+
+    // Remove all code formatting (`text`, ```text```)
+    cleaned = cleaned.replaceAll(RegExp(r'`+([^`]+)`+'), r'$1');
+
+    // Remove all heading symbols (# ## ### #### ##### ######)
+    cleaned = cleaned.replaceAll(RegExp(r'^#{1,6}\s+', multiLine: true), '');
+
+    // Remove blockquotes (> text)
+    cleaned = cleaned.replaceAll(RegExp(r'^>\s+', multiLine: true), '');
+
+    // Remove links [text](url) -> text
+    cleaned = cleaned.replaceAll(RegExp(r'\[([^\]]+)\]\([^\)]+\)'), r'$1');
+
+    // Remove images ![alt](url) -> alt
+    cleaned = cleaned.replaceAll(RegExp(r'!\[([^\]]+)\]\([^\)]+\)'), r'$1');
+
+    // Remove horizontal rules (---, ***)
+    cleaned = cleaned.replaceAll(RegExp(r'^[-*]{3,}$', multiLine: true), '');
+
+    // Remove list markers (-, *, +, 1., 2., etc.)
+    cleaned =
+        cleaned.replaceAll(RegExp(r'^[\s]*[-*+]\s+', multiLine: true), '');
+    cleaned =
+        cleaned.replaceAll(RegExp(r'^[\s]*\d+\.\s+', multiLine: true), '');
+
+    // Clean up extra spaces and line breaks
+    cleaned = cleaned.replaceAll(
+        RegExp(r'\n\s*\n\s*\n'), '\n\n'); // Max 2 line breaks
+    cleaned =
+        cleaned.replaceAll(RegExp(r'[ \t]+'), ' '); // Multiple spaces to single
+
+    // Remove any remaining asterisks that might be standalone
+    cleaned = cleaned.replaceAll(RegExp(r'\*+'), '');
 
     return cleaned.trim();
   }
@@ -1919,7 +3120,7 @@ Respond as a professional golf mental coach with expertise in sports psychology:
     if (_isListening) {
       return 'Listening to your message...';
     } else if (_isAISpeaking) {
-      return 'Speaking response via Cartesia...';
+      return 'Speaking response...';
     } else {
       return 'Ready to help with your mental game';
     }
@@ -1961,17 +3162,18 @@ Respond as a professional golf mental coach with expertise in sports psychology:
               isSystem: true,
             ),
           );
+        } else if (state == PermissionServiceState.permanentlyDenied) {
+          // Don't spam messages, but show helpful info if user tries to use voice
+          if (kDebugMode) {
+            print(
+                '⚠️ Microphone permission permanently denied. User needs to enable in Settings.');
+          }
         } else if (state == PermissionServiceState.denied) {
-          _addMessage(
-            ChatMessage(
-              id: DateTime.now().millisecondsSinceEpoch.toString(),
-              content:
-                  '⚠️ Microphone permission needed for voice features. You can still use text chat.',
-              isUser: false,
-              timestamp: DateTime.now(),
-              isSystem: true,
-            ),
-          );
+          // Only show message if not already shown
+          if (kDebugMode) {
+            print(
+                '⚠️ Microphone permission denied. User can still use text chat.');
+          }
         }
       }
     });
@@ -1998,7 +3200,7 @@ Respond as a professional golf mental coach with expertise in sports psychology:
     buffer.writeln('=== CURRENT SESSION ===');
     buffer.writeln('Session ID: ${_memoryService.currentSessionId}');
     buffer.writeln('Deep Thinking Mode: ${_isDeepThinking ? "ON" : "OFF"}');
-    buffer.writeln('Voice Service: Cartesia + Gemini AI');
+    buffer.writeln('Voice Service: Active');
     buffer.writeln();
 
     return buffer.toString();
@@ -2035,32 +3237,5 @@ Respond as a professional golf mental coach with expertise in sports psychology:
 
     // General supportive response
     return "I'm here to help you develop your mental game and unlock your potential on the course. While I'm experiencing some technical difficulties with my advanced features, I can still provide guidance on focus, confidence, and control. What specific aspect of your golf psychology would you like to work on?";
-  }
-
-  // Sample conversation method removed - chat starts clean
-
-  /// Simulate voice input for demonstration
-  void _simulateVoiceInput() {
-    final sampleQuestions = [
-      "How can I stay focused during my swing?",
-      "I get nervous on the first tee, any advice?",
-      "What's the best way to recover from a bad shot?",
-      "How do I build confidence in my short game?",
-    ];
-
-    final randomQuestion =
-        sampleQuestions[DateTime.now().millisecond % sampleQuestions.length];
-
-    // Add user message
-    final userMessage = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      content: randomQuestion,
-      isUser: true,
-      timestamp: DateTime.now(),
-    );
-    _addMessage(userMessage);
-
-    // Generate and speak AI response
-    _sendTextMessage(randomQuestion);
   }
 }

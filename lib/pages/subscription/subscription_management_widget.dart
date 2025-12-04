@@ -1,12 +1,19 @@
+import 'dart:ui';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '/ai_integration/widgets/enhanced_navbar_widget.dart';
+import '/widgets/floating_voice_button.dart';
+import '/data/store_subscription_plans.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
-import '/services/stripe_service.dart';
+// import '/services/stripe_service.dart';
 import '/services/biometric_auth_service.dart';
-import '/ai_integration/widgets/enhanced_navbar_widget.dart';
-import 'dart:ui';
 import 'subscription_management_model.dart';
 export 'subscription_management_model.dart';
 
@@ -26,7 +33,6 @@ class _SubscriptionManagementWidgetState
   late SubscriptionManagementModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
-  final StripeService _stripeService = StripeService();
   final BiometricAuthService _biometricService = BiometricAuthService();
 
   // Animation controllers - matching settings pattern
@@ -35,9 +41,8 @@ class _SubscriptionManagementWidgetState
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  UserSubscriptionInfo? _currentSubscription;
+  _StoreSubscriptionInfo? _currentSubscription;
   bool _isLoading = true;
-  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -93,7 +98,29 @@ class _SubscriptionManagementWidgetState
         return;
       }
 
-      final subscription = await _stripeService.getCurrentSubscription();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final subscriptionQuery = await FirebaseFirestore.instance
+          .collection('user_subscriptions')
+          .where('userId', isEqualTo: user.uid)
+          .orderBy('currentPeriodEnd', descending: true)
+          .limit(5)
+          .get();
+
+      _StoreSubscriptionInfo? subscription;
+      for (final doc in subscriptionQuery.docs) {
+        final data = doc.data();
+        final platform = (data['platform'] ?? '') as String;
+        if (platform == 'app_store' || platform == 'google_play') {
+          subscription = _StoreSubscriptionInfo.fromMap(data);
+          break;
+        }
+      }
+
       setState(() {
         _currentSubscription = subscription;
         _isLoading = false;
@@ -257,7 +284,7 @@ class _SubscriptionManagementWidgetState
   /// Active subscription view
   Widget _buildActiveSubscription(FlutterFlowTheme theme) {
     final subscription = _currentSubscription!;
-    final plan = StripeService.subscriptionPlans[subscription.membershipTier];
+    final plan = storeSubscriptionPlans[subscription.membershipTier];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -380,8 +407,8 @@ class _SubscriptionManagementWidgetState
   /// Current plan card
   Widget _buildCurrentPlanCard(
     FlutterFlowTheme theme,
-    UserSubscriptionInfo subscription,
-    SubscriptionPlan? plan,
+    _StoreSubscriptionInfo subscription,
+    StoreSubscriptionPlan? plan,
   ) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -500,7 +527,7 @@ class _SubscriptionManagementWidgetState
   /// Subscription details
   Widget _buildSubscriptionDetails(
     FlutterFlowTheme theme,
-    UserSubscriptionInfo subscription,
+    _StoreSubscriptionInfo subscription,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -575,7 +602,10 @@ class _SubscriptionManagementWidgetState
   }
 
   /// Plan features
-  Widget _buildPlanFeatures(FlutterFlowTheme theme, SubscriptionPlan plan) {
+  Widget _buildPlanFeatures(
+    FlutterFlowTheme theme,
+    StoreSubscriptionPlan plan,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -617,10 +647,10 @@ class _SubscriptionManagementWidgetState
   /// Plan options (upgrade/downgrade)
   Widget _buildPlanOptions(
     FlutterFlowTheme theme,
-    UserSubscriptionInfo subscription,
+    _StoreSubscriptionInfo subscription,
   ) {
     final currentTier = subscription.membershipTier;
-    final availablePlans = StripeService.subscriptionPlans.entries
+    final availablePlans = storeSubscriptionPlans.entries
         .where((entry) => entry.key != currentTier)
         .toList();
 
@@ -647,7 +677,7 @@ class _SubscriptionManagementWidgetState
               theme: theme,
               plan: plan,
               isUpgrade: isUpgrade,
-              onTap: () => _changePlan(plan.id),
+              onTap: () => _showStoreManagementSheet(plan),
             ),
           );
         }).toList(),
@@ -658,12 +688,12 @@ class _SubscriptionManagementWidgetState
   /// Plan option card
   Widget _buildPlanOptionCard({
     required FlutterFlowTheme theme,
-    required SubscriptionPlan plan,
+    required StoreSubscriptionPlan plan,
     required bool isUpgrade,
     required VoidCallback onTap,
   }) {
     return InkWell(
-      onTap: _isProcessing ? null : onTap,
+      onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -753,7 +783,7 @@ class _SubscriptionManagementWidgetState
   /// Available plans for non-subscribers
   Widget _buildAvailablePlans(FlutterFlowTheme theme) {
     return Column(
-      children: StripeService.subscriptionPlans.entries.map((entry) {
+      children: storeSubscriptionPlans.entries.map((entry) {
         final plan = entry.value;
         final isPopular = plan.id == 'plus';
 
@@ -835,8 +865,11 @@ class _SubscriptionManagementWidgetState
   /// Manage subscription section
   Widget _buildManageSubscription(
     FlutterFlowTheme theme,
-    UserSubscriptionInfo subscription,
+    _StoreSubscriptionInfo subscription,
   ) {
+    final isAppStore = subscription.platform == 'app_store';
+    final isGooglePlay = subscription.platform == 'google_play';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -848,37 +881,35 @@ class _SubscriptionManagementWidgetState
           ),
         ),
         const SizedBox(height: 16),
-
-        // Cancel subscription
-        if (!subscription.cancelAtPeriodEnd)
-          _buildManageButton(
-            theme: theme,
-            title: 'Cancel Subscription',
-            subtitle: 'Cancel at the end of current period',
-            icon: Icons.cancel_outlined,
-            color: theme.performancePoor,
-            onTap: () => _cancelSubscription(subscription),
-          )
-        else
-          _buildManageButton(
-            theme: theme,
-            title: 'Reactivate Subscription',
-            subtitle: 'Continue your subscription',
-            icon: Icons.refresh,
-            color: theme.performanceExcellent,
-            onTap: () => _reactivateSubscription(subscription),
-          ),
-
+        _buildManageButton(
+          theme: theme,
+          title: 'Manage in App Store',
+          subtitle: isAppStore
+              ? 'Your subscription is billed via Apple. Tap to update or cancel.'
+              : 'For members who subscribed on iOS.',
+          icon: FontAwesomeIcons.apple,
+          color: theme.primary,
+          onTap: _openAppStoreSubscriptions,
+        ),
         const SizedBox(height: 12),
-
-        // Contact support
+        _buildManageButton(
+          theme: theme,
+          title: 'Manage in Google Play',
+          subtitle: isGooglePlay
+              ? 'Your subscription is billed via Google. Tap to update or cancel.'
+              : 'For members who subscribed on Android.',
+          icon: FontAwesomeIcons.googlePlay,
+          color: theme.warning,
+          onTap: _openGooglePlaySubscriptions,
+        ),
+        const SizedBox(height: 12),
         _buildManageButton(
           theme: theme,
           title: 'Contact Support',
-          subtitle: 'Get help with your subscription',
+          subtitle: 'Need help? Our team can assist you.',
           icon: Icons.support_agent,
-          color: theme.primary,
-          onTap: () => _contactSupport(),
+          color: theme.secondary,
+          onTap: _contactSupport,
         ),
       ],
     );
@@ -894,7 +925,7 @@ class _SubscriptionManagementWidgetState
     required VoidCallback onTap,
   }) {
     return InkWell(
-      onTap: _isProcessing ? null : onTap,
+      onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -942,18 +973,11 @@ class _SubscriptionManagementWidgetState
                 ],
               ),
             ),
-            if (_isProcessing)
-              const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            else
-              Icon(
-                Icons.arrow_forward_ios,
-                color: theme.secondaryText,
-                size: 16,
-              ),
+            Icon(
+              Icons.arrow_forward_ios,
+              color: theme.secondaryText,
+              size: 16,
+            ),
           ],
         ),
       ),
@@ -973,114 +997,170 @@ class _SubscriptionManagementWidgetState
     context.pushNamed('subscription_onboarding');
   }
 
-  Future<void> _changePlan(String planId) async {
-    // TODO: Implement plan change logic
-    // This would typically involve calling your backend to modify the subscription
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Plan changes coming soon!'),
-      ),
-    );
-  }
-
-  Future<void> _cancelSubscription(UserSubscriptionInfo subscription) async {
-    final confirmed = await _showConfirmationDialog(
-      title: 'Cancel Subscription?',
-      content:
-          'Your subscription will remain active until ${DateFormat('MMM dd, yyyy').format(subscription.currentPeriodEnd)}. You can reactivate anytime before then.',
-      confirmText: 'Cancel Subscription',
-      isDestructive: true,
-    );
-
-    if (!confirmed) return;
-
-    setState(() => _isProcessing = true);
-
-    try {
-      final success =
-          await _stripeService.cancelSubscription(subscription.subscriptionId);
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Subscription canceled successfully'),
-            backgroundColor: Colors.green,
+  Future<void> _showStoreManagementSheet(StoreSubscriptionPlan plan) async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final theme = FlutterFlowTheme.of(context);
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: theme.secondaryBackground,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(
+              color: theme.secondaryText.withValues(alpha: 0.1),
+            ),
           ),
-        );
-        _loadSubscriptionData();
-      } else {
-        throw Exception('Failed to cancel subscription');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to cancel subscription: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() => _isProcessing = false);
-    }
-  }
-
-  Future<void> _reactivateSubscription(
-      UserSubscriptionInfo subscription) async {
-    // TODO: Implement reactivation logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Reactivation coming soon!'),
-      ),
-    );
-  }
-
-  void _contactSupport() {
-    // TODO: Implement support contact
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Support contact coming soon!'),
-      ),
-    );
-  }
-
-  Future<bool> _showConfirmationDialog({
-    required String title,
-    required String content,
-    required String confirmText,
-    bool isDestructive = false,
-  }) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Text(title),
-            content: Text(content),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Manage ${plan.name}',
+                style: theme.titleLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.primaryText,
+                ),
               ),
+              const SizedBox(height: 12),
+              Text(
+                'Subscriptions are handled directly by the App Store and Google Play. Use the links below to change or cancel your plan.',
+                style: theme.bodyMedium.copyWith(
+                  color: theme.secondaryText,
+                ),
+              ),
+              const SizedBox(height: 20),
               FFButtonWidget(
-                onPressed: () => Navigator.of(context).pop(true),
-                text: confirmText,
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _openAppStoreSubscriptions();
+                },
+                text: 'Open App Store Subscriptions',
+                icon: const Icon(FontAwesomeIcons.apple, size: 18),
                 options: FFButtonOptions(
-                  height: 40,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  iconPadding: EdgeInsets.zero,
-                  color: isDestructive
-                      ? Colors.red
-                      : FlutterFlowTheme.of(context).primary,
-                  textStyle: FlutterFlowTheme.of(context).titleSmall.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  width: double.infinity,
+                  height: 48,
+                  color: theme.primary,
+                  textStyle: theme.titleSmall.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
                   elevation: 0,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(height: 12),
+              FFButtonWidget(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _openGooglePlaySubscriptions();
+                },
+                text: 'Open Google Play Subscriptions',
+                icon: const Icon(FontAwesomeIcons.googlePlay, size: 18),
+                options: FFButtonOptions(
+                  width: double.infinity,
+                  height: 48,
+                  color: theme.warning,
+                  textStyle: theme.titleSmall.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  elevation: 0,
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ],
           ),
-        ) ??
-        false;
+        );
+      },
+    );
+  }
+
+  Future<void> _openAppStoreSubscriptions() async {
+    final uri = Uri.parse('https://apps.apple.com/account/subscriptions');
+    await _launchExternalUrl(
+      uri,
+      errorMessage: 'Unable to open the App Store subscriptions page.',
+    );
+  }
+
+  Future<void> _openGooglePlaySubscriptions() async {
+    final uri =
+        Uri.parse('https://play.google.com/store/account/subscriptions');
+    await _launchExternalUrl(
+      uri,
+      errorMessage: 'Unable to open the Google Play subscriptions page.',
+    );
+  }
+
+  Future<void> _launchExternalUrl(
+    Uri uri, {
+    required String errorMessage,
+  }) async {
+    final didLaunch = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!didLaunch && mounted) {
+      _showSnack(errorMessage, isError: true);
+    }
+  }
+
+  void _contactSupport() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'support@fococo.app',
+      queryParameters: {
+        'subject': 'FoCoCo Subscription Support',
+      },
+    );
+
+    final didLaunch = await launchUrl(uri);
+    if (!didLaunch && mounted) {
+      _showSnack('Email us at support@fococo.app for assistance.');
+    }
+  }
+
+  void _showSnack(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : null,
+      ),
+    );
+  }
+}
+
+class _StoreSubscriptionInfo {
+  final String membershipTier;
+  final String platform;
+  final DateTime currentPeriodStart;
+  final DateTime currentPeriodEnd;
+  final bool cancelAtPeriodEnd;
+  final bool autoRenewing;
+
+  _StoreSubscriptionInfo({
+    required this.membershipTier,
+    required this.platform,
+    required this.currentPeriodStart,
+    required this.currentPeriodEnd,
+    required this.cancelAtPeriodEnd,
+    required this.autoRenewing,
+  });
+
+  bool get isActive =>
+      DateTime.now().isBefore(currentPeriodEnd) && !cancelAtPeriodEnd;
+
+  factory _StoreSubscriptionInfo.fromMap(Map<String, dynamic> map) {
+    return _StoreSubscriptionInfo(
+      membershipTier: map['membershipTier'] ?? 'base',
+      platform: map['platform'] ?? 'app_store',
+      currentPeriodStart: (map['currentPeriodStart'] as Timestamp).toDate(),
+      currentPeriodEnd: (map['currentPeriodEnd'] as Timestamp).toDate(),
+      cancelAtPeriodEnd: map['cancelAtPeriodEnd'] ?? false,
+      autoRenewing: map['autoRenewing'] ?? true,
+    );
   }
 }

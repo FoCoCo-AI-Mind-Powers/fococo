@@ -4,6 +4,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_components.dart';
 import '/ai_integration/widgets/enhanced_navbar_widget.dart';
+import '/widgets/floating_voice_button.dart';
 import 'dashboard_model.dart';
 export 'dashboard_model.dart';
 
@@ -11,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'dart:math' as math;
+import 'dart:math' show Random;
 
 class DashboardWidget extends StatefulWidget {
   const DashboardWidget({Key? key}) : super(key: key);
@@ -40,10 +42,47 @@ class _DashboardWidgetState extends State<DashboardWidget>
   late Animation<double> _pulseAnimation;
   late Animation<double> _chartAnimation;
 
+  // Tagline system
+  String _currentTagline = '';
+
+  // Tagline lists from PDF
+  static const List<String> _focusTaglines = [
+    'Lock in. One shot at a time.',
+    'You don\'t need more time, just more attention.',
+    'Everything else can wait. Right now matters most.',
+    'Quiet the noise. Trust the target.',
+  ];
+
+  static const List<String> _confidenceTaglines = [
+    'Confidence isn\'t a feeling, it\'s your preparation showing up.',
+    'Back yourself. You\'ve earned the right.',
+    'No hype. Just trust.',
+    'Let your routine do the talking.',
+  ];
+
+  static const List<String> _controlTaglines = [
+    'Control isn\'t not feeling, it\'s responding with clarity.',
+    'Whatever happens next, you\'ve got a plan.',
+    'Reset. Rebuild. Respond.',
+    'Composure wins more than talent.',
+  ];
+
+  String _getRandomTagline() {
+    final allTaglines = [
+      ..._focusTaglines,
+      ..._confidenceTaglines,
+      ..._controlTaglines
+    ];
+    return allTaglines[Random().nextInt(allTaglines.length)];
+  }
+
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => DashboardModel());
+
+    // Initialize random tagline
+    _currentTagline = _getRandomTagline();
 
     // Initialize animations
     _fadeController = AnimationController(
@@ -150,6 +189,11 @@ class _DashboardWidgetState extends State<DashboardWidget>
                             padding: const EdgeInsets.all(20),
                             child: Column(
                               children: [
+                                // TODAY Header with colored tab
+                                _buildTodayHeaderSection(theme),
+
+                                const SizedBox(height: 24),
+
                                 // Mental Performance Overview
                                 _buildMentalPerformanceSection(theme),
 
@@ -172,6 +216,11 @@ class _DashboardWidgetState extends State<DashboardWidget>
 
                                 // AI Insights & Goals
                                 _buildInsightsSection(theme),
+
+                                const SizedBox(height: 24),
+
+                                // Focus Areas
+                                _buildFocusAreasSection(theme),
 
                                 const SizedBox(height: 100), // Space for navbar
                               ],
@@ -209,6 +258,9 @@ class _DashboardWidgetState extends State<DashboardWidget>
           : null,
       builder: (context, userSnapshot) {
         final user = userSnapshot.data;
+        final displayName = user?.displayName.isNotEmpty == true
+            ? user!.displayName
+            : 'Golfer';
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -238,30 +290,20 @@ class _DashboardWidgetState extends State<DashboardWidget>
 
               const SizedBox(width: 16),
 
-              // Welcome text
+              // Welcome message with full name
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome back,',
-                      style: theme.bodyMedium.copyWith(
-                        color: theme.secondaryText,
-                        fontSize: 14,
-                      ),
-                    ),
-                    Text(
-                      user?.displayName.isNotEmpty == true
-                          ? user!.displayName
-                          : 'Golfer',
-                      style: theme.headlineSmall.copyWith(
-                        color: theme.primaryText,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'Welcome back, $displayName',
+                  style: theme.titleLarge.copyWith(
+                    color: theme.primaryText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.clip,
                 ),
               ),
+
+              const SizedBox(width: 16),
 
               // Notification button
               Container(
@@ -288,6 +330,104 @@ class _DashboardWidgetState extends State<DashboardWidget>
     );
   }
 
+  Widget _buildTodayHeaderSection(FlutterFlowTheme theme) {
+    // Ensure tagline is initialized
+    if (_currentTagline.isEmpty) {
+      _currentTagline = _getRandomTagline();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Colored "Today" tab
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                theme.primary.withValues(alpha: 0.8),
+                theme.primary.withValues(alpha: 0.6),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: theme.primary.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.today_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'TODAY',
+                style: theme.titleSmall.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Today content card
+        GlassDashboardCard(
+          title: 'Momentum Overview',
+          subtitle:
+              'Momentum overview. It\'s where your mind and game meet ... today!',
+          children: [
+            const SizedBox(height: 8),
+            // Today's advice/tagline
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.primary.withValues(alpha: 0.1),
+                    theme.primary.withValues(alpha: 0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.primary.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.lightbulb_outline,
+                    color: theme.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _currentTagline,
+                      style: theme.bodyMedium.copyWith(
+                        color: theme.primaryText,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildMentalPerformanceSection(FlutterFlowTheme theme) {
     return StreamBuilder<List<DashboardDataRecord>>(
       stream: FirebaseFirestore.instance
@@ -302,8 +442,9 @@ class _DashboardWidgetState extends State<DashboardWidget>
         final dashboardData = snapshot.data?.firstOrNull;
 
         return GlassDashboardCard(
-          title: 'Mental Performance Index',
-          subtitle: 'Focus • Confidence • Control',
+          title: 'Mind Power Index (MPI)',
+          subtitle:
+              'Your current mental game, based on the 3 core pillars for peak performance',
           children: [
             Column(
               children: [
@@ -411,57 +552,137 @@ class _DashboardWidgetState extends State<DashboardWidget>
           builder: (context, userSnapshot) {
             final user = userSnapshot.data;
 
-            return Column(
+            return GlassDashboardCard(
+              title: 'Golf Performance',
+              subtitle:
+                  'The physical result of mental routines done right (MPI)',
               children: [
-                // Golf Stats Cards Row
-                Row(
+                Column(
                   children: [
-                    Expanded(
-                      child: _buildStatCard(
-                        theme,
-                        'Handicap',
-                        user?.handicap != null
-                            ? user!.handicap.toStringAsFixed(1)
-                            : '--',
-                        Icons.golf_course,
-                        theme.golfPrimary,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildStatCard(
-                        theme,
-                        'Avg Score',
-                        _calculateAverageScore(recentRounds).toStringAsFixed(1),
-                        FontAwesomeIcons.golfBallTee,
-                        theme.primary,
-                      ),
-                    ),
-                  ],
-                ),
+                    const SizedBox(height: 20),
 
-                const SizedBox(height: 16),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildStatCard(
-                        theme,
-                        'Rounds',
-                        recentRounds.length.toString(),
-                        Icons.calendar_month,
-                        theme.success,
+                    // Handicap wrapped in container (Section 2)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            theme.glassBackground.withValues(alpha: 0.2),
+                            theme.glassTint.withValues(alpha: 0.15),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: theme.glassBorder.withValues(alpha: 0.4),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: theme.golfPrimary.withValues(alpha: 0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color:
+                                      theme.golfPrimary.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  Icons.golf_course,
+                                  color: theme.golfPrimary,
+                                  size: 22,
+                                ),
+                              ),
+                              const Spacer(),
+                              Icon(
+                                Icons.trending_up,
+                                color: theme.success,
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            user?.handicap != null
+                                ? user!.handicap.toStringAsFixed(1)
+                                : '--',
+                            style: theme.headlineMedium.copyWith(
+                              color: theme.primaryText,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 36,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Handicap',
+                            style: theme.titleMedium.copyWith(
+                              color: theme.secondaryText,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildStatCard(
-                        theme,
-                        'Best Round',
-                        _getBestScore(recentRounds).toString(),
-                        Icons.star,
-                        theme.warning,
-                      ),
+
+                    const SizedBox(height: 16),
+
+                    // Other Golf Stats Cards Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStatCard(
+                            theme,
+                            'Avg Score',
+                            _calculateAverageScore(recentRounds)
+                                .toStringAsFixed(1),
+                            FontAwesomeIcons.golfBallTee,
+                            theme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildStatCard(
+                            theme,
+                            'Rounds',
+                            recentRounds.length.toString(),
+                            Icons.calendar_month,
+                            theme.success,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStatCard(
+                            theme,
+                            'Best Round',
+                            _getBestScore(recentRounds).toString(),
+                            Icons.star,
+                            theme.warning,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Container(), // Empty space for alignment
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -489,8 +710,8 @@ class _DashboardWidgetState extends State<DashboardWidget>
             dashboardData?.weeklyProgress ?? [65, 72, 68, 85, 78, 92, 88];
 
         return GlassDashboardCard(
-          title: 'Weekly Progress',
-          subtitle: 'Mental training consistency',
+          title: 'Progress Streaks',
+          subtitle: 'This is how Focus, Confidence, and Control are built',
           children: [
             Column(
               children: [
@@ -600,8 +821,8 @@ class _DashboardWidgetState extends State<DashboardWidget>
         final activities = snapshot.data ?? [];
 
         return GlassDashboardCard(
-          title: 'Recent Activities',
-          subtitle: 'Your latest sessions',
+          title: 'Recent Sessions',
+          subtitle: 'The routines that shape your results',
           children: [
             Column(
               children: activities.isEmpty
@@ -648,7 +869,7 @@ class _DashboardWidgetState extends State<DashboardWidget>
             // AI Insight Card
             GlassDashboardCard(
               title: 'AI Insights',
-              subtitle: 'Personalized recommendations',
+              subtitle: 'Understand what\'s working, and why',
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1045,6 +1266,87 @@ class _DashboardWidgetState extends State<DashboardWidget>
               progressColor: theme.primary,
               barRadius: const Radius.circular(2),
               padding: EdgeInsets.zero,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFocusAreasSection(FlutterFlowTheme theme) {
+    return StreamBuilder<List<DashboardDataRecord>>(
+      stream: FirebaseFirestore.instance
+          .collection('dashboard_data')
+          .where('userId', isEqualTo: currentUserUid)
+          .limit(1)
+          .snapshots()
+          .map((snapshot) => snapshot.docs
+              .map((doc) => DashboardDataRecord.fromSnapshot(doc))
+              .toList()),
+      builder: (context, snapshot) {
+        final dashboardData = snapshot.data?.firstOrNull;
+        // Use focusAreas if available, otherwise use activeGoals or default
+        final focusAreas = dashboardData?.activeGoals ??
+            ['Improve putting', 'Mental focus training'];
+
+        return GlassDashboardCard(
+          title: 'Focus Areas',
+          subtitle: 'Currently working on ...',
+          children: [
+            Column(
+              children: focusAreas.isEmpty
+                  ? [
+                      const SizedBox(height: 40),
+                      Icon(
+                        Icons.center_focus_strong_outlined,
+                        size: 48,
+                        color: theme.secondaryText.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No focus areas set',
+                        style: theme.bodyMedium.copyWith(
+                          color: theme.secondaryText,
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                    ]
+                  : focusAreas
+                      .map((area) => _buildFocusAreaItem(theme, area))
+                      .toList(),
+            )
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFocusAreaItem(FlutterFlowTheme theme, String area) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.glassBackground.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.glassBorder.withValues(alpha: 0.1),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.center_focus_strong,
+            color: theme.primary,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              area,
+              style: theme.bodyMedium.copyWith(
+                color: theme.primaryText,
+              ),
             ),
           ),
         ],

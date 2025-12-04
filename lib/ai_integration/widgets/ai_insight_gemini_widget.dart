@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_design_system.dart';
@@ -269,8 +268,8 @@ class _AIInsightGeminiWidgetState extends State<AIInsightGeminiWidget>
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Colors.black.withOpacity(0.9),
-            FlutterFlowTheme.of(context).primary.withOpacity(0.1),
+            Colors.black.withValues(alpha: 0.9),
+            FlutterFlowTheme.of(context).primary.withValues(alpha: 0.1),
           ],
         ),
       ),
@@ -335,7 +334,7 @@ class _AIInsightGeminiWidgetState extends State<AIInsightGeminiWidget>
                         color: _getStateColor(),
                         boxShadow: [
                           BoxShadow(
-                            color: _getStateColor().withOpacity(0.5),
+                            color: _getStateColor().withValues(alpha: 0.5),
                             blurRadius: 8,
                             spreadRadius: 2,
                           ),
@@ -364,7 +363,7 @@ class _AIInsightGeminiWidgetState extends State<AIInsightGeminiWidget>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -468,10 +467,11 @@ class _AIInsightGeminiWidgetState extends State<AIInsightGeminiWidget>
                                     vertical: 6,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.1),
+                                    color: Colors.white.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
-                                      color: Colors.white.withOpacity(0.2),
+                                      color:
+                                          Colors.white.withValues(alpha: 0.2),
                                     ),
                                   ),
                                   child: Text(
@@ -550,7 +550,7 @@ class _AIInsightGeminiWidgetState extends State<AIInsightGeminiWidget>
             painter: AudioWavePainter(
               audioLevels: _audioLevels,
               wavePhase: _waveAnimation.value,
-              color: _getStateColor().withOpacity(0.3),
+              color: _getStateColor().withValues(alpha: 0.3),
             ),
           );
         },
@@ -587,13 +587,13 @@ class _AIInsightGeminiWidgetState extends State<AIInsightGeminiWidget>
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
                     child: Icon(
                       Icons.insights,
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       size: 40,
                     ),
                   ),
@@ -622,10 +622,10 @@ class _AIInsightGeminiWidgetState extends State<AIInsightGeminiWidget>
         margin: const EdgeInsets.all(16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.5),
+          color: Colors.black.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.white.withValues(alpha: 0.1),
           ),
         ),
         child: Row(
@@ -678,12 +678,12 @@ class _AIInsightGeminiWidgetState extends State<AIInsightGeminiWidget>
                       gradient: LinearGradient(
                         colors: [
                           _getStateColor(),
-                          _getStateColor().withOpacity(0.6),
+                          _getStateColor().withValues(alpha: 0.6),
                         ],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: _getStateColor().withOpacity(0.5),
+                          color: _getStateColor().withValues(alpha: 0.5),
                           blurRadius: 20,
                           spreadRadius: 5,
                         ),

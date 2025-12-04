@@ -77,16 +77,25 @@ class RegisterModel extends FlutterFlowModel<RegisterWidget> {
 
   @override
   void dispose() {
+    // Safely dispose FocusNodes and TextControllers
     nameFocusNode?.dispose();
     nameTextController?.dispose();
+    nameFocusNode = null;
+    nameTextController = null;
 
     emailFocusNode?.dispose();
     emailTextController?.dispose();
+    emailFocusNode = null;
+    emailTextController = null;
 
     passwordFocusNode?.dispose();
     passwordTextController?.dispose();
+    passwordFocusNode = null;
+    passwordTextController = null;
 
     confirmPasswordFocusNode?.dispose();
     confirmPasswordTextController?.dispose();
+    confirmPasswordFocusNode = null;
+    confirmPasswordTextController = null;
   }
 } 

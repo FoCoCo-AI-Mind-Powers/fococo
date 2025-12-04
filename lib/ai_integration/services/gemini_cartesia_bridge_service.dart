@@ -24,7 +24,7 @@ class GeminiCartesiaBridgeService {
   final CartesiaAPIService _cartesiaService = CartesiaAPIService.instance;
   final PermissionService _permissionService = PermissionService();
   final AIMemoryService _memoryService = AIMemoryService();
-  final Record _audioRecorder = Record();
+  final AudioRecorder _audioRecorder = AudioRecorder();
 
   // WebSocket connection to Gemini Live API
   WebSocketChannel? _channel;
@@ -165,10 +165,12 @@ class GeminiCartesiaBridgeService {
       }
 
       // Start audio recording
-      await _audioRecorder.start(
-        encoder: AudioEncoder.aacLc,
-        samplingRate: 16000,
-        numChannels: 1,
+      await _audioRecorder.startStream(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
       );
 
       _isRecording = true;

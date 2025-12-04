@@ -385,8 +385,7 @@ class VoiceChatDatabaseService {
         .get();
 
     return snapshot.docs
-        .map((doc) =>
-            VoiceChatMessage.fromFirestore(doc.data() as Map<String, dynamic>))
+        .map((doc) => VoiceChatMessage.fromFirestore(doc.data()))
         .where((message) =>
             message.content.toLowerCase().contains(searchTerm.toLowerCase()))
         .take(limit)
@@ -407,8 +406,7 @@ class VoiceChatDatabaseService {
         .get();
 
     return snapshot.docs
-        .map((doc) =>
-            VoiceChatMessage.fromFirestore(doc.data() as Map<String, dynamic>))
+        .map((doc) => VoiceChatMessage.fromFirestore(doc.data()))
         .toList()
         .reversed
         .toList();

@@ -83,16 +83,20 @@ class FoCoMapAIService {
               {'text': text}
             ]
           },
-          'embedding_config': {
-            'task_type': taskType,
-            'output_dimensionality': outputDimensionality,
-          }
+          'taskType': taskType,
+          'outputDimensionality': outputDimensionality,
         }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final embedding = List<double>.from(data['embeddings'][0]['values']);
+        final embeddings = data['embedding'] ?? data['embeddings'];
+        if (embeddings == null) {
+          throw Exception('No embedding data in response: ${response.body}');
+        }
+        // Handle both single embedding and array of embeddings
+        final embeddingData = embeddings is List ? embeddings[0] : embeddings;
+        final embedding = List<double>.from(embeddingData['values'] ?? []);
 
         // Normalize embedding for better similarity calculations
         final normalized = _normalizeEmbedding(embedding);
@@ -362,29 +366,88 @@ class FoCoMapAIService {
 
   RoboticsAnalysis _parseRoboticsResponse(Map<String, dynamic> data) {
     try {
-      final content = data['candidates'][0]['content']['parts'][0]['text'];
-      final parsed = jsonDecode(content);
+      // Null-safe access to nested properties
+      final candidates = data['candidates'] as List?;
+      if (candidates == null || candidates.isEmpty) {
+        debugPrint(
+            'Error parsing robotics response: No candidates in response');
+        return RoboticsAnalysis.empty();
+      }
+
+      final candidate = candidates[0] as Map<String, dynamic>?;
+      if (candidate == null) {
+        debugPrint(
+            'Error parsing robotics response: Invalid candidate structure');
+        return RoboticsAnalysis.empty();
+      }
+
+      final contentObj = candidate['content'] as Map<String, dynamic>?;
+      if (contentObj == null) {
+        debugPrint('Error parsing robotics response: No content in candidate');
+        return RoboticsAnalysis.empty();
+      }
+
+      final parts = contentObj['parts'] as List?;
+      if (parts == null || parts.isEmpty) {
+        debugPrint('Error parsing robotics response: No parts in content');
+        return RoboticsAnalysis.empty();
+      }
+
+      final part = parts[0] as Map<String, dynamic>?;
+      if (part == null) {
+        debugPrint('Error parsing robotics response: Invalid part structure');
+        return RoboticsAnalysis.empty();
+      }
+
+      String content = part['text'] as String? ?? '';
+
+      if (content.isEmpty) {
+        debugPrint('Error parsing robotics response: Empty content');
+        return RoboticsAnalysis.empty();
+      }
+
+      // Strip markdown code blocks if present
+      content = _stripMarkdownCodeBlocks(content);
+
+      // Use safe JSON parser to handle malformed responses
+      final parsed = _safeJsonParse(content);
+      if (parsed == null) {
+        debugPrint('Error parsing robotics response: Could not parse JSON');
+        return RoboticsAnalysis.empty();
+      }
 
       return RoboticsAnalysis(
-        patterns: List<String>.from(parsed['patterns'] ?? []),
-        hotspots: (parsed['hotspots'] as List?)
-                ?.map((h) => HotSpot(
-                      center: LatLng(h['lat'], h['lng']),
-                      radius: h['radius'].toDouble(),
-                      intensity: h['intensity'].toDouble(),
-                      description: h['description'],
-                    ))
-                .toList() ??
+        patterns:
+            (parsed['patterns'] as List?)?.map((p) => p.toString()).toList() ??
+                [],
+        hotspots: (parsed['hotspots'] as List?)?.map((h) {
+              final hotspot = h as Map<String, dynamic>;
+              return HotSpot(
+                center: LatLng(
+                  (hotspot['lat'] as num?)?.toDouble() ?? 0.0,
+                  (hotspot['lng'] as num?)?.toDouble() ?? 0.0,
+                ),
+                radius: (hotspot['radius'] as num?)?.toDouble() ?? 0.0,
+                intensity: (hotspot['intensity'] as num?)?.toDouble() ?? 0.0,
+                description: hotspot['description']?.toString() ?? '',
+              );
+            }).toList() ??
             [],
-        trajectories: (parsed['trajectories'] as List?)
-                ?.map((t) => Trajectory(
-                      points: (t['points'] as List)
-                          .map((p) => LatLng(p['lat'], p['lng']))
-                          .toList(),
-                      type: t['type'],
-                      confidence: t['confidence'].toDouble(),
-                    ))
-                .toList() ??
+        trajectories: (parsed['trajectories'] as List?)?.map((t) {
+              final trajectory = t as Map<String, dynamic>;
+              return Trajectory(
+                points: ((trajectory['points'] as List?) ?? []).map((p) {
+                  final point = p as Map<String, dynamic>;
+                  return LatLng(
+                    (point['lat'] as num?)?.toDouble() ?? 0.0,
+                    (point['lng'] as num?)?.toDouble() ?? 0.0,
+                  );
+                }).toList(),
+                type: trajectory['type']?.toString() ?? '',
+                confidence:
+                    (trajectory['confidence'] as num?)?.toDouble() ?? 0.0,
+              );
+            }).toList() ??
             [],
       );
     } catch (e) {
@@ -713,35 +776,157 @@ Be specific, encouraging, and golf-focused. Reference their actual data when pos
   RealtimeGuidance _parseGuidanceResponse(
       Map<String, dynamic> data, String context) {
     try {
-      final content = data['candidates'][0]['content']['parts'][0]['text'];
+      // Null-safe access to nested properties
+      final candidates = data['candidates'] as List?;
+      if (candidates == null || candidates.isEmpty) {
+        debugPrint(
+            'Error parsing guidance response: No candidates in response');
+        return RealtimeGuidance.empty();
+      }
 
-      // Try to parse as JSON first
-      try {
-        final parsed = jsonDecode(content);
+      final candidate = candidates[0] as Map<String, dynamic>?;
+      if (candidate == null) {
+        debugPrint(
+            'Error parsing guidance response: Invalid candidate structure');
+        return RealtimeGuidance.empty();
+      }
+
+      final contentObj = candidate['content'] as Map<String, dynamic>?;
+      if (contentObj == null) {
+        debugPrint('Error parsing guidance response: No content in candidate');
+        return RealtimeGuidance.empty();
+      }
+
+      final parts = contentObj['parts'] as List?;
+      if (parts == null || parts.isEmpty) {
+        debugPrint('Error parsing guidance response: No parts in content');
+        return RealtimeGuidance.empty();
+      }
+
+      final part = parts[0] as Map<String, dynamic>?;
+      if (part == null) {
+        debugPrint('Error parsing guidance response: Invalid part structure');
+        return RealtimeGuidance.empty();
+      }
+
+      String content = part['text'] as String? ?? '';
+
+      if (content.isEmpty) {
+        debugPrint('Error parsing guidance response: Empty content');
+        return RealtimeGuidance.empty();
+      }
+
+      // Strip markdown code blocks if present
+      content = _stripMarkdownCodeBlocks(content);
+
+      // Try to parse as JSON using safe parser
+      final parsed = _safeJsonParse(content);
+      if (parsed != null) {
         return RealtimeGuidance(
           timestamp: DateTime.now(),
-          immediateGuidance: parsed['immediateGuidance'] ?? '',
-          spatialInsight: parsed['spatialInsight'] ?? '',
-          mentalFocus: parsed['mentalFocus'] ?? '',
-          actionableTip: parsed['actionableTip'] ?? '',
-          confidence: (parsed['confidence'] ?? 0.8).toDouble(),
+          immediateGuidance: parsed['immediateGuidance']?.toString() ?? '',
+          spatialInsight: parsed['spatialInsight']?.toString() ?? '',
+          mentalFocus: parsed['mentalFocus']?.toString() ?? '',
+          actionableTip: parsed['actionableTip']?.toString() ?? '',
+          confidence: (parsed['confidence'] as num?)?.toDouble() ?? 0.8,
           context: context,
         );
-      } catch (e) {
-        // If not JSON, parse as text
+      } else {
+        // If not JSON, treat as plain text guidance
         return RealtimeGuidance(
           timestamp: DateTime.now(),
-          immediateGuidance: content,
+          immediateGuidance:
+              content.length > 500 ? content.substring(0, 500) : content,
           spatialInsight: '',
           mentalFocus: '',
           actionableTip: '',
-          confidence: 0.7,
+          confidence: 0.6,
           context: context,
         );
       }
     } catch (e) {
       debugPrint('Error parsing guidance response: $e');
       return RealtimeGuidance.empty();
+    }
+  }
+
+  /// Strip markdown code blocks from text and sanitize for JSON parsing
+  String _stripMarkdownCodeBlocks(String text) {
+    if (text.isEmpty) return text;
+
+    // Remove ```json, ```JSON, ``` markers (case insensitive)
+    text = text.replaceAll(RegExp(r'```json\s*', caseSensitive: false), '');
+    text = text.replaceAll(RegExp(r'```\s*'), '');
+
+    // Remove leading/trailing whitespace
+    text = text.trim();
+
+    // Try to extract JSON object if text contains other content
+    final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(text);
+    if (jsonMatch != null) {
+      text = jsonMatch.group(0) ?? text;
+    }
+
+    return text;
+  }
+
+  /// Safely extract JSON from potentially malformed response
+  Map<String, dynamic>? _safeJsonParse(String content) {
+    if (content.isEmpty) return null;
+
+    try {
+      // First try direct parsing
+      return jsonDecode(content) as Map<String, dynamic>;
+    } catch (e) {
+      // Try to fix common JSON issues
+
+      // Fix unterminated strings by finding the last complete JSON structure
+      String fixedContent = content;
+
+      // Try to find a valid JSON object
+      int braceCount = 0;
+      int lastValidEnd = -1;
+
+      for (int i = 0; i < content.length; i++) {
+        if (content[i] == '{') braceCount++;
+        if (content[i] == '}') {
+          braceCount--;
+          if (braceCount == 0) {
+            lastValidEnd = i;
+          }
+        }
+      }
+
+      if (lastValidEnd > 0) {
+        fixedContent = content.substring(0, lastValidEnd + 1);
+        try {
+          return jsonDecode(fixedContent) as Map<String, dynamic>;
+        } catch (_) {
+          // Still failed, try more aggressive fixing
+        }
+      }
+
+      // Try removing problematic trailing content
+      final lines = content.split('\n');
+      for (int i = lines.length; i > 0; i--) {
+        final truncated = lines.take(i).join('\n');
+        // Ensure we have balanced braces
+        final openBraces = truncated.split('{').length - 1;
+        final closeBraces = truncated.split('}').length - 1;
+
+        if (openBraces > closeBraces) {
+          // Add missing closing braces
+          final fixed = truncated + ('}' * (openBraces - closeBraces));
+          try {
+            return jsonDecode(fixed) as Map<String, dynamic>;
+          } catch (_) {
+            continue;
+          }
+        }
+      }
+
+      debugPrint('⚠️ Could not parse JSON even after fixing attempts');
+      return null;
     }
   }
 

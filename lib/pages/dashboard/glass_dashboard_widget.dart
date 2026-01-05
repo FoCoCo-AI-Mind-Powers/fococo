@@ -339,7 +339,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
             color: theme.mentalFocus,
             isPositive: true,
             onTap: () {
-              context.pushNamed('coaching_modules');
+              context.pushNamed('mind_coach');
             },
           ),
         ),
@@ -574,7 +574,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
             const Spacer(),
             GestureDetector(
               onTap: () {
-                context.pushNamed('golf_rounds');
+                context.pushNamed('golf_sync');
               },
               child: Text(
                 'View All',
@@ -665,7 +665,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
                 text: 'Log Round',
                 icon: FontAwesomeIcons.plus,
                 onPressed: () {
-                  context.pushNamed('golf_rounds');
+                  context.pushNamed('golf_sync');
                 },
                 color: theme.golfPrimary,
                 theme: theme,
@@ -677,7 +677,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
                 text: 'Train Mind',
                 icon: FontAwesomeIcons.brain,
                 onPressed: () {
-                  context.pushNamed('coaching_modules');
+                  context.pushNamed('mind_coach');
                 },
                 color: theme.aiPrimary,
                 theme: theme,

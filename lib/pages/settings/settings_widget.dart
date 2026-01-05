@@ -6,11 +6,17 @@ import '/backend/push_notifications/push_notifications_util.dart';
 import '/backend/push_notifications/notification_settings_widget.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_components.dart';
-import '/ai_integration/widgets/enhanced_navbar_widget.dart';
+import '/flutter_flow/glass_design_system.dart';
 import '/widgets/floating_voice_button.dart';
+import '/services/revenuecat_service.dart';
+import '/services/subscription_state_provider.dart';
 import '/main.dart';
 import 'settings_model.dart';
 export 'settings_model.dart';
@@ -42,10 +48,27 @@ class _SettingsWidgetState extends State<SettingsWidget>
   // Notification settings
   NotificationSettingsStruct? _notificationSettings;
   bool _isLoadingNotifications = true;
+  bool _newsletterEnabled = false;
 
   // App preferences
   AppPreferencesStruct? _appPreferences;
   bool _isLoadingPreferences = true;
+  
+  // Additional app preferences (not in struct)
+  bool _reduceMotion = false;
+  bool _offlineMode = false;
+  bool _isLoadingAdditionalPrefs = true;
+  
+  // Permission states
+  bool? _microphonePermission;
+  bool? _gpsPermission;
+  bool _isLoadingPermissions = true;
+  
+  // Subscription states
+  final RevenueCatService _revenueCatService = RevenueCatService();
+  final SubscriptionStateProvider _subscriptionProvider = SubscriptionStateProvider();
+  Offerings? _offerings;
+  bool _isLoadingOfferings = false;
 
   @override
   void initState() {
@@ -77,6 +100,72 @@ class _SettingsWidgetState extends State<SettingsWidget>
     // Load notification settings and app preferences
     _loadNotificationSettings();
     _loadAppPreferences();
+    _loadAdditionalPreferences();
+    _checkPermissions();
+    _loadOfferings();
+  }
+  
+  Future<void> _loadOfferings() async {
+    setState(() => _isLoadingOfferings = true);
+    try {
+      final offerings = await _revenueCatService.getOfferings();
+      setState(() {
+        _offerings = offerings;
+        _isLoadingOfferings = false;
+      });
+    } catch (e) {
+      debugPrint('Failed to load offerings: $e');
+      setState(() => _isLoadingOfferings = false);
+    }
+  }
+  
+  Future<void> _showPaywall() async {
+    if (_offerings?.current == null) {
+      // Fallback: navigate to subscription onboarding
+      if (mounted) {
+        context.pushNamed('subscription_onboarding');
+      }
+      return;
+    }
+
+    if (mounted) {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          height: MediaQuery.of(context).size.height * 0.9,
+          decoration: BoxDecoration(
+            color: FlutterFlowTheme.of(context).primaryBackground,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: FlutterFlowTheme.of(context).secondaryText.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Paywall View
+              Expanded(
+                child: PaywallView(
+                  offering: _offerings!.current!,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      // Refresh subscription state after paywall is dismissed
+      await Future.delayed(const Duration(milliseconds: 500));
+      await _subscriptionProvider.refreshSubscriptionState();
+    }
   }
 
   Future<void> _loadNotificationSettings() async {
@@ -94,13 +183,16 @@ class _SettingsWidgetState extends State<SettingsWidget>
           userData['notificationSettings'],
         );
 
+        final newsletterEnabled = userData['newsletterEnabled'] ?? false;
         setState(() {
           _notificationSettings = settings ?? NotificationSettingsStruct();
+          _newsletterEnabled = newsletterEnabled;
           _isLoadingNotifications = false;
         });
       } else {
         setState(() {
           _notificationSettings = NotificationSettingsStruct();
+          _newsletterEnabled = false;
           _isLoadingNotifications = false;
         });
       }
@@ -108,6 +200,7 @@ class _SettingsWidgetState extends State<SettingsWidget>
       debugPrint('❌ Error loading notification settings: $e');
       setState(() {
         _notificationSettings = NotificationSettingsStruct();
+        _newsletterEnabled = false;
         _isLoadingNotifications = false;
       });
     }
@@ -152,6 +245,27 @@ class _SettingsWidgetState extends State<SettingsWidget>
             weeklyProgress: value,
           );
           break;
+        case 'newsletter':
+          // Handle newsletter separately as it's not in the struct
+          await FirebaseFirestore.instance
+              .collection('user')
+              .doc(currentUserUid)
+              .update({
+            'newsletterEnabled': value,
+          });
+          setState(() {
+            _newsletterEnabled = value;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ Newsletter preference updated'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+          return;
         default:
           return;
       }
@@ -245,16 +359,6 @@ class _SettingsWidgetState extends State<SettingsWidget>
             themeMode: _appPreferences!.themeMode,
             hapticFeedbackEnabled: value as bool,
             language: _appPreferences!.language,
-            analyticsEnabled: _appPreferences!.analyticsEnabled,
-            crashReportingEnabled: _appPreferences!.crashReportingEnabled,
-            preferredUnits: _appPreferences!.preferredUnits,
-          );
-          break;
-        case 'language':
-          updatedPreferences = createAppPreferencesStruct(
-            themeMode: _appPreferences!.themeMode,
-            hapticFeedbackEnabled: _appPreferences!.hapticFeedbackEnabled,
-            language: value as String,
             analyticsEnabled: _appPreferences!.analyticsEnabled,
             crashReportingEnabled: _appPreferences!.crashReportingEnabled,
             preferredUnits: _appPreferences!.preferredUnits,
@@ -432,37 +536,404 @@ class _SettingsWidgetState extends State<SettingsWidget>
     );
   }
 
-  Future<void> _launchAppStore() async {
+  Future<void> _loadAdditionalPreferences() async {
     try {
-      const String appStoreUrl =
-          'https://apps.apple.com/app/fococo-golf/id123456789';
-      const String playStoreUrl =
-          'https://play.google.com/store/apps/details?id=com.fococo.app';
+      if (currentUserUid.isEmpty) return;
 
-      // Use appropriate URL based on platform
-      final String url = Theme.of(context).platform == TargetPlatform.iOS
-          ? appStoreUrl
-          : playStoreUrl;
+      final userDoc = await FirebaseFirestore.instance
+          .collection('user')
+          .doc(currentUserUid)
+          .get();
 
-      final Uri uri = Uri.parse(url);
-
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        setState(() {
+          _reduceMotion = userData['reduceMotion'] ?? false;
+          _offlineMode = userData['offlineMode'] ?? false;
+          _isLoadingAdditionalPrefs = false;
+        });
       } else {
-        throw 'Could not launch $url';
+        setState(() {
+          _reduceMotion = false;
+          _offlineMode = false;
+          _isLoadingAdditionalPrefs = false;
+        });
       }
     } catch (e) {
-      debugPrint('❌ Error launching app store: $e');
+      debugPrint('❌ Error loading additional preferences: $e');
+      setState(() {
+        _reduceMotion = false;
+        _offlineMode = false;
+        _isLoadingAdditionalPrefs = false;
+      });
+    }
+  }
+
+  Future<void> _updateAdditionalPreference(String preference, bool value) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('user')
+          .doc(currentUserUid)
+          .update({
+        preference: value,
+      });
+
+      setState(() {
+        if (preference == 'reduceMotion') {
+          _reduceMotion = value;
+        } else if (preference == 'offlineMode') {
+          _offlineMode = value;
+        }
+      });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('❌ Unable to open app store'),
+            content: Text('✅ Preference updated'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error updating additional preference: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Failed to update preference'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
           ),
         );
       }
     }
   }
+
+  Future<void> _checkPermissions() async {
+    try {
+      // Check microphone permission
+      final micStatus = await Permission.microphone.status;
+      final micGranted = micStatus.isGranted;
+
+      // Check location permission
+      bool locationGranted = false;
+      try {
+        LocationPermission locationStatus = await Geolocator.checkPermission();
+        locationGranted = locationStatus == LocationPermission.always ||
+            locationStatus == LocationPermission.whileInUse;
+      } catch (e) {
+        debugPrint('Error checking location permission: $e');
+      }
+
+      setState(() {
+        _microphonePermission = micGranted;
+        _gpsPermission = locationGranted;
+        _isLoadingPermissions = false;
+      });
+    } catch (e) {
+      debugPrint('❌ Error checking permissions: $e');
+      setState(() {
+        _isLoadingPermissions = false;
+      });
+    }
+  }
+
+  Future<void> _requestMicrophonePermission() async {
+    try {
+      final status = await Permission.microphone.request();
+      final granted = status.isGranted;
+
+      setState(() {
+        _microphonePermission = granted;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(granted
+                ? '✅ Microphone permission granted'
+                : '❌ Microphone permission denied'),
+            backgroundColor: granted ? Colors.green : Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      if (!granted && status.isPermanentlyDenied) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Microphone Permission Required'),
+              content: const Text(
+                  'Please enable microphone permission in app settings to use voice features.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    openAppSettings();
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Open Settings'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error requesting microphone permission: $e');
+    }
+  }
+
+  Future<void> _requestGPSPermission() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      final granted = permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse;
+
+      setState(() {
+        _gpsPermission = granted;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(granted
+                ? '✅ Location permission granted'
+                : '❌ Location permission denied'),
+            backgroundColor: granted ? Colors.green : Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      if (!granted && permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Location Permission Required'),
+              content: const Text(
+                  'Please enable location permission in app settings to use GPS features.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    openAppSettings();
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Open Settings'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error requesting GPS permission: $e');
+    }
+  }
+
+  Future<void> _showSignOutConfirmation() async {
+    final theme = FlutterFlowTheme.of(context);
+    
+    final confirmed = await GlassDesignSystem.showGlassModal<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: theme.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.logout,
+                      color: theme.error,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      'Sign Out',
+                      style: theme.headlineSmall.copyWith(
+                        color: theme.primaryText,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Are you sure you want to sign out?',
+                style: theme.bodyLarge.copyWith(
+                  color: theme.primaryText,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'You\'ll need to sign in again to access your account and continue your mental performance journey.',
+                style: theme.bodyMedium.copyWith(
+                  color: theme.secondaryText,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: Text(
+                      'Cancel',
+                      style: theme.bodyMedium.copyWith(
+                        color: theme.secondaryText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.error,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Sign Out',
+                      style: theme.bodyMedium.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      await authManager.signOut();
+      if (mounted) {
+        context.go('/login');
+      }
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('⚠️ Delete Account'),
+        content: const Text(
+          'Are you sure you want to permanently delete your account? This action cannot be undone and will delete all your data, including:\n\n'
+          '• Profile information\n'
+          '• Golf statistics\n'
+          '• Coaching progress\n'
+          '• All saved preferences\n\n'
+          'This action is permanent.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Delete Account'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        // Show loading
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        // Delete user data from Firestore
+        await FirebaseFirestore.instance
+            .collection('user')
+            .doc(currentUserUid)
+            .delete();
+
+        // Sign out
+        await authManager.signOut();
+
+        // Close loading dialog
+        if (mounted) Navigator.of(context).pop();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Account deleted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          context.go('/login');
+        }
+      } catch (e) {
+        // Close loading if still open
+        if (mounted) Navigator.of(context).pop();
+
+        debugPrint('❌ Error deleting account: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('❌ Failed to delete account'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
 
   @override
   void dispose() {
@@ -484,20 +955,6 @@ class _SettingsWidgetState extends State<SettingsWidget>
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: theme.primaryBackground,
-        drawer: loggedIn
-            ? StreamBuilder<UserRecord>(
-                stream: UserRecord.getDocument(
-                    FirebaseFirestore.instance.doc('user/${currentUserUid}')),
-                builder: (context, snapshot) {
-                  final userData = snapshot.data;
-                  return EnhancedFoCoCoDrawer(
-                    currentUser: userData,
-                    currentRoute: 'settings',
-                    onNavigate: (route) => context.goNamed(route),
-                  );
-                },
-              )
-            : null,
         body: Stack(
           children: [
             // Main content
@@ -528,6 +985,11 @@ class _SettingsWidgetState extends State<SettingsWidget>
                             padding: const EdgeInsets.all(20),
                             child: Column(
                               children: [
+                                // Subscription Section (Paywall by default)
+                                _buildSubscriptionSection(theme),
+
+                                const SizedBox(height: 24),
+
                                 // Account Settings
                                 _buildAccountSection(theme),
 
@@ -538,20 +1000,15 @@ class _SettingsWidgetState extends State<SettingsWidget>
 
                                 const SizedBox(height: 24),
 
-                                // Privacy & Security
-                                _buildPrivacySection(theme),
+                                // Legal & Policies
+                                _buildLegalSection(theme),
 
                                 const SizedBox(height: 24),
 
                                 // App Preferences
                                 _buildPreferencesSection(theme),
 
-                                const SizedBox(height: 24),
-
-                                // About & Support
-                                _buildAboutSection(theme),
-
-                                const SizedBox(height: 100), // Space for navbar
+                                const SizedBox(height: 24), // Bottom padding
                               ],
                             ),
                           ),
@@ -567,14 +1024,6 @@ class _SettingsWidgetState extends State<SettingsWidget>
             const FloatingVoiceButton(),
           ],
         ),
-        bottomNavigationBar: EnhancedFoCoCoNavBar(
-          currentRoute: 'settings',
-          onTap: (route) {
-            print('🔄 Settings page: Navigation requested to route: $route');
-            context.goNamed(route);
-          },
-          currentUser: null,
-        ),
       ),
     );
   }
@@ -584,9 +1033,9 @@ class _SettingsWidgetState extends State<SettingsWidget>
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
         children: [
-          // Menu button
+          // Back button
           GestureDetector(
-            onTap: () => scaffoldKey.currentState?.openDrawer(),
+            onTap: () => Navigator.of(context).pop(),
             child: Container(
               width: 44,
               height: 44,
@@ -599,9 +1048,9 @@ class _SettingsWidgetState extends State<SettingsWidget>
                 ),
               ),
               child: Icon(
-                Icons.menu_rounded,
+                Icons.arrow_back_ios_new,
                 color: theme.primaryText,
-                size: 24,
+                size: 20,
               ),
             ),
           ),
@@ -645,94 +1094,131 @@ class _SettingsWidgetState extends State<SettingsWidget>
     );
   }
 
-  Widget _buildAccountSection(FlutterFlowTheme theme) {
-    return GlassDashboardCard(
-      title: 'Account',
-      subtitle: 'Manage your account settings',
-      children: [
-        Column(
-          children: [
-            const SizedBox(height: 16),
-            _buildSettingsItem(
-              theme,
-              Icons.edit_outlined,
-              'Edit Profile',
-              'Update your personal information',
-              () => context.goNamed('edit_profile'),
-            ),
-            _buildSettingsItem(
-              theme,
-              Icons.security_outlined,
-              'Privacy & Security',
-              'Manage your privacy settings',
-              () => context.goNamed('face_id_settings'),
-            ),
-            _buildSettingsItem(
-              theme,
-              Icons.payment_outlined,
-              'Subscription',
-              'Manage your subscription',
-              () => context.goNamed('subscription_management'),
-            ),
-          ],
-        )
-      ],
-    );
-  }
+  Widget _buildSubscriptionSection(FlutterFlowTheme theme) {
+    final hasActiveSubscription = _subscriptionProvider.hasActiveSubscription ||
+        _subscriptionProvider.isSubscriptionActive();
+    final isWithinTrial = _subscriptionProvider.isWithinTrialPeriod();
+    final trialDaysRemaining = _subscriptionProvider.getTrialDaysRemaining();
 
-  Widget _buildNotificationsSection(FlutterFlowTheme theme) {
     return GlassDashboardCard(
-      title: 'Notifications',
-      subtitle: 'Control your notification preferences',
+      title: 'Subscription',
+      subtitle: hasActiveSubscription
+          ? 'Manage your premium subscription'
+          : isWithinTrial
+              ? '$trialDaysRemaining days left in your trial'
+              : 'Unlock premium features',
       children: [
         Column(
           children: [
             const SizedBox(height: 16),
-            if (_isLoadingNotifications)
-              const CircularProgressIndicator()
-            else ...[
-              _buildSwitchItem(
-                theme,
-                Icons.schedule_outlined,
-                'Daily Practice Reminders',
-                'Get reminded to complete your daily mental coaching sessions',
-                _notificationSettings?.dailyReminders ?? false,
-                (value) => _updateNotificationSetting('dailyReminders', value),
-              ),
-              _buildSwitchItem(
-                theme,
-                Icons.psychology_outlined,
-                'AI Insights Ready',
-                'Be notified when your personalized golf insights are ready',
-                _notificationSettings?.insightNotifications ?? false,
-                (value) =>
-                    _updateNotificationSetting('insightNotifications', value),
-              ),
-              _buildSwitchItem(
-                theme,
-                Icons.emoji_events_outlined,
-                'Achievement Alerts',
-                'Celebrate your progress with achievement notifications',
-                _notificationSettings?.achievementAlerts ?? false,
-                (value) =>
-                    _updateNotificationSetting('achievementAlerts', value),
-              ),
-              _buildSwitchItem(
-                theme,
-                Icons.trending_up_outlined,
-                'Weekly Progress Summary',
-                'Get a weekly overview of your golf improvement journey',
-                _notificationSettings?.weeklyProgress ?? false,
-                (value) => _updateNotificationSetting('weeklyProgress', value),
-              ),
-              // Add settings link for advanced notification management
+            if (hasActiveSubscription)
               _buildSettingsItem(
                 theme,
-                Icons.tune_outlined,
-                'Advanced Notification Settings',
-                'Configure detailed notification preferences',
-                () => _showAdvancedNotificationSettings(context),
-              ),
+                Icons.workspace_premium,
+                'Manage Subscription',
+                'View and manage your subscription details',
+                () => context.goNamed('subscription_management'),
+              )
+            else ...[
+              // Show Paywall UI by default
+              if (_isLoadingOfferings)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(),
+                )
+              else if (_offerings?.current != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    children: [
+                      // Paywall Preview Card
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              theme.primary.withValues(alpha: 0.1),
+                              theme.secondary.withValues(alpha: 0.1),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.primary.withValues(alpha: 0.3),
+                            width: 2,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.workspace_premium,
+                              color: theme.primary,
+                              size: 48,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Upgrade to Premium',
+                              style: theme.titleMedium.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: theme.primaryText,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              isWithinTrial
+                                  ? 'Your trial ends in $trialDaysRemaining days'
+                                  : 'Unlock all premium features',
+                              style: theme.bodyMedium.copyWith(
+                                color: theme.secondaryText,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _showPaywall,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: theme.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: Text(
+                                'View Plans',
+                                style: theme.titleSmall.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSettingsItem(
+                        theme,
+                        Icons.settings,
+                        'Subscription Management',
+                        'Manage your subscription settings',
+                        () => context.goNamed('subscription_management'),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                _buildSettingsItem(
+                  theme,
+                  Icons.workspace_premium,
+                  'Upgrade to Premium',
+                  'Unlock all premium features',
+                  () => context.pushNamed('subscription_onboarding'),
+                ),
             ],
           ],
         )
@@ -740,28 +1226,20 @@ class _SettingsWidgetState extends State<SettingsWidget>
     );
   }
 
-  void _showAdvancedNotificationSettings(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const NotificationSettingsWidget(),
-      ),
-    );
-  }
-
-  Widget _buildPrivacySection(FlutterFlowTheme theme) {
+  Widget _buildAccountSection(FlutterFlowTheme theme) {
     return GlassDashboardCard(
-      title: 'Privacy & Security',
-      subtitle: 'Protect your data and privacy',
+      title: 'Account Settings',
+      subtitle: 'Manage your personal info and privacy',
       children: [
         Column(
           children: [
             const SizedBox(height: 16),
             _buildSettingsItem(
               theme,
-              Icons.fingerprint_outlined,
-              'Face ID / Touch ID',
-              'Enable biometric authentication',
-              () => context.goNamed('face_id_settings'),
+              Icons.person_outline,
+              'Manage Account Info',
+              'Update your profile',
+              () => context.goNamed('edit_profile'),
             ),
             _buildSettingsItem(
               theme,
@@ -788,10 +1266,33 @@ class _SettingsWidgetState extends State<SettingsWidget>
             ),
             _buildSettingsItem(
               theme,
+              Icons.fingerprint_outlined,
+              'Face ID / Touch ID',
+              'Enable biometric authentication',
+              () => context.goNamed('face_id_settings'),
+            ),
+            _buildSettingsItem(
+              theme,
               Icons.download_outlined,
               'Download Data',
-              'Export your personal data',
+              'Export your personal data (GDPR / CCPA compliant)',
               _exportUserData,
+            ),
+            _buildSettingsItem(
+              theme,
+              Icons.delete_outline,
+              'Delete Account',
+              'Permanently close your FoCoCo account',
+              _deleteAccount,
+              isDestructive: true,
+            ),
+            _buildSettingsItem(
+              theme,
+              Icons.logout,
+              'Sign Out',
+              'Sign out of your account',
+              _showSignOutConfirmation,
+              isDestructive: true,
             ),
           ],
         )
@@ -799,22 +1300,249 @@ class _SettingsWidgetState extends State<SettingsWidget>
     );
   }
 
-  Widget _buildPreferencesSection(FlutterFlowTheme theme) {
+  Widget _buildNotificationsSection(FlutterFlowTheme theme) {
     return GlassDashboardCard(
-      title: 'App Preferences',
-      subtitle: 'Customize your app experience',
+      title: 'Notifications',
+      subtitle: 'Control your notification preferences',
       children: [
         Column(
           children: [
             const SizedBox(height: 16),
-            if (_isLoadingPreferences)
+            if (_isLoadingNotifications)
               const CircularProgressIndicator()
             else ...[
+              _buildSwitchItem(
+                theme,
+                Icons.schedule_outlined,
+                'Daily Practice Reminders',
+                'Stay consistent with your coaching routines',
+                _notificationSettings?.dailyReminders ?? false,
+                (value) => _updateNotificationSetting('dailyReminders', value),
+              ),
+              _buildSwitchItem(
+                theme,
+                Icons.psychology_outlined,
+                'AI Insights Ready',
+                'Get notified when personalized golf insights are available',
+                _notificationSettings?.insightNotifications ?? false,
+                (value) =>
+                    _updateNotificationSetting('insightNotifications', value),
+              ),
+              _buildSwitchItem(
+                theme,
+                Icons.emoji_events_outlined,
+                'Achievement Alerts',
+                'Celebrate your progress with milestone updates',
+                _notificationSettings?.achievementAlerts ?? false,
+                (value) =>
+                    _updateNotificationSetting('achievementAlerts', value),
+              ),
+              _buildSwitchItem(
+                theme,
+                Icons.trending_up_outlined,
+                'Weekly Progress Summary',
+                'Receive a weekly overview of your golf improvement',
+                _notificationSettings?.weeklyProgress ?? false,
+                (value) => _updateNotificationSetting('weeklyProgress', value),
+              ),
+              _buildSwitchItem(
+                theme,
+                Icons.email_outlined,
+                'FoCoCo Newsletter (email)',
+                'Stay up-to-date with FoCoCo latest news & updates',
+                _newsletterEnabled,
+                (value) => _updateNotificationSetting('newsletter', value),
+              ),
+              // Add settings link for advanced notification management
+              _buildSettingsItem(
+                theme,
+                Icons.tune_outlined,
+                'Advanced Notification Settings',
+                'Configure detailed notification preferences',
+                () => _showAdvancedNotificationSettings(context),
+              ),
+            ],
+          ],
+        )
+      ],
+    );
+  }
+
+  void _showAdvancedNotificationSettings(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const NotificationSettingsWidget(),
+      ),
+    );
+  }
+
+  Widget _buildLegalSection(FlutterFlowTheme theme) {
+    return GlassDashboardCard(
+      title: 'Legal & Policies',
+      subtitle: 'Understand your rights and data protection',
+      children: [
+        Column(
+          children: [
+            const SizedBox(height: 16),
+            _buildSettingsItem(
+              theme,
+              Icons.medical_information_outlined,
+              'Medical Disclaimer',
+              'See below',
+              () => _showMedicalDisclaimer(),
+            ),
+            _buildSettingsItem(
+              theme,
+              Icons.description_outlined,
+              'Terms & Conditions',
+              'View terms of service',
+              () => _openLegalDocument('terms'),
+            ),
+            _buildSettingsItem(
+              theme,
+              Icons.privacy_tip_outlined,
+              'Privacy Policy',
+              'View privacy policy',
+              () => _openLegalDocument('privacy'),
+            ),
+            _buildSettingsItem(
+              theme,
+              Icons.accessibility_new_outlined,
+              'Accessibility Statement',
+              'View accessibility information',
+              () => _openLegalDocument('accessibility'),
+            ),
+            _buildSettingsItem(
+              theme,
+              Icons.cookie_outlined,
+              'Cookie Policy',
+              'View cookie policy',
+              () => _openLegalDocument('cookies'),
+            ),
+            _buildSettingsItem(
+              theme,
+              Icons.attribution_outlined,
+              'Licenses & Attributions',
+              'View open source licenses',
+              () => _openLegalDocument('licenses'),
+            ),
+          ],
+        )
+      ],
+    );
+  }
+
+  void _showMedicalDisclaimer() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Medical Disclaimer'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'FoCoCo provides mindset, focus, and performance guidance for golf and other sports.',
+                style: TextStyle(height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'It does not diagnose, treat, or replace any form of medical, psychological, or therapeutic care.',
+                style: TextStyle(height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Content is for educational and self-development purposes only.',
+                style: TextStyle(height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Always consult a qualified medical or mental-health professional before making decisions that may affect your health or wellbeing.',
+                style: TextStyle(
+                  height: 1.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openLegalDocument(String documentType) async {
+    // Placeholder URLs - replace with actual URLs when available
+    final Map<String, String> documentUrls = {
+      'terms': 'https://fococo.app/terms',
+      'privacy': 'https://fococo.app/privacy',
+      'accessibility': 'https://fococo.app/accessibility',
+      'cookies': 'https://fococo.app/cookies',
+      'licenses': 'https://fococo.app/licenses',
+    };
+
+    final url = documentUrls[documentType] ?? 'https://fococo.app';
+    final Uri uri = Uri.parse(url);
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Could not launch $url';
+      }
+    } catch (e) {
+      debugPrint('❌ Error launching legal document: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Unable to open ${documentType.replaceAll('_', ' ')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildPreferencesSection(FlutterFlowTheme theme) {
+    return GlassDashboardCard(
+      title: 'App Preferences',
+      subtitle: 'Customize how FoCoCo looks and behaves',
+      children: [
+        Column(
+          children: [
+            const SizedBox(height: 16),
+            if (_isLoadingPreferences || _isLoadingPermissions || _isLoadingAdditionalPrefs)
+              const CircularProgressIndicator()
+            else ...[
+              // Microphone permission
+              _buildPermissionItem(
+                theme,
+                Icons.mic_outlined,
+                'Microphone',
+                _microphonePermission == true ? 'Allowed' : 'Not Allowed',
+                _microphonePermission ?? false,
+                _requestMicrophonePermission,
+              ),
+              // GPS permission
+              _buildPermissionItem(
+                theme,
+                Icons.location_on_outlined,
+                'GPS',
+                _gpsPermission == true ? 'Allowed' : 'Not Allowed',
+                _gpsPermission ?? false,
+                _requestGPSPermission,
+              ),
               // Theme selection with three options
               _buildSettingsItem(
                 theme,
                 Icons.palette_outlined,
-                'Theme',
+                'App Theme',
                 _getThemeDisplayName(_appPreferences?.themeMode ?? 'system'),
                 () => _showThemeSelectionDialog(),
               ),
@@ -826,12 +1554,21 @@ class _SettingsWidgetState extends State<SettingsWidget>
                 _appPreferences?.hapticFeedbackEnabled ?? true,
                 (value) => _updateAppPreference('hapticFeedback', value),
               ),
-              _buildSettingsItem(
+              _buildSwitchItem(
                 theme,
-                Icons.language_outlined,
-                'Language',
-                _getLanguageDisplayName(_appPreferences?.language ?? 'en_US'),
-                () => _showLanguageSelectionDialog(),
+                Icons.accessibility_new_outlined,
+                'Reduce Motion',
+                'Minimize animations for a calmer interface',
+                _reduceMotion,
+                (value) => _updateAdditionalPreference('reduceMotion', value),
+              ),
+              _buildSwitchItem(
+                theme,
+                Icons.cloud_off_outlined,
+                'Offline Mode',
+                'Store data locally until reconnected',
+                _offlineMode,
+                (value) => _updateAdditionalPreference('offlineMode', value),
               ),
             ],
           ],
@@ -843,27 +1580,12 @@ class _SettingsWidgetState extends State<SettingsWidget>
   String _getThemeDisplayName(String themeMode) {
     switch (themeMode) {
       case 'light':
-        return '☀️ Light Mode';
+        return '☀️ Light';
       case 'dark':
-        return '🌙 Dark Mode';
+        return '🌙 Dark';
       case 'system':
       default:
-        return '📱 System Default';
-    }
-  }
-
-  String _getLanguageDisplayName(String languageCode) {
-    switch (languageCode) {
-      case 'en_US':
-        return '🇺🇸 English (US)';
-      case 'es_ES':
-        return '🇪🇸 Spanish';
-      case 'fr_FR':
-        return '🇫🇷 French';
-      case 'de_DE':
-        return '🇩🇪 German';
-      default:
-        return '🇺🇸 English (US)';
+        return '📱 Auto';
     }
   }
 
@@ -876,10 +1598,10 @@ class _SettingsWidgetState extends State<SettingsWidget>
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildThemeOption(
-                'system', '📱 System Default', 'Follow device settings'),
+                'system', '📱 Auto', 'Follow device settings'),
             _buildThemeOption(
-                'light', '☀️ Light Mode', 'Always use light theme'),
-            _buildThemeOption('dark', '🌙 Dark Mode', 'Always use dark theme'),
+                'light', '☀️ Light', 'Always use light theme'),
+            _buildThemeOption('dark', '🌙 Dark', 'Always use dark theme'),
           ],
         ),
         actions: [
@@ -913,111 +1635,6 @@ class _SettingsWidgetState extends State<SettingsWidget>
     );
   }
 
-  void _showLanguageSelectionDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('🌍 Choose Language'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildLanguageOption('en_US', '🇺🇸 English (US)'),
-            _buildLanguageOption('es_ES', '🇪🇸 Spanish'),
-            _buildLanguageOption('fr_FR', '🇫🇷 French'),
-            _buildLanguageOption('de_DE', '🇩🇪 German'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLanguageOption(String value, String title) {
-    return ListTile(
-      leading: Radio<String>(
-        value: value,
-        groupValue: _appPreferences?.language ?? 'en_US',
-        onChanged: (newValue) {
-          if (newValue != null) {
-            _updateAppPreference('language', newValue);
-            Navigator.of(context).pop();
-            // Show restart message for language changes
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content:
-                    Text('🌍 Language updated! Restart app to apply changes'),
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-        },
-      ),
-      title: Text(title),
-      onTap: () {
-        _updateAppPreference('language', value);
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🌍 Language updated! Restart app to apply changes'),
-            duration: Duration(seconds: 3),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildAboutSection(FlutterFlowTheme theme) {
-    return GlassDashboardCard(
-      title: 'About & Support',
-      subtitle: 'Get help and app information',
-      children: [
-        Column(
-          children: [
-            const SizedBox(height: 16),
-            _buildSettingsItem(
-              theme,
-              Icons.help_outline,
-              'Help & Support',
-              'Get help with the app',
-              () => context.goNamed('support'),
-            ),
-            _buildSettingsItem(
-              theme,
-              Icons.star_outline,
-              'Rate App',
-              'Rate FoCoCo on the App Store',
-              _launchAppStore,
-            ),
-            _buildSettingsItem(
-              theme,
-              Icons.info_outline,
-              'About FoCoCo',
-              'Version 1.0.0',
-              () => _showAboutDialog(),
-            ),
-            _buildSettingsItem(
-              theme,
-              Icons.logout,
-              'Sign Out',
-              'Sign out of your account',
-              () async {
-                await authManager.signOut();
-                if (context.mounted) {
-                  context.go('/login');
-                }
-              },
-              isDestructive: true,
-            ),
-          ],
-        )
-      ],
-    );
-  }
 
   Widget _buildSettingsItem(
     FlutterFlowTheme theme,
@@ -1071,107 +1688,6 @@ class _SettingsWidgetState extends State<SettingsWidget>
     );
   }
 
-  void _showAboutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    FlutterFlowTheme.of(context).primary,
-                    FlutterFlowTheme.of(context).secondary
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.golf_course,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text('About FoCoCo'),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                '🏌️ FoCoCo - Mental Performance for Golf',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text('Version 1.0.0'),
-              const SizedBox(height: 16),
-              const Text(
-                'Transform your golf game through the power of mental performance. FoCoCo combines cutting-edge AI insights with proven sports psychology techniques.',
-                style: TextStyle(height: 1.4),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '🎯 Features:',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              _buildFeatureItem('🧠', 'AI-powered mental coaching'),
-              _buildFeatureItem('📊', 'Performance analytics'),
-              _buildFeatureItem('🎓', 'VARK learning adaptation'),
-              _buildFeatureItem('🔒', 'Secure biometric protection'),
-              _buildFeatureItem('🏆', 'Progress tracking & achievements'),
-              const SizedBox(height: 16),
-              const Text(
-                'Built with ❤️ for golfers who want to unlock their mental edge.',
-                style: TextStyle(
-                  fontStyle: FontStyle.italic,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '© 2024 FoCoCo Golf. All rights reserved.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeatureItem(String emoji, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Text(emoji),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text)),
-        ],
-      ),
-    );
-  }
 
   Widget _buildSwitchItem(
     FlutterFlowTheme theme,
@@ -1215,6 +1731,57 @@ class _SettingsWidgetState extends State<SettingsWidget>
           onChanged: onChanged,
           activeColor: theme.primary,
         ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPermissionItem(
+    FlutterFlowTheme theme,
+    IconData icon,
+    String title,
+    String subtitle,
+    bool isGranted,
+    VoidCallback onTap,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: theme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            color: theme.primary,
+            size: 22,
+          ),
+        ),
+        title: Text(
+          title,
+          style: theme.bodyMedium.copyWith(
+            color: theme.primaryText,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: theme.labelSmall.copyWith(
+            color: isGranted ? Colors.green : Colors.orange,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        trailing: Icon(
+          isGranted ? Icons.check_circle : Icons.settings,
+          color: isGranted ? Colors.green : theme.secondaryText,
+          size: 24,
+        ),
+        onTap: onTap,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),

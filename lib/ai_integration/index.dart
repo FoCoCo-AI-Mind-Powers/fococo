@@ -50,9 +50,8 @@ export 'services/ai_insight_service.dart';
 export 'utils/ai_utils.dart';
 
 // AI Widgets
-export 'widgets/ai_insight_widget.dart';
+export 'widgets/ai_insight_card_widget.dart';
 export 'widgets/ai_insight_widget_enhanced.dart';
-export 'widgets/voice_chat_button.dart';
 export 'widgets/voice_chat_modal.dart'
     hide ChatMessage; // Hide to avoid conflict
 export 'widgets/navbar_widget.dart';
@@ -133,17 +132,20 @@ class FoCoCoAI {
     List<MentalSessionsRecord>? mentalSessions,
     String? sessionId,
   }) async {
+    // Convert WeatherStruct to Map for JSON serialization
+    final weatherMap = golfRound.weather?.toMap() ?? <String, dynamic>{};
+
     return await client.generateGolfInsight(
       userId: userId,
       roundData: {
         'score': golfRound.score,
         'parTotal': golfRound.parTotal,
-        'weather': golfRound.weather,
+        'weather': weatherMap,
         'date': golfRound.date?.toIso8601String() ?? '',
       },
       userNotes: golfRound.notes,
       contextualFactors: {
-        'weather': golfRound.weather,
+        'weather': weatherMap,
         'courseName': golfRound.courseName,
         'date': golfRound.date?.toIso8601String() ?? '',
         'userProfile': 'basic',

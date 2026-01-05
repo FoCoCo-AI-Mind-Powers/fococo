@@ -186,9 +186,9 @@ final breakdown = await costTracker.getCostBreakdown(
 ### AI Insight Widget
 
 ```dart
-import 'package:fo_co_co/ai_integration/widgets/ai_insight_widget.dart';
+import 'package:fo_co_co/ai_integration/widgets/ai_insight_card_widget.dart';
 
-AIInsightWidget(
+AIInsightCardWidget(
   insight: aiInsightRecord,
   showActions: true,
   onInsightRead: () {

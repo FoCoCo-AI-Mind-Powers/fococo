@@ -4,6 +4,8 @@
 /// Based on pattern from coelle project and issue #574: https://github.com/Baseflow/flutter-permission-handler/issues/574
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart' as ph;
@@ -66,45 +68,60 @@ class PermissionService {
   }
 
   /// Check current microphone permission status
-  /// Uses AudioRecorder's permission check as PRIMARY source of truth (more reliable)
-  /// Falls back to permission_handler if recorder is unavailable
-  /// Based on pattern from coelle project - fixes issue #574 where permission_handler incorrectly reports denied
+  /// Uses permission_handler as PRIMARY source (per official documentation)
+  /// Adds robust timeout to prevent hanging in "checking" state
+  /// Verifies with AudioRecorder after permission_handler check (if available)
   Future<PermissionServiceState> checkMicrophonePermission() async {
+    if (kDebugMode) {
+      print('🔍 [DEBUG] checkMicrophonePermission ENTRY - currentState: $_microphoneState');
+    }
+    
+    // Immediately set state to checking
+    _updateMicrophoneState(PermissionServiceState.checking);
+    
+    // Use Future.any to race between permission check and timeout
+    // This ensures timeout ALWAYS wins if permission check hangs
     try {
-      _updateMicrophoneState(PermissionServiceState.checking);
-      
-      await _ensureRecorderInitialized();
-
-      // PRIMARY CHECK: Use AudioRecorder's permission check as it's more reliable
-      // This fixes the issue where permission_handler incorrectly reports denied
-      // even when permission is actually granted (issue #574)
-      if (_audioRecorder != null) {
-        try {
-          final recorderHasPermission = await _audioRecorder!.hasPermission();
-          if (recorderHasPermission) {
-            _updateMicrophoneState(PermissionServiceState.granted);
-            if (kDebugMode) {
-              print('✅ Microphone permission granted (verified by AudioRecorder)');
-            }
-            return PermissionServiceState.granted;
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print('⚠️ Error checking AudioRecorder permission: $e');
-          }
-        }
+      if (kDebugMode) {
+        print('🔍 [DEBUG] Starting permission check with 2-second timeout');
       }
-
-      // SECONDARY CHECK: Use permission_handler as fallback
-      // Only trust it if it says granted - don't trust denied status
-      final status = await ph.Permission.microphone.status;
       
-      // Return granted only if explicitly granted or limited
+      // Create a timeout future that will definitely complete
+      final timeoutFuture = Future<ph.PermissionStatus>.delayed(
+        const Duration(seconds: 2),
+        () {
+          if (kDebugMode) {
+            print('⚠️ [DEBUG] TIMEOUT: Permission check took too long, defaulting to denied');
+          }
+          return ph.PermissionStatus.denied;
+        },
+      );
+      
+      // Race between actual permission check and timeout
+      final status = await Future.any<ph.PermissionStatus>([
+        ph.Permission.microphone.status.catchError((e) {
+          if (kDebugMode) {
+            print('⚠️ [DEBUG] Permission check error: $e');
+          }
+          return ph.PermissionStatus.denied;
+        }),
+        timeoutFuture,
+      ]);
+      
+      if (kDebugMode) {
+        print('🔍 [DEBUG] Permission status received: $status (isGranted: ${status.isGranted})');
+      }
+      
+      // Handle granted or limited status immediately
       if (status.isGranted || status.isLimited) {
         _updateMicrophoneState(PermissionServiceState.granted);
         if (kDebugMode) {
           print('✅ Microphone permission granted (verified by permission_handler)');
         }
+        
+        // Optional verification with AudioRecorder (non-blocking)
+        _verifyWithAudioRecorder();
+        
         return PermissionServiceState.granted;
       }
 
@@ -117,13 +134,41 @@ class PermissionService {
       }
 
       return state;
-    } catch (e) {
+    } catch (e, stackTrace) {
       if (kDebugMode) {
-        print('❌ Error checking microphone permission: $e');
+        print('❌ [DEBUG] EXCEPTION in checkMicrophonePermission: $e');
+        print('❌ [DEBUG] StackTrace: $stackTrace');
       }
+      
+      // Ensure we always update state even on error
       _updateMicrophoneState(PermissionServiceState.denied);
       return PermissionServiceState.denied;
     }
+  }
+  
+  /// Verify permission with AudioRecorder (non-blocking, runs in background)
+  void _verifyWithAudioRecorder() {
+    _ensureRecorderInitialized().then((_) {
+      if (_audioRecorder != null) {
+        _audioRecorder!.hasPermission()
+            .timeout(
+              const Duration(seconds: 2),
+              onTimeout: () => false,
+            )
+            .then((hasPermission) {
+          if (hasPermission && _microphoneState != PermissionServiceState.granted) {
+            if (kDebugMode) {
+              print('✅ Microphone permission verified by AudioRecorder');
+            }
+            _updateMicrophoneState(PermissionServiceState.granted);
+          }
+        }).catchError((e) {
+          if (kDebugMode) {
+            print('⚠️ AudioRecorder verification failed (non-critical): $e');
+          }
+        });
+      }
+    });
   }
   
   /// Refresh microphone permission status (useful when returning from settings)
@@ -135,43 +180,33 @@ class PermissionService {
   }
 
   /// Request microphone permission with enhanced handling
-  /// Fixed based on https://github.com/Baseflow/flutter-permission-handler/issues/574
-  /// Uses AudioRecorder's permission check as primary verification
+  /// Follows permission_handler documentation best practices
+  /// Uses permission_handler as primary source with timeout protection
   Future<PermissionServiceState> requestMicrophonePermission({
     bool showRationale = true,
   }) async {
     try {
       _updateMicrophoneState(PermissionServiceState.checking);
       
-      await _ensureRecorderInitialized();
-
-      // PRIMARY CHECK: Use AudioRecorder's permission check first
-      if (_audioRecorder != null) {
-        try {
-          final recorderHasPermission = await _audioRecorder!.hasPermission();
-          if (recorderHasPermission) {
-            _updateMicrophoneState(PermissionServiceState.granted);
-            if (kDebugMode) {
-              print('✅ Microphone permission already granted (verified by AudioRecorder)');
-            }
-            return PermissionServiceState.granted;
-          }
-        } catch (e) {
+      // PRIMARY CHECK: Use permission_handler.status (per official docs)
+      // Check current status first with timeout
+      final currentStatus = await ph.Permission.microphone.status.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
           if (kDebugMode) {
-            print('⚠️ Error checking AudioRecorder permission: $e');
+            print('⚠️ Permission status check timeout');
           }
-        }
-      }
+          return ph.PermissionStatus.denied;
+        },
+      );
 
-      // Check current status using permission_handler
-      final currentStatus = await ph.Permission.microphone.status;
-
-      // If already granted, return granted
-      if (currentStatus.isGranted) {
+      // If already granted, return granted immediately
+      if (currentStatus.isGranted || currentStatus.isLimited) {
         _updateMicrophoneState(PermissionServiceState.granted);
         if (kDebugMode) {
           print('✅ Microphone permission already granted');
         }
+        _verifyWithAudioRecorder();
         return PermissionServiceState.granted;
       }
 
@@ -184,28 +219,28 @@ class PermissionService {
         return PermissionServiceState.permanentlyDenied;
       }
 
-      // If denied but not permanently, request permission
+      // If denied but not permanently, request permission with timeout
       ph.PermissionStatus status = currentStatus;
       if (currentStatus.isDenied) {
-        status = await ph.Permission.microphone.request();
+        status = await ph.Permission.microphone.request().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            if (kDebugMode) {
+              print('⚠️ Permission request timeout');
+            }
+            return ph.PermissionStatus.denied;
+          },
+        );
       }
 
-      // Verify with AudioRecorder after request
-      if (_audioRecorder != null) {
-        try {
-          final recorderHasPermission = await _audioRecorder!.hasPermission();
-          if (recorderHasPermission) {
-            _updateMicrophoneState(PermissionServiceState.granted);
-            if (kDebugMode) {
-              print('✅ Microphone permission granted (verified by AudioRecorder after request)');
-            }
-            return PermissionServiceState.granted;
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print('⚠️ Error verifying AudioRecorder permission after request: $e');
-          }
+      // Handle the result immediately
+      if (status.isGranted || status.isLimited) {
+        _updateMicrophoneState(PermissionServiceState.granted);
+        if (kDebugMode) {
+          print('✅ Microphone permission granted after request');
         }
+        _verifyWithAudioRecorder();
+        return PermissionServiceState.granted;
       }
 
       // Convert permission_handler result
@@ -387,9 +422,52 @@ class PermissionService {
 
   /// Update microphone state and notify listeners
   void _updateMicrophoneState(PermissionServiceState newState) {
+    // #region agent log
+    final logEntry = {
+      'sessionId': 'debug-session',
+      'runId': 'run1',
+      'hypothesisId': 'C',
+      'location': 'permission_service.dart:_updateMicrophoneState',
+      'message': '_updateMicrophoneState ENTRY',
+      'data': {'oldState': _microphoneState.toString(), 'newState': newState.toString()},
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+    File('/Users/mac/Documents/Projects Code/fococo/.cursor/debug.log')
+        .writeAsStringSync('${jsonEncode(logEntry)}\n', mode: FileMode.append);
+    // #endregion
+    
     if (_microphoneState != newState) {
       _microphoneState = newState;
+      
+      // #region agent log
+      final logEntry2 = {
+        'sessionId': 'debug-session',
+        'runId': 'run1',
+        'hypothesisId': 'C',
+        'location': 'permission_service.dart:_updateMicrophoneState',
+        'message': 'BEFORE stream.add',
+        'data': {'state': newState.toString()},
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+      File('/Users/mac/Documents/Projects Code/fococo/.cursor/debug.log')
+          .writeAsStringSync('${jsonEncode(logEntry2)}\n', mode: FileMode.append);
+      // #endregion
+      
       _microphoneStateController.add(newState);
+
+      // #region agent log
+      final logEntry3 = {
+        'sessionId': 'debug-session',
+        'runId': 'run1',
+        'hypothesisId': 'C',
+        'location': 'permission_service.dart:_updateMicrophoneState',
+        'message': 'AFTER stream.add',
+        'data': {},
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+      File('/Users/mac/Documents/Projects Code/fococo/.cursor/debug.log')
+          .writeAsStringSync('${jsonEncode(logEntry3)}\n', mode: FileMode.append);
+      // #endregion
 
       // Handle UI feedback
       handlePermissionStateChange(newState);
@@ -397,6 +475,20 @@ class PermissionService {
       if (kDebugMode) {
         print('🔄 Microphone permission state: $newState');
       }
+      
+      // #region agent log
+      final logEntry4 = {
+        'sessionId': 'debug-session',
+        'runId': 'run1',
+        'hypothesisId': 'C',
+        'location': 'permission_service.dart:_updateMicrophoneState',
+        'message': '_updateMicrophoneState EXIT',
+        'data': {},
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+      File('/Users/mac/Documents/Projects Code/fococo/.cursor/debug.log')
+          .writeAsStringSync('${jsonEncode(logEntry4)}\n', mode: FileMode.append);
+      // #endregion
     }
   }
 

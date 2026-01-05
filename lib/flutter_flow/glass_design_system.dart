@@ -646,7 +646,7 @@ class _FoCoCoGlassNavBarWidgetState extends State<_FoCoCoGlassNavBarWidget>
       icon: Icons.favorite_outline,
       activeIcon: Icons.favorite_rounded,
       label: 'Rounds',
-      route: '/golf_rounds',
+      route: '/golf_sync',
     ),
     // Center space for voice button
     FoCoCoNavItem(

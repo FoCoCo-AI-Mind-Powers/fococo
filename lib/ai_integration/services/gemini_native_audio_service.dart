@@ -436,7 +436,9 @@ Areas of expertise:
               }
 
               // Update transcript
-              _transcriptController.add(responseText);
+              if (!_transcriptController.isClosed) {
+                _transcriptController.add(responseText);
+              }
             }
 
             // Handle audio responses
@@ -463,7 +465,9 @@ Areas of expertise:
             },
           );
 
-          _responseController.add(response);
+          if (!_responseController.isClosed) {
+            _responseController.add(response);
+          }
           _updateState(GeminiNativeAudioState.connected);
 
           if (kDebugMode) {
@@ -503,7 +507,9 @@ Areas of expertise:
   void _updateState(GeminiNativeAudioState newState) {
     if (_currentState != newState) {
       _currentState = newState;
-      _stateController.add(newState);
+      if (!_stateController.isClosed) {
+        _stateController.add(newState);
+      }
 
       if (kDebugMode) {
         print('🔄 State changed to: $newState');

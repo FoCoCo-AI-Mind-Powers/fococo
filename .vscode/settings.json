@@ -2,7 +2,7 @@
   "dart.flutterSdkPath": "~/fvm/versions/3.38.1",
   "window.autoDetectColorScheme": true,
   "workbench.preferredLightColorTheme": "Default Light Modern",
-  "workbench.preferredDarkColorTheme": "Cursor Dark",
+  "workbench.preferredDarkColorTheme": "GitHub Dark Colorblind (Beta)",
   "workbench.colorTheme": "Light Modern",
   "terminal.integrated.windowsEnableConpty": false,
   "terminal.integrated.persistentSessionReviveProcess": "never",

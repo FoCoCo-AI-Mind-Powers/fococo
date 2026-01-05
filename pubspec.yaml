@@ -15,7 +15,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-version: 1.0.0+10
+version: 1.0.0+13
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -87,8 +87,6 @@ dependencies:
   sign_in_with_apple: ^7.0.1
   sign_in_with_apple_platform_interface: ^2.0.0
   sign_in_with_apple_web: ^3.0.0
-  sqflite: ^2.3.0
-  sqflite_common: ^2.4.0
   stream_transform: ^2.1.1
   timeago: ^3.7.1
   timezone: ^0.10.1
@@ -105,6 +103,7 @@ dependencies:
   # Enhanced UI Components Dependencies
   percent_indicator: ^4.2.3
   shimmer: ^3.0.0
+  flutter_loading_skeleton: ^1.0.1
 
   # Tutorial and Guidance Dependencies
   tutorial_coach_mark: ^1.2.11
@@ -120,7 +119,6 @@ dependencies:
 
   # Audio Intelligence Dependencies
   flutter_tts: ^4.2.0
-  speech_to_text: ^7.1.1
   just_audio: ^0.10.5
   permission_handler: ^12.0.1
   record: ^6.1.1
@@ -146,6 +144,13 @@ dependencies:
   
   # In-App Purchase Dependencies (iOS StoreKit & Android Google Play Billing)
   in_app_purchase: ^3.2.0
+  
+  # RevenueCat Dependencies
+  purchases_flutter: ^9.0.0
+  purchases_ui_flutter: ^9.0.0
+
+  # LiveKit Client for Real-time Voice/Video
+  livekit_client: ^2.6.0
 
   # Splash Screen Package
   another_flutter_splash_screen: ^1.2.1
@@ -153,10 +158,12 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.0
+  speech_to_text: ^7.3.0
 
 dependency_overrides:
   http: 1.2.2
   uuid: ^4.0.0
+  sqflite_android: 2.4.1
 
 dev_dependencies:
   flutter_lints: ^6.0.0

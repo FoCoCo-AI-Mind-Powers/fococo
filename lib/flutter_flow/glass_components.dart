@@ -778,11 +778,11 @@ class FoCoCoGlassNavBar extends StatelessWidget {
 class FoCoCoNavigation {
   // Route constants
   static const String dashboard = '/dashboard';
-  static const String golfRounds = '/golf_rounds';
+  static const String golfRounds = '/golf_sync';
   static const String focoMap = '/foco_map';
   static const String profile = '/profile';
   static const String aiInsights = '/ai_insights';
-  static const String coachingModules = '/coaching_modules';
+  static const String coachingModules = '/mind_coach';
   static const String progress = '/progress';
   static const String achievements = '/achievements';
   static const String varkOnboarding = '/vark_onboarding';
@@ -794,7 +794,7 @@ class FoCoCoNavigation {
         Navigator.pushReplacementNamed(context, '/dashboard');
         break;
       case golfRounds:
-        Navigator.pushReplacementNamed(context, '/golf_rounds');
+        Navigator.pushReplacementNamed(context, '/golf_sync');
         break;
       case focoMap:
         Navigator.pushReplacementNamed(context, '/foco_map');
@@ -806,7 +806,7 @@ class FoCoCoNavigation {
         Navigator.pushNamed(context, '/ai_insights');
         break;
       case coachingModules:
-        Navigator.pushNamed(context, '/coaching_modules');
+        Navigator.pushNamed(context, '/mind_coach');
         break;
       case progress:
         Navigator.pushNamed(context, '/progress');

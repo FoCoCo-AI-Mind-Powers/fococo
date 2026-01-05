@@ -100,5 +100,8 @@
 		<false/>
 		<key>FirebaseMessagingAutoInitEnabled</key>
 		<true/>
+		<!-- Google Maps API Key for iOS -->
+		<key>GMSApiKey</key>
+		<string>AIzaSyAYkQKNgnVZUj5Yd9C3Iyjjg0lwc4TJXuA</string>
 	</dict>
 </plist>

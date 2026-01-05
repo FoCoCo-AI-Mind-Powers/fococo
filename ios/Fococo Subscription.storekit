@@ -1,0 +1,121 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "1B6440B2",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6748402830",
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_developerTeamID" : "8NXWKZGJ54",
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 788812957.091717,
+    "_locale" : "en_US",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21837702",
+      "localizations" : [
+
+      ],
+      "name" : "FoCoCo Subscription",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "14.99",
+          "familyShareable" : true,
+          "groupNumber" : 1,
+          "internalID" : "6755597169",
+          "introductoryOffer" : {
+            "internalID" : "577B45CB",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P2W"
+          },
+          "localizations" : [
+            {
+              "description" : "Full access to FoCoCo and the MindGame System™",
+              "displayName" : "FoCoCo Prime Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "fococo_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "FoCoCo Prime Monthly",
+          "subscriptionGroupID" : "21837702",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "119.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "6755598350",
+          "introductoryOffer" : {
+            "internalID" : "0D8FF453",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P2W"
+          },
+          "localizations" : [
+            {
+              "description" : "Full access to FoCoCo and the MindGame System™",
+              "displayName" : "FoCoCo Prime Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "fococo_yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "FoCoCo Prime Yearly",
+          "subscriptionGroupID" : "21837702",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "subscriptionOffersKeyPair" : {
+    "id" : "85A4FEEC",
+    "privateKey" : "MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgMvFvLlz0QZjWUitMu0A1qdmX5iWT16BiDr1eZeiIx46gCgYIKoZIzj0DAQehRANCAARY3rCFb9M6IZLoOH9S6ragtriYRcosOBtR3FkglLf76i08VSVYNoQTTSZLxf/FtxdzUpvQJHxHDxzzs1QoCoS9"
+  },
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

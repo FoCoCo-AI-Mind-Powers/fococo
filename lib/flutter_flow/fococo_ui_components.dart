@@ -44,23 +44,26 @@ class FoCoCoActivityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: FlutterFlowTheme.spacingM),
       decoration: BoxDecoration(
         color: theme.activityCardBackground,
         borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
         boxShadow: [theme.activityCardShadow],
-        border: isPersonalRecord ? Border.all(
-          color: theme.personalRecord,
-          width: 2,
-        ) : null,
+        border: isPersonalRecord
+            ? Border.all(
+                color: theme.personalRecord,
+                width: 2,
+              )
+            : null,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
+          borderRadius:
+              BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
           child: Padding(
             padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
             child: Column(
@@ -98,7 +101,8 @@ class FoCoCoActivityCard extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: theme.personalRecord,
-                          borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusS),
+                          borderRadius: BorderRadius.circular(
+                              FlutterFlowTheme.borderRadiusS),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -121,9 +125,9 @@ class FoCoCoActivityCard extends StatelessWidget {
                       ),
                   ],
                 ),
-                
+
                 const SizedBox(height: FlutterFlowTheme.spacingM),
-                
+
                 // Main score display
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -137,7 +141,8 @@ class FoCoCoActivityCard extends StatelessWidget {
                     ),
                     const SizedBox(width: FlutterFlowTheme.spacingS),
                     Padding(
-                      padding: const EdgeInsets.only(bottom: FlutterFlowTheme.spacingS),
+                      padding: const EdgeInsets.only(
+                          bottom: FlutterFlowTheme.spacingS),
                       child: Text(
                         date,
                         style: theme.bodySmall.copyWith(
@@ -147,29 +152,34 @@ class FoCoCoActivityCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                
+
                 if (showStats && stats.isNotEmpty) ...[
                   const SizedBox(height: FlutterFlowTheme.spacingM),
-                  
+
                   // Stats row
                   Row(
-                    children: stats.map((stat) => Expanded(
-                      child: _buildStatItem(theme, stat),
-                    )).toList(),
+                    children: stats
+                        .map((stat) => Expanded(
+                              child: _buildStatItem(theme, stat),
+                            ))
+                        .toList(),
                   ),
                 ],
-                
+
                 if (achievements.isNotEmpty) ...[
                   const SizedBox(height: FlutterFlowTheme.spacingM),
-                  
+
                   // Achievements row
                   Row(
-                    children: achievements.map((achievement) => 
-                      Container(
-                        margin: const EdgeInsets.only(right: FlutterFlowTheme.spacingS),
-                        child: _buildAchievementBadge(theme, achievement),
-                      ),
-                    ).toList(),
+                    children: achievements
+                        .map(
+                          (achievement) => Container(
+                            margin: const EdgeInsets.only(
+                                right: FlutterFlowTheme.spacingS),
+                            child: _buildAchievementBadge(theme, achievement),
+                          ),
+                        )
+                        .toList(),
                   ),
                 ],
               ],
@@ -202,7 +212,8 @@ class FoCoCoActivityCard extends StatelessWidget {
     );
   }
 
-  Widget _buildAchievementBadge(FlutterFlowTheme theme, Achievement achievement) {
+  Widget _buildAchievementBadge(
+      FlutterFlowTheme theme, Achievement achievement) {
     return Container(
       padding: const EdgeInsets.all(FlutterFlowTheme.spacingXS),
       decoration: BoxDecoration(
@@ -234,7 +245,7 @@ class FoCoCoPerformanceMetrics extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
+
     return Container(
       padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
       decoration: BoxDecoration(
@@ -262,9 +273,7 @@ class FoCoCoPerformanceMetrics extends StatelessWidget {
               ),
             ],
           ),
-          
           const SizedBox(height: FlutterFlowTheme.spacingM),
-          
           if (compactView)
             _buildCompactMetrics(theme)
           else
@@ -276,26 +285,31 @@ class FoCoCoPerformanceMetrics extends StatelessWidget {
 
   Widget _buildCompactMetrics(FlutterFlowTheme theme) {
     return Row(
-      children: metrics.map((metric) => Expanded(
-        child: _buildMetricItem(theme, metric, true),
-      )).toList(),
+      children: metrics
+          .map((metric) => Expanded(
+                child: _buildMetricItem(theme, metric, true),
+              ))
+          .toList(),
     );
   }
 
   Widget _buildDetailedMetrics(FlutterFlowTheme theme) {
     return Column(
-      children: metrics.map((metric) => 
-        Container(
-          margin: const EdgeInsets.only(bottom: FlutterFlowTheme.spacingM),
-          child: _buildMetricItem(theme, metric, false),
-        ),
-      ).toList(),
+      children: metrics
+          .map(
+            (metric) => Container(
+              margin: const EdgeInsets.only(bottom: FlutterFlowTheme.spacingM),
+              child: _buildMetricItem(theme, metric, false),
+            ),
+          )
+          .toList(),
     );
   }
 
-  Widget _buildMetricItem(FlutterFlowTheme theme, PerformanceMetric metric, bool compact) {
+  Widget _buildMetricItem(
+      FlutterFlowTheme theme, PerformanceMetric metric, bool compact) {
     final Color metricColor = theme.getPerformanceColor(metric.score);
-    
+
     return Container(
       padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
       decoration: BoxDecoration(
@@ -306,12 +320,14 @@ class FoCoCoPerformanceMetrics extends StatelessWidget {
           width: 1,
         ),
       ),
-      child: compact ? _buildCompactMetricContent(theme, metric, metricColor) 
-                    : _buildDetailedMetricContent(theme, metric, metricColor),
+      child: compact
+          ? _buildCompactMetricContent(theme, metric, metricColor)
+          : _buildDetailedMetricContent(theme, metric, metricColor),
     );
   }
 
-  Widget _buildCompactMetricContent(FlutterFlowTheme theme, PerformanceMetric metric, Color color) {
+  Widget _buildCompactMetricContent(
+      FlutterFlowTheme theme, PerformanceMetric metric, Color color) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -333,7 +349,8 @@ class FoCoCoPerformanceMetrics extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailedMetricContent(FlutterFlowTheme theme, PerformanceMetric metric, Color color) {
+  Widget _buildDetailedMetricContent(
+      FlutterFlowTheme theme, PerformanceMetric metric, Color color) {
     return Row(
       children: [
         Expanded(
@@ -361,9 +378,11 @@ class FoCoCoPerformanceMetrics extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(FlutterFlowTheme.spacingS),
             decoration: BoxDecoration(
-              color: metric.trend! > 0 ? theme.performanceGood.withValues(alpha: 0.1) 
-                                      : theme.performancePoor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusS),
+              color: metric.trend! > 0
+                  ? theme.performanceGood.withValues(alpha: 0.1)
+                  : theme.performancePoor.withValues(alpha: 0.1),
+              borderRadius:
+                  BorderRadius.circular(FlutterFlowTheme.borderRadiusS),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -371,13 +390,17 @@ class FoCoCoPerformanceMetrics extends StatelessWidget {
                 Icon(
                   metric.trend! > 0 ? Icons.trending_up : Icons.trending_down,
                   size: FlutterFlowTheme.iconSizeS,
-                  color: metric.trend! > 0 ? theme.performanceGood : theme.performancePoor,
+                  color: metric.trend! > 0
+                      ? theme.performanceGood
+                      : theme.performancePoor,
                 ),
                 const SizedBox(width: FlutterFlowTheme.spacingXS),
                 Text(
                   '${metric.trend!.abs().toStringAsFixed(1)}%',
                   style: theme.bodySmall.copyWith(
-                    color: metric.trend! > 0 ? theme.performanceGood : theme.performancePoor,
+                    color: metric.trend! > 0
+                        ? theme.performanceGood
+                        : theme.performancePoor,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -407,7 +430,7 @@ class FoCoCoStreakWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
+
     return Container(
       padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
       decoration: BoxDecoration(
@@ -432,7 +455,8 @@ class FoCoCoStreakWidget extends StatelessWidget {
             padding: const EdgeInsets.all(FlutterFlowTheme.spacingM),
             decoration: BoxDecoration(
               color: theme.streakActive,
-              borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
+              borderRadius:
+                  BorderRadius.circular(FlutterFlowTheme.borderRadiusL),
             ),
             child: Icon(
               Icons.local_fire_department,
@@ -440,9 +464,9 @@ class FoCoCoStreakWidget extends StatelessWidget {
               color: Colors.white,
             ),
           ),
-          
+
           const SizedBox(width: FlutterFlowTheme.spacingM),
-          
+
           // Streak information
           Expanded(
             child: Column(
@@ -508,26 +532,30 @@ class FoCoCoMindfulnessCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
+
     return Container(
       height: FlutterFlowTheme.moduleCardHeight,
       margin: const EdgeInsets.only(bottom: FlutterFlowTheme.spacingM),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
         boxShadow: [theme.coachingModuleShadow],
-        image: backgroundImage != null ? DecorationImage(
-          image: AssetImage(backgroundImage!),
-          fit: BoxFit.cover,
-        ) : null,
+        image: backgroundImage != null
+            ? DecorationImage(
+                image: AssetImage(backgroundImage!),
+                fit: BoxFit.cover,
+              )
+            : null,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: isLocked ? null : onTap,
-          borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
+          borderRadius:
+              BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
           child: Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
+              borderRadius:
+                  BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
               gradient: LinearGradient(
                 colors: [
                   theme.getMindfulnessColor(sessionType).withValues(alpha: 0.8),
@@ -554,7 +582,8 @@ class FoCoCoMindfulnessCard extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusS),
+                          borderRadius: BorderRadius.circular(
+                              FlutterFlowTheme.borderRadiusS),
                         ),
                         child: Text(
                           sessionType.toUpperCase(),
@@ -564,9 +593,9 @@ class FoCoCoMindfulnessCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      
+
                       const Spacer(),
-                      
+
                       // Title and description
                       Text(
                         title,
@@ -578,7 +607,8 @@ class FoCoCoMindfulnessCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: FlutterFlowTheme.spacingS),
-                      Flexible( // Make description flexible
+                      Flexible(
+                        // Make description flexible
                         child: Text(
                           description,
                           style: theme.bodyMedium.copyWith(
@@ -588,9 +618,10 @@ class FoCoCoMindfulnessCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      
-                      const SizedBox(height: FlutterFlowTheme.spacingS), // Reduced spacing
-                      
+
+                      const SizedBox(
+                          height: FlutterFlowTheme.spacingS), // Reduced spacing
+
                       // Duration and progress
                       Row(
                         children: [
@@ -617,25 +648,29 @@ class FoCoCoMindfulnessCard extends StatelessWidget {
                             ),
                         ],
                       ),
-                      
+
                       if (progress != null) ...[
-                        const SizedBox(height: FlutterFlowTheme.spacingXS), // Reduced spacing
+                        const SizedBox(
+                            height:
+                                FlutterFlowTheme.spacingXS), // Reduced spacing
                         LinearProgressIndicator(
                           value: progress!,
                           backgroundColor: Colors.white.withValues(alpha: 0.2),
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
                           minHeight: FlutterFlowTheme.moduleProgressHeight,
                         ),
                       ],
                     ],
                   ),
                 ),
-                
+
                 // Lock overlay
                 if (isLocked)
                   Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusCard),
+                      borderRadius: BorderRadius.circular(
+                          FlutterFlowTheme.borderRadiusCard),
                       color: Colors.black.withValues(alpha: 0.5),
                     ),
                     child: Center(
@@ -699,15 +734,16 @@ class _FoCoCoBreathingWidgetState extends State<FoCoCoBreathingWidget>
   late Animation<double> _breathingAnimation;
   bool _isActive = false;
   String _currentPhase = 'Inhale';
-  
+
   @override
   void initState() {
     super.initState();
     _breathingController = AnimationController(
-      duration: Duration(seconds: widget.inhaleTime + widget.holdTime + widget.exhaleTime),
+      duration: Duration(
+          seconds: widget.inhaleTime + widget.holdTime + widget.exhaleTime),
       vsync: this,
     );
-    
+
     _breathingAnimation = Tween<double>(
       begin: 0.6,
       end: 1.0,
@@ -727,7 +763,7 @@ class _FoCoCoBreathingWidgetState extends State<FoCoCoBreathingWidget>
     setState(() {
       _isActive = true;
     });
-    
+
     _breathingController.repeat();
     widget.onStart?.call();
   }
@@ -736,7 +772,7 @@ class _FoCoCoBreathingWidgetState extends State<FoCoCoBreathingWidget>
     setState(() {
       _isActive = false;
     });
-    
+
     _breathingController.stop();
     widget.onStop?.call();
   }
@@ -744,7 +780,7 @@ class _FoCoCoBreathingWidgetState extends State<FoCoCoBreathingWidget>
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
+
     return Container(
       padding: const EdgeInsets.all(FlutterFlowTheme.spacingXL),
       decoration: BoxDecoration(
@@ -790,9 +826,9 @@ class _FoCoCoBreathingWidgetState extends State<FoCoCoBreathingWidget>
               );
             },
           ),
-          
+
           const SizedBox(height: FlutterFlowTheme.spacingXL),
-          
+
           // Instructions
           Text(
             _isActive ? 'Follow the circle' : 'Tap to start breathing',
@@ -800,9 +836,9 @@ class _FoCoCoBreathingWidgetState extends State<FoCoCoBreathingWidget>
               color: Colors.white,
             ),
           ),
-          
+
           const SizedBox(height: FlutterFlowTheme.spacingM),
-          
+
           // Control button
           ElevatedButton(
             onPressed: _isActive ? _stopBreathing : _startBreathing,
@@ -814,7 +850,8 @@ class _FoCoCoBreathingWidgetState extends State<FoCoCoBreathingWidget>
                 vertical: FlutterFlowTheme.spacingM,
               ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(FlutterFlowTheme.borderRadiusButton),
+                borderRadius:
+                    BorderRadius.circular(FlutterFlowTheme.borderRadiusButton),
               ),
             ),
             child: Text(
@@ -837,7 +874,7 @@ class _FoCoCoBreathingWidgetState extends State<FoCoCoBreathingWidget>
 class ActivityStat {
   final String label;
   final String value;
-  
+
   ActivityStat({required this.label, required this.value});
 }
 
@@ -845,7 +882,7 @@ class Achievement {
   final String tier;
   final IconData icon;
   final String name;
-  
+
   Achievement({required this.tier, required this.icon, required this.name});
 }
 
@@ -854,7 +891,7 @@ class PerformanceMetric {
   final String value;
   final double score;
   final double? trend;
-  
+
   PerformanceMetric({
     required this.label,
     required this.value,
@@ -904,7 +941,7 @@ class FoCoCoColors {
   static const Color brandOrange = Color(0xFFFEA400);
   static const Color brandBlue = Color(0xFF0A3669);
   static const Color brandGreen = Color(0xFF017B3D);
-} 
+}
 
 // ============================================================================
 // MISSING UI COMPONENTS - CORE FOCOCO WIDGETS
@@ -1059,19 +1096,20 @@ class _FoCoCoAnimatedSplashState extends State<FoCoCoAnimatedSplash>
                       const SizedBox(height: 24),
                       Text(
                         'FoCoCo',
-                        style: FlutterFlowTheme.of(context).headlineLarge.override(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          height: 1.0,
-                        ),
+                        style:
+                            FlutterFlowTheme.of(context).headlineLarge.override(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  height: 1.0,
+                                ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Focus • Confidence • Control',
                         style: FlutterFlowTheme.of(context).bodyLarge.override(
-                          color: Colors.white70,
-                          height: 1.0,
-                        ),
+                              color: Colors.white70,
+                              height: 1.0,
+                            ),
                       ),
                     ],
                   ),
@@ -1336,9 +1374,9 @@ class AIInsightCard extends StatelessWidget {
                 child: Text(
                   title,
                   style: FlutterFlowTheme.of(context).headlineSmall.override(
-                    fontWeight: FontWeight.w600,
-                    height: 1.0,
-                  ),
+                        fontWeight: FontWeight.w600,
+                        height: 1.0,
+                      ),
                 ),
               ),
               if (category != null)
@@ -1348,16 +1386,18 @@ class AIInsightCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.1),
+                    color: FlutterFlowTheme.of(context)
+                        .primary
+                        .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     category!,
                     style: FlutterFlowTheme.of(context).bodySmall.override(
-                      color: FlutterFlowTheme.of(context).primary,
-                      fontWeight: FontWeight.w500,
-                      height: 1.0,
-                    ),
+                          color: FlutterFlowTheme.of(context).primary,
+                          fontWeight: FontWeight.w500,
+                          height: 1.0,
+                        ),
                   ),
                 ),
             ],
@@ -1413,7 +1453,7 @@ class PerformanceMetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cardColor = color ?? FlutterFlowTheme.of(context).primary;
-    
+
     return FoCoCoCard(
       style: FoCoCoCardStyle.standard,
       child: Column(
@@ -1447,10 +1487,10 @@ class PerformanceMetricCard extends StatelessWidget {
                   child: Text(
                     trend!,
                     style: FlutterFlowTheme.of(context).bodySmall.override(
-                      color: _getTrendColor(trend!),
-                      fontWeight: FontWeight.w600,
-                      height: 1.0,
-                    ),
+                          color: _getTrendColor(trend!),
+                          fontWeight: FontWeight.w600,
+                          height: 1.0,
+                        ),
                   ),
                 ),
             ],
@@ -1459,18 +1499,18 @@ class PerformanceMetricCard extends StatelessWidget {
           Text(
             value,
             style: FlutterFlowTheme.of(context).headlineMedium.override(
-              color: cardColor,
-              fontWeight: FontWeight.bold,
-              height: 1.0,
-            ),
+                  color: cardColor,
+                  fontWeight: FontWeight.bold,
+                  height: 1.0,
+                ),
           ),
           const SizedBox(height: 4),
           Text(
             title,
             style: FlutterFlowTheme.of(context).bodyMedium.override(
-              color: FlutterFlowTheme.of(context).secondaryText,
-              height: 1.0,
-            ),
+                  color: FlutterFlowTheme.of(context).secondaryText,
+                  height: 1.0,
+                ),
           ),
         ],
       ),
@@ -1512,12 +1552,12 @@ class AchievementBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final badgeColor = _getTierColor();
-    
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isUnlocked 
-            ? badgeColor.withValues(alpha: 0.1) 
+        color: isUnlocked
+            ? badgeColor.withValues(alpha: 0.1)
             : Colors.grey.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
@@ -1536,10 +1576,10 @@ class AchievementBadge extends StatelessWidget {
           Text(
             title,
             style: FlutterFlowTheme.of(context).bodySmall.override(
-              color: isUnlocked ? badgeColor : Colors.grey,
-              fontWeight: FontWeight.w600,
-              height: 1.0,
-            ),
+                  color: isUnlocked ? badgeColor : Colors.grey,
+                  fontWeight: FontWeight.w600,
+                  height: 1.0,
+                ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -1584,7 +1624,7 @@ class WellnessScoreCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scoreColor = _getScoreColor(score);
-    
+
     return FoCoCoCard(
       style: FoCoCoCardStyle.wellness,
       child: Column(
@@ -1605,10 +1645,10 @@ class WellnessScoreCard extends StatelessWidget {
               child: Text(
                 score.toString(),
                 style: FlutterFlowTheme.of(context).headlineLarge.override(
-                  color: scoreColor,
-                  fontWeight: FontWeight.bold,
-                  height: 1.0,
-                ),
+                      color: scoreColor,
+                      fontWeight: FontWeight.bold,
+                      height: 1.0,
+                    ),
               ),
             ),
           ),
@@ -1616,18 +1656,18 @@ class WellnessScoreCard extends StatelessWidget {
           Text(
             title,
             style: FlutterFlowTheme.of(context).headlineSmall.override(
-              fontWeight: FontWeight.w600,
-              height: 1.0,
-            ),
+                  fontWeight: FontWeight.w600,
+                  height: 1.0,
+                ),
           ),
           if (subtitle != null) ...[
             const SizedBox(height: 4),
             Text(
               subtitle!,
               style: FlutterFlowTheme.of(context).bodyMedium.override(
-                color: FlutterFlowTheme.of(context).secondaryText,
-                height: 1.0,
-              ),
+                    color: FlutterFlowTheme.of(context).secondaryText,
+                    height: 1.0,
+                  ),
             ),
           ],
         ],
@@ -1681,9 +1721,9 @@ class SubscriptionTierCard extends StatelessWidget {
               Text(
                 tierName,
                 style: FlutterFlowTheme.of(context).headlineSmall.override(
-                  fontWeight: FontWeight.bold,
-                  height: 1.0,
-                ),
+                      fontWeight: FontWeight.bold,
+                      height: 1.0,
+                    ),
               ),
               const Spacer(),
               if (isCurrentTier)
@@ -1699,10 +1739,10 @@ class SubscriptionTierCard extends StatelessWidget {
                   child: Text(
                     'Current',
                     style: FlutterFlowTheme.of(context).bodySmall.override(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      height: 1.0,
-                    ),
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          height: 1.0,
+                        ),
                   ),
                 ),
             ],
@@ -1711,31 +1751,31 @@ class SubscriptionTierCard extends StatelessWidget {
           Text(
             price,
             style: FlutterFlowTheme.of(context).headlineMedium.override(
-              color: FlutterFlowTheme.of(context).primary,
-              fontWeight: FontWeight.bold,
-              height: 1.0,
-            ),
+                  color: FlutterFlowTheme.of(context).primary,
+                  fontWeight: FontWeight.bold,
+                  height: 1.0,
+                ),
           ),
           const SizedBox(height: 16),
           ...features.map((feature) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.check_circle,
-                  color: FlutterFlowTheme.of(context).primary,
-                  size: 16,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      color: FlutterFlowTheme.of(context).primary,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        feature,
+                        style: FlutterFlowTheme.of(context).bodyMedium,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    feature,
-                    style: FlutterFlowTheme.of(context).bodyMedium,
-                  ),
-                ),
-              ],
-            ),
-          )),
+              )),
         ],
       ),
     );
@@ -1765,7 +1805,8 @@ class FoCoCoAnimatedBottomNavBar extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<FoCoCoAnimatedBottomNavBar> createState() => _FoCoCoAnimatedBottomNavBarState();
+  State<FoCoCoAnimatedBottomNavBar> createState() =>
+      _FoCoCoAnimatedBottomNavBarState();
 }
 
 class _FoCoCoAnimatedBottomNavBarState extends State<FoCoCoAnimatedBottomNavBar>
@@ -1774,9 +1815,9 @@ class _FoCoCoAnimatedBottomNavBarState extends State<FoCoCoAnimatedBottomNavBar>
   late AnimationController _scaleController;
   late Animation<double> _slideAnimation;
   late Animation<double> _scaleAnimation;
-  
+
   int _currentIndex = 0;
-  
+
   // Navigation items configuration
   final List<NavigationItem> _navItems = [
     NavigationItem(
@@ -1789,7 +1830,7 @@ class _FoCoCoAnimatedBottomNavBarState extends State<FoCoCoAnimatedBottomNavBar>
       icon: FontAwesomeIcons.golfBallTee,
       activeIcon: FontAwesomeIcons.golfBallTee,
       label: 'Rounds',
-      route: 'golf_rounds',
+      route: 'golf_sync',
     ),
     NavigationItem(
       icon: Icons.psychology_outlined,
@@ -1820,17 +1861,17 @@ class _FoCoCoAnimatedBottomNavBarState extends State<FoCoCoAnimatedBottomNavBar>
   @override
   void initState() {
     super.initState();
-    
+
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     _scaleController = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-    
+
     _slideAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -1838,7 +1879,7 @@ class _FoCoCoAnimatedBottomNavBarState extends State<FoCoCoAnimatedBottomNavBar>
       parent: _slideController,
       curve: Curves.easeInOutCubic,
     ));
-    
+
     _scaleAnimation = Tween<double>(
       begin: 0.8,
       end: 1.0,
@@ -1846,10 +1887,10 @@ class _FoCoCoAnimatedBottomNavBarState extends State<FoCoCoAnimatedBottomNavBar>
       parent: _scaleController,
       curve: Curves.elasticOut,
     ));
-    
+
     // Set initial index based on current route
     _currentIndex = _getIndexFromRoute(widget.currentRoute);
-    
+
     _slideController.forward();
     _scaleController.forward();
   }
@@ -1882,10 +1923,10 @@ class _FoCoCoAnimatedBottomNavBarState extends State<FoCoCoAnimatedBottomNavBar>
       setState(() {
         _currentIndex = index;
       });
-      
+
       _scaleController.reset();
       _scaleController.forward();
-      
+
       // Haptic feedback for better UX
       HapticFeedback.lightImpact();
     }
@@ -1893,10 +1934,10 @@ class _FoCoCoAnimatedBottomNavBarState extends State<FoCoCoAnimatedBottomNavBar>
 
   void _onItemTapped(int index) {
     final item = _navItems[index];
-    
+
     if (index != _currentIndex) {
       _animateToIndex(index);
-      
+
       // Navigate to the new route
       if (widget.onTap != null) {
         widget.onTap!(item.route);
@@ -1909,7 +1950,7 @@ class _FoCoCoAnimatedBottomNavBarState extends State<FoCoCoAnimatedBottomNavBar>
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
+
     return AnimatedBuilder(
       animation: _slideAnimation,
       builder: (context, child) {
@@ -2044,7 +2085,8 @@ class _FoCoCoAnimatedBottomNavBarState extends State<FoCoCoAnimatedBottomNavBar>
                         fontFamily: 'Inter',
                         color: isActive ? Colors.white : theme.secondaryText,
                         fontSize: isActive ? 10 : 9,
-                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight:
+                            isActive ? FontWeight.w600 : FontWeight.w500,
                         height: 1.0,
                       ),
                       child: Text(
@@ -2083,17 +2125,18 @@ class FoCoCoIndicatorBottomNavBar extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<FoCoCoIndicatorBottomNavBar> createState() => _FoCoCoIndicatorBottomNavBarState();
+  State<FoCoCoIndicatorBottomNavBar> createState() =>
+      _FoCoCoIndicatorBottomNavBarState();
 }
 
-class _FoCoCoIndicatorBottomNavBarState extends State<FoCoCoIndicatorBottomNavBar>
-    with TickerProviderStateMixin {
+class _FoCoCoIndicatorBottomNavBarState
+    extends State<FoCoCoIndicatorBottomNavBar> with TickerProviderStateMixin {
   late AnimationController _indicatorController;
   late Animation<double> _indicatorAnimation;
-  
+
   int _currentIndex = 0;
   double _indicatorPosition = 0.0;
-  
+
   // Navigation items configuration
   final List<NavigationItem> _navItems = [
     NavigationItem(
@@ -2106,7 +2149,7 @@ class _FoCoCoIndicatorBottomNavBarState extends State<FoCoCoIndicatorBottomNavBa
       icon: FontAwesomeIcons.golfBallTee,
       activeIcon: FontAwesomeIcons.golfBallTee,
       label: 'Rounds',
-      route: 'golf_rounds',
+      route: 'golf_sync',
     ),
     NavigationItem(
       icon: Icons.psychology_outlined,
@@ -2137,12 +2180,12 @@ class _FoCoCoIndicatorBottomNavBarState extends State<FoCoCoIndicatorBottomNavBa
   @override
   void initState() {
     super.initState();
-    
+
     _indicatorController = AnimationController(
       duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-    
+
     _indicatorAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -2150,10 +2193,10 @@ class _FoCoCoIndicatorBottomNavBarState extends State<FoCoCoIndicatorBottomNavBa
       parent: _indicatorController,
       curve: Curves.easeInOutCubic,
     ));
-    
+
     // Set initial index based on current route
     _currentIndex = _getIndexFromRoute(widget.currentRoute);
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updateIndicatorPosition();
       _indicatorController.forward();
@@ -2184,9 +2227,10 @@ class _FoCoCoIndicatorBottomNavBarState extends State<FoCoCoIndicatorBottomNavBa
 
   void _updateIndicatorPosition() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final navBarWidth = screenWidth - (widget.margin.left + widget.margin.right);
+    final navBarWidth =
+        screenWidth - (widget.margin.left + widget.margin.right);
     final itemWidth = navBarWidth / _navItems.length;
-    
+
     setState(() {
       _indicatorPosition = (_currentIndex * itemWidth) + (itemWidth / 2) - 20;
     });
@@ -2197,11 +2241,11 @@ class _FoCoCoIndicatorBottomNavBarState extends State<FoCoCoIndicatorBottomNavBa
       setState(() {
         _currentIndex = index;
       });
-      
+
       _updateIndicatorPosition();
       _indicatorController.reset();
       _indicatorController.forward();
-      
+
       // Haptic feedback
       HapticFeedback.lightImpact();
     }
@@ -2209,10 +2253,10 @@ class _FoCoCoIndicatorBottomNavBarState extends State<FoCoCoIndicatorBottomNavBa
 
   void _onItemTapped(int index) {
     final item = _navItems[index];
-    
+
     if (index != _currentIndex) {
       _animateToIndex(index);
-      
+
       // Navigate to the new route
       if (widget.onTap != null) {
         widget.onTap!(item.route);
@@ -2225,7 +2269,7 @@ class _FoCoCoIndicatorBottomNavBarState extends State<FoCoCoIndicatorBottomNavBa
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    
+
     return Container(
       height: widget.height,
       margin: widget.margin,
@@ -2282,7 +2326,7 @@ class _FoCoCoIndicatorBottomNavBarState extends State<FoCoCoIndicatorBottomNavBa
               );
             },
           ),
-          
+
           // Navigation items
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -2318,7 +2362,7 @@ class _FoCoCoIndicatorBottomNavBarState extends State<FoCoCoIndicatorBottomNavBa
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const SizedBox(height: 8), // Space for indicator
-              
+
               AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOutCubic,
@@ -2342,7 +2386,7 @@ class _FoCoCoIndicatorBottomNavBarState extends State<FoCoCoIndicatorBottomNavBa
                   ),
                 ),
               ),
-              
+
               if (widget.showLabels) ...[
                 const SizedBox(height: 4),
                 AnimatedDefaultTextStyle(

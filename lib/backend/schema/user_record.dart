@@ -167,6 +167,21 @@ class UserRecord extends FirestoreRecord {
   String get lastTrainingPlanId => _lastTrainingPlanId ?? '';
   bool hasLastTrainingPlanId() => _lastTrainingPlanId != null;
 
+  // "lastAIError" field.
+  String? _lastAIError;
+  String get lastAIError => _lastAIError ?? '';
+  bool hasLastAIError() => _lastAIError != null;
+
+  // "lastAIErrorTimestamp" field.
+  DateTime? _lastAIErrorTimestamp;
+  DateTime? get lastAIErrorTimestamp => _lastAIErrorTimestamp;
+  bool hasLastAIErrorTimestamp() => _lastAIErrorTimestamp != null;
+
+  // "aiErrorCount" field.
+  int? _aiErrorCount;
+  int get aiErrorCount => _aiErrorCount ?? 0;
+  bool hasAiErrorCount() => _aiErrorCount != null;
+
   void _initializeFields() {
     _email = snapshotData['email'] as String?;
     _displayName = snapshotData['displayName'] as String?;
@@ -239,6 +254,9 @@ class UserRecord extends FirestoreRecord {
     _referralSource = snapshotData['referralSource'] as String?;
     _currentAdaptiveMode = snapshotData['currentAdaptiveMode'] as String?;
     _lastTrainingPlanId = snapshotData['lastTrainingPlanId'] as String?;
+    _lastAIError = snapshotData['lastAIError'] as String?;
+    _lastAIErrorTimestamp = snapshotData['lastAIErrorTimestamp'] as DateTime?;
+    _aiErrorCount = castToType<int>(snapshotData['aiErrorCount']);
   }
 
   static CollectionReference get collection =>

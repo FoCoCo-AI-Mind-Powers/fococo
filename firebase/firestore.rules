@@ -1,6 +1,16 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the resource (userId matches auth.uid)
+    function isOwner(userId) {
+      return isAuthenticated() && userId == request.auth.uid;
+    }
+    
     // App settings - public read access for configuration
     match /app_settings/{document} {
       allow read: if true;
@@ -9,16 +19,31 @@ service cloud.firestore {
     
     match /user/{document} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null && (request.auth.uid == document || request.auth.token.email_verified);
+      // Allow users to read their own user document
+      allow read: if request.auth != null && request.auth.uid == document;
       allow write: if request.auth != null && request.auth.uid == document;
       allow delete: if request.auth != null && request.auth.uid == document;
     }
     
     match /golf_rounds/{document} {
-      allow create: if request.auth != null && request.auth.token.email_verified;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow write: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+      // Allow creating golf rounds - require userId to match auth.uid
+      allow create: if isAuthenticated() && 
+                     request.resource.data.userId == request.auth.uid;
+      
+      // Allow reading golf rounds that belong to the authenticated user
+      // This works for both individual document reads and collection queries
+      // Firestore will evaluate this rule against each document in query results
+      allow read: if isAuthenticated() && 
+                   isOwner(resource.data.userId);
+      
+      // Allow updating golf rounds - require userId to remain the same
+      allow update: if isAuthenticated() && 
+                     isOwner(resource.data.userId) &&
+                     request.resource.data.userId == request.auth.uid;
+      
+      // Allow deleting golf rounds that belong to the authenticated user
+      allow delete: if isAuthenticated() && 
+                     isOwner(resource.data.userId);
     }
     
     match /mental_sessions/{document} {
@@ -36,10 +61,18 @@ service cloud.firestore {
     }
     
     match /user_subscriptions/{document} {
-      allow create: if request.auth != null && request.auth.token.email_verified;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow write: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified &&
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid;
     }
     
     // AI Memory Service - Enhanced conversation memory and NLP analysis
@@ -98,15 +131,16 @@ service cloud.firestore {
     match /user_module_progress/{document} {
       allow create: if request.auth != null && 
                      request.auth.token.email_verified && 
-                     request.auth.uid == resource.data.userId;
+                     request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && 
-                   request.auth.uid == resource.data.userId;
-      allow write: if request.auth != null && 
-                    request.auth.token.email_verified && 
-                    request.auth.uid == resource.data.userId;
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && 
                      request.auth.token.email_verified && 
-                     request.auth.uid == resource.data.userId;
+                     resource.data.userId == request.auth.uid;
     }
     
     // Module Ratings & Reviews - User feedback on coaching modules
@@ -123,6 +157,22 @@ service cloud.firestore {
                      request.auth.uid == resource.data.userId;
     }
     
+    // Training Plans - User-specific training plans
+    match /training_plans/{document} {
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified &&
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   request.auth.token.email_verified &&
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid;
+    }
+    
     // Content Analytics - Module usage and performance metrics
     match /module_analytics/{document} {
       allow read: if false; // Analytics are read via Cloud Functions only
@@ -131,6 +181,115 @@ service cloud.firestore {
     
     // ============================================================================
     // END COACHING MODULES RULES
+    // ============================================================================
+    
+    // ============================================================================
+    // MINDCOACH AI SESSIONS - PRODUCTION SECURITY RULES
+    // ============================================================================
+    
+    // MindCoach Sessions - User-specific AI coaching sessions
+    match /mindcoach_sessions/{document} {
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified &&
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid;
+    }
+    
+    // MindCoach Templates - Read-only for authenticated users, admin-only writes
+    match /mindcoach_templates/{document} {
+      allow read: if request.auth != null; // All authenticated users can read templates
+      allow create: if false; // Only admins can create templates (via Admin SDK/Cloud Functions)
+      allow update: if false; // Only admins can update templates (via Admin SDK/Cloud Functions)
+      allow delete: if false; // Only admins can delete templates (via Admin SDK/Cloud Functions)
+    }
+    
+    // AI Validator Logs - Backend-only writes, admin-only reads
+    match /ai_validator_logs/{document} {
+      allow read: if false; // Admin-only reads (via Cloud Functions/Admin SDK)
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified;
+      allow update: if false; // Logs are immutable
+      allow delete: if false; // Logs should not be deleted
+    }
+    
+    // ============================================================================
+    // END MINDCOACH AI SESSIONS RULES
+    // ============================================================================
+    
+    // ============================================================================
+    // AI USAGE TRACKING - PRODUCTION SECURITY RULES
+    // ============================================================================
+    
+    // AI Usage Tracking - Track AI token usage and costs per user
+    match /ai_usage_tracking/{document} {
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified &&
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if false; // Usage records are immutable
+      allow delete: if false; // Usage records should not be deleted
+    }
+    
+    // User Tokens - Track user token balances and limits
+    match /user_tokens/{document} {
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified &&
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if false; // Token records should not be deleted
+    }
+    
+    // Token Purchases - Track token purchase transactions
+    match /token_purchases/{document} {
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified &&
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if false; // Purchase records are immutable
+      allow delete: if false; // Purchase records should not be deleted
+    }
+    
+    // ============================================================================
+    // END AI USAGE TRACKING RULES
+    // ============================================================================
+    
+    // ============================================================================
+    // ASSESSMENT RESULTS - PRODUCTION SECURITY RULES
+    // ============================================================================
+    
+    // Assessment Results - Store VARK assessment results per user
+    match /assessment_results/{document} {
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified &&
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid;
+    }
+    
+    // ============================================================================
+    // END ASSESSMENT RESULTS RULES
     // ============================================================================
     
     // FoCoMap Collections - Enhanced security for golf data
@@ -146,6 +305,70 @@ service cloud.firestore {
       allow read: if request.auth != null && resource.data.userId == request.auth.uid;
       allow write: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+    }
+    
+    // Notifications - User-specific notifications from push notifications or system
+    match /notifications/{document} {
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified &&
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   request.auth.token.email_verified &&
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid;
+    }
+    
+    // Dashboard Data - User-specific dashboard analytics and summaries
+    match /dashboard_data/{document} {
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified &&
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid;
+    }
+    
+    // Home Data - User-specific home page data cache
+    match /home_data/{document} {
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified &&
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid;
+    }
+    
+    // Scorecards - User-specific golf scorecard data (Prime tier feature)
+    match /scorecards/{document} {
+      allow create: if request.auth != null && 
+                     request.auth.token.email_verified &&
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid;
     }
   }
 }

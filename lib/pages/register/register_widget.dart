@@ -1,7 +1,6 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/glass_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'register_model.dart';
@@ -97,11 +96,8 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                       offset: Offset(0, 50 * (1 - value)),
                       child: Opacity(
                         opacity: value,
-                        child: GlassDesignSystem.glass3DCard(
-                          width: double.infinity,
+                        child: Padding(
                           padding: const EdgeInsets.all(24),
-                          tintColor: theme.secondaryBackground
-                              .withValues(alpha: 0.95),
                           child: Column(
                             children: [
                               // Logo Section - FoCoCo Logo Image
@@ -249,16 +245,11 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                     );
                                   }
                                 },
-                                icon: Container(
+                                icon: Image.asset(
+                                  'assets/images/google-logo.png',
                                   width: 20,
                                   height: 20,
-                                  decoration: const BoxDecoration(
-                                    image: DecorationImage(
-                                      image: NetworkImage(
-                                          'https://developers.google.com/identity/images/g-logo.png'),
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
+                                  fit: BoxFit.contain,
                                 ),
                                 text: 'Continue with Google',
                                 backgroundColor: theme.secondaryBackground,
@@ -385,7 +376,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                 ),
                                 style: theme.bodyMedium.override(
                                   fontFamily: 'Inter',
-                                  color: const Color(0xFF1B5E20),
+                                  color: theme.primaryText,
                                   fontSize: 14,
                                   height: 1.4,
                                 ),
@@ -459,7 +450,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                 ),
                                 style: theme.bodyMedium.override(
                                   fontFamily: 'Inter',
-                                  color: const Color(0xFF1B5E20),
+                                  color: theme.primaryText,
                                   fontSize: 14,
                                   height: 1.4,
                                 ),
@@ -549,7 +540,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                 ),
                                 style: theme.bodyMedium.override(
                                   fontFamily: 'Inter',
-                                  color: const Color(0xFF1B5E20),
+                                  color: theme.primaryText,
                                   fontSize: 14,
                                   height: 1.4,
                                 ),
@@ -640,7 +631,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                 ),
                                 style: theme.bodyMedium.override(
                                   fontFamily: 'Inter',
-                                  color: const Color(0xFF1B5E20),
+                                  color: theme.primaryText,
                                   fontSize: 14,
                                   height: 1.4,
                                 ),

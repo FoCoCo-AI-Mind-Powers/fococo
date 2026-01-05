@@ -2,7 +2,7 @@ import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/ai_integration/widgets/enhanced_navbar_widget.dart';
+import '/ai_integration/widgets/navbar_widget.dart';
 import '/widgets/floating_voice_button.dart';
 import '/services/profile_service.dart';
 import 'edit_profile_model.dart';
@@ -902,6 +902,8 @@ class _EditProfileWidgetState extends State<EditProfileWidget>
                         color: theme.primaryText,
                         fontWeight: FontWeight.w500,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     if (club.address.isNotEmpty)
                       Text(
@@ -909,6 +911,8 @@ class _EditProfileWidgetState extends State<EditProfileWidget>
                         style: theme.bodySmall.copyWith(
                           color: theme.secondaryText,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                   ],
                 ),

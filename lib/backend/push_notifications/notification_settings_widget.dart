@@ -2,30 +2,75 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fo_co_co/backend/schema/structs/notification_settings_struct.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'dart:ui';
 
 import '/auth/firebase_auth/auth_util.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
+import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/glass_design_system.dart';
+import '/flutter_flow/glass_components.dart';
 import 'push_notifications_util.dart';
 
 class NotificationSettingsWidget extends StatefulWidget {
   const NotificationSettingsWidget({super.key});
+
+  static String routeName = 'notification_settings';
+  static String routePath = '/notification-settings';
 
   @override
   State<NotificationSettingsWidget> createState() =>
       _NotificationSettingsWidgetState();
 }
 
-class _NotificationSettingsWidgetState
-    extends State<NotificationSettingsWidget> {
+class _NotificationSettingsWidgetState extends State<NotificationSettingsWidget>
+    with TickerProviderStateMixin {
   NotificationSettingsStruct? _currentSettings;
   bool _isLoading = true;
   bool _isSaving = false;
 
+  // Animation controllers
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  final scaffoldKey = GlobalKey<ScaffoldState>();
+
   @override
   void initState() {
     super.initState();
+
+    // Initialize animations
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
+
+    // Start animations
+    _fadeController.forward();
+    _slideController.forward();
+
     _loadCurrentSettings();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCurrentSettings() async {
@@ -75,28 +120,36 @@ class _NotificationSettingsWidgetState
       await PushNotificationsUtil.updateNotificationPreferences(
           _currentSettings!);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ Notification preferences updated successfully!'),
-          backgroundColor: FlutterFlowTheme.of(context).success,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Notification preferences updated successfully!'),
+            backgroundColor: FlutterFlowTheme.of(context).success,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (e) {
       if (kDebugMode) {
         print('❌ Error saving notification settings: $e');
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              '❌ Failed to update notification preferences. Please try again.'),
-          backgroundColor: FlutterFlowTheme.of(context).error,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '❌ Failed to update notification preferences. Please try again.'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isSaving = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 
@@ -143,163 +196,312 @@ class _NotificationSettingsWidgetState
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('Notification Settings'),
-          backgroundColor: FlutterFlowTheme.of(context).primary,
-          foregroundColor: Colors.white,
-        ),
-        body: Center(
-          child: CircularProgressIndicator(
-            color: FlutterFlowTheme.of(context).primary,
-          ),
-        ),
-      );
-    }
+    final theme = FlutterFlowTheme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Notification Settings'),
-        backgroundColor: FlutterFlowTheme.of(context).primary,
-        foregroundColor: Colors.white,
-        actions: [
-          TextButton(
-            onPressed: _isSaving ? null : _saveSettings,
-            child: _isSaving
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Text(
-                    'Save',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return GestureDetector(
+      onTap: () {
+        FocusScope.of(context).unfocus();
+        FocusManager.instance.primaryFocus?.unfocus();
+      },
+      child: Scaffold(
+        key: scaffoldKey,
+        backgroundColor: theme.primaryBackground,
+        body: Stack(
           children: [
-            Text(
-              '🔔 Manage Your Notifications',
-              style: FlutterFlowTheme.of(context).headlineSmall.override(
-                    fontFamily: 'Inter',
-                    fontWeight: FontWeight.bold,
-                    height: 1.0,
-                  ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Choose which notifications you\'d like to receive to optimize your golf mental training journey.',
-              style: FlutterFlowTheme.of(context).bodyMedium.override(
-                    fontFamily: 'Inter',
-                    color: FlutterFlowTheme.of(context).secondaryText,
-                    height: 1.0,
-                  ),
-            ),
-            SizedBox(height: 24),
-
-            // Daily Reminders
-            _buildNotificationTile(
-              icon: Icons.schedule,
-              title: 'Daily Practice Reminders',
-              subtitle:
-                  'Get reminded to complete your daily mental coaching sessions',
-              value: _currentSettings?.dailyReminders ?? false,
-              onChanged: (value) => _updateSetting('dailyReminders', value),
-            ),
-
-            SizedBox(height: 16),
-
-            // AI Insights
-            _buildNotificationTile(
-              icon: Icons.psychology,
-              title: 'AI Insights Ready',
-              subtitle:
-                  'Be notified when your personalized golf insights are ready',
-              value: _currentSettings?.insightNotifications ?? false,
-              onChanged: (value) =>
-                  _updateSetting('insightNotifications', value),
-            ),
-
-            SizedBox(height: 16),
-
-            // Achievement Alerts
-            _buildNotificationTile(
-              icon: Icons.emoji_events,
-              title: 'Achievement Alerts',
-              subtitle:
-                  'Celebrate your progress with achievement notifications',
-              value: _currentSettings?.achievementAlerts ?? false,
-              onChanged: (value) => _updateSetting('achievementAlerts', value),
-            ),
-
-            SizedBox(height: 16),
-
-            // Weekly Progress
-            _buildNotificationTile(
-              icon: Icons.trending_up,
-              title: 'Weekly Progress Summary',
-              subtitle:
-                  'Get a weekly overview of your golf improvement journey',
-              value: _currentSettings?.weeklyProgress ?? false,
-              onChanged: (value) => _updateSetting('weeklyProgress', value),
-            ),
-
-            SizedBox(height: 32),
-
-            // Test notification button (only in debug mode)
-            if (kDebugMode) ...[
-              Divider(),
-              SizedBox(height: 16),
-              FFButtonWidget(
-                onPressed: () async {
-                  await PushNotificationsUtil.sendTestNotification();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('🧪 Test notification sent!'),
-                      backgroundColor: FlutterFlowTheme.of(context).success,
-                    ),
-                  );
-                },
-                text: '🧪 Send Test Notification',
-                options: FFButtonOptions(
-                  width: double.infinity,
-                  height: 50,
-                  padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
-                  iconPadding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
-                  color: FlutterFlowTheme.of(context).secondaryBackground,
-                  textStyle: FlutterFlowTheme.of(context).bodyMedium.override(
-                        fontFamily: 'Inter',
-                        color: FlutterFlowTheme.of(context).primaryText,
-                        height: 1.0,
-                      ),
-                  elevation: 0,
-                  borderSide: BorderSide(
-                    color: FlutterFlowTheme.of(context).alternate,
-                    width: 1,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
+            // Main content
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    theme.primaryBackground,
+                    theme.secondaryBackground.withValues(alpha: 0.8),
+                  ],
                 ),
               ),
-            ],
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: SafeArea(
+                    child: Column(
+                      children: [
+                        // Custom App Bar
+                        _buildCustomAppBar(theme),
+
+                        // Main Content
+                        Expanded(
+                          child: _isLoading
+                              ? _buildLoadingState(theme)
+                              : _buildNotificationSettings(theme),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNotificationTile({
+  Widget _buildCustomAppBar(FlutterFlowTheme theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          // Back button
+          GestureDetector(
+            onTap: () {
+              if (Navigator.of(context).canPop()) {
+                context.pop();
+              } else {
+                context.goNamed('settings');
+              }
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.glassBackground.withValues(alpha: 0.3),
+                        theme.glassTint.withValues(alpha: 0.2),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: theme.glassBorder.withValues(alpha: 0.4),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.arrow_back_ios,
+                    color: theme.primaryText,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 16),
+
+          // Title
+          Expanded(
+            child: Text(
+              'Notification Settings',
+              style: theme.headlineSmall.copyWith(
+                color: theme.primaryText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+
+          // Save button
+          GestureDetector(
+            onTap: _isSaving ? null : _saveSettings,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: _isSaving
+                        ? LinearGradient(
+                            colors: [
+                              theme.glassBackground.withValues(alpha: 0.3),
+                              theme.glassTint.withValues(alpha: 0.2),
+                            ],
+                          )
+                        : theme.primaryBrandGradient,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _isSaving
+                          ? theme.glassBorder.withValues(alpha: 0.4)
+                          : theme.primary.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: _isSaving
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Text(
+                          'Save',
+                          style: theme.labelMedium.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingState(FlutterFlowTheme theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(theme.primary),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Loading notification settings...',
+            style: theme.bodyMedium.copyWith(
+              color: theme.secondaryText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationSettings(FlutterFlowTheme theme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Card
+          GlassDashboardCard(
+            title: 'Manage Your Notifications',
+            subtitle:
+                'Choose which notifications you\'d like to receive to optimize your golf mental training journey',
+            icon: Icon(
+              FontAwesomeIcons.bell,
+              color: theme.primary,
+              size: 24,
+            ),
+            children: [
+              const SizedBox(height: 20),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // Notification Options
+          GlassDashboardCard(
+            title: 'Notification Preferences',
+            subtitle: 'Control what notifications you receive',
+            children: [
+              const SizedBox(height: 16),
+
+              // Daily Practice Reminders
+              _buildNotificationSwitch(
+                theme: theme,
+                icon: Icons.schedule,
+                title: 'Daily Practice Reminders',
+                subtitle:
+                    'Get reminded to complete your daily mental coaching sessions',
+                value: _currentSettings?.dailyReminders ?? false,
+                onChanged: (value) => _updateSetting('dailyReminders', value),
+              ),
+
+              const SizedBox(height: 12),
+
+              // AI Insights Ready
+              _buildNotificationSwitch(
+                theme: theme,
+                icon: FontAwesomeIcons.brain,
+                title: 'AI Insights Ready',
+                subtitle:
+                    'Be notified when your personalized golf insights are ready',
+                value: _currentSettings?.insightNotifications ?? false,
+                onChanged: (value) =>
+                    _updateSetting('insightNotifications', value),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Achievement Alerts
+              _buildNotificationSwitch(
+                theme: theme,
+                icon: FontAwesomeIcons.trophy,
+                title: 'Achievement Alerts',
+                subtitle:
+                    'Celebrate your progress with achievement notifications',
+                value: _currentSettings?.achievementAlerts ?? false,
+                onChanged: (value) =>
+                    _updateSetting('achievementAlerts', value),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Weekly Progress Summary
+              _buildNotificationSwitch(
+                theme: theme,
+                icon: FontAwesomeIcons.chartLine,
+                title: 'Weekly Progress Summary',
+                subtitle:
+                    'Get a weekly overview of your golf improvement journey',
+                value: _currentSettings?.weeklyProgress ?? false,
+                onChanged: (value) => _updateSetting('weeklyProgress', value),
+              ),
+            ],
+          ),
+
+          // Test notification button (only in debug mode)
+          if (kDebugMode) ...[
+            const SizedBox(height: 20),
+            GlassDashboardCard(
+              title: 'Testing',
+              subtitle: 'Developer tools',
+              children: [
+                const SizedBox(height: 16),
+                GlassDesignSystem.glassButton(
+                  text: '🧪 Send Test Notification',
+                  onPressed: () async {
+                    await PushNotificationsUtil.sendTestNotification();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('🧪 Test notification sent!'),
+                          backgroundColor: theme.success,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
+                  icon: Icons.bug_report,
+                  theme: theme,
+                  color: theme.secondaryText,
+                ),
+              ],
+            ),
+          ],
+
+          const SizedBox(height: 100), // Bottom padding
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationSwitch({
+    required FlutterFlowTheme theme,
     required IconData icon,
     required String title,
     required String subtitle,
@@ -307,55 +509,67 @@ class _NotificationSettingsWidgetState
     required Function(bool) onChanged,
   }) {
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FlutterFlowTheme.of(context).secondaryBackground,
+        gradient: LinearGradient(
+          colors: [
+            theme.glassTint.withValues(alpha: 0.1),
+            theme.glassTint.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: FlutterFlowTheme.of(context).alternate,
+          color: theme.glassBorder.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: theme.primary,
+              size: 20,
+            ),
           ),
-          child: Icon(
-            icon,
-            color: FlutterFlowTheme.of(context).primary,
-            size: 24,
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.titleSmall.copyWith(
+                    color: theme.primaryText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: theme.bodySmall.copyWith(
+                    color: theme.secondaryText,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        title: Text(
-          title,
-          style: FlutterFlowTheme.of(context).bodyLarge.override(
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w600,
-                height: 1.0,
-              ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: FlutterFlowTheme.of(context).bodySmall.override(
-                fontFamily: 'Inter',
-                color: FlutterFlowTheme.of(context).secondaryText,
-                height: 1.0,
-              ),
-        ),
-        trailing: Switch(
-          value: value,
-          onChanged: onChanged,
-          activeColor: FlutterFlowTheme.of(context).primary,
-          activeTrackColor:
-              FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
-          inactiveThumbColor: FlutterFlowTheme.of(context).alternate,
-          inactiveTrackColor:
-              FlutterFlowTheme.of(context).alternate.withValues(alpha: 0.3),
-        ),
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: theme.primary,
+            activeTrackColor: theme.primary.withValues(alpha: 0.3),
+            inactiveThumbColor: theme.secondaryText,
+            inactiveTrackColor: theme.secondaryText.withValues(alpha: 0.3),
+          ),
+        ],
       ),
     );
   }

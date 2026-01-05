@@ -1,7 +1,6 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/glass_design_system.dart';
 import '/services/biometric_auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -18,7 +17,8 @@ class LoginWidget extends StatefulWidget {
   State<LoginWidget> createState() => _LoginWidgetState();
 }
 
-class _LoginWidgetState extends State<LoginWidget> {
+class _LoginWidgetState extends State<LoginWidget>
+    with TickerProviderStateMixin {
   late LoginModel _model;
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final BiometricAuthService _biometricService = BiometricAuthService();
@@ -28,6 +28,11 @@ class _LoginWidgetState extends State<LoginWidget> {
   bool _isBiometricEnabled = false;
   String _biometricName = 'Biometric';
   bool _isCheckingBiometric = false;
+  bool _hasFaceBiometric = false;
+
+  // Logo rotation animation
+  late AnimationController _logoRotationController;
+  late Animation<double> _logoRotationAnimation;
 
   @override
   void initState() {
@@ -40,17 +45,28 @@ class _LoginWidgetState extends State<LoginWidget> {
     _model.passwordTextController ??= TextEditingController();
     _model.passwordFocusNode ??= FocusNode();
 
+    // Initialize logo rotation animation
+    _logoRotationController = AnimationController(
+      duration: const Duration(seconds: 8),
+      vsync: this,
+    )..repeat();
+
+    _logoRotationAnimation = Tween<double>(
+      begin: 0.0,
+      end: 2 * 3.14159, // Full rotation in radians
+    ).animate(CurvedAnimation(
+      parent: _logoRotationController,
+      curve: Curves.linear,
+    ));
+
     // Check biometric availability
     _checkBiometricAvailability();
   }
 
   @override
   void dispose() {
-    _model.emailAddressFocusNode?.dispose();
-    _model.emailAddressTextController?.dispose();
-
-    _model.passwordFocusNode?.dispose();
-    _model.passwordTextController?.dispose();
+    _logoRotationController.dispose();
+    // Model's dispose() method handles disposing FocusNodes and TextControllers
     _model.dispose();
     super.dispose();
   }
@@ -63,6 +79,7 @@ class _LoginWidgetState extends State<LoginWidget> {
           _isBiometricAvailable = status['isAvailable'] ?? false;
           _isBiometricEnabled = status['isEnabled'] ?? false;
           _biometricName = status['biometricName'] ?? 'Biometric';
+          _hasFaceBiometric = status['hasFace'] ?? false;
         });
       }
     } catch (e) {
@@ -355,38 +372,43 @@ class _LoginWidgetState extends State<LoginWidget> {
                       offset: Offset(0, 50 * (1 - value)),
                       child: Opacity(
                         opacity: value,
-                        child: GlassDesignSystem.glass3DCard(
-                          width: double.infinity,
+                        child: Padding(
                           padding: const EdgeInsets.all(24),
-                          tintColor:
-                              theme.secondaryBackground.withValues(alpha: 0.95),
                           child: Column(
                             children: [
-                              // Logo Section - FoCoCo Logo Image
-                              Container(
-                                width: 120,
-                                height: 120,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(16),
-                                  gradient: RadialGradient(
-                                    colors: [
-                                      theme.secondaryBackground
-                                          .withValues(alpha: 0.1),
-                                      Colors.transparent,
-                                    ],
-                                    stops: const [0.0, 1.0],
-                                  ),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.asset(
-                                    'assets/images/logo/Logo.png',
-                                    width: 96,
-                                    height: 96,
-                                    fit: BoxFit.contain,
-                                  ),
-                                ),
+                              // Logo Section - FoCoCo Logo Image with rotation
+                              AnimatedBuilder(
+                                animation: _logoRotationAnimation,
+                                builder: (context, child) {
+                                  return Transform.rotate(
+                                    angle: _logoRotationAnimation.value,
+                                    child: Container(
+                                      width: 120,
+                                      height: 120,
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(16),
+                                        gradient: RadialGradient(
+                                          colors: [
+                                            theme.secondaryBackground
+                                                .withValues(alpha: 0.1),
+                                            Colors.transparent,
+                                          ],
+                                          stops: const [0.0, 1.0],
+                                        ),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.asset(
+                                          'assets/images/logo/Logo.png',
+                                          width: 96,
+                                          height: 96,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
 
                               const SizedBox(height: 16),
@@ -504,16 +526,11 @@ class _LoginWidgetState extends State<LoginWidget> {
                                     );
                                   }
                                 },
-                                icon: Container(
+                                icon: Image.asset(
+                                  'assets/images/google-logo.png',
                                   width: 20,
                                   height: 20,
-                                  decoration: const BoxDecoration(
-                                    image: DecorationImage(
-                                      image: NetworkImage(
-                                          'https://developers.google.com/identity/images/g-logo.png'),
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
+                                  fit: BoxFit.contain,
                                 ),
                                 text: 'Continue with Google',
                                 backgroundColor: theme.secondaryBackground,
@@ -638,7 +655,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                                 ),
                                 style: theme.bodyMedium.override(
                                   fontFamily: 'Inter',
-                                  color: const Color(0xFF1B5E20),
+                                  color: theme.primaryText,
                                   fontSize: 14,
                                   height: 1.4,
                                 ),
@@ -727,7 +744,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                                 ),
                                 style: theme.bodyMedium.override(
                                   fontFamily: 'Inter',
-                                  color: const Color(0xFF1B5E20),
+                                  color: theme.primaryText,
                                   fontSize: 14,
                                   height: 1.4,
                                 ),
@@ -778,10 +795,9 @@ class _LoginWidgetState extends State<LoginWidget> {
                                       'Forgot password?',
                                       style: theme.bodyMedium.override(
                                         fontFamily: 'Inter',
-                                        color: const Color(0xFF1B5E20),
+                                        color: Colors.white,
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
-                                        decoration: TextDecoration.underline,
                                         height: 1.4,
                                       ),
                                     ),
@@ -901,10 +917,9 @@ class _LoginWidgetState extends State<LoginWidget> {
                                       'Sign Up',
                                       style: theme.bodyMedium.override(
                                         fontFamily: 'Inter',
-                                        color: const Color(0xFF1B5E20),
+                                        color: Colors.white,
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
-                                        decoration: TextDecoration.underline,
                                         height: 1.4,
                                       ),
                                     ),
@@ -1077,7 +1092,8 @@ class _LoginWidgetState extends State<LoginWidget> {
   }
 
   IconData _getBiometricIcon() {
-    if (_biometricName.toLowerCase().contains('face')) {
+    // Check for face biometric using both the status flag and name
+    if (_hasFaceBiometric || _biometricName.toLowerCase().contains('face')) {
       return FontAwesomeIcons.faceSmile;
     } else if (_biometricName.toLowerCase().contains('touch') ||
         _biometricName.toLowerCase().contains('fingerprint')) {

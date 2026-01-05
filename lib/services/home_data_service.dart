@@ -249,7 +249,6 @@ class HomeDataService {
     if (rounds.isEmpty) return 0.0;
 
     final distances = rounds
-        .where((r) => r.driving != null)
         .map((r) => 250.0) // Default average distance
         .toList();
 

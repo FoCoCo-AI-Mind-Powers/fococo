@@ -168,7 +168,14 @@ class _FaceIdSettingsWidgetState extends State<FaceIdSettingsWidget>
           _buildGlassButton(
             theme: theme,
             icon: Icons.arrow_back_ios,
-            onTap: () => context.pop(),
+            onTap: () {
+              // Try to pop first, if that fails navigate to settings
+              if (Navigator.of(context).canPop()) {
+                context.pop();
+              } else {
+                context.goNamed('settings');
+              }
+            },
           ),
 
           const SizedBox(width: 16),

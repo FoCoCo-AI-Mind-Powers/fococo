@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:apple_maps_flutter/apple_maps_flutter.dart' as apple_maps;
 import 'package:google_maps_flutter/google_maps_flutter.dart' as google_maps;
@@ -6,14 +8,15 @@ import 'package:google_maps_flutter/google_maps_flutter.dart'
     show BitmapDescriptor;
 import 'package:geolocator/geolocator.dart';
 import '/flutter_flow/lat_lng.dart';
+import '/services/focomap_custom_markers.dart';
 
 // Export BitmapDescriptor for custom markers
 export 'package:google_maps_flutter/google_maps_flutter.dart'
     show BitmapDescriptor;
 
-/// Enhanced Platform-aware map widget with clustering and performance optimization
-/// iOS: Native Apple Maps integration with clustering
-/// Android: Google Maps with clustering support
+/// Enhanced Platform-aware map widget with clustering, 3D view, and polyline drawing
+/// Uses Google Maps on both iOS and Android platforms
+/// Apple Maps code is preserved but commented out for future reference
 class PlatformMapWidget extends StatefulWidget {
   final Set<MapMarker> markers;
   final Function(MapMarker)? onMarkerTap;
@@ -27,6 +30,14 @@ class PlatformMapWidget extends StatefulWidget {
   final bool showUserLocation;
   final bool enableScrollGestures;
   final bool enableZoomGestures;
+  final bool enable3DView;
+  final double tilt;
+  final double bearing;
+  final Set<MapPolyline> polylines;
+  final bool enablePolylineDrawing;
+  final Function(List<LatLng>)? onPolylineDrawn;
+  final Function(double)? onTiltChanged;
+  final Function(double)? onBearingChanged;
 
   const PlatformMapWidget({
     super.key,
@@ -42,13 +53,22 @@ class PlatformMapWidget extends StatefulWidget {
     this.showUserLocation = true,
     this.enableScrollGestures = true,
     this.enableZoomGestures = true,
+    this.enable3DView = false,
+    this.tilt = 0.0,
+    this.bearing = 0.0,
+    this.polylines = const {},
+    this.enablePolylineDrawing = false,
+    this.onPolylineDrawn,
+    this.onTiltChanged,
+    this.onBearingChanged,
   });
 
   @override
   State<PlatformMapWidget> createState() => _PlatformMapWidgetState();
-  
+
   /// Public method to animate to a location
-  static Future<void> animateToLocationFromKey(GlobalKey key, LatLng location, {double? zoom}) async {
+  static Future<void> animateToLocationFromKey(GlobalKey key, LatLng location,
+      {double? zoom}) async {
     final state = key.currentState;
     if (state is _PlatformMapWidgetState) {
       await state.animateToLocation(location, zoom: zoom);
@@ -57,7 +77,8 @@ class PlatformMapWidget extends StatefulWidget {
 }
 
 class _PlatformMapWidgetState extends State<PlatformMapWidget> {
-  apple_maps.AppleMapController? _appleMapController;
+  // Apple Maps controller - COMMENTED OUT: Using Google Maps on all platforms now
+  // apple_maps.AppleMapController? _appleMapController;
   google_maps.GoogleMapController? _googleMapController;
   LatLng? _currentLocation;
   bool _isLoading = true;
@@ -70,22 +91,77 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
   Set<MapCluster> _clusters = {};
   bool _needsClusterUpdate = true;
 
+  // 3D view state
+  bool _is3DViewEnabled = false;
+  double _currentTilt = 0.0;
+  double _currentBearing = 0.0;
+
+  // Polyline drawing state
+  bool _isDrawingPolyline = false;
+  List<LatLng> _currentPolylinePoints = [];
+  Set<MapPolyline> _polylines = {};
+
   // Performance optimization
   DateTime? _lastClusterUpdate;
   static const Duration _clusterUpdateThrottle = Duration(milliseconds: 500);
+
+  // Live location tracking
+  StreamSubscription<Position>? _locationSubscription;
+
+  // Dark mode map style for Google Maps
+  static const String _darkMapStyle = '''
+[
+  {"elementType": "geometry", "stylers": [{"color": "#1d2c4d"}]},
+  {"elementType": "labels.text.fill", "stylers": [{"color": "#8ec3b9"}]},
+  {"elementType": "labels.text.stroke", "stylers": [{"color": "#1a3646"}]},
+  {"featureType": "administrative.country", "elementType": "geometry.stroke", "stylers": [{"color": "#4b6878"}]},
+  {"featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{"color": "#64779e"}]},
+  {"featureType": "administrative.province", "elementType": "geometry.stroke", "stylers": [{"color": "#4b6878"}]},
+  {"featureType": "landscape.man_made", "elementType": "geometry.stroke", "stylers": [{"color": "#334e87"}]},
+  {"featureType": "landscape.natural", "elementType": "geometry", "stylers": [{"color": "#023e58"}]},
+  {"featureType": "poi", "elementType": "geometry", "stylers": [{"color": "#283d6a"}]},
+  {"featureType": "poi", "elementType": "labels.text.fill", "stylers": [{"color": "#6f9ba5"}]},
+  {"featureType": "poi", "elementType": "labels.text.stroke", "stylers": [{"color": "#1d2c4d"}]},
+  {"featureType": "poi.park", "elementType": "geometry.fill", "stylers": [{"color": "#023e58"}]},
+  {"featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [{"color": "#3C7680"}]},
+  {"featureType": "poi.sports_complex", "elementType": "geometry.fill", "stylers": [{"color": "#1a472a"}]},
+  {"featureType": "road", "elementType": "geometry", "stylers": [{"color": "#304a7d"}]},
+  {"featureType": "road", "elementType": "labels.text.fill", "stylers": [{"color": "#98a5be"}]},
+  {"featureType": "road", "elementType": "labels.text.stroke", "stylers": [{"color": "#1d2c4d"}]},
+  {"featureType": "road.highway", "elementType": "geometry", "stylers": [{"color": "#2c6675"}]},
+  {"featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [{"color": "#255763"}]},
+  {"featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [{"color": "#b0d5ce"}]},
+  {"featureType": "road.highway", "elementType": "labels.text.stroke", "stylers": [{"color": "#023e58"}]},
+  {"featureType": "transit", "elementType": "labels.text.fill", "stylers": [{"color": "#98a5be"}]},
+  {"featureType": "transit", "elementType": "labels.text.stroke", "stylers": [{"color": "#1d2c4d"}]},
+  {"featureType": "transit.line", "elementType": "geometry.fill", "stylers": [{"color": "#283d6a"}]},
+  {"featureType": "transit.station", "elementType": "geometry", "stylers": [{"color": "#3a4762"}]},
+  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#0e1626"}]},
+  {"featureType": "water", "elementType": "labels.text.fill", "stylers": [{"color": "#4e6d70"}]}
+]
+''';
 
   @override
   void initState() {
     super.initState();
     _currentZoom = widget.initialZoom;
+    _is3DViewEnabled = widget.enable3DView ?? false;
+    _currentTilt = widget.tilt ?? 0.0;
+    _currentBearing = widget.bearing ?? 0.0;
+    _polylines = widget.polylines;
+    _isDrawingPolyline = widget.enablePolylineDrawing ?? false;
     _initializeLocation();
   }
 
   @override
   void dispose() {
+    // Stop location tracking
+    _locationSubscription?.cancel();
+    _locationSubscription = null;
+
     // Clear controller references (controllers don't have dispose methods)
     // The platform will handle cleanup automatically
-    _appleMapController = null;
+    // _appleMapController = null; // COMMENTED OUT: Using Google Maps on all platforms
     _googleMapController = null;
     super.dispose();
   }
@@ -100,6 +176,38 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
       _updateCameraPosition();
     }
 
+    // Update 3D view settings - use null-aware operators to handle potential null values
+    final newEnable3D = widget.enable3DView ?? false;
+    final oldEnable3D = oldWidget.enable3DView ?? false;
+    final newTilt = widget.tilt ?? 0.0;
+    final oldTilt = oldWidget.tilt ?? 0.0;
+    final newBearing = widget.bearing ?? 0.0;
+    final oldBearing = oldWidget.bearing ?? 0.0;
+
+    if (newEnable3D != oldEnable3D ||
+        newTilt != oldTilt ||
+        newBearing != oldBearing) {
+      setState(() {
+        _is3DViewEnabled = newEnable3D;
+        _currentTilt = newTilt;
+        _currentBearing = newBearing;
+      });
+      // Apple Maps 3D view code commented out - using Google Maps on all platforms
+      // if (Platform.isIOS && _is3DViewEnabled && _appleMapController != null) {
+      //   _applyAppleMaps3DView();
+      // } else {
+      _updateCameraPosition();
+      // }
+    }
+
+    // Update polylines
+    if (widget.polylines != oldWidget.polylines) {
+      _polylines = widget.polylines;
+      if (_isMapCreated) {
+        setState(() {});
+      }
+    }
+
     // Check if markers changed and need clustering update
     if (widget.markers != oldWidget.markers) {
       _needsClusterUpdate = true;
@@ -107,6 +215,21 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
         _updateClustering();
       }
     }
+  }
+
+  // Track previous brightness to detect theme changes
+  Brightness? _previousBrightness;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Detect theme change and update map style
+    final brightness = MediaQuery.platformBrightnessOf(context);
+    if (_previousBrightness != null && _previousBrightness != brightness) {
+      _applyMapStyle();
+    }
+    _previousBrightness = brightness;
   }
 
   /// Update camera position without recreating the map
@@ -117,24 +240,30 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
     if (newLocation == null) return;
 
     try {
-      if (Platform.isIOS && _appleMapController != null) {
-        await _appleMapController!.animateCamera(
-          apple_maps.CameraUpdate.newCameraPosition(
-            apple_maps.CameraPosition(
-              target: apple_maps.LatLng(newLocation.latitude, newLocation.longitude),
-              zoom: widget.initialZoom,
-            ),
-          ),
+      // Apple Maps code commented out - using Google Maps on all platforms
+      // if (Platform.isIOS && _appleMapController != null) {
+      //   await _appleMapController!.animateCamera(
+      //     apple_maps.CameraUpdate.newCameraPosition(
+      //       apple_maps.CameraPosition(
+      //         target: apple_maps.LatLng(newLocation.latitude, newLocation.longitude),
+      //         zoom: widget.initialZoom,
+      //       ),
+      //     ),
+      //   );
+      // } else
+      if (_googleMapController != null) {
+        final cameraPosition = google_maps.CameraPosition(
+          target:
+              google_maps.LatLng(newLocation.latitude, newLocation.longitude),
+          zoom: widget.initialZoom,
+          tilt: _is3DViewEnabled ? _currentTilt : 0.0,
+          bearing: _currentBearing,
         );
-      } else if (!Platform.isIOS && _googleMapController != null) {
         await _googleMapController!.animateCamera(
-          google_maps.CameraUpdate.newLatLngZoom(
-            google_maps.LatLng(newLocation.latitude, newLocation.longitude),
-            widget.initialZoom,
-          ),
+          google_maps.CameraUpdate.newCameraPosition(cameraPosition),
         );
       }
-      
+
       if (mounted) {
         setState(() {
           _currentLocation = newLocation;
@@ -146,24 +275,146 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
     }
   }
 
+  /// Toggle 3D view
+  void toggle3DView() {
+    setState(() {
+      _is3DViewEnabled = !_is3DViewEnabled;
+      if (_is3DViewEnabled) {
+        _currentTilt = 45.0; // Default tilt for 3D view
+      } else {
+        _currentTilt = 0.0;
+      }
+    });
+    _updateCameraPosition();
+  }
+
+  /// Update tilt angle
+  void updateTilt(double tilt) {
+    setState(() {
+      _currentTilt = tilt.clamp(0.0, 90.0);
+    });
+    widget.onTiltChanged?.call(_currentTilt);
+    _updateCameraPosition();
+  }
+
+  /// Update bearing (rotation)
+  void updateBearing(double bearing) {
+    setState(() {
+      _currentBearing = bearing % 360.0;
+    });
+    widget.onBearingChanged?.call(_currentBearing);
+    _updateCameraPosition();
+  }
+
+  /// Start drawing a polyline
+  void startDrawingPolyline() {
+    if (!(widget.enablePolylineDrawing ?? false)) return;
+    setState(() {
+      _isDrawingPolyline = true;
+      _currentPolylinePoints = [];
+    });
+  }
+
+  /// Add point to current polyline
+  void addPolylinePoint(LatLng point) {
+    if (!_isDrawingPolyline) return;
+    setState(() {
+      _currentPolylinePoints.add(point);
+    });
+  }
+
+  /// Finish drawing polyline
+  void finishDrawingPolyline() {
+    if (!_isDrawingPolyline || _currentPolylinePoints.isEmpty) return;
+
+    widget.onPolylineDrawn?.call(_currentPolylinePoints);
+
+    setState(() {
+      _isDrawingPolyline = false;
+      _currentPolylinePoints = [];
+    });
+  }
+
+  /// Cancel drawing polyline
+  void cancelDrawingPolyline() {
+    setState(() {
+      _isDrawingPolyline = false;
+      _currentPolylinePoints = [];
+    });
+  }
+
   Future<void> _initializeLocation() async {
     try {
       if (widget.initialLocation != null) {
         _currentLocation = widget.initialLocation;
-      } else {
-        final position = await _getCurrentPosition();
-        _currentLocation = LatLng(position.latitude, position.longitude);
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      // Get actual current location - no defaults
+      final position = await _getCurrentPosition();
+      _currentLocation = LatLng(position.latitude, position.longitude);
+
+      // Start live location tracking for real-time updates
+      _startLocationTracking();
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     } catch (e) {
-      // Default to a golf course location if permission denied
-      _currentLocation = const LatLng(40.7128, -74.0060); // New York
+      debugPrint('❌ Error getting location: $e');
+      // No default location - wait for actual location or show error
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          // Keep _currentLocation as null - map will handle this gracefully
+        });
+      }
     }
+  }
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+  /// Start live location tracking for real-time updates
+  void _startLocationTracking() {
+    // Cancel existing subscription if any
+    _locationSubscription?.cancel();
+
+    // Start listening to position stream for live updates
+    _locationSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10, // Update every 10 meters
+        timeLimit: Duration(seconds: 30), // Timeout after 30 seconds
+      ),
+    ).listen(
+      (Position position) {
+        if (mounted) {
+          final newLocation = LatLng(position.latitude, position.longitude);
+
+          // Only update if location changed significantly
+          if (_currentLocation == null ||
+              _calculateDistance(_currentLocation!, newLocation) > 0.01) {
+            setState(() {
+              _currentLocation = newLocation;
+            });
+
+            // Update camera position if map is created
+            if (_isMapCreated) {
+              _updateCameraPosition();
+            }
+          }
+        }
+      },
+      onError: (error) {
+        debugPrint('⚠️ Location stream error: $error');
+        // Don't set default - just log the error
+      },
+    );
   }
 
   Future<Position> _getCurrentPosition() async {
@@ -172,22 +423,57 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      throw Exception('Location services are disabled.');
+      throw Exception(
+          'Location services are disabled. Please enable location services in your device settings.');
     }
 
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        throw Exception('Location permissions are denied');
+        throw Exception(
+            'Location permissions are denied. Please grant location permission to use this feature.');
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      throw Exception('Location permissions are permanently denied');
+      throw Exception(
+          'Location permissions are permanently denied. Please enable location permission in app settings.');
     }
 
-    return await Geolocator.getCurrentPosition();
+    // Get current position with high accuracy and explicit timeout
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit:
+              Duration(seconds: 10), // Reduced timeout for faster failure
+        ),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw TimeoutException(
+            'Location request timed out after 10 seconds. Please check your location settings and try again.',
+            const Duration(seconds: 10),
+          );
+        },
+      );
+    } on TimeoutException catch (e) {
+      debugPrint('⚠️ Location timeout: $e');
+      // Try with lower accuracy as fallback
+      try {
+        return await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy:
+                LocationAccuracy.medium, // Lower accuracy for faster response
+            timeLimit: Duration(seconds: 5),
+          ),
+        ).timeout(const Duration(seconds: 5));
+      } catch (fallbackError) {
+        debugPrint('⚠️ Fallback location also failed: $fallbackError');
+        rethrow;
+      }
+    }
   }
 
   /// Enhanced clustering algorithm for performance optimization
@@ -281,6 +567,7 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // Wait for actual location - no default fallback
     if (_isLoading || _currentLocation == null) {
       return Container(
         decoration: BoxDecoration(
@@ -294,8 +581,21 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
             ],
           ),
         ),
-        child: const Center(
-          child: CircularProgressIndicator(color: Colors.white),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(color: Colors.white),
+              const SizedBox(height: 16),
+              Text(
+                _isLoading
+                    ? 'Getting your location...'
+                    : 'Location not available. Please enable location services.',
+                style: const TextStyle(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -306,11 +606,13 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
     }
 
     try {
-      if (Platform.isIOS) {
-        return _buildAppleMap();
-      } else {
-        return _buildGoogleMap();
-      }
+      // Use Google Maps on both iOS and Android
+      // Apple Maps code is commented out but preserved below
+      // if (Platform.isIOS) {
+      //   return _buildAppleMap();
+      // } else {
+      return _buildGoogleMap();
+      // }
     } catch (e) {
       print('Platform view error: $e');
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -324,42 +626,91 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
     }
   }
 
-  Widget _buildAppleMap() {
-    // Update clustering if needed
-    if (_needsClusterUpdate) {
-      _updateClustering();
-    }
+  /// Apply 3D view settings for Apple Maps
+  /// COMMENTED OUT: Using Google Maps on all platforms now
+  // Future<void> _applyAppleMaps3DView() async {
+  //   if (!_isMapCreated || _appleMapController == null) return;
+  //
+  //   final location = widget.initialLocation ?? _currentLocation;
+  //   if (location == null) return;
+  //
+  //   try {
+  //     // For Apple Maps, we enable pitch gestures and let users tilt manually
+  //     // Apple Maps doesn't support programmatic pitch setting in the plugin
+  //     // But we can ensure the map is ready for 3D gestures
+  //     debugPrint('🎯 Apple Maps: 3D view enabled - pitch gestures active');
+  //
+  //     // The pitchGesturesEnabled property in the widget will handle enabling gestures
+  //     // Users can now use two-finger drag up/down to tilt the map
+  //   } catch (e) {
+  //     debugPrint('❌ Error applying Apple Maps 3D view: $e');
+  //   }
+  // }
 
-    return apple_maps.AppleMap(
-      initialCameraPosition: apple_maps.CameraPosition(
-        target: apple_maps.LatLng(
-            _currentLocation!.latitude, _currentLocation!.longitude),
-        zoom: widget.initialZoom,
-      ),
-      onMapCreated: (apple_maps.AppleMapController controller) {
-        _appleMapController = controller;
-        _isMapCreated = true;
-        // Update markers after map is created
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _needsClusterUpdate) {
-            _updateClustering();
-          }
-        });
-      },
-      annotations: _convertToAppleAnnotations(),
-      mapType: _convertToAppleMapType(widget.mapType),
-      myLocationEnabled: widget.showUserLocation,
-      myLocationButtonEnabled: false,
-      scrollGesturesEnabled: widget.enableScrollGestures,
-      zoomGesturesEnabled: widget.enableZoomGestures,
-      onCameraMove: (apple_maps.CameraPosition position) {
-        _onCameraMove(position.zoom);
-      },
-      onTap: (apple_maps.LatLng position) {
-        widget.onMapTap?.call(LatLng(position.latitude, position.longitude));
-      },
-    );
-  }
+  /// Build Apple Maps widget
+  /// COMMENTED OUT: Using Google Maps on all platforms now
+  //   // Widget _buildAppleMap() {
+  //   // Update clustering if needed
+  //   if (_needsClusterUpdate) {
+  //     _updateClustering();
+  //   }
+  //
+  //   return apple_maps.AppleMap(
+  //     initialCameraPosition: apple_maps.CameraPosition(
+  //       target: apple_maps.LatLng(
+  //           _currentLocation!.latitude, _currentLocation!.longitude),
+  //       zoom: widget.initialZoom,
+  //     ),
+  //     onMapCreated: (apple_maps.AppleMapController controller) {
+  //       _appleMapController = controller;
+  //       _isMapCreated = true;
+  //       // Apply 3D view if enabled
+  //       if (_is3DViewEnabled) {
+  //         WidgetsBinding.instance.addPostFrameCallback((_) {
+  //           if (mounted) {
+  //             _applyAppleMaps3DView();
+  //           }
+  //         });
+  //       }
+  //       // Update markers after map is created
+  //       WidgetsBinding.instance.addPostFrameCallback((_) {
+  //         if (mounted && _needsClusterUpdate) {
+  //           _updateClustering();
+  //         }
+  //       });
+  //     },
+  //     annotations: _convertToAppleAnnotations(),
+  //     polylines: _convertToApplePolylines(),
+  //     mapType: _convertToAppleMapType(widget.mapType),
+  //     myLocationEnabled: true, // Always show current location on Apple Maps
+  //     myLocationButtonEnabled: false, // We have custom location button
+  //     scrollGesturesEnabled: widget.enableScrollGestures,
+  //     zoomGesturesEnabled: widget.enableZoomGestures,
+  //     // Enable pitch gestures when 3D view is enabled - allows two-finger tilt
+  //     pitchGesturesEnabled: _is3DViewEnabled,
+  //     // Always enable rotate gestures for better 3D experience
+  //     rotateGesturesEnabled: true,
+  //     onCameraMove: (apple_maps.CameraPosition position) {
+  //       _onCameraMove(position.zoom);
+  //       // Apple Maps doesn't expose tilt/bearing in CameraPosition
+  //       // These are handled through gesture controls (pitchGesturesEnabled)
+  //     },
+  //     onTap: (apple_maps.LatLng position) {
+  //       final latLng = LatLng(position.latitude, position.longitude);
+  //       if (_isDrawingPolyline) {
+  //         addPolylinePoint(latLng);
+  //       } else {
+  //         widget.onMapTap?.call(latLng);
+  //       }
+  //     },
+  //     onLongPress: (apple_maps.LatLng position) {
+  //       if ((widget.enablePolylineDrawing ?? false) && !_isDrawingPolyline) {
+  //         startDrawingPolyline();
+  //         addPolylinePoint(LatLng(position.latitude, position.longitude));
+  //       }
+  //     },
+  //   );
+  // }
 
   Widget _buildGoogleMap() {
     // Update clustering if needed
@@ -372,10 +723,16 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
         target: google_maps.LatLng(
             _currentLocation!.latitude, _currentLocation!.longitude),
         zoom: widget.initialZoom,
+        tilt: _is3DViewEnabled ? _currentTilt : 0.0,
+        bearing: _currentBearing,
       ),
-      onMapCreated: (google_maps.GoogleMapController controller) {
+      onMapCreated: (google_maps.GoogleMapController controller) async {
         _googleMapController = controller;
         _isMapCreated = true;
+
+        // Apply dark mode style if system is in dark mode
+        _applyMapStyle();
+
         // Update markers after map is created
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _needsClusterUpdate) {
@@ -384,21 +741,94 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
         });
       },
       markers: _convertToGoogleMarkers(),
+      polylines: _convertToGooglePolylines(),
       mapType: _convertToGoogleMapType(widget.mapType),
-      myLocationEnabled: widget.showUserLocation,
-      myLocationButtonEnabled: false,
+      myLocationEnabled: true, // Always show current location on Google Maps
+      myLocationButtonEnabled: false, // We have custom location button
       scrollGesturesEnabled: widget.enableScrollGestures,
       zoomGesturesEnabled: widget.enableZoomGestures,
+      tiltGesturesEnabled: _is3DViewEnabled,
+      rotateGesturesEnabled: true,
+      buildingsEnabled: _is3DViewEnabled,
       onCameraMove: (google_maps.CameraPosition position) {
         _onCameraMove(position.zoom);
+        _currentTilt = position.tilt;
+        _currentBearing = position.bearing;
+        widget.onTiltChanged?.call(_currentTilt);
+        widget.onBearingChanged?.call(_currentBearing);
       },
       onTap: (google_maps.LatLng position) {
-        widget.onMapTap?.call(LatLng(position.latitude, position.longitude));
+        final latLng = LatLng(position.latitude, position.longitude);
+        if (_isDrawingPolyline) {
+          addPolylinePoint(latLng);
+        } else {
+          widget.onMapTap?.call(latLng);
+        }
+      },
+      onLongPress: (google_maps.LatLng position) {
+        if ((widget.enablePolylineDrawing ?? false) && !_isDrawingPolyline) {
+          startDrawingPolyline();
+          addPolylinePoint(LatLng(position.latitude, position.longitude));
+        }
       },
     );
   }
 
+  /// Apply map style based on system theme (dark/light mode)
+  void _applyMapStyle() {
+    if (_googleMapController == null) return;
+
+    // Check if system is in dark mode
+    final brightness = MediaQuery.platformBrightnessOf(context);
+    final isDarkMode = brightness == Brightness.dark;
+
+    if (isDarkMode) {
+      _googleMapController!.setMapStyle(_darkMapStyle);
+      debugPrint('🌙 Map: Dark mode style applied');
+    } else {
+      // Use default light style (null clears custom style)
+      _googleMapController!.setMapStyle(null);
+      debugPrint('☀️ Map: Light mode style applied');
+    }
+  }
+
   Widget _buildFallbackMap() {
+    // If no location available, show error message
+    if (_currentLocation == null) {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.green[800]!,
+              Colors.green[600]!,
+              Colors.blue[400]!,
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.location_off, color: Colors.white, size: 64),
+              const SizedBox(height: 16),
+              const Text(
+                'Location not available',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Please enable location services to use the map',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -440,15 +870,13 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        Platform.isIOS ? Icons.apple : Icons.android,
+                        Icons.map,
                         color: Colors.white,
                         size: 16,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        Platform.isIOS
-                            ? 'Apple Maps Fallback'
-                            : 'Google Maps Fallback',
+                        'Google Maps Fallback',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -480,7 +908,7 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        'Retry ${Platform.isIOS ? 'Apple' : 'Google'} Maps',
+                        'Retry Google Maps',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 10,
@@ -553,47 +981,69 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
     }).toList();
   }
 
-  Set<apple_maps.Annotation> _convertToAppleAnnotations() {
-    final annotations = <apple_maps.Annotation>{};
-
-    // Add individual markers
-    for (final marker in _visibleMarkers) {
-      annotations.add(
-        apple_maps.Annotation(
-          annotationId: apple_maps.AnnotationId(marker.markerId),
-          position: apple_maps.LatLng(
-              marker.position.latitude, marker.position.longitude),
-          infoWindow: apple_maps.InfoWindow(
-            title: marker.infoWindow.title,
-            snippet: marker.infoWindow.snippet,
-          ),
-          onTap: () {
-            widget.onMarkerTap?.call(marker);
-          },
-        ),
-      );
-    }
-
-    // Add cluster markers
-    for (final cluster in _clusters) {
-      annotations.add(
-        apple_maps.Annotation(
-          annotationId: apple_maps.AnnotationId(cluster.clusterId),
-          position: apple_maps.LatLng(
-              cluster.center.latitude, cluster.center.longitude),
-          infoWindow: apple_maps.InfoWindow(
-            title: '${cluster.markers.length} locations',
-            snippet: 'Tap to expand cluster',
-          ),
-          onTap: () {
-            _handleClusterTap(cluster);
-          },
-        ),
-      );
-    }
-
-    return annotations;
-  }
+  /// Convert markers to Apple Maps annotations
+  /// COMMENTED OUT: Using Google Maps on all platforms now
+  // Set<apple_maps.Annotation> _convertToAppleAnnotations() {
+  //   final annotations = <apple_maps.Annotation>{};
+  //
+  //   // Add individual markers with custom icons
+  //   for (final marker in _visibleMarkers) {
+  //     // Get icon bytes from marker (preferred) or try to extract from descriptor
+  //     Uint8List? iconBytes = marker.iconBytes;
+  //     if (iconBytes == null && marker.icon != null) {
+  //       // Fallback: try to get bytes from custom marker service cache
+  //       iconBytes = FoCoMapCustomMarkers.getBytesFromDescriptor(marker.icon!);
+  //     }
+  //
+  //     // Create annotation - Apple Maps Annotation may support custom icons via:
+  //     // - annotationIcon property (Uint8List)
+  //     // - icon property (Uint8List or UIImage)
+  //     // Check apple_maps_flutter 1.4.0 API documentation for exact property name
+  //     final annotation = apple_maps.Annotation(
+  //       annotationId: apple_maps.AnnotationId(marker.markerId),
+  //       position: apple_maps.LatLng(
+  //           marker.position.latitude, marker.position.longitude),
+  //       infoWindow: apple_maps.InfoWindow(
+  //         title: marker.infoWindow.title,
+  //         snippet: marker.infoWindow.snippet,
+  //       ),
+  //       // TODO: Add custom icon support once we verify the API property name
+  //       // If apple_maps_flutter supports: annotationIcon: iconBytes
+  //       // or icon: iconBytes (check actual API)
+  //       onTap: () {
+  //         widget.onMarkerTap?.call(marker);
+  //       },
+  //     );
+  //
+  //     annotations.add(annotation);
+  //
+  //     if (iconBytes != null) {
+  //       debugPrint('✅ Apple Maps: Custom icon bytes ready for marker ${marker.markerId} (${iconBytes.length} bytes) - Note: Need to verify API property name');
+  //     } else {
+  //       debugPrint('⚠️ Apple Maps: No custom icon bytes for marker ${marker.markerId} - will use default pin');
+  //     }
+  //   }
+  //
+  //   // Add cluster markers
+  //   for (final cluster in _clusters) {
+  //     annotations.add(
+  //       apple_maps.Annotation(
+  //         annotationId: apple_maps.AnnotationId(cluster.clusterId),
+  //         position: apple_maps.LatLng(
+  //             cluster.center.latitude, cluster.center.longitude),
+  //         infoWindow: apple_maps.InfoWindow(
+  //           title: '${cluster.markers.length} locations',
+  //           snippet: 'Tap to expand cluster',
+  //         ),
+  //         onTap: () {
+  //           _handleClusterTap(cluster);
+  //         },
+  //       ),
+  //     );
+  //   }
+  //
+  //   return annotations;
+  // }
 
   Set<google_maps.Marker> _convertToGoogleMarkers() {
     final markers = <google_maps.Marker>{};
@@ -720,16 +1170,18 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
     );
   }
 
-  apple_maps.MapType _convertToAppleMapType(MapType mapType) {
-    switch (mapType) {
-      case MapType.satellite:
-        return apple_maps.MapType.satellite;
-      case MapType.hybrid:
-        return apple_maps.MapType.hybrid;
-      case MapType.normal:
-        return apple_maps.MapType.standard;
-    }
-  }
+  /// Convert MapType to Apple Maps format
+  /// COMMENTED OUT: Using Google Maps on all platforms now
+  // apple_maps.MapType _convertToAppleMapType(MapType mapType) {
+  //   switch (mapType) {
+  //     case MapType.satellite:
+  //       return apple_maps.MapType.satellite;
+  //     case MapType.hybrid:
+  //       return apple_maps.MapType.hybrid;
+  //     case MapType.normal:
+  //       return apple_maps.MapType.standard;
+  //   }
+  // }
 
   google_maps.MapType _convertToGoogleMapType(MapType mapType) {
     switch (mapType) {
@@ -743,25 +1195,103 @@ class _PlatformMapWidgetState extends State<PlatformMapWidget> {
   }
 
   Future<void> animateToLocation(LatLng location, {double? zoom}) async {
-    if (Platform.isIOS && _appleMapController != null) {
-      await _appleMapController!.animateCamera(
-        apple_maps.CameraUpdate.newCameraPosition(
-          apple_maps.CameraPosition(
-            target: apple_maps.LatLng(location.latitude, location.longitude),
-            zoom: zoom ?? widget.initialZoom,
-          ),
-        ),
-      );
-    } else if (Platform.isAndroid && _googleMapController != null) {
+    // Apple Maps code commented out - using Google Maps on all platforms
+    // if (Platform.isIOS && _appleMapController != null) {
+    //   await _appleMapController!.animateCamera(
+    //     apple_maps.CameraUpdate.newCameraPosition(
+    //       apple_maps.CameraPosition(
+    //         target: apple_maps.LatLng(location.latitude, location.longitude),
+    //         zoom: zoom ?? widget.initialZoom,
+    //       ),
+    //     ),
+    //   );
+    // } else
+    if (_googleMapController != null) {
       await _googleMapController!.animateCamera(
         google_maps.CameraUpdate.newCameraPosition(
           google_maps.CameraPosition(
             target: google_maps.LatLng(location.latitude, location.longitude),
             zoom: zoom ?? widget.initialZoom,
+            tilt: _is3DViewEnabled ? _currentTilt : 0.0,
+            bearing: _currentBearing,
           ),
         ),
       );
     }
+  }
+
+  /// Convert polylines to Apple Maps format
+  /// COMMENTED OUT: Using Google Maps on all platforms now
+  // Set<apple_maps.Polyline> _convertToApplePolylines() {
+  //   final applePolylines = <apple_maps.Polyline>{};
+  //
+  //   // Add existing polylines
+  //   for (final polyline in _polylines) {
+  //     applePolylines.add(
+  //       apple_maps.Polyline(
+  //         polylineId: apple_maps.PolylineId(polyline.polylineId),
+  //         points: polyline.points.map((p) => apple_maps.LatLng(p.latitude, p.longitude)).toList(),
+  //         color: polyline.color,
+  //         width: polyline.width.toInt(),
+  //         patterns: polyline.pattern.map((p) => apple_maps.PatternItem.dash(p.toDouble())).toList(),
+  //       ),
+  //     );
+  //   }
+  //
+  //     // Add current drawing polyline if active
+  //     if (_isDrawingPolyline && _currentPolylinePoints.isNotEmpty) {
+  //       applePolylines.add(
+  //         apple_maps.Polyline(
+  //           polylineId: apple_maps.PolylineId('drawing_polyline'),
+  //           points: _currentPolylinePoints.map((p) => apple_maps.LatLng(p.latitude, p.longitude)).toList(),
+  //           color: Colors.blue,
+  //           width: 4,
+  //         ),
+  //       );
+  //     }
+  //
+  //   return applePolylines;
+  // }
+
+  /// Convert polylines to Google Maps format
+  Set<google_maps.Polyline> _convertToGooglePolylines() {
+    final googlePolylines = <google_maps.Polyline>{};
+
+    // Add existing polylines
+    for (final polyline in _polylines) {
+      googlePolylines.add(
+        google_maps.Polyline(
+          polylineId: google_maps.PolylineId(polyline.polylineId),
+          points: polyline.points
+              .map((p) => google_maps.LatLng(p.latitude, p.longitude))
+              .toList(),
+          color: polyline.color,
+          width: polyline.width.toInt(),
+          patterns: polyline.pattern
+              .map((p) => google_maps.PatternItem.dash(p.toDouble()))
+              .toList(),
+          geodesic: polyline.geodesic,
+          zIndex: polyline.zIndex,
+        ),
+      );
+    }
+
+    // Add current drawing polyline if active
+    if (_isDrawingPolyline && _currentPolylinePoints.isNotEmpty) {
+      googlePolylines.add(
+        google_maps.Polyline(
+          polylineId: google_maps.PolylineId('drawing_polyline'),
+          points: _currentPolylinePoints
+              .map((p) => google_maps.LatLng(p.latitude, p.longitude))
+              .toList(),
+          color: Colors.blue,
+          width: 4,
+          geodesic: true,
+        ),
+      );
+    }
+
+    return googlePolylines;
   }
 }
 
@@ -772,6 +1302,7 @@ class MapMarker {
   final InfoWindow infoWindow;
   final Color? color;
   final BitmapDescriptor? icon;
+  final Uint8List? iconBytes; // PNG bytes for Apple Maps
 
   const MapMarker({
     required this.markerId,
@@ -779,6 +1310,7 @@ class MapMarker {
     required this.infoWindow,
     this.color,
     this.icon,
+    this.iconBytes,
   });
 }
 
@@ -842,6 +1374,27 @@ class MapCluster {
 
     return colorCounts.entries.reduce((a, b) => a.value > b.value ? a : b).key;
   }
+}
+
+/// Map Polyline class for drawing paths on the map
+class MapPolyline {
+  final String polylineId;
+  final List<LatLng> points;
+  final Color color;
+  final double width;
+  final List<int> pattern;
+  final bool geodesic;
+  final int zIndex;
+
+  const MapPolyline({
+    required this.polylineId,
+    required this.points,
+    this.color = Colors.blue,
+    this.width = 5.0,
+    this.pattern = const [],
+    this.geodesic = true,
+    this.zIndex = 0,
+  });
 }
 
 /// Custom painter for fallback map when platform views fail

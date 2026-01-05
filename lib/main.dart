@@ -14,6 +14,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import '/services/stripe_service.dart';
 import '/services/store_subscription_service.dart';
+import '/services/revenuecat_service.dart';
 import '/services/subscription_state_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -52,7 +53,19 @@ void main() async {
     }
   }
 
-  // Initialize Store Subscription Service
+  // Initialize RevenueCat (primary subscription handler)
+  try {
+    await RevenueCatService().initialize();
+    if (kDebugMode) {
+      print('✅ RevenueCat initialized successfully');
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      print('❌ Failed to initialize RevenueCat: $e');
+    }
+  }
+
+  // Initialize Store Subscription Service (fallback/legacy)
   try {
     await StoreSubscriptionService().initialize();
     if (kDebugMode) {

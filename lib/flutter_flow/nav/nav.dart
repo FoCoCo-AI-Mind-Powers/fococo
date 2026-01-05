@@ -23,7 +23,13 @@ import '/pages/security/face_id_settings_widget.dart';
 import '/pages/edit_profile/edit_profile_widget.dart';
 import '/pages/settings/settings_widget.dart';
 import '/pages/support/support_widget.dart';
-import '/pages/ai_insights/claude_style_ai_insights_widget.dart';
+import '/pages/ai_insights/ai_insights_widget.dart';
+import '/pages/quick_mind_tools/breathing_tool_widget.dart';
+import '/pages/quick_mind_tools/visualize_tool_widget.dart';
+import '/pages/quick_mind_tools/reset_tool_widget.dart';
+import '/pages/quick_mind_tools/rebalance_tool_widget.dart';
+import '/pages/quick_mind_tools/virtual_training_experience_widget.dart';
+import '/pages/just_talk/just_talk_widget.dart';
 
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
@@ -125,19 +131,19 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           name: 'ai_insights',
           path: '/ai_insights',
           requireAuth: true,
-          builder: (context, params) => const ClaudeStyleAiInsightsWidget(),
+          builder: (context, params) => const AiInsightsWidget(),
         ),
         FFRoute(
-          name: GolfRoundsWidget.routeName,
-          path: GolfRoundsWidget.routePath,
+          name: GolfSyncWidget.routeName,
+          path: GolfSyncWidget.routePath,
           requireAuth: true,
-          builder: (context, params) => GolfRoundsWidget(),
+          builder: (context, params) => GolfSyncWidget(),
         ),
         FFRoute(
-          name: CoachingModulesWidget.routeName,
-          path: CoachingModulesWidget.routePath,
+          name: MindCoachWidget.routeName,
+          path: MindCoachWidget.routePath,
           requireAuth: true,
-          builder: (context, params) => CoachingModulesWidget(
+          builder: (context, params) => MindCoachWidget(
             initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
           ),
         ),
@@ -203,6 +209,53 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           path: '/support',
           requireAuth: true,
           builder: (context, params) => const SupportWidget(),
+        ),
+        FFRoute(
+          name: AiAssessmentWidget.routeName,
+          path: AiAssessmentWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => const AiAssessmentWidget(),
+        ),
+        FFRoute(
+          name: BreathingToolWidget.routeName,
+          path: BreathingToolWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => const BreathingToolWidget(),
+        ),
+        FFRoute(
+          name: VisualizeToolWidget.routeName,
+          path: VisualizeToolWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => const VisualizeToolWidget(),
+        ),
+        FFRoute(
+          name: ResetToolWidget.routeName,
+          path: ResetToolWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => const ResetToolWidget(),
+        ),
+        FFRoute(
+          name: RebalanceToolWidget.routeName,
+          path: RebalanceToolWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => const RebalanceToolWidget(),
+        ),
+        FFRoute(
+          name: VirtualTrainingExperienceWidget.routeName,
+          path: VirtualTrainingExperienceWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => VirtualTrainingExperienceWidget(
+            moduleTitle: params.state.extraMap['moduleTitle'] as String?,
+            moduleId: params.state.extraMap['moduleId'] as String?,
+            description: params.state.extraMap['description'] as String?,
+            estimatedDuration: params.state.extraMap['estimatedDuration'] as int?,
+          ),
+        ),
+        FFRoute(
+          name: JustTalkWidget.routeName,
+          path: JustTalkWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => const JustTalkWidget(),
         ),
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );
@@ -381,6 +434,7 @@ class FFRoute {
         },
         pageBuilder: (context, state) {
           fixStatusBarOniOS16AndBelow(context);
+          
           final ffParams = FFParameters(state, asyncParams);
           final page = ffParams.hasFutures
               ? FutureBuilder(

@@ -504,7 +504,9 @@ Areas of expertise:
             // Handle text responses
             if (part['text'] != null) {
               responseText = part['text'] as String;
-              _transcriptController.add(responseText);
+              if (!_transcriptController.isClosed) {
+                _transcriptController.add(responseText);
+              }
             }
 
             // Note: We don't handle audio responses here as Cartesia handles TTS
@@ -522,7 +524,9 @@ Areas of expertise:
             },
           );
 
-          _responseController.add(response);
+          if (!_responseController.isClosed) {
+            _responseController.add(response);
+          }
           _updateState(VertexAIGeminiLiveState.connected);
         }
       }
@@ -561,7 +565,10 @@ Areas of expertise:
   void _updateState(VertexAIGeminiLiveState newState) {
     if (_currentState != newState) {
       _currentState = newState;
-      _stateController.add(newState);
+      // Check if controller is closed before adding events
+      if (!_stateController.isClosed) {
+        _stateController.add(newState);
+      }
 
       if (kDebugMode) {
         print('🔄 State changed to: $newState');

@@ -17,6 +17,7 @@ import '/services/focomap_tutorial_service.dart';
 import '/services/focomap_ai_service.dart';
 import '/services/focomap_custom_markers.dart';
 import '/ai_integration/config/gemini_live_config.dart';
+import '/ai_integration/services/gemini_live_api_service.dart';
 import 'platform_map_widget.dart';
 import 'advanced_map_view.dart';
 import 'foco_map_model.dart';
@@ -26,6 +27,10 @@ import '/pages/golf_rounds/golf_round_modal_grint_style.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:ui';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class FoCoMapWidget extends StatefulWidget {
   const FoCoMapWidget({super.key});
@@ -49,6 +54,25 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
   bool _useAdvancedView = false;
   double _currentZoom = 15.0;
 
+  // 3D view state
+  bool _is3DViewEnabled = false;
+  double _currentTilt = 0.0;
+  double _currentBearing = 0.0;
+
+  // Unified floating menu state
+  bool _isFloatingMenuExpanded = false;
+  
+  // Tooltip overlay entries for layer options
+  OverlayEntry? _layerTooltipOverlay;
+
+  // Polyline drawing state
+  bool _isDrawingPolyline = false;
+  Set<MapPolyline> _polylines = {};
+
+  // Location cache
+  static const String _locationCacheKey = 'focomap_cached_location';
+  LatLng? _cachedLocation;
+
   // Map controller keys for location animation
   final GlobalKey _platformMapKey = GlobalKey();
   final GlobalKey _advancedMapKey = GlobalKey();
@@ -59,9 +83,11 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
   Timer? _liveSessionTimer;
 
   // Services
-  final voice.FoCoMapVoiceService _voiceService = voice.FoCoMapVoiceService();
-  // Gemini voice service ready for integration
-  // final gemini_voice.FoCoMapGeminiVoiceService _geminiVoiceService = gemini_voice.FoCoMapGeminiVoiceService();
+  // Legacy voice service (kept for fallback)
+  final voice.FoCoMapVoiceService _legacyVoiceService =
+      voice.FoCoMapVoiceService();
+  // Gemini Live API service for real-time speech-to-speech (uses API key)
+  final GeminiLiveAPIService _geminiLiveService = GeminiLiveAPIService();
   final FoCoMapLiveService _liveService = FoCoMapLiveService();
   final LiveLocationService _locationService = LiveLocationService();
   final FoCoMapTutorialService _tutorialService = FoCoMapTutorialService();
@@ -106,6 +132,11 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
   StreamSubscription? _spatialAnalysisSubscription;
   StreamSubscription? _patternInsightSubscription;
   StreamSubscription? _guidanceSubscription;
+  StreamSubscription? _geminiLiveStateSubscription;
+  StreamSubscription? _geminiLiveResponseSubscription;
+
+  // Gemini Live state tracking
+  GeminiLiveState _geminiLiveState = GeminiLiveState.disconnected;
 
   // Animation controllers for real-time effects
   late AnimationController _pulseController;
@@ -144,6 +175,8 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
     debugPrint('🎯 FoCoMap: Initializing custom markers...');
     FoCoMapCustomMarkers.initialize();
 
+    // Load cached location first, then get fresh location
+    _loadCachedLocation();
     // Load map location first (critical for map display)
     debugPrint('🎯 FoCoMap: Getting current location for map display...');
     _getCurrentLocation();
@@ -193,11 +226,17 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
     _hideAITooltip();
     _tooltipTimer?.cancel();
 
+    // Hide tooltips
+    _hideLayerTooltip();
+
     // Dispose services
     _model.dispose();
     _liveService.stopLiveMode();
-    _voiceService.stopListening();
-    _voiceService.dispose();
+    _legacyVoiceService.stopListening();
+    _legacyVoiceService.dispose();
+    _geminiLiveService.disconnect();
+    _geminiLiveStateSubscription?.cancel();
+    _geminiLiveResponseSubscription?.cancel();
     _locationService.stopTracking();
     _locationService.dispose();
     _tutorialService.dispose();
@@ -235,9 +274,38 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
 
   Future<void> _initializeServices() async {
     try {
-      debugPrint('🎯 FoCoMap: Initializing voice service...');
-      // Initialize services
-      await _voiceService.initialize();
+      debugPrint('🎯 FoCoMap: Initializing Gemini Live voice service...');
+      // Initialize Gemini Live service for voice
+      await _geminiLiveService.initialize();
+
+      // Set up Gemini Live listeners
+      _geminiLiveStateSubscription =
+          _geminiLiveService.stateStream.listen((state) {
+        if (mounted) {
+          setState(() {
+            _geminiLiveState = state;
+          });
+          debugPrint('🎤 Gemini Live state: ${state.name}');
+        }
+      });
+
+      _geminiLiveResponseSubscription =
+          _geminiLiveService.responseStream.listen((response) {
+        if (mounted) {
+          // Show AI response as tooltip
+          if (response.isNotEmpty) {
+            _showAITooltip(response, Colors.blue);
+          }
+        }
+      });
+
+      // Listen to transcript stream separately
+      _geminiLiveService.transcriptStream.listen((transcript) {
+        // Transcript can be used for debugging or display if needed
+        if (mounted && transcript.isNotEmpty) {
+          debugPrint('🎤 FoCoMap: Transcript: $transcript');
+        }
+      });
 
       debugPrint('🎯 FoCoMap: Initializing live service...');
       await _liveService.initialize();
@@ -320,9 +388,9 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
         debugPrint('Live update stream error: $error');
       });
 
-      // Set up voice service listeners for real-time feedback
+      // Set up legacy voice service listeners as fallback
       _voiceUpdateSubscription =
-          _voiceService.liveUpdateStream.listen((update) {
+          _legacyVoiceService.liveUpdateStream.listen((update) {
         _handleVoiceUpdate(update);
       }, onError: (error) {
         debugPrint('Voice update stream error: $error');
@@ -618,12 +686,22 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
               primaryType: MarkerType.roundLog,
               isSelected: false,
             );
+
+            // Get bytes for Apple Maps
+            final clusterIconBytes =
+                await FoCoMapCustomMarkers.getClusterMarkerBytes(
+              count: cluster.markers.length,
+              primaryType: MarkerType.roundLog,
+              isSelected: false,
+            );
+
             markers.add(
               MapMarker(
                 markerId:
                     'cluster_${cluster.center.latitude}_${cluster.center.longitude}',
                 position: cluster.center,
                 icon: clusterIcon,
+                iconBytes: clusterIconBytes,
                 infoWindow: InfoWindow(
                   title: '${cluster.markers.length} items',
                   snippet: 'Tap to zoom in',
@@ -890,37 +968,201 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
     }
   }
 
+  /// Load cached location from SharedPreferences
+  Future<void> _loadCachedLocation() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedLocationJson = prefs.getString(_locationCacheKey);
+      if (cachedLocationJson != null) {
+        final locationData =
+            jsonDecode(cachedLocationJson) as Map<String, dynamic>;
+        final cachedLat = locationData['latitude'] as double;
+        final cachedLng = locationData['longitude'] as double;
+        final cachedTimestamp =
+            DateTime.parse(locationData['timestamp'] as String);
+
+        // Use cached location if it's less than 1 hour old
+        if (DateTime.now().difference(cachedTimestamp).inHours < 1) {
+          _cachedLocation = LatLng(cachedLat, cachedLng);
+          setState(() {
+            currentLocation = _cachedLocation;
+            _currentZoom = 15.0;
+          });
+          debugPrint(
+              '✅ FoCoMap: Loaded cached location: $cachedLat, $cachedLng');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ FoCoMap: Error loading cached location: $e');
+    }
+  }
+
+  /// Save location to cache
+  Future<void> _saveLocationToCache(LatLng location) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final locationData = {
+        'latitude': location.latitude,
+        'longitude': location.longitude,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+      await prefs.setString(_locationCacheKey, jsonEncode(locationData));
+      debugPrint('✅ FoCoMap: Saved location to cache');
+    } catch (e) {
+      debugPrint('⚠️ FoCoMap: Error saving location to cache: $e');
+    }
+  }
+
   Future<void> _getCurrentLocation() async {
     try {
-      // First try to get last round location for better initial view
-      final lastRoundLocation = await _getLastRoundLocation();
-      if (lastRoundLocation != null) {
+      // Check location service enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint('⚠️ FoCoMap: Location services are disabled');
+        // Use cached location if available
+        if (_cachedLocation != null) {
+          setState(() {
+            currentLocation = _cachedLocation;
+            _currentZoom = 15.0;
+          });
+          debugPrint('✅ FoCoMap: Using cached location (services disabled)');
+          return;
+        }
+        // Try to request service
+        serviceEnabled = await Geolocator.openLocationSettings();
+        if (!serviceEnabled) {
+          throw Exception(
+              'Location services are disabled. Please enable location services in your device settings.');
+        }
+      }
+
+      // Check and request permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        debugPrint('🎯 FoCoMap: Requesting location permission...');
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          // Use cached location if permission denied
+          if (_cachedLocation != null) {
+            setState(() {
+              currentLocation = _cachedLocation;
+              _currentZoom = 15.0;
+            });
+            debugPrint('✅ FoCoMap: Using cached location (permission denied)');
+            return;
+          }
+          throw Exception(
+              'Location permissions are denied. Please grant location permission to use this feature.');
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        // Use cached location if permission permanently denied
+        if (_cachedLocation != null) {
+          setState(() {
+            currentLocation = _cachedLocation;
+            _currentZoom = 15.0;
+          });
+          debugPrint(
+              '✅ FoCoMap: Using cached location (permission permanently denied)');
+          return;
+        }
+        throw Exception(
+            'Location permissions are permanently denied. Please enable location permission in app settings.');
+      }
+
+      // Get current device location with reduced timeout and better error handling
+      debugPrint('🎯 FoCoMap: Getting current device location...');
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 10), // Reduced timeout
+          ),
+        ).timeout(
+          const Duration(seconds: 10),
+        );
+      } catch (timeoutError) {
+        debugPrint('⚠️ FoCoMap: Location timeout: $timeoutError');
+        // Use cached location on timeout
+        if (_cachedLocation != null) {
+          setState(() {
+            currentLocation = _cachedLocation;
+            _currentZoom = 15.0;
+          });
+          debugPrint('✅ FoCoMap: Using cached location (timeout)');
+          return;
+        }
+        rethrow;
+      }
+
+      if (position == null) {
+        // Use cached location if position is null
+        if (_cachedLocation != null) {
+          setState(() {
+            currentLocation = _cachedLocation;
+            _currentZoom = 15.0;
+          });
+          debugPrint('✅ FoCoMap: Using cached location (position null)');
+          return;
+        }
+        throw Exception('Unable to get current location');
+      }
+
+      final deviceLocation = LatLng(position.latitude, position.longitude);
+
+      // Save to cache
+      await _saveLocationToCache(deviceLocation);
+      _cachedLocation = deviceLocation;
+
+      setState(() {
+        currentLocation = deviceLocation;
+        _currentZoom = 15.0; // Standard zoom for current location
+      });
+      debugPrint(
+          '✅ FoCoMap: Set location to device GPS: ${deviceLocation.latitude}, ${deviceLocation.longitude}');
+
+      // Update location service
+      await _locationService.initialize();
+    } catch (e) {
+      debugPrint('❌ FoCoMap: Error getting device location: $e');
+
+      // Use cached location if available
+      if (_cachedLocation != null) {
         setState(() {
-          currentLocation = lastRoundLocation;
-          _currentZoom = 16.0; // Good zoom level for golf course view
+          currentLocation = _cachedLocation;
+          _currentZoom = 15.0;
         });
-        debugPrint(
-            'Set initial location to last round: ${lastRoundLocation.latitude}, ${lastRoundLocation.longitude}');
+        debugPrint('✅ FoCoMap: Using cached location after error');
         return;
       }
 
-      // Fallback to current GPS location
-      await _locationService.initialize();
-      final position = _locationService.currentLocation;
-      if (position != null) {
-        setState(() {
-          currentLocation = position;
-          _currentZoom = 15.0; // Standard zoom for current location
-        });
-        debugPrint('Set initial location to current GPS position');
+      // Only use last round location as last resort fallback
+      try {
+        final lastRoundLocation = await _getLastRoundLocation();
+        if (lastRoundLocation != null) {
+          setState(() {
+            currentLocation = lastRoundLocation;
+            _currentZoom = 16.0;
+          });
+          // Save last round location to cache
+          await _saveLocationToCache(lastRoundLocation);
+          debugPrint(
+              '⚠️ FoCoMap: Using last round location as fallback: ${lastRoundLocation.latitude}, ${lastRoundLocation.longitude}');
+          return;
+        }
+      } catch (fallbackError) {
+        debugPrint(
+            '❌ FoCoMap: Error getting last round location: $fallbackError');
       }
-    } catch (e) {
-      debugPrint('Error getting initial location: $e');
-      // Set default golf course location (Pebble Beach)
+
+      // No location available - show loading state
       setState(() {
-        currentLocation = const LatLng(36.5669, -121.9508);
-        _currentZoom = 15.0;
+        currentLocation = null;
       });
+      debugPrint(
+          '⚠️ FoCoMap: No location available - map will show loading state');
     }
   }
 
@@ -971,7 +1213,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
     }
   }
 
-  /// Start live golf session mode
+  /// Start live golf session mode with Gemini Live API voice guidance
   Future<void> _startLiveSession() async {
     try {
       setState(() {
@@ -985,34 +1227,144 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
       // Start location tracking
       await _locationService.startTracking();
 
-      // Start voice service for live logging
-      _voiceService.setActiveRound(_liveSessionRoundId);
-
       // Start live data service
       await _liveService.startLiveMode(roundId: _liveSessionRoundId);
+
+      // Initialize and connect Gemini Live API for voice guidance
+      try {
+        debugPrint('🎤 FoCoMap: Initializing Gemini Live API for voice guidance...');
+        
+        // Get user behavior data for personalized coaching
+        final recentRounds = _liveService.cachedRoundLogs.take(5).toList();
+        final recentShots = _liveService.cachedShotLogs.take(10).toList();
+        
+        // Analyze user behavior patterns
+        final behaviorAnalysis = _analyzeUserBehavior(recentRounds, recentShots);
+        
+        // Initialize Gemini Live with personalized golf coaching context
+        await _geminiLiveService.initialize(
+          config: GeminiLiveConfig(
+            systemInstruction: '''You are FoCoCo's AI golf mental performance coach providing real-time, personalized guidance during a live golf round.
+
+**YOUR COACHING APPROACH:**
+You are an observant, proactive coach who analyzes the player's behavior patterns and provides guidance that matches their playing style and mental state.
+
+**PLAYER BEHAVIOR ANALYSIS:**
+${behaviorAnalysis}
+
+**YOUR ROLE:**
+1. **Behavior-Matched Guidance**: Adapt your coaching style to match how the player actually plays:
+   - If they struggle with focus → Provide specific focus techniques
+   - If confidence dips after bad shots → Offer immediate recovery strategies
+   - If they rush decisions → Suggest deliberate pre-shot routines
+   - If they overthink → Provide simple, clear mental cues
+
+2. **Proactive Coaching**: Don't wait for questions - observe patterns and offer guidance:
+   - Before important shots: "I notice you tend to rush here. Let's take a deep breath and visualize the shot."
+   - After challenging holes: "That was tough, but I see you're improving at recovery. Here's what worked..."
+   - When patterns emerge: "I'm noticing you play better when you [specific behavior]. Let's apply that now."
+
+3. **Personalized Communication Style**:
+   - Match their energy level (if they're calm, be calm; if they're frustrated, be supportive)
+   - Use their preferred mental cues (if they respond to visual cues, use imagery; if they prefer action, give physical routines)
+   - Reference their past successes to build confidence
+
+4. **Real-Time Adaptation**:
+   - Monitor their current performance state
+   - Adjust guidance based on what's happening RIGHT NOW
+   - Provide immediate, actionable advice for the current situation
+
+**CURRENT CONTEXT:**
+- Location: ${currentLocation != null ? '${currentLocation!.latitude}, ${currentLocation!.longitude}' : 'Unknown'}
+- Round ID: $_liveSessionRoundId
+- User tier: ${_liveService.userTier.name}
+- Recent rounds analyzed: ${recentRounds.length}
+- Recent shots analyzed: ${recentShots.length}
+
+**COMMUNICATION GUIDELINES:**
+- Keep responses concise (2-3 sentences max for voice)
+- Be encouraging but honest
+- Use golf-specific language they understand
+- Reference their actual performance data when relevant
+- Provide ONE actionable tip at a time
+
+**STARTING CONVERSATION:**
+Begin by acknowledging their behavior patterns and offering personalized guidance. For example:
+- If they struggle with focus: "I see you've been working on focus. Let's use a simple technique today..."
+- If they're improving: "Your mental game has been getting stronger. Let's build on that confidence..."
+- If this is early data: "I'm here to help you develop your mental game. Let's start with..."
+
+Remember: You're not just giving generic advice - you're coaching based on HOW THEY ACTUALLY PLAY.''',
+            responseModalities: ['AUDIO', 'TEXT'],
+            enableThinking: false,
+          ),
+        );
+
+        // Connect to Gemini Live API
+        await _geminiLiveService.connect();
+        debugPrint('✅ FoCoMap: Connected to Gemini Live API');
+
+        // Start listening for voice input
+        await _geminiLiveService.startListening();
+        debugPrint('🎤 FoCoMap: Started listening for voice input');
+
+        // Send initial greeting message to start the conversation
+        await Future.delayed(const Duration(milliseconds: 500));
+        await _geminiLiveService.sendTextMessage(
+          'Hello! I\'m ready to help you with your mental game during this round. How are you feeling, and what would you like to focus on today?'
+        );
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.mic, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text('🎤 Voice coach activated! Speak naturally for guidance.'),
+                  ),
+                ],
+              ),
+            backgroundColor: Colors.green.shade600,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } catch (geminiError) {
+        debugPrint('⚠️ FoCoMap: Gemini Live API error (non-critical): $geminiError');
+        // Continue with live session even if voice fails
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Live session started (voice guidance unavailable)'),
+              backgroundColor: Colors.orange.shade600,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        }
+      }
 
       // Auto-refresh location every 10 seconds during live session
       _liveSessionTimer = Timer.periodic(const Duration(seconds: 10), (_) {
         _updateCurrentLocationInLiveMode();
       });
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('🏌️ Live golf session started!'),
-            backgroundColor: Colors.green.shade600,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-
-      debugPrint('Live golf session started with ID: $_liveSessionRoundId');
+      debugPrint('✅ FoCoMap: Live golf session started with ID: $_liveSessionRoundId');
     } catch (e) {
-      debugPrint('Error starting live session: $e');
+      debugPrint('❌ FoCoMap: Error starting live session: $e');
       setState(() {
         _isLiveSession = false;
       });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error starting live session: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -1023,6 +1375,15 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
         _isLiveSession = false;
         _currentZoom = 15.0; // Return to normal zoom
       });
+
+      // Stop Gemini Live API
+      try {
+        await _geminiLiveService.stopListening();
+        await _geminiLiveService.disconnect();
+        debugPrint('🎤 FoCoMap: Disconnected from Gemini Live API');
+      } catch (e) {
+        debugPrint('⚠️ FoCoMap: Error disconnecting Gemini Live: $e');
+      }
 
       // Stop timers and services
       _liveSessionTimer?.cancel();
@@ -1043,9 +1404,9 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
       // Reset session data
       _liveSessionRoundId = null;
 
-      debugPrint('Live golf session ended');
+      debugPrint('✅ FoCoMap: Live golf session ended');
     } catch (e) {
-      debugPrint('Error stopping live session: $e');
+      debugPrint('❌ FoCoMap: Error stopping live session: $e');
     }
   }
 
@@ -1508,6 +1869,9 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
     for (final roundLog in roundLogs) {
       if (!_model.showRoundLogs) continue;
 
+      // Filter out sample/test data
+      if (roundLog.courseName.toLowerCase().contains('sample')) continue;
+
       if (roundLog.coordinates != null && _shouldIncludeByDate(roundLog.date)) {
         final marker = await _createRoundLogMarker(roundLog);
         if (marker != null) newMarkers.add(marker);
@@ -1590,11 +1954,26 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
 
   /// Add markers for MindMap layer (mental focus)
   Future<void> _addMindMapMarkers() async {
+    // Respect showRoundLogs filter
+    if (!_model.showRoundLogs) return;
+
     for (final round in _model.getFilteredRoundLogs()) {
       if (round.coordinates == null) continue;
 
+      // Filter out sample/test data
+      if (round.courseName.toLowerCase().contains('sample')) continue;
+
+      // Apply date filter
+      if (!_shouldIncludeByDate(round.date)) continue;
+
       final isSelected = _model.selectedMarkerId == 'round_${round.roundId}';
       final customIcon = await FoCoMapCustomMarkers.createRoundLogMarker(
+        round: round,
+        isSelected: isSelected,
+      );
+
+      // Get bytes for Apple Maps
+      final iconBytes = await FoCoMapCustomMarkers.getRoundLogMarkerBytes(
         round: round,
         isSelected: isSelected,
       );
@@ -1604,6 +1983,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
           markerId: 'round_${round.roundId}',
           position: round.coordinates!,
           icon: customIcon,
+          iconBytes: iconBytes,
           infoWindow: InfoWindow(
             title: '${round.overallMindsetEmoji} ${round.courseName}',
             snippet: round.bestCue.isNotEmpty
@@ -1617,11 +1997,23 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
 
   /// Add markers for ShotMap layer (technical focus)
   Future<void> _addShotMapMarkers() async {
+    // Respect showShotLogs filter
+    if (!_model.showShotLogs) return;
+
     for (final shot in _model.getFilteredShotLogs()) {
       if (shot.coordinates == null) continue;
 
+      // Apply date filter
+      if (!_shouldIncludeByDate(shot.timestamp)) continue;
+
       final isSelected = _model.selectedMarkerId == 'shot_${shot.shotId}';
       final customIcon = await FoCoMapCustomMarkers.createShotLogMarker(
+        shot: shot,
+        isSelected: isSelected,
+      );
+
+      // Get bytes for Apple Maps
+      final iconBytes = await FoCoMapCustomMarkers.getShotLogMarkerBytes(
         shot: shot,
         isSelected: isSelected,
       );
@@ -1631,6 +2023,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
           markerId: 'shot_${shot.shotId}',
           position: shot.coordinates!,
           icon: customIcon,
+          iconBytes: iconBytes,
           infoWindow: InfoWindow(
             title:
                 '${shot.clubIcon.isNotEmpty ? shot.clubIcon : '🏌️'} ${shot.clubUsed} - Hole ${shot.holeNumber}',
@@ -1645,13 +2038,20 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
 
   /// Add markers for SyncMap layer (combined view)
   Future<void> _addSyncMapMarkers() async {
+    // Respect both filters
+    if (!_model.showRoundLogs || !_model.showShotLogs) return;
+
     // Combine round and shot data for synchronized view
     final Map<String, RoundLogsRecord> roundsMap = {
-      for (final round in _model.getFilteredRoundLogs()) round.roundId: round
+      for (final round in _model.getFilteredRoundLogs())
+        if (_shouldIncludeByDate(round.date)) round.roundId: round
     };
 
     for (final shot in _model.getFilteredShotLogs()) {
       if (shot.coordinates == null) continue;
+
+      // Apply date filter
+      if (!_shouldIncludeByDate(shot.timestamp)) continue;
 
       final round = roundsMap[shot.roundId];
       if (round == null) continue;
@@ -1663,11 +2063,18 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
         isSelected: isSelected,
       );
 
+      // Get bytes for Apple Maps
+      final iconBytes = await FoCoMapCustomMarkers.getRoundLogMarkerBytes(
+        round: round,
+        isSelected: isSelected,
+      );
+
       markers.add(
         MapMarker(
           markerId: 'sync_${shot.shotId}',
           position: shot.coordinates!,
           icon: customIcon,
+          iconBytes: iconBytes,
           infoWindow: InfoWindow(
             title: '${round.overallMindsetEmoji} ${round.courseName}',
             snippet: shot.cueUsed.isNotEmpty
@@ -1718,7 +2125,18 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
   /// Create a map marker for a round log
   Future<MapMarker?> _createRoundLogMarker(RoundLogsRecord roundLog) async {
     try {
+      // Filter out sample/test data
+      if (roundLog.courseName.toLowerCase().contains('sample')) {
+        return null;
+      }
+
       final icon = await FoCoMapCustomMarkers.createRoundLogMarker(
+        round: roundLog,
+        isSelected: false,
+      );
+
+      // Get bytes for Apple Maps
+      final iconBytes = await FoCoMapCustomMarkers.getRoundLogMarkerBytes(
         round: roundLog,
         isSelected: false,
       );
@@ -1730,6 +2148,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
           roundLog.coordinates!.longitude,
         ),
         icon: icon,
+        iconBytes: iconBytes,
         infoWindow: InfoWindow(
           title: '${roundLog.overallMindsetEmoji} ${roundLog.courseName}',
           snippet: roundLog.bestCue.isNotEmpty
@@ -1751,6 +2170,12 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
         isSelected: false,
       );
 
+      // Get bytes for Apple Maps
+      final iconBytes = await FoCoMapCustomMarkers.getShotLogMarkerBytes(
+        shot: shotLog,
+        isSelected: false,
+      );
+
       return MapMarker(
         markerId: 'shot_log_${shotLog.shotId}',
         position: LatLng(
@@ -1758,6 +2183,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
           shotLog.coordinates!.longitude,
         ),
         icon: icon,
+        iconBytes: iconBytes,
         infoWindow: InfoWindow(
           title:
               '${shotLog.clubIcon.isNotEmpty ? shotLog.clubIcon : '🏌️'} ${shotLog.clubUsed} - Hole ${shotLog.holeNumber}',
@@ -1781,6 +2207,12 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
         isSelected: false,
       );
 
+      // Get bytes for Apple Maps
+      final iconBytes = await FoCoMapCustomMarkers.getGolfRoundMarkerBytes(
+        round: golfRound,
+        isSelected: false,
+      );
+
       return MapMarker(
         markerId: 'golf_round_${golfRound.reference.id}',
         position: LatLng(
@@ -1788,6 +2220,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
           roundLog.coordinates!.longitude,
         ),
         icon: icon,
+        iconBytes: iconBytes,
         infoWindow: InfoWindow(
           title: '⛳ ${golfRound.courseName}',
           snippet:
@@ -1809,6 +2242,12 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
         isSelected: false,
       );
 
+      // Get bytes for Apple Maps
+      final iconBytes = await FoCoMapCustomMarkers.getScorecardMarkerBytes(
+        scorecard: scorecard,
+        isSelected: false,
+      );
+
       return MapMarker(
         markerId: 'scorecard_${scorecard.reference.id}',
         position: LatLng(
@@ -1816,6 +2255,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
           roundLog.coordinates!.longitude,
         ),
         icon: icon,
+        iconBytes: iconBytes,
         infoWindow: InfoWindow(
           title: '📋 ${scorecard.courseName}',
           snippet: scorecard.scoreDifferential.isNotEmpty
@@ -1839,6 +2279,12 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
         isSelected: false,
       );
 
+      // Get bytes for Apple Maps
+      final iconBytes = await FoCoMapCustomMarkers.getRoundLogMarkerBytes(
+        round: roundLog,
+        isSelected: false,
+      );
+
       return MapMarker(
         markerId: 'activity_${activity.reference.id}',
         position: LatLng(
@@ -1846,6 +2292,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
           roundLog.coordinates!.longitude,
         ),
         icon: icon,
+        iconBytes: iconBytes,
         infoWindow: InfoWindow(
           title: activity.title.isNotEmpty
               ? '📊 ${activity.title}'
@@ -1882,11 +2329,20 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
           isSelected: false,
         );
 
+        // Get bytes for Apple Maps
+        final clusterIconBytes =
+            await FoCoMapCustomMarkers.getClusterMarkerBytes(
+          count: cluster.markers.length,
+          primaryType: MarkerType.cluster,
+          isSelected: false,
+        );
+
         clusteredMarkers.add(MapMarker(
           markerId:
               'cluster_${cluster.center.latitude}_${cluster.center.longitude}',
           position: cluster.center,
           icon: clusterIcon,
+          iconBytes: clusterIconBytes,
           infoWindow: InfoWindow(
             title: '${cluster.markers.length} Golf Records',
             snippet: 'Tap to zoom in and see individual markers',
@@ -3152,11 +3608,46 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
                       initialLocation: currentLocation,
                       initialZoom: _currentZoom,
                       mapType: currentMapType,
+                      enable3DView: _is3DViewEnabled,
+                      tilt: _currentTilt,
+                      bearing: _currentBearing,
+                      polylines: _polylines,
+                      enablePolylineDrawing: _isDrawingPolyline,
+                      onPolylineDrawn: (points) {
+                        if (points.length >= 2) {
+                          setState(() {
+                            _polylines.add(MapPolyline(
+                              polylineId:
+                                  'polyline_${DateTime.now().millisecondsSinceEpoch}',
+                              points: points,
+                              color: Colors.blue,
+                              width: 5.0,
+                            ));
+                            _isDrawingPolyline = false;
+                          });
+                        }
+                      },
+                      onTiltChanged: (tilt) {
+                        setState(() {
+                          _currentTilt = tilt;
+                        });
+                      },
+                      onBearingChanged: (bearing) {
+                        setState(() {
+                          _currentBearing = bearing;
+                        });
+                      },
                       onMarkerTap: (marker) {
                         _handleMarkerTap(marker);
                       },
                       onMapTap: (position) {
-                        // Handle map tap if needed
+                        if (_isDrawingPolyline) {
+                          // Add point to polyline
+                          final state = _platformMapKey.currentState;
+                          if (state != null) {
+                            // The polyline drawing is handled by PlatformMapWidget
+                          }
+                        }
                       },
                       onZoomChanged: (zoom) {
                         // Update zoom state when user zooms
@@ -3225,7 +3716,7 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
                                     child: Text(
                                       'FoCoMap',
                                       style: FlutterFlowTheme.of(context)
-                                          .headlineSmall
+                                          .titleMedium
                                           .override(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
@@ -3367,205 +3858,24 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
                         ),
                       ),
                     ),
-                  ),
-                ),
-              ),
-
-            // Zoom to Fit All Markers Button (Bottom Right - Above Location Button)
-            if (markers.isNotEmpty)
-              Positioned(
-                bottom: 300,
-                right: 20,
-                child: SafeArea(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.blue.withValues(alpha: 0.9),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue.withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () {
-                          HapticFeedback.mediumImpact();
-                          _zoomToFitAllMarkers();
-                        },
-                        borderRadius: BorderRadius.circular(50),
-                        child: Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.blue.withValues(alpha: 0.9),
-                          ),
-                          child: const Icon(
-                            Icons.fit_screen,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-            // Floating Location Toggle Button (Bottom Right - Above Microphone) - Green Circle
-            Positioned(
-              bottom: 240,
-              right: 20,
-              child: SafeArea(
-                child: Container(
-                  key: _locationPanelKey,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: FlutterFlowTheme.of(context).tertiary, // Green
-                    boxShadow: [
-                      BoxShadow(
-                        color: FlutterFlowTheme.of(context)
-                            .tertiary
-                            .withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () async {
-                        // Refocus map to current location
-                        debugPrint(
-                            '🎯 FoCoMap: Location button tapped - refocusing to current location');
-                        try {
-                          // Get current location
-                          final position = _locationService.currentLocation;
-                          if (position != null) {
-                            setState(() {
-                              currentLocation = position;
-                              _currentZoom = 18.0; // Close zoom for focus mode
-                            });
-
-                            // Animate map to location if controllers are available
-                            if (!_useAdvancedView) {
-                              await PlatformMapWidget.animateToLocationFromKey(
-                                _platformMapKey,
-                                position,
-                                zoom: 18.0,
-                              );
-                            }
-
-                            debugPrint(
-                                '✅ FoCoMap: Map refocused to current location');
-                          } else {
-                            // Try to get fresh location
-                            await _getCurrentLocation();
-                            if (currentLocation != null) {
-                              setState(() {
-                                _currentZoom = 18.0;
-                              });
-                              if (!_useAdvancedView) {
-                                await PlatformMapWidget
-                                    .animateToLocationFromKey(
-                                  _platformMapKey,
-                                  currentLocation!,
-                                  zoom: 18.0,
-                                );
-                              }
-                            }
-                          }
-                        } catch (e) {
-                          debugPrint('❌ FoCoMap: Error refocusing map: $e');
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(50),
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _model.isLiveMode
-                              ? FlutterFlowTheme.of(context).tertiary
-                              : FlutterFlowTheme.of(context)
-                                  .tertiary
-                                  .withValues(alpha: 0.7),
-                        ),
-                        child: Icon(
-                          _model.isLiveMode
-                              ? Icons.my_location
-                              : Icons.location_off,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
                 ),
               ),
             ),
 
-            // Glass Live Score Panel (Top Right)
-            if (_model.roundLogs.isNotEmpty)
+            // Glass Live Score Panel (Top Right) - Shows details for selected marker
+            if (_model.selectedMarkerId?.isNotEmpty ?? false)
               Positioned(
                 top: 100,
                 right: 16,
                 child: SafeArea(
                   child: Container(
                     key: _scorePanelKey,
-                    child: GlassDesignSystem.glass3DCard(
-                      width: 160,
-                      padding: const EdgeInsets.all(16),
-                      tintColor: Colors.white,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Mental Score',
-                            style: FlutterFlowTheme.of(context)
-                                .bodySmall
-                                .override(
-                                  color: Colors.white.withValues(alpha: 0.7),
-                                  height: 1.0,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '${_model.roundLogs.last.mindsetFocus + _model.roundLogs.last.mindsetConfidence + _model.roundLogs.last.mindsetControl}',
-                            style: FlutterFlowTheme.of(context)
-                                .headlineLarge
-                                .override(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  height: 1.0,
-                                ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _model.roundLogs.last.courseName,
-                            style: FlutterFlowTheme.of(context)
-                                .bodySmall
-                                .override(
-                                  color: Colors.white.withValues(alpha: 0.8),
-                                  height: 1.0,
-                                ),
-                            textAlign: TextAlign.center,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
+                    child: _buildMarkerDetailGlassCard(),
                   ),
                 ),
               ),
 
-            // Glass Layer Selection (Bottom) - Moved lower
+            // Enhanced Glass Layer Selection (Bottom) - Each with unique style and options
             Positioned(
               bottom: 20,
               left: 16,
@@ -3580,18 +3890,36 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
                   child: Row(
                     children: [
                       Expanded(
-                        child: _buildGlassLayerButton('MindMap', 'MindMap',
-                            Icons.psychology, _layerMindMapKey),
+                        child: _buildEnhancedLayerButton(
+                          'MindMap',
+                          'MindMap',
+                          Icons.psychology,
+                          _layerMindMapKey,
+                          Colors.purple,
+                          ['Show Mental Scores', 'Filter by Mindset', 'View Insights'],
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _buildGlassLayerButton('ShotMap', 'ShotMap',
-                            Icons.golf_course, _layerShotMapKey),
+                        child: _buildEnhancedLayerButton(
+                          'ShotMap',
+                          'ShotMap',
+                          Icons.golf_course,
+                          _layerShotMapKey,
+                          Colors.blue,
+                          ['Show Shot Outcomes', 'Filter by Club', 'View Trajectories'],
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _buildGlassLayerButton(
-                            'SyncMap', 'SyncMap', Icons.sync, _layerSyncMapKey),
+                        child: _buildEnhancedLayerButton(
+                          'SyncMap',
+                          'SyncMap',
+                          Icons.sync,
+                          _layerSyncMapKey,
+                          Colors.green,
+                          ['Combined View', 'Sync Timeline', 'View Patterns'],
+                        ),
                       ),
                     ],
                   ),
@@ -3599,117 +3927,21 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
               ),
             ),
 
-            // Floating Microphone Toggle Button (Bottom Right - Above Add Button) - Orange Circle
+            // Unified Floating Menu (Bottom Right) - All buttons in one expandable menu
             Positioned(
-              bottom: 190,
+              bottom: 100,
               right: 20,
               child: SafeArea(
-                child: StreamBuilder<bool>(
-                  stream: _voiceService.listeningStream,
-                  builder: (context, listeningSnapshot) {
-                    final isListening = listeningSnapshot.data ?? false;
-
-                    return AnimatedBuilder(
-                      animation: _pulseAnimation,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: isListening ? _pulseAnimation.value : 1.0,
-                          child: Container(
-                            key: _voiceButtonKey,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: FlutterFlowTheme.of(context)
-                                  .primary, // Orange
-                              boxShadow: [
-                                BoxShadow(
-                                  color: FlutterFlowTheme.of(context)
-                                      .primary
-                                      .withValues(alpha: 0.4),
-                                  blurRadius: 12,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: _handleVoiceButtonTap,
-                                borderRadius: BorderRadius.circular(50),
-                                child: Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: isListening
-                                        ? Colors.red
-                                        : FlutterFlowTheme.of(context).primary,
-                                  ),
-                                  child: Icon(
-                                    isListening ? Icons.stop : Icons.mic,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
+                child: _buildUnifiedFloatingMenu(),
               ),
             ),
 
-            // Add Round Button (Bottom Right - Next to Microphone) - Shows log round sheet
-            Positioned(
-              bottom: 120,
-              right: 20,
-              child: SafeArea(
-                child: Container(
-                  key: _addDataKey,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: FlutterFlowTheme.of(context).primary,
-                    boxShadow: [
-                      BoxShadow(
-                        color: FlutterFlowTheme.of(context)
-                            .primary
-                            .withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _showLogRoundSheet,
-                      borderRadius: BorderRadius.circular(50),
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: FlutterFlowTheme.of(context).primary,
-                        ),
-                        child: const Icon(
-                          Icons.add,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
 
             // Enhanced Live Mode Indicator with Animation - Near Header (Top Right)
             if (_model.isLiveMode)
               Positioned(
                 top: 100,
-                right: 180,
+                right: 80,
                 child: SafeArea(
                   child: AnimatedBuilder(
                     animation: _pulseAnimation,
@@ -3821,70 +4053,862 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
     HapticFeedback.mediumImpact();
 
     try {
-      if (_voiceService.isListening) {
-        await _voiceService.stopListening();
+      // Use Gemini Live for voice input
+      if (_geminiLiveService.isListening) {
+        // Stop listening
+        await _geminiLiveService.stopListening();
+        debugPrint('🎤 FoCoMap: Stopped Gemini Live listening');
       } else {
-        // Set context based on live mode
-        final context = _model.isLiveMode
-            ? voice.VoiceContext.activeRound
-            : voice.VoiceContext.offCourse;
-
-        // Set active round if in live mode
-        if (_model.isLiveMode && _model.roundLogs.isNotEmpty) {
-          _voiceService.setActiveRound(_model.roundLogs.first.roundId);
+        // Connect if not connected
+        if (!_geminiLiveService.isConnected) {
+          debugPrint('🎤 FoCoMap: Connecting to Gemini Live...');
+          await _geminiLiveService.connect();
         }
 
-        await _voiceService.startListening(context: context);
+        // Start listening for audio input
+        await _geminiLiveService.startListening();
+        debugPrint('🎤 FoCoMap: Started Gemini Live listening');
+
+        // Show feedback
+        _showLiveUpdateNotification(
+          'Listening... Speak about your golf experience',
+          Colors.green,
+        );
       }
     } catch (e) {
+      debugPrint('❌ FoCoMap: Gemini Live error: $e');
       _showLiveUpdateNotification('Voice error: $e', Colors.red);
     }
   }
 
-  Widget _buildGlassLayerButton(
-      String layerKey, String label, IconData icon, GlobalKey key) {
+  /// Build glass card showing details for selected marker
+  Widget _buildMarkerDetailGlassCard() {
+    final markerId = _model.selectedMarkerId;
+
+    if (markerId == null || markerId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Find the selected round or shot
+    RoundLogsRecord? selectedRound;
+    ShotLogsRecord? selectedShot;
+
+    if (markerId.startsWith('round_')) {
+      final roundId = markerId.substring(6);
+      selectedRound = _model.roundLogs
+          .where((r) => r.roundId == roundId)
+          .where((r) => !r.courseName.toLowerCase().contains('sample'))
+          .firstOrNull;
+    } else if (markerId.startsWith('shot_')) {
+      final shotId = markerId.substring(5);
+      selectedShot =
+          _model.shotLogs.where((s) => s.shotId == shotId).firstOrNull;
+    }
+
+    if (selectedRound == null && selectedShot == null) {
+      return const SizedBox.shrink();
+    }
+
+    if (selectedRound != null) {
+      final mentalScore = selectedRound.mindsetFocus +
+          selectedRound.mindsetConfidence +
+          selectedRound.mindsetControl;
+
+      return GlassDesignSystem.glass3DCard(
+        width: 160,
+        padding: const EdgeInsets.all(16),
+        tintColor: Colors.white,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Mental Score',
+              style: FlutterFlowTheme.of(context).bodySmall.override(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    height: 1.0,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$mentalScore',
+              style: FlutterFlowTheme.of(context).headlineLarge.override(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    height: 1.0,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              selectedRound.courseName,
+              style: FlutterFlowTheme.of(context).bodySmall.override(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    height: 1.0,
+                  ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
+            if (selectedRound.bestCue.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  selectedRound.bestCue,
+                  style: FlutterFlowTheme.of(context).bodySmall.override(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 11,
+                        height: 1.0,
+                      ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    } else if (selectedShot != null) {
+      return GlassDesignSystem.glass3DCard(
+        width: 160,
+        padding: const EdgeInsets.all(16),
+        tintColor: Colors.white,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Shot Details',
+              style: FlutterFlowTheme.of(context).bodySmall.override(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    height: 1.0,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              selectedShot.clubIcon.isNotEmpty ? selectedShot.clubIcon : '🏌️',
+              style: const TextStyle(fontSize: 32),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${selectedShot.clubUsed}',
+              style: FlutterFlowTheme.of(context).headlineSmall.override(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    height: 1.0,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Hole ${selectedShot.holeNumber}',
+              style: FlutterFlowTheme.of(context).bodySmall.override(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    height: 1.0,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                selectedShot.shotOutcome,
+                style: FlutterFlowTheme.of(context).bodySmall.override(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 11,
+                      height: 1.0,
+                    ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  /// Build enhanced layer button with unique style and tooltip options
+  Widget _buildEnhancedLayerButton(
+    String layerKey,
+    String label,
+    IconData icon,
+    GlobalKey key,
+    Color accentColor,
+    List<String> options,
+  ) {
     final isSelected = _model.selectedLayer == layerKey;
+    
     return GestureDetector(
       key: key,
       onTap: () {
+        setState(() {
         _model.selectLayer(layerKey);
+        });
         _updateMarkers();
+        HapticFeedback.lightImpact();
       },
+      onLongPress: () {
+        // Long press to show tooltip with options
+        _showLayerTooltip(layerKey, label, accentColor, options);
+        HapticFeedback.mediumImpact();
+      },
+      child: Tooltip(
+        message: 'Long press for options',
+        preferBelow: false,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
+            gradient: isSelected
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      accentColor.withValues(alpha: 0.4),
+                      accentColor.withValues(alpha: 0.2),
+                    ],
+                  )
+                : null,
           color: isSelected
-              ? Colors.white.withValues(alpha: 0.3)
+                ? null
               : Colors.white.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? Colors.white.withValues(alpha: 0.5)
+                  ? accentColor.withValues(alpha: 0.6)
                 : Colors.white.withValues(alpha: 0.2),
-            width: 1,
-          ),
+              width: isSelected ? 2 : 1,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: accentColor.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : null,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              color: Colors.white,
-              size: 20,
+                color: isSelected ? accentColor : Colors.white,
+                size: 24,
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: FlutterFlowTheme.of(context).bodySmall.override(
-                    color: Colors.white,
+                      color: isSelected ? accentColor : Colors.white,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                     height: 1.0,
                   ),
             ),
           ],
+          ),
         ),
       ),
     );
+  }
+
+  /// Show tooltip with layer options
+  void _showLayerTooltip(
+    String layerKey,
+    String label,
+    Color accentColor,
+    List<String> options,
+  ) {
+    // Hide existing tooltip
+    _hideLayerTooltip();
+
+    // Find the button position
+    RenderBox? targetBox;
+    
+    if (layerKey == 'MindMap') {
+      targetBox = _layerMindMapKey.currentContext?.findRenderObject() as RenderBox?;
+    } else if (layerKey == 'ShotMap') {
+      targetBox = _layerShotMapKey.currentContext?.findRenderObject() as RenderBox?;
+    } else if (layerKey == 'SyncMap') {
+      targetBox = _layerSyncMapKey.currentContext?.findRenderObject() as RenderBox?;
+    }
+
+    if (targetBox == null) return;
+
+    final offset = targetBox.localToGlobal(Offset.zero);
+    final size = targetBox.size;
+
+    // Create tooltip overlay
+    _layerTooltipOverlay = OverlayEntry(
+      builder: (context) => Positioned(
+        left: offset.dx,
+        top: offset.dy - (options.length * 40.0 + 60),
+        child: Material(
+          color: Colors.transparent,
+          child: GestureDetector(
+            onTap: _hideLayerTooltip,
+            child: GlassDesignSystem.glassBackground(
+              borderRadius: BorderRadius.circular(16),
+              tintColor: accentColor,
+              opacity: 0.2,
+              blur: 20,
+              child: Container(
+                width: size.width + 40,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: accentColor.withValues(alpha: 0.5),
+                    width: 1.5,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, color: accentColor, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$label Options',
+                          style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                height: 1.0,
+                              ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white70, size: 18),
+                          onPressed: _hideLayerTooltip,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ...options.map((option) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle_outline,
+                              size: 16,
+                              color: accentColor,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                option,
+                                style: FlutterFlowTheme.of(context).bodySmall.override(
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                      fontSize: 12,
+                                      height: 1.2,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Insert overlay
+    Overlay.of(context).insert(_layerTooltipOverlay!);
+
+    // Auto-hide after 5 seconds
+    Future.delayed(const Duration(seconds: 5), () {
+      _hideLayerTooltip();
+    });
+  }
+
+  /// Hide layer tooltip
+  void _hideLayerTooltip() {
+    if (_layerTooltipOverlay != null) {
+      _layerTooltipOverlay!.remove();
+      _layerTooltipOverlay = null;
+    }
+  }
+
+  /// Analyze user behavior patterns for personalized coaching
+  String _analyzeUserBehavior(
+    List<RoundLogsRecord> recentRounds,
+    List<ShotLogsRecord> recentShots,
+  ) {
+    if (recentRounds.isEmpty && recentShots.isEmpty) {
+      return '''**Behavior Pattern**: New player or limited data
+**Insights**: 
+- This appears to be early in their FoCoCo journey
+- Focus on foundational mental game principles
+- Be encouraging and educational
+- Build trust through helpful, clear guidance''';
+    }
+
+    // Analyze focus patterns
+    final avgFocus = recentRounds.isNotEmpty
+        ? recentRounds.map((r) => r.mindsetFocus).reduce((a, b) => a + b) /
+            recentRounds.length
+        : 0.0;
+    final focusTrend = recentRounds.length >= 2
+        ? (recentRounds.last.mindsetFocus - recentRounds.first.mindsetFocus)
+        : 0;
+
+    // Analyze confidence patterns
+    final avgConfidence = recentRounds.isNotEmpty
+        ? recentRounds.map((r) => r.mindsetConfidence).reduce((a, b) => a + b) /
+            recentRounds.length
+        : 0.0;
+    final confidenceTrend = recentRounds.length >= 2
+        ? (recentRounds.last.mindsetConfidence -
+            recentRounds.first.mindsetConfidence)
+        : 0;
+
+    // Analyze control patterns
+    final avgControl = recentRounds.isNotEmpty
+        ? recentRounds.map((r) => r.mindsetControl).reduce((a, b) => a + b) /
+            recentRounds.length
+        : 0.0;
+
+    // Analyze recovery patterns
+    final recoveryHolesCount = recentRounds
+        .map((r) => r.recoveryHoles.length)
+        .reduce((a, b) => a + b);
+    final hasRecoveryPattern = recoveryHolesCount > 0;
+
+    // Analyze shot confidence
+    final avgShotConfidence = recentShots.isNotEmpty
+        ? recentShots
+                .map((s) => s.confidenceLevel)
+                .reduce((a, b) => a + b) /
+            recentShots.length
+        : 0.0;
+
+    // Build behavior analysis
+    final StringBuffer analysis = StringBuffer();
+    analysis.writeln('**Behavior Pattern Analysis:**');
+    analysis.writeln('');
+
+    // Focus analysis
+    if (avgFocus < 6) {
+      analysis.writeln(
+          '• **Focus Challenge**: Low average focus (${avgFocus.toStringAsFixed(1)}/10) - Player struggles with maintaining concentration');
+      if (focusTrend < 0) {
+        analysis.writeln('  → Focus is DECLINING - Need immediate intervention');
+      } else if (focusTrend > 0) {
+        analysis.writeln('  → Focus is IMPROVING - Reinforce what\'s working');
+      }
+    } else if (avgFocus >= 8) {
+      analysis.writeln(
+          '• **Focus Strength**: High average focus (${avgFocus.toStringAsFixed(1)}/10) - Player maintains good concentration');
+    }
+
+    // Confidence analysis
+    if (avgConfidence < 6) {
+      analysis.writeln(
+          '• **Confidence Challenge**: Low average confidence (${avgConfidence.toStringAsFixed(1)}/10) - Player doubts their abilities');
+      if (confidenceTrend < 0) {
+        analysis.writeln('  → Confidence is DECLINING - Build them up immediately');
+      } else if (confidenceTrend > 0) {
+        analysis.writeln('  → Confidence is IMPROVING - Celebrate progress');
+      }
+    } else if (avgConfidence >= 8) {
+      analysis.writeln(
+          '• **Confidence Strength**: High average confidence (${avgConfidence.toStringAsFixed(1)}/10) - Player trusts their game');
+    }
+
+    // Control analysis
+    if (avgControl < 6) {
+      analysis.writeln(
+          '• **Control Challenge**: Low average control (${avgControl.toStringAsFixed(1)}/10) - Player struggles with emotional regulation');
+    } else if (avgControl >= 8) {
+      analysis.writeln(
+          '• **Control Strength**: High average control (${avgControl.toStringAsFixed(1)}/10) - Player manages emotions well');
+    }
+
+    // Recovery pattern
+    if (hasRecoveryPattern) {
+      analysis.writeln(
+          '• **Recovery Pattern**: Player shows ability to bounce back after difficult holes (${recoveryHolesCount} recovery holes recorded)');
+      analysis.writeln('  → Use this strength - remind them of past recoveries');
+    } else {
+      analysis.writeln(
+          '• **Recovery Opportunity**: Limited recovery data - Player may struggle to bounce back');
+      analysis.writeln('  → Focus on teaching recovery techniques');
+    }
+
+    // Shot confidence
+    if (avgShotConfidence < 6 && recentShots.isNotEmpty) {
+      analysis.writeln(
+          '• **Shot Confidence**: Low shot confidence (${avgShotConfidence.toStringAsFixed(1)}/10) - Player lacks trust in their shots');
+    } else if (avgShotConfidence >= 8 && recentShots.isNotEmpty) {
+      analysis.writeln(
+          '• **Shot Confidence**: High shot confidence (${avgShotConfidence.toStringAsFixed(1)}/10) - Player trusts their swing');
+    }
+
+    // Overall mental game state
+    final overallMental = (avgFocus + avgConfidence + avgControl) / 3;
+    analysis.writeln('');
+    analysis.writeln('**Overall Mental Game State**: ${overallMental.toStringAsFixed(1)}/10');
+    if (overallMental < 6) {
+      analysis.writeln('→ Player needs significant mental game support');
+      analysis.writeln('→ Focus on ONE area at a time (start with weakest)');
+      analysis.writeln('→ Be patient and encouraging');
+    } else if (overallMental >= 7.5) {
+      analysis.writeln('→ Player has strong mental game foundation');
+      analysis.writeln('→ Focus on refinement and advanced techniques');
+      analysis.writeln('→ Help them maintain consistency');
+    } else {
+      analysis.writeln('→ Player is developing mental game skills');
+      analysis.writeln('→ Build on strengths, address weaknesses');
+      analysis.writeln('→ Provide balanced guidance');
+    }
+
+    return analysis.toString();
+  }
+
+  /// Build unified floating menu that contains all floating buttons
+  Widget _buildUnifiedFloatingMenu() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // Menu Items (shown when expanded)
+        if (_isFloatingMenuExpanded) ...[
+          // Zoom to Fit All Markers
+          if (markers.isNotEmpty)
+            _buildFloatingMenuItem(
+              icon: Icons.fit_screen_rounded,
+              label: 'Fit All',
+              color: Colors.blue,
+              onTap: () {
+                _zoomToFitAllMarkers();
+                _toggleFloatingMenu();
+              },
+            ),
+          
+          // Location Toggle
+          _buildFloatingMenuItem(
+            icon: _model.isLiveMode
+                ? Icons.my_location
+                : Icons.location_searching,
+            label: 'My Location',
+            color: FlutterFlowTheme.of(context).tertiary,
+            onTap: () async {
+              await _refocusToCurrentLocation();
+              _toggleFloatingMenu();
+            },
+          ),
+          
+          // Microphone/Voice (Gemini Live)
+          StreamBuilder<GeminiLiveState>(
+            stream: _geminiLiveService.stateStream,
+            initialData: _geminiLiveState,
+            builder: (context, snapshot) {
+              final state = snapshot.data ?? GeminiLiveState.disconnected;
+              final isActive = state == GeminiLiveState.listening ||
+                  state == GeminiLiveState.thinking ||
+                  state == GeminiLiveState.speaking;
+              
+              Color voiceColor;
+              IconData voiceIcon;
+              String voiceLabel;
+              
+              if (state == GeminiLiveState.listening) {
+                voiceColor = Colors.red;
+                voiceIcon = Icons.mic;
+                voiceLabel = 'Stop';
+              } else if (state == GeminiLiveState.thinking) {
+                voiceColor = Colors.orange;
+                voiceIcon = Icons.psychology;
+                voiceLabel = 'Thinking...';
+              } else if (state == GeminiLiveState.speaking) {
+                voiceColor = Colors.blue;
+                voiceIcon = Icons.volume_up;
+                voiceLabel = 'Speaking';
+              } else {
+                voiceColor = FlutterFlowTheme.of(context).primary;
+                voiceIcon = Icons.mic;
+                voiceLabel = 'Voice Coach';
+              }
+              
+              return _buildFloatingMenuItem(
+                icon: voiceIcon,
+                label: voiceLabel,
+                color: voiceColor,
+                isActive: isActive,
+                onTap: () {
+                  _handleVoiceButtonTap();
+                  if (!isActive) _toggleFloatingMenu();
+                },
+              );
+            },
+          ),
+          
+          // Add Round Button
+          _buildFloatingMenuItem(
+            icon: Icons.add_rounded,
+            label: 'Log Round',
+            color: FlutterFlowTheme.of(context).primary,
+            onTap: () {
+              _showLogRoundSheet();
+              _toggleFloatingMenu();
+            },
+          ),
+          
+          // 3D View Toggle
+          _buildFloatingMenuItem(
+            icon: _is3DViewEnabled
+                ? Icons.view_in_ar
+                : Icons.layers_outlined,
+            label: _is3DViewEnabled ? '2D View' : '3D View',
+            color: Colors.purple,
+            isActive: _is3DViewEnabled,
+            onTap: () {
+              setState(() {
+                _is3DViewEnabled = !_is3DViewEnabled;
+                if (_is3DViewEnabled) {
+                  _currentTilt = 45.0;
+                } else {
+                  _currentTilt = 0.0;
+                }
+              });
+              HapticFeedback.mediumImpact();
+              _toggleFloatingMenu();
+            },
+          ),
+          
+          // Polyline Drawing Toggle
+          _buildFloatingMenuItem(
+            icon: _isDrawingPolyline ? Icons.edit_road : Icons.route,
+            label: _isDrawingPolyline ? 'Stop Drawing' : 'Draw Path',
+            color: Colors.blue,
+            isActive: _isDrawingPolyline,
+            onTap: () {
+              setState(() {
+                _isDrawingPolyline = !_isDrawingPolyline;
+              });
+              HapticFeedback.mediumImpact();
+              _toggleFloatingMenu();
+            },
+          ),
+        ],
+        
+        // Main Menu Toggle Button
+        _buildEnhancedFAB(
+          size: 60,
+          primaryColor: _isFloatingMenuExpanded
+              ? Colors.red
+              : FlutterFlowTheme.of(context).primary,
+          isActive: _isFloatingMenuExpanded,
+          onTap: _toggleFloatingMenu,
+          child: AnimatedRotation(
+            turns: _isFloatingMenuExpanded ? 0.125 : 0,
+            duration: const Duration(milliseconds: 200),
+            child: Icon(
+              _isFloatingMenuExpanded ? Icons.close : Icons.menu,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Build individual floating menu item
+  Widget _buildFloatingMenuItem({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+    bool isActive = false,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Label
+          Container(
+            margin: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: Text(
+              label,
+              style: FlutterFlowTheme.of(context).bodySmall.override(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    height: 1.0,
+                  ),
+            ),
+          ),
+          // Icon Button
+          _buildEnhancedFAB(
+            size: 52,
+            primaryColor: color,
+            isActive: isActive,
+            onTap: onTap,
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Toggle floating menu
+  void _toggleFloatingMenu() {
+    setState(() {
+      _isFloatingMenuExpanded = !_isFloatingMenuExpanded;
+    });
+    HapticFeedback.mediumImpact();
+  }
+
+  /// Refocus map to current location (extracted from inline code)
+  Future<void> _refocusToCurrentLocation() async {
+    debugPrint('🎯 FoCoMap: Location button tapped - refocusing to current device location');
+    try {
+      // Check location service enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint('⚠️ FoCoMap: Location services disabled');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please enable location services in your device settings'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Check and request permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location permission denied. Please grant permission in settings'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location permission permanently denied. Please enable in app settings'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Get fresh device location with timeout handling
+      debugPrint('🎯 FoCoMap: Getting fresh device location...');
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 8),
+          ),
+        ).timeout(const Duration(seconds: 8));
+      } catch (timeoutError) {
+        debugPrint('⚠️ FoCoMap: Location timeout: $timeoutError');
+        position = null;
+      }
+
+      LatLng? deviceLocation;
+      if (position != null) {
+        deviceLocation = LatLng(position.latitude, position.longitude);
+        await _saveLocationToCache(deviceLocation);
+        _cachedLocation = deviceLocation;
+      } else {
+        deviceLocation = _cachedLocation ?? currentLocation;
+        if (deviceLocation == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location unavailable. Using cached location or last known position.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      setState(() {
+        currentLocation = deviceLocation;
+        _currentZoom = 18.0; // Close zoom for focus mode
+      });
+
+      // Animate map to location
+      if (!_useAdvancedView && deviceLocation != null) {
+        await PlatformMapWidget.animateToLocationFromKey(
+          _platformMapKey,
+          deviceLocation,
+          zoom: 18.0,
+        );
+      }
+
+      if (deviceLocation != null) {
+        debugPrint('✅ FoCoMap: Map refocused to device location: ${deviceLocation.latitude}, ${deviceLocation.longitude}');
+      }
+    } catch (e) {
+      debugPrint('❌ FoCoMap: Error refocusing map: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error getting location: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showMapTypeSelector() {
@@ -3974,13 +4998,16 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => StreamBuilder<bool>(
-        stream: _voiceService.listeningStream,
-        builder: (context, listeningSnapshot) {
-          final isListening = listeningSnapshot.data ?? false;
-          
+      builder: (context) => StreamBuilder<GeminiLiveState>(
+        stream: _geminiLiveService.stateStream,
+        initialData: _geminiLiveState,
+        builder: (context, stateSnapshot) {
+          final state =
+              stateSnapshot.data ?? GeminiLiveState.disconnected;
+          final isListening = state == GeminiLiveState.listening;
+
           return StreamBuilder<String>(
-            stream: _voiceService.transcriptionStream,
+            stream: _geminiLiveService.transcriptStream,
             builder: (context, transcriptionSnapshot) {
               final transcription = transcriptionSnapshot.data ?? '';
               
@@ -4056,9 +5083,12 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
                             child: FFButtonWidget(
                               onPressed: () async {
                                 if (isListening) {
-                                  await _voiceService.stopListening();
+                                  await _geminiLiveService.stopListening();
                                 } else {
-                                  await _voiceService.startListening();
+                                  if (!_geminiLiveService.isConnected) {
+                                    await _geminiLiveService.connect();
+                                  }
+                                  await _geminiLiveService.startListening();
                                 }
                               },
                               text: isListening ? 'Stop Recording' : 'Start Recording',
@@ -4111,4 +5141,74 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
     );
   }
   */
+
+  /// Build an enhanced glassmorphism floating action button
+  Widget _buildEnhancedFAB({
+    required Widget child,
+    required VoidCallback onTap,
+    required Color primaryColor,
+    double size = 56,
+    bool isActive = false,
+    Key? key,
+  }) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size / 2),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          key: key,
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isActive
+                  ? [
+                      primaryColor,
+                      primaryColor.withValues(alpha: 0.85),
+                    ]
+                  : [
+                      primaryColor.withValues(alpha: 0.9),
+                      primaryColor.withValues(alpha: 0.7),
+                    ],
+            ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.35),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withValues(alpha: isActive ? 0.6 : 0.4),
+                blurRadius: isActive ? 24 : 16,
+                spreadRadius: isActive ? 4 : 2,
+                offset: const Offset(0, 4),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 8,
+                spreadRadius: 0,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                onTap();
+              },
+              borderRadius: BorderRadius.circular(size / 2),
+              splashColor: Colors.white.withValues(alpha: 0.2),
+              highlightColor: Colors.white.withValues(alpha: 0.1),
+              child: Center(child: child),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

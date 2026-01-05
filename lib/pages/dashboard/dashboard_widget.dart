@@ -1,9 +1,13 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/schema/mindcoach_sessions_record.dart';
+import '/backend/schema/training_plans_record.dart';
+import '/backend/schema/ai_insights_record.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/glass_components.dart';
-import '/ai_integration/widgets/enhanced_navbar_widget.dart';
+import '/ai_integration/widgets/navbar_widget.dart';
 import '/widgets/floating_voice_button.dart';
 import 'dashboard_model.dart';
 export 'dashboard_model.dart';
@@ -159,6 +163,7 @@ class _DashboardWidgetState extends State<DashboardWidget>
                 },
               )
             : null,
+        endDrawer: loggedIn ? _buildNotificationsDrawer(theme) : null,
         body: Stack(
           children: [
             // Main content
@@ -306,21 +311,67 @@ class _DashboardWidgetState extends State<DashboardWidget>
               const SizedBox(width: 16),
 
               // Notification button
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: theme.glassBackground.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: theme.glassBorder.withValues(alpha: 0.2),
-                    width: 1,
-                  ),
-                ),
-                child: Icon(
-                  Icons.notifications_outlined,
-                  color: theme.primaryText,
-                  size: 24,
+              GestureDetector(
+                onTap: () {
+                  scaffoldKey.currentState?.openEndDrawer();
+                },
+                child: StreamBuilder<int>(
+                  stream: NotificationsRecord.collection
+                      .where('userId', isEqualTo: currentUserUid)
+                      .where('isRead', isEqualTo: false)
+                      .snapshots()
+                      .map((snapshot) => snapshot.docs.length),
+                  builder: (context, snapshot) {
+                    final unreadCount = snapshot.data ?? 0;
+                    return Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: theme.glassBackground.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: theme.glassBorder.withValues(alpha: 0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Stack(
+                        children: [
+                          Center(
+                            child: Icon(
+                              Icons.notifications_outlined,
+                              color: theme.primaryText,
+                              size: 24,
+                            ),
+                          ),
+                          if (unreadCount > 0)
+                            Positioned(
+                              right: 6,
+                              top: 6,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: theme.error,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 16,
+                                  minHeight: 16,
+                                ),
+                                child: Text(
+                                  unreadCount > 9 ? '9+' : '$unreadCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -807,43 +858,52 @@ class _DashboardWidgetState extends State<DashboardWidget>
   }
 
   Widget _buildActivitiesSection(FlutterFlowTheme theme) {
-    return StreamBuilder<List<ActivityRecord>>(
-      stream: FirebaseFirestore.instance
-          .collection('activities')
+    return StreamBuilder<List<MindcoachSessionsRecord>>(
+      stream: MindcoachSessionsRecord.collection
           .where('userId', isEqualTo: currentUserUid)
-          .orderBy('activityDate', descending: true)
+          .orderBy('timestamp', descending: true)
           .limit(3)
           .snapshots()
           .map((snapshot) => snapshot.docs
-              .map((doc) => ActivityRecord.fromSnapshot(doc))
+              .map((doc) => MindcoachSessionsRecord.fromSnapshot(doc))
               .toList()),
       builder: (context, snapshot) {
-        final activities = snapshot.data ?? [];
+        final sessions = snapshot.data ?? [];
 
         return GlassDashboardCard(
           title: 'Recent Sessions',
           subtitle: 'The routines that shape your results',
           children: [
             Column(
-              children: activities.isEmpty
+              children: sessions.isEmpty
                   ? [
-                      const SizedBox(height: 40),
-                      Icon(
-                        Icons.psychology_outlined,
-                        size: 48,
-                        color: theme.secondaryText.withValues(alpha: 0.5),
-                      ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                       Text(
-                        'No activities yet',
+                        'No sessions completed yet',
                         style: theme.bodyMedium.copyWith(
                           color: theme.secondaryText,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 16),
+                      FFButtonWidget(
+                        onPressed: () => context.goNamed('mind_coach'),
+                        text: 'Start Your First Session',
+                        options: FFButtonOptions(
+                          height: 40,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          color: theme.primary,
+                          textStyle: theme.bodyMedium.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                     ]
-                  : activities
-                      .map((activity) => _buildActivityItem(theme, activity))
+                  : sessions
+                      .map((session) => _buildMindcoachSessionItem(theme, session))
                       .toList(),
             )
           ],
@@ -853,16 +913,35 @@ class _DashboardWidgetState extends State<DashboardWidget>
   }
 
   Widget _buildInsightsSection(FlutterFlowTheme theme) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('ai_insights')
+    // Get today's date at start of day
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day);
+    final todayEnd = todayStart.add(const Duration(days: 1));
+
+    return StreamBuilder<List<AiInsightsRecord>>(
+      stream: AiInsightsRecord.collection
           .where('userId', isEqualTo: currentUserUid)
-          .orderBy('generatedTime', descending: true)
-          .limit(1)
-          .snapshots(),
+          .orderBy('createdTime', descending: true)
+          .limit(10)
+          .snapshots()
+          .map((snapshot) => snapshot.docs
+              .map((doc) => AiInsightsRecord.fromSnapshot(doc))
+              .toList()),
       builder: (context, snapshot) {
-        final insights = snapshot.data?.docs ?? [];
-        final latestInsight = insights.isNotEmpty ? insights.first : null;
+        final allInsights = snapshot.data ?? [];
+        // Check if there's an insight for today
+        AiInsightsRecord? todayInsight;
+        for (final insight in allInsights) {
+          final generatedTime = insight.generatedTime ?? insight.createdTime;
+          if (generatedTime != null &&
+              generatedTime.isAfter(todayStart) &&
+              generatedTime.isBefore(todayEnd)) {
+            todayInsight = insight;
+            break;
+          }
+        }
+        // Only show insight if it's from today
+        final hasTodayInsight = todayInsight != null;
 
         return Column(
           children: [
@@ -875,7 +954,7 @@ class _DashboardWidgetState extends State<DashboardWidget>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 16),
-                    if (latestInsight != null) ...[
+                    if (hasTodayInsight) ...[
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -904,9 +983,9 @@ class _DashboardWidgetState extends State<DashboardWidget>
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    (latestInsight.data() as Map<String,
-                                            dynamic>?)?['insightTitle'] ??
-                                        'AI Insight',
+                                    todayInsight.insightTitle.isNotEmpty
+                                        ? todayInsight.insightTitle
+                                        : 'AI Insight',
                                     style: theme.titleSmall.copyWith(
                                       color: theme.primaryText,
                                       fontWeight: FontWeight.w600,
@@ -917,14 +996,11 @@ class _DashboardWidgetState extends State<DashboardWidget>
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              () {
-                                final content = (latestInsight.data() as Map<
-                                        String, dynamic>?)?['insightContent'] ??
-                                    'Your personalized AI insight will appear here.';
-                                return content.length > 120
-                                    ? '${content.substring(0, 120)}...'
-                                    : content;
-                              }(),
+                              todayInsight.insightContent.isNotEmpty
+                                  ? (todayInsight.insightContent.length > 120
+                                      ? '${todayInsight.insightContent.substring(0, 120)}...'
+                                      : todayInsight.insightContent)
+                                  : 'Your personalized AI insight will appear here.',
                               style: theme.bodyMedium.copyWith(
                                 color: theme.secondaryText,
                                 height: 1.4,
@@ -934,24 +1010,33 @@ class _DashboardWidgetState extends State<DashboardWidget>
                         ),
                       ),
                     ] else ...[
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.psychology_outlined,
-                              size: 48,
-                              color: theme.secondaryText.withValues(alpha: 0.5),
+                      Column(
+                        children: [
+                          const SizedBox(height: 24),
+                          Text(
+                            'No insights available for today',
+                            style: theme.bodyMedium.copyWith(
+                              color: theme.secondaryText,
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Complete a round to get AI insights',
-                              style: theme.bodyMedium.copyWith(
-                                color: theme.secondaryText,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          FFButtonWidget(
+                            onPressed: () => context.goNamed('ai_insights'),
+                            text: 'Generate Insights',
+                            options: FFButtonOptions(
+                              height: 40,
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              color: theme.primary,
+                              textStyle: theme.bodyMedium.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
                               ),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
                       ),
                     ],
                   ],
@@ -962,19 +1047,19 @@ class _DashboardWidgetState extends State<DashboardWidget>
             const SizedBox(height: 16),
 
             // Goals Card
-            StreamBuilder<List<DashboardDataRecord>>(
-              stream: FirebaseFirestore.instance
-                  .collection('dashboard_data')
+            StreamBuilder<List<TrainingPlansRecord>>(
+              stream: TrainingPlansRecord.collection
                   .where('userId', isEqualTo: currentUserUid)
-                  .limit(1)
+                  .where('isActive', isEqualTo: true)
                   .snapshots()
                   .map((snapshot) => snapshot.docs
-                      .map((doc) => DashboardDataRecord.fromSnapshot(doc))
+                      .map((doc) => TrainingPlansRecord.fromSnapshot(doc))
                       .toList()),
               builder: (context, snapshot) {
-                final dashboardData = snapshot.data?.firstOrNull;
-                final goals = dashboardData?.activeGoals ??
-                    ['Improve putting', 'Mental focus training'];
+                final activePlans = snapshot.data ?? [];
+                final goals = activePlans
+                    .map((plan) => plan.title.isNotEmpty ? plan.title : 'Training Plan')
+                    .toList();
 
                 return GlassDashboardCard(
                   title: 'Active Goals',
@@ -983,21 +1068,30 @@ class _DashboardWidgetState extends State<DashboardWidget>
                     Column(
                       children: goals.isEmpty
                           ? [
-                              const SizedBox(height: 40),
-                              Icon(
-                                Icons.flag_outlined,
-                                size: 48,
-                                color:
-                                    theme.secondaryText.withValues(alpha: 0.5),
-                              ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 24),
                               Text(
-                                'Set your first goal',
+                                'No active goals set yet',
                                 style: theme.bodyMedium.copyWith(
                                   color: theme.secondaryText,
                                 ),
+                                textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 40),
+                              const SizedBox(height: 16),
+                              FFButtonWidget(
+                                onPressed: () => context.goNamed('mind_coach'),
+                                text: 'Set Your Goals',
+                                options: FFButtonOptions(
+                                  height: 40,
+                                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                                  color: theme.primary,
+                                  textStyle: theme.bodyMedium.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
                             ]
                           : goals
                               .map((goal) => _buildGoalItem(theme, goal))
@@ -1159,7 +1253,12 @@ class _DashboardWidgetState extends State<DashboardWidget>
     );
   }
 
-  Widget _buildActivityItem(FlutterFlowTheme theme, ActivityRecord activity) {
+
+  Widget _buildMindcoachSessionItem(FlutterFlowTheme theme, MindcoachSessionsRecord session) {
+    final timestamp = session.timestamp ?? session.createdTime;
+    final routineType = session.routineType.isNotEmpty ? session.routineType : 'Mind Coach Session';
+    final deliveryLength = session.deliveryLength.isNotEmpty ? session.deliveryLength : '';
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -1181,9 +1280,7 @@ class _DashboardWidgetState extends State<DashboardWidget>
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              activity.activityType == 'round'
-                  ? FontAwesomeIcons.golfBallTee
-                  : Icons.psychology,
+              Icons.psychology,
               color: theme.primary,
               size: 20,
             ),
@@ -1194,39 +1291,314 @@ class _DashboardWidgetState extends State<DashboardWidget>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  activity.title,
+                  routineType,
                   style: theme.bodyMedium.copyWith(
                     color: theme.primaryText,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                Text(
-                  activity.subtitle,
-                  style: theme.labelSmall.copyWith(
-                    color: theme.secondaryText,
-                  ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    if (deliveryLength.isNotEmpty) ...[
+                      Text(
+                        deliveryLength,
+                        style: theme.labelSmall.copyWith(
+                          color: theme.secondaryText,
+                        ),
+                      ),
+                    ],
+                    if (timestamp != null) ...[
+                      if (deliveryLength.isNotEmpty) const SizedBox(width: 8),
+                      Text(
+                        _formatSessionDate(timestamp),
+                        style: theme.labelSmall.copyWith(
+                          color: theme.secondaryText,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
           ),
-          if (activity.isPersonalRecord)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: theme.warning.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'PR',
-                style: theme.labelSmall.copyWith(
-                  color: theme.warning,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: theme.success.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
+            child: Icon(
+              Icons.check_circle,
+              color: theme.success,
+              size: 16,
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  String _formatSessionDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
+  }
+
+  Widget _buildNotificationsDrawer(FlutterFlowTheme theme) {
+    return Drawer(
+      backgroundColor: theme.primaryBackground,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.primary.withValues(alpha: 0.1),
+                    theme.primary.withValues(alpha: 0.05),
+                  ],
+                ),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    'Notifications',
+                    style: theme.headlineSmall.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.primaryText,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(Icons.close, color: theme.primaryText),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            // Notifications list
+            Expanded(
+              child: StreamBuilder<List<NotificationsRecord>>(
+                stream: NotificationsRecord.collection
+                    .where('userId', isEqualTo: currentUserUid)
+                    .snapshots()
+                    .map((snapshot) {
+                      final notifications = snapshot.docs
+                          .map((doc) => NotificationsRecord.fromSnapshot(doc))
+                          .toList();
+                      // Sort by createdTime descending
+                      notifications.sort((a, b) {
+                        final aTime = a.createdTime ?? DateTime(1970);
+                        final bTime = b.createdTime ?? DateTime(1970);
+                        return bTime.compareTo(aTime);
+                      });
+                      return notifications.take(50).toList();
+                    }),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(theme.primary),
+                      ),
+                    );
+                  }
+
+                  final notifications = snapshot.data ?? [];
+
+                  if (notifications.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.notifications_none,
+                            size: 64,
+                            color: theme.secondaryText.withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No notifications',
+                            style: theme.bodyLarge.copyWith(
+                              color: theme.secondaryText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(8),
+                    itemCount: notifications.length,
+                    itemBuilder: (context, index) {
+                      final notification = notifications[index];
+                      return _buildNotificationItem(theme, notification);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationItem(FlutterFlowTheme theme, NotificationsRecord notification) {
+    final isUnread = !notification.isRead;
+    
+    return InkWell(
+      onTap: () async {
+        // Mark as read
+        if (!notification.isRead) {
+          await notification.reference.update({
+            'isRead': true,
+            'readTime': FieldValue.serverTimestamp(),
+          });
+        }
+        
+        // Handle action if available
+        if (notification.actionUrl.isNotEmpty) {
+          // Navigate or handle action
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isUnread
+              ? theme.primary.withValues(alpha: 0.05)
+              : theme.glassBackground.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isUnread
+                ? theme.primary.withValues(alpha: 0.2)
+                : theme.glassBorder.withValues(alpha: 0.1),
+            width: isUnread ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _getNotificationColor(theme, notification.type)
+                    .withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                _getNotificationIcon(notification.type),
+                color: _getNotificationColor(theme, notification.type),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    notification.title,
+                    style: theme.bodyMedium.copyWith(
+                      color: theme.primaryText,
+                      fontWeight: isUnread ? FontWeight.w600 : FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    notification.body,
+                    style: theme.bodySmall.copyWith(
+                      color: theme.secondaryText,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  if (notification.createdTime != null)
+                    Text(
+                      _formatNotificationDate(notification.createdTime!),
+                      style: theme.labelSmall.copyWith(
+                        color: theme.secondaryText.withValues(alpha: 0.7),
+                        fontSize: 10,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (isUnread)
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: theme.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getNotificationColor(FlutterFlowTheme theme, String type) {
+    switch (type.toLowerCase()) {
+      case 'achievement':
+        return theme.success;
+      case 'insight':
+        return theme.aiPrimary;
+      case 'reminder':
+        return theme.warning;
+      case 'progress':
+        return theme.primary;
+      default:
+        return theme.primary;
+    }
+  }
+
+  IconData _getNotificationIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'achievement':
+        return Icons.emoji_events;
+      case 'insight':
+        return Icons.psychology;
+      case 'reminder':
+        return Icons.notifications;
+      case 'progress':
+        return Icons.trending_up;
+      default:
+        return Icons.notifications;
+    }
+  }
+
+  String _formatNotificationDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
   }
 
   Widget _buildGoalItem(FlutterFlowTheme theme, String goal) {
@@ -1274,20 +1646,19 @@ class _DashboardWidgetState extends State<DashboardWidget>
   }
 
   Widget _buildFocusAreasSection(FlutterFlowTheme theme) {
-    return StreamBuilder<List<DashboardDataRecord>>(
-      stream: FirebaseFirestore.instance
-          .collection('dashboard_data')
+    return StreamBuilder<List<TrainingPlansRecord>>(
+      stream: TrainingPlansRecord.collection
           .where('userId', isEqualTo: currentUserUid)
-          .limit(1)
+          .where('isActive', isEqualTo: true)
           .snapshots()
           .map((snapshot) => snapshot.docs
-              .map((doc) => DashboardDataRecord.fromSnapshot(doc))
+              .map((doc) => TrainingPlansRecord.fromSnapshot(doc))
               .toList()),
       builder: (context, snapshot) {
-        final dashboardData = snapshot.data?.firstOrNull;
-        // Use focusAreas if available, otherwise use activeGoals or default
-        final focusAreas = dashboardData?.activeGoals ??
-            ['Improve putting', 'Mental focus training'];
+        final activePlans = snapshot.data ?? [];
+        final focusAreas = activePlans
+            .map((plan) => plan.title.isNotEmpty ? plan.title : 'Training Plan')
+            .toList();
 
         return GlassDashboardCard(
           title: 'Focus Areas',
@@ -1296,20 +1667,30 @@ class _DashboardWidgetState extends State<DashboardWidget>
             Column(
               children: focusAreas.isEmpty
                   ? [
-                      const SizedBox(height: 40),
-                      Icon(
-                        Icons.center_focus_strong_outlined,
-                        size: 48,
-                        color: theme.secondaryText.withValues(alpha: 0.5),
-                      ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                       Text(
-                        'No focus areas set',
+                        'No focus areas set yet',
                         style: theme.bodyMedium.copyWith(
                           color: theme.secondaryText,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 16),
+                      FFButtonWidget(
+                        onPressed: () => context.goNamed('mind_coach'),
+                        text: 'Set Focus Areas',
+                        options: FFButtonOptions(
+                          height: 40,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          color: theme.primary,
+                          textStyle: theme.bodyMedium.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                     ]
                   : focusAreas
                       .map((area) => _buildFocusAreaItem(theme, area))

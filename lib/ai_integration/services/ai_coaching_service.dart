@@ -774,8 +774,9 @@ class AICoachingService {
     return buffer.toString();
   }
 
-  /// Parse JSON response from Gemini
+  /// Parse JSON response from Gemini with handling for truncated responses
   Map<String, dynamic> _parseJsonResponse(String responseText) {
+    bool attemptedRepair = false;
     try {
       // Clean up the response text
       String cleanedText = responseText.trim();
@@ -788,12 +789,94 @@ class AICoachingService {
         cleanedText = cleanedText.substring(0, cleanedText.length - 3);
       }
 
-      // Parse JSON
-      return jsonDecode(cleanedText) as Map<String, dynamic>;
+      // Check if JSON appears truncated (incomplete string values)
+      if (_hasMalformedPatterns(cleanedText) || _isJsonTruncated(cleanedText)) {
+        if (kDebugMode) {
+          print('⚠️ JSON response appears truncated, attempting repair...');
+        }
+        cleanedText = _repairTruncatedJson(cleanedText);
+        attemptedRepair = true;
+      }
+
+      // Parse JSON - handle both List and Map responses
+      final decoded = jsonDecode(cleanedText);
+      
+      // If response is a List, take the first element or wrap it
+      if (decoded is List) {
+        if (decoded.isEmpty) {
+          if (kDebugMode) {
+            print('⚠️ JSON response is an empty list');
+          }
+          return {
+            'error': 'Empty response from AI',
+            'rawResponse': responseText,
+          };
+        }
+        
+        // If list contains a single map, return it
+        if (decoded.length == 1 && decoded[0] is Map<String, dynamic>) {
+          if (kDebugMode) {
+            print('ℹ️ JSON response is a list with single map, extracting first element');
+          }
+          return decoded[0] as Map<String, dynamic>;
+        }
+        
+        // If list contains multiple items, wrap in a response object
+        if (kDebugMode) {
+          print('ℹ️ JSON response is a list with ${decoded.length} items, wrapping in response object');
+        }
+        return {
+          'items': decoded,
+          'count': decoded.length,
+        };
+      }
+      
+      // If response is already a Map, return it
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      
+      // Fallback for unexpected types
+      if (kDebugMode) {
+        print('⚠️ JSON response is unexpected type: ${decoded.runtimeType}');
+      }
+      return {
+        'error': 'Unexpected response format',
+        'rawResponse': responseText,
+        'decodedType': decoded.runtimeType.toString(),
+      };
     } catch (e) {
+      // Try a second repair pass before returning a fallback
+      if (!attemptedRepair) {
+        final fallback = _repairTruncatedJson(responseText.trim());
+        try {
+          if (kDebugMode) {
+            print('⚠️ Retrying JSON parse after additional repair...');
+          }
+          final decoded = jsonDecode(fallback);
+          
+          // Handle List response in retry
+          if (decoded is List) {
+            if (decoded.isNotEmpty && decoded[0] is Map<String, dynamic>) {
+              return decoded[0] as Map<String, dynamic>;
+            }
+            return {
+              'items': decoded,
+              'count': decoded.length,
+            };
+          }
+          
+          return decoded as Map<String, dynamic>;
+        } catch (_) {
+          // Continue to fallback below
+        }
+      }
+
       if (kDebugMode) {
         print('❌ Error parsing JSON response: $e');
-        print('Response text: $responseText');
+        print('Response text length: ${responseText.length}');
+        print(
+            'Response text (first 500 chars): ${responseText.substring(0, responseText.length > 500 ? 500 : responseText.length)}');
       }
 
       // Return a fallback response
@@ -802,5 +885,235 @@ class AICoachingService {
         'rawResponse': responseText,
       };
     }
+  }
+
+  /// Check for malformed JSON patterns that need repair
+  bool _hasMalformedPatterns(String jsonText) {
+    final malformedPattern =
+        RegExp(r'"[\w\s]+"\s*:\s*(\]+|}+)', caseSensitive: false);
+    return malformedPattern.hasMatch(jsonText);
+  }
+
+  /// Check if JSON response appears truncated
+  bool _isJsonTruncated(String jsonText) {
+    // Check for common signs of truncation:
+    // 1. Unclosed string quotes
+    // 2. Unclosed brackets/braces
+    // 3. Incomplete escape sequences
+
+    int openBraces = jsonText.split('{').length - 1;
+    int closeBraces = jsonText.split('}').length - 1;
+
+    // Count quotes (should be even for complete strings)
+    int quotes = jsonText.split('"').length - 1;
+
+    // Check for incomplete string (odd number of quotes at end)
+    if (quotes % 2 != 0) {
+      return true;
+    }
+
+    // Check for unclosed braces
+    if (openBraces > closeBraces) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Attempt to repair truncated JSON by closing incomplete structures
+  String _repairTruncatedJson(String jsonText) {
+    String repaired = jsonText.trim();
+
+    // Remove trailing commas before closing braces/brackets
+    repaired = repaired.replaceAll(RegExp(r',\s*([}\]])'), r'\1');
+
+    // Close dangling string if the response was cut mid-string
+    if (_hasUnclosedQuote(repaired)) {
+      repaired = '$repaired"';
+    }
+
+    // Replace missing values right before a closing brace/bracket with null
+    repaired = repaired.replaceAllMapped(
+      RegExp(r'(".*?"\s*:\s*)(?=[}\]])'),
+      (match) => '${match.group(1)}null',
+    );
+
+    // Track nesting depth by walking through the string
+    int braceDepth = 0;
+    int bracketDepth = 0;
+    bool inString = false;
+    bool escaped = false;
+    int lastValidPosition = 0;
+
+    for (int i = 0; i < repaired.length; i++) {
+      final char = repaired[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char == '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char == '"') {
+        inString = !inString;
+        if (!inString) {
+          // String closed, this is a valid position
+          lastValidPosition = i + 1;
+        }
+        continue;
+      }
+
+      if (inString) continue;
+
+      // Track valid positions (after complete values)
+      if (char == ',' || char == ':' || char == '}' || char == ']') {
+        lastValidPosition = i + 1;
+      }
+
+      if (char == '{') {
+        braceDepth++;
+        lastValidPosition = i + 1;
+      } else if (char == '}') {
+        braceDepth--;
+        lastValidPosition = i + 1;
+      } else if (char == '[') {
+        bracketDepth++;
+        lastValidPosition = i + 1;
+      } else if (char == ']') {
+        bracketDepth--;
+        lastValidPosition = i + 1;
+      }
+    }
+
+    // If we're in the middle of an incomplete field/value, truncate to last valid position
+    if (inString || lastValidPosition < repaired.length) {
+      // Find the last complete field/value
+      // Look backwards from the end to find a valid closing point
+      int truncatePos = repaired.length;
+
+      // If we're in a string, try to find where it started
+      if (inString) {
+        // Find the last quote that started this string
+        for (int i = repaired.length - 1; i >= 0; i--) {
+          if (repaired[i] == '"' && (i == 0 || repaired[i - 1] != '\\')) {
+            truncatePos = i;
+            break;
+          }
+        }
+      } else {
+        // Find the last complete value (ends with quote, number, true/false/null, or closing bracket/brace)
+        // Look for patterns like: ", "value", number, true, false, null, ], }
+        for (int i = repaired.length - 1; i >= 0; i--) {
+          final char = repaired[i];
+          if (char == '"' ||
+              char == '}' ||
+              char == ']' ||
+              char == ',' ||
+              char == 'e' ||
+              char == 'l' ||
+              char == '0' ||
+              char == '1' ||
+              char == '2' ||
+              char == '3' ||
+              char == '4' ||
+              char == '5' ||
+              char == '6' ||
+              char == '7' ||
+              char == '8' ||
+              char == '9') {
+            // Check if this looks like end of a value
+            if (i < repaired.length - 1) {
+              final nextChars = repaired.substring(i).trim();
+              if (nextChars.isEmpty ||
+                  nextChars.startsWith(',') ||
+                  nextChars.startsWith('}') ||
+                  nextChars.startsWith(']')) {
+                truncatePos = i + 1;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Truncate to remove incomplete field/value
+      repaired = repaired.substring(0, truncatePos).trim();
+
+      // Remove trailing comma if present
+      if (repaired.endsWith(',')) {
+        repaired = repaired.substring(0, repaired.length - 1).trim();
+      }
+    }
+
+    // Track remaining open delimiters so we can close them in the right order
+    final openDelimiters = <String>[];
+    inString = false;
+    escaped = false;
+
+    for (int i = 0; i < repaired.length; i++) {
+      final char = repaired[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char == '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char == '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (char == '{' || char == '[') {
+        openDelimiters.add(char);
+      } else if (char == '}' || char == ']') {
+        if (openDelimiters.isNotEmpty &&
+            ((char == '}' && openDelimiters.last == '{') ||
+                (char == ']' && openDelimiters.last == '['))) {
+          openDelimiters.removeLast();
+        }
+      }
+    }
+
+    for (final delimiter in openDelimiters.reversed) {
+      repaired = repaired + (delimiter == '{' ? '}' : ']');
+    }
+
+    return repaired;
+  }
+
+  bool _hasUnclosedQuote(String text) {
+    bool escaped = false;
+    int quotes = 0;
+
+    for (int i = 0; i < text.length; i++) {
+      final char = text[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char == '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char == '"') {
+        quotes++;
+      }
+    }
+
+    return quotes % 2 != 0;
   }
 }

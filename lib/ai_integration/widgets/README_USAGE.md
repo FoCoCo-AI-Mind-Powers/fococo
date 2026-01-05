@@ -2,13 +2,13 @@
 
 ## Available Widgets
 
-### 1. AIInsightWidget (Original)
-The basic insight widget without conversation features.
+### 1. AIInsightCardWidget (Original)
+The basic insight card widget without conversation features.
 
 ```dart
-import 'package:fo_co_co/ai_integration/widgets/ai_insight_widget.dart';
+import 'package:fo_co_co/ai_integration/widgets/ai_insight_card_widget.dart';
 
-AIInsightWidget(
+AIInsightCardWidget(
   insight: insightRecord,
   onTap: () => navigateToDetails(),
   onRate: (rating, feedback) => handleRating(),
@@ -36,7 +36,7 @@ To upgrade from the original widget to the enhanced version:
 1. **Change Import**:
    ```dart
    // From:
-   import 'package:fo_co_co/ai_integration/widgets/ai_insight_widget.dart';
+   import 'package:fo_co_co/ai_integration/widgets/ai_insight_card_widget.dart';
    
    // To:
    import 'package:fo_co_co/ai_integration/widgets/ai_insight_widget_enhanced.dart';
@@ -45,7 +45,7 @@ To upgrade from the original widget to the enhanced version:
 2. **Update Widget Name**:
    ```dart
    // From:
-   AIInsightWidget(...)
+   AIInsightCardWidget(...)
    
    // To:
    EnhancedAIInsightWidget(...)
@@ -62,7 +62,7 @@ To upgrade from the original widget to the enhanced version:
 
 ## Features Comparison
 
-| Feature | AIInsightWidget | EnhancedAIInsightWidget |
+| Feature | AIInsightCardWidget | EnhancedAIInsightWidget |
 |---------|----------------|-------------------------|
 | Basic insight display | ✅ | ✅ |
 | Animations | ✅ | ✅ |

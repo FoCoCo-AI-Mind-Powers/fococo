@@ -1,0 +1,666 @@
+{
+  "collections": {
+    "user": {
+      "fields": {
+        "email": "string",
+        "displayName": "string",
+        "profileImageUrl": "string",
+        "handicap": "number",
+        "golfExperience": "string",
+        "homeClub": "string",
+        "varkPreferences": {
+          "type": "struct",
+          "struct": "VarkPreferencesStruct",
+          "fields": {
+            "visual": "boolean",
+            "aural": "boolean",
+            "readWrite": "boolean",
+            "kinesthetic": "boolean"
+          }
+        },
+        "currentMembershipTier": "string",
+        "appleSubscriptionId": "string",
+        "googleSubscriptionId": "string",
+        "tokensRemaining": "number",
+        "totalAIInsightsGenerated": "number",
+        "mentalPerformanceScore": "number",
+        "coachingStreak": "number",
+        "totalModulesCompleted": "number",
+        "notificationSettings": {
+          "type": "struct",
+          "struct": "NotificationSettingsStruct",
+          "fields": {
+            "dailyReminders": "boolean",
+            "insightNotifications": "boolean",
+            "achievementAlerts": "boolean",
+            "weeklyProgress": "boolean"
+          }
+        },
+        "audioPreferences": {
+          "type": "struct",
+          "struct": "AudioPreferencesStruct",
+          "fields": {
+            "enableTextToSpeech": "boolean",
+            "speechRate": "number",
+            "voicePitch": "number",
+            "voiceVolume": "number",
+            "backgroundAudioEnabled": "boolean",
+            "backgroundVolume": "number",
+            "preferredVoiceGender": "string",
+            "audioFeedbackEnabled": "boolean"
+          }
+        },
+        "timezone": "string",
+        "createdTime": "timestamp",
+        "lastActive": "timestamp",
+        "notificationTokens": "array<string>",
+        "dataProcessingConsent": "boolean",
+        "marketingConsent": "boolean",
+        "lastPrivacyPolicyAccepted": "timestamp",
+        "appVersion": "string",
+        "platform": "string",
+        "referralSource": "string",
+        "currentAdaptiveMode": "string",
+        "lastTrainingPlanId": "string"
+      }
+    },
+    "achievements": {
+      "fields": {
+        "achievementId": "string",
+        "title": "string",
+        "description": "string",
+        "category": "string",
+        "tier": "string",
+        "iconName": "string",
+        "iconUrl": "string",
+        "criteria": {
+          "type": "struct",
+          "struct": "AchievementCriteriaStruct",
+          "fields": {
+            "type": "string",
+            "metric": "string",
+            "targetValue": "number",
+            "comparison": "string",
+            "timeframe": "number",
+            "timeframeUnit": "string",
+            "conditions": "map"
+          }
+        },
+        "points": "number",
+        "isActive": "boolean",
+        "isSecret": "boolean",
+        "order": "number",
+        "createdTime": "timestamp",
+        "updatedTime": "timestamp"
+      }
+    },
+    "activities": {
+      "fields": {
+        "title": "string",
+        "subtitle": "string",
+        "activityType": "string",
+        "score": "string",
+        "activityDate": "timestamp",
+        "stats": "map",
+        "achievements": "array<map>",
+        "isPersonalRecord": "boolean",
+        "courseName": "string",
+        "duration": "number",
+        "rating": "number",
+        "notes": "string"
+      }
+    },
+    "ai_insights": {
+      "fields": {
+        "userId": "string",
+        "sourceId": "string",
+        "sourceType": "string",
+        "insightType": "string",
+        "category": "string",
+        "priority": "string",
+        "insightTitle": "string",
+        "insightContent": "string",
+        "keyPoints": "array<string>",
+        "recommendations": {
+          "type": "array",
+          "itemType": "struct",
+          "struct": "RecommendationStruct",
+          "fields": {
+            "action": "string",
+            "priority": "string",
+            "category": "string",
+            "relatedModuleId": "string"
+          }
+        },
+        "personalizedElements": "array<string>",
+        "isRead": "boolean",
+        "userRating": "number",
+        "userFeedback": "string",
+        "actionsTaken": "array<string>",
+        "generatedTime": "timestamp",
+        "aiModel": "string",
+        "promptUsed": "string",
+        "rawAiResponse": "string",
+        "processingTime": "number",
+        "tokensUsed": "number",
+        "costPerInsight": "number",
+        "generationVersion": "string",
+        "status": "string",
+        "expiryDate": "timestamp",
+        "viewCount": "number",
+        "shareCount": "number",
+        "relatedInsights": "array<string>",
+        "followUpGenerated": "boolean",
+        "createdTime": "timestamp",
+        "updatedTime": "timestamp"
+      }
+    },
+    "app_settings": {
+      "fields": {
+        "appVersion": "string",
+        "buildNumber": "string",
+        "minSupportedVersion": "string",
+        "forceUpdate": "boolean",
+        "maintenanceMode": "boolean",
+        "maintenanceMessage": "string",
+        "featureFlags": "map",
+        "aiTokenCosts": "map",
+        "subscriptionPricing": "map",
+        "supportedPlatforms": "array<string>",
+        "apiEndpoints": "map",
+        "createdTime": "timestamp",
+        "updatedTime": "timestamp",
+        "biometricSettings": "map",
+        "securitySettings": "map"
+      }
+    },
+    "coaching_modules": {
+      "fields": {
+        "moduleId": "string",
+        "title": "string",
+        "description": "string",
+        "category": "string",
+        "pillar": "string",
+        "difficulty": "string",
+        "duration": "number",
+        "varkTags": "array<string>",
+        "primaryVarkStyle": "string",
+        "tierRequirement": "string",
+        "contentVersions": {
+          "type": "struct",
+          "struct": "ModuleContentVersionsStruct",
+          "fields": {
+            "visual": {
+              "type": "struct",
+              "struct": "ModuleContentStruct",
+              "fields": {
+                "contentUrl": "string",
+                "format": "string",
+                "duration": "number",
+                "transcript": "string",
+                "sections": "array<string>",
+                "thumbnailUrl": "string"
+              }
+            },
+            "aural": {
+              "type": "struct",
+              "struct": "ModuleContentStruct"
+            },
+            "readWrite": {
+              "type": "struct",
+              "struct": "ModuleContentStruct"
+            },
+            "kinesthetic": {
+              "type": "struct",
+              "struct": "ModuleContentStruct"
+            }
+          }
+        },
+        "prerequisites": "array<string>",
+        "learningObjectives": "array<string>",
+        "tags": "array<string>",
+        "thumbnailUrl": "string",
+        "isActive": "boolean",
+        "order": "number",
+        "completionCount": "number",
+        "averageRating": "number",
+        "createdTime": "timestamp",
+        "updatedTime": "timestamp"
+      }
+    },
+    "dashboard_data": {
+      "fields": {
+        "currentStreak": "number",
+        "longestStreak": "number",
+        "streakType": "string",
+        "isStreakActive": "boolean",
+        "mentalFocusScore": "number",
+        "mentalFocusTrend": "number",
+        "confidenceScore": "number",
+        "confidenceTrend": "number",
+        "controlScore": "number",
+        "controlTrend": "number",
+        "weeklyProgress": "array<number>",
+        "recentActivities": "array<reference>",
+        "totalMindfulMinutes": "number",
+        "weeklyMindfulSessions": "number",
+        "currentMindfulnessGoal": "string",
+        "averageScore": "number",
+        "handicap": "number",
+        "roundsThisMonth": "number",
+        "activeGoals": "array<string>",
+        "recentAchievements": "array<string>",
+        "preferredTrainingTime": "string",
+        "focusAreas": "array<string>",
+        "dailyInsight": "string",
+        "weeklyChallenge": "string"
+      }
+    },
+    "golf_rounds": {
+      "fields": {
+        "userId": "string",
+        "date": "timestamp",
+        "courseName": "string",
+        "courseId": "string",
+        "teeBox": "string",
+        "courseRating": "number",
+        "slopeRating": "number",
+        "score": "number",
+        "parTotal": "number",
+        "scoreToPar": "number",
+        "totalPutts": "number",
+        "fairwaysHit": "number",
+        "fairwaysTotal": "number",
+        "greensInRegulation": "number",
+        "greensTotal": "number",
+        "penalties": "number",
+        "sandSaves": "number",
+        "sandSaveOpportunities": "number",
+        "upAndDowns": "number",
+        "upAndDownOpportunities": "number",
+        "driving": {
+          "type": "struct",
+          "struct": "DrivingStatsStruct",
+          "fields": {
+            "averageDistance": "number",
+            "accuracy": "number",
+            "longestDrive": "number"
+          }
+        },
+        "approach": {
+          "type": "struct",
+          "struct": "ApproachStatsStruct",
+          "fields": {
+            "averageProximity": "number",
+            "insideTenFeet": "number"
+          }
+        },
+        "shortGame": {
+          "type": "struct",
+          "struct": "ShortGameStatsStruct",
+          "fields": {
+            "chipsAndPitches": "number",
+            "chipsHoled": "number"
+          }
+        },
+        "putting": {
+          "type": "struct",
+          "struct": "PuttingStatsStruct",
+          "fields": {
+            "averagePuttsPerHole": "number",
+            "oneputts": "number",
+            "threeputts": "number",
+            "longestPuttMade": "number"
+          }
+        },
+        "preRoundMood": "string",
+        "postRoundMood": "string",
+        "mentalFocus": "number",
+        "courseManagement": "number",
+        "emotionalControl": "number",
+        "weather": {
+          "type": "struct",
+          "struct": "WeatherStruct",
+          "fields": {
+            "condition": "string",
+            "temperature": "number",
+            "windSpeed": "number"
+          }
+        },
+        "courseCondition": "string",
+        "notes": "string",
+        "lessonsLearned": "string",
+        "keyMoments": "string",
+        "aiInsightsGenerated": "boolean",
+        "aiProcessingStatus": "string",
+        "journalEntries": "array<string>",
+        "createdTime": "timestamp",
+        "updatedTime": "timestamp",
+        "isValid": "boolean",
+        "validationErrors": "array<string>"
+      }
+    },
+    "home_data": {
+      "fields": {
+        "mentalScore": "number",
+        "mentalScoreLabel": "string",
+        "teeDistance": "string",
+        "teeDistanceUnit": "string",
+        "ebedScore": "string",
+        "ebedLabel": "string",
+        "stiksaScore": "string",
+        "stiksaLabel": "string",
+        "performanceTrend": "string",
+        "performanceData": "array<number>",
+        "lastRoundScore": "string",
+        "lastRoundDiff": "string",
+        "lastRoundStatus": "string",
+        "lastRoundType": "string",
+        "userName": "string",
+        "welcomeMessage": "string",
+        "coachMessage": "string",
+        "isPremium": "boolean",
+        "aiInsightTitle": "string",
+        "aiInsightContent": "string"
+      }
+    },
+    "mental_sessions": {
+      "fields": {
+        "userId": "string",
+        "moduleId": "string",
+        "moduleTitle": "string",
+        "dateStarted": "timestamp",
+        "dateCompleted": "timestamp",
+        "duration": "number",
+        "completionStatus": "string",
+        "sectionsCompleted": "array<string>",
+        "totalSections": "number",
+        "progressPercentage": "number",
+        "userMoodBefore": "string",
+        "userMoodAfter": "string",
+        "perceivedValue": "number",
+        "journalEntry": "string",
+        "keyTakeaways": "array<string>",
+        "actionItems": "array<string>",
+        "linkedToRound": "string",
+        "sessionContext": "string",
+        "aiFeedbackReceived": "boolean",
+        "aiProcessingStatus": "string",
+        "interruptions": "number",
+        "environment": "string",
+        "isPartOfStreak": "boolean",
+        "streakDay": "number",
+        "createdTime": "timestamp",
+        "updatedTime": "timestamp",
+        "adaptiveMode": "string",
+        "rebalanceTriggered": "boolean",
+        "pillar": "string",
+        "isCompleted": "boolean",
+        "trainingPlanId": "string"
+      }
+    },
+    "notifications": {
+      "fields": {
+        "userId": "string",
+        "title": "string",
+        "body": "string",
+        "type": "string",
+        "category": "string",
+        "isRead": "boolean",
+        "actionUrl": "string",
+        "actionData": "map",
+        "imageUrl": "string",
+        "priority": "string",
+        "createdTime": "timestamp",
+        "readTime": "timestamp",
+        "expiresAt": "timestamp"
+      }
+    },
+    "round_logs": {
+      "fields": {
+        "userId": "string",
+        "roundId": "string",
+        "date": "timestamp",
+        "courseName": "string",
+        "courseType": "string",
+        "coordinates": "geopoint",
+        "mindsetFocus": "number",
+        "mindsetConfidence": "number",
+        "mindsetControl": "number",
+        "bestCue": "string",
+        "recoveryHoles": "array<string>",
+        "overallMindsetEmoji": "string",
+        "technicalSummary": "string",
+        "aiRoundSummary": "string",
+        "voiceTranscription": "string",
+        "nlpProcessed": "boolean",
+        "isLive": "boolean",
+        "mindsetColor": "string",
+        "linkedGolfRoundId": "string",
+        "createdTime": "timestamp",
+        "updatedTime": "timestamp"
+      }
+    },
+    "scorecards": {
+      "fields": {
+        "holeScores": "array<number>",
+        "holePars": "array<number>",
+        "stalScores": "array<string>",
+        "totalScore": "number",
+        "totalPar": "number",
+        "scoreDifferential": "string",
+        "shotOverview": "map",
+        "roundId": "string",
+        "roundDate": "timestamp",
+        "courseName": "string"
+      }
+    },
+    "shot_logs": {
+      "fields": {
+        "userId": "string",
+        "roundId": "string",
+        "shotId": "string",
+        "holeNumber": "number",
+        "clubUsed": "string",
+        "distanceAttempted": "number",
+        "shotShape": "string",
+        "shotOutcome": "string",
+        "cueUsed": "string",
+        "confidenceLevel": "number",
+        "windCondition": "string",
+        "coordinates": "geopoint",
+        "aiShotInsight": "string",
+        "voiceTranscription": "string",
+        "nlpProcessed": "boolean",
+        "shotTrend": "string",
+        "missPattern": "string",
+        "performanceRating": "number",
+        "clubIcon": "string",
+        "timestamp": "timestamp",
+        "createdTime": "timestamp",
+        "updatedTime": "timestamp"
+      }
+    },
+    "training_plans": {
+      "fields": {
+        "planId": "string",
+        "userId": "string",
+        "title": "string",
+        "description": "string",
+        "modules": "array<string>",
+        "currentModuleIndex": "number",
+        "isActive": "boolean",
+        "createdTime": "timestamp",
+        "updatedTime": "timestamp",
+        "completedModules": "array<string>",
+        "totalModules": "number",
+        "estimatedDuration": "number"
+      }
+    },
+    "user_achievements": {
+      "fields": {
+        "userId": "string",
+        "achievementId": "string",
+        "earnedDate": "timestamp",
+        "progress": "number",
+        "currentValue": "number",
+        "targetValue": "number",
+        "isCompleted": "boolean",
+        "notificationSent": "boolean",
+        "relatedRoundId": "string",
+        "relatedSessionId": "string",
+        "createdTime": "timestamp",
+        "updatedTime": "timestamp"
+      }
+    },
+    "user_subscriptions": {
+      "fields": {
+        "userId": "string",
+        "platform": "string",
+        "productId": "string",
+        "originalTransactionId": "string",
+        "purchaseToken": "string",
+        "status": "string",
+        "membershipTier": "string",
+        "currentPeriodStart": "timestamp",
+        "currentPeriodEnd": "timestamp",
+        "nextBillingDate": "timestamp",
+        "cancelAtPeriodEnd": "boolean",
+        "autoRenewing": "boolean",
+        "purchaseDate": "timestamp",
+        "originalPurchaseDate": "timestamp",
+        "priceAmountMicros": "number",
+        "priceCurrencyCode": "string",
+        "isTrialPeriod": "boolean",
+        "trialEndDate": "timestamp",
+        "cancellationDate": "timestamp",
+        "cancellationReason": "string",
+        "refundDate": "timestamp",
+        "createdTime": "timestamp",
+        "updatedTime": "timestamp",
+        "lastValidated": "timestamp",
+        "rawReceiptData": "string",
+        "stripeCustomerId": "string",
+        "stripeSubscriptionId": "string",
+        "stripePriceId": "string",
+        "paymentMethodId": "string",
+        "lastPaymentDate": "timestamp",
+        "failedPaymentAttempts": "number"
+      }
+    }
+  },
+  "structs": {
+    "AchievementCriteriaStruct": {
+      "type": "string",
+      "metric": "string",
+      "targetValue": "number",
+      "comparison": "string",
+      "timeframe": "number",
+      "timeframeUnit": "string",
+      "conditions": "map"
+    },
+    "AiMemoryStruct": {
+      "sessionId": "string",
+      "conversationHistory": "array<ConversationTurnStruct>",
+      "userInsights": "map",
+      "golfPatterns": "map",
+      "mentalPatterns": "map",
+      "keyTopics": "array<string>",
+      "lastUpdated": "timestamp",
+      "totalInteractions": "number",
+      "engagementScore": "number",
+      "personalityTraits": "map"
+    },
+    "AppPreferencesStruct": {
+      "themeMode": "string",
+      "hapticFeedbackEnabled": "boolean",
+      "language": "string",
+      "analyticsEnabled": "boolean",
+      "crashReportingEnabled": "boolean",
+      "preferredUnits": "string"
+    },
+    "ApproachStatsStruct": {
+      "averageProximity": "number",
+      "insideTenFeet": "number"
+    },
+    "AudioPreferencesStruct": {
+      "enableTextToSpeech": "boolean",
+      "speechRate": "number",
+      "voicePitch": "number",
+      "voiceVolume": "number",
+      "backgroundAudioEnabled": "boolean",
+      "backgroundVolume": "number",
+      "preferredVoiceGender": "string",
+      "audioFeedbackEnabled": "boolean"
+    },
+    "ConversationTurnStruct": {
+      "id": "string",
+      "userMessage": "string",
+      "aiResponse": "string",
+      "timestamp": "timestamp",
+      "messageType": "string",
+      "sentiment": "map",
+      "extractedTopics": "array<string>",
+      "confidenceScore": "number"
+    },
+    "DrivingStatsStruct": {
+      "averageDistance": "number",
+      "accuracy": "number",
+      "longestDrive": "number"
+    },
+    "ModuleContentStruct": {
+      "contentUrl": "string",
+      "format": "string",
+      "duration": "number",
+      "transcript": "string",
+      "sections": "array<string>",
+      "thumbnailUrl": "string"
+    },
+    "ModuleContentVersionsStruct": {
+      "visual": "ModuleContentStruct",
+      "aural": "ModuleContentStruct",
+      "readWrite": "ModuleContentStruct",
+      "kinesthetic": "ModuleContentStruct"
+    },
+    "NotificationSettingsStruct": {
+      "dailyReminders": "boolean",
+      "insightNotifications": "boolean",
+      "achievementAlerts": "boolean",
+      "weeklyProgress": "boolean"
+    },
+    "PuttingStatsStruct": {
+      "averagePuttsPerHole": "number",
+      "oneputts": "number",
+      "threeputts": "number",
+      "longestPuttMade": "number"
+    },
+    "RecommendationStruct": {
+      "action": "string",
+      "priority": "string",
+      "category": "string",
+      "relatedModuleId": "string"
+    },
+    "ShortGameStatsStruct": {
+      "chipsAndPitches": "number",
+      "chipsHoled": "number"
+    },
+    "VarkPreferencesStruct": {
+      "visual": "boolean",
+      "aural": "boolean",
+      "readWrite": "boolean",
+      "kinesthetic": "boolean"
+    },
+    "WeatherStruct": {
+      "condition": "string",
+      "temperature": "number",
+      "windSpeed": "number"
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "lastUpdated": "2024",
+    "description": "Complete Firestore database schema for FoCoCo - Mental Performance Golf Coaching App",
+    "totalCollections": 17,
+    "totalStructs": 16
+  }
+}

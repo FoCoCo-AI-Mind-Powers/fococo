@@ -10,19 +10,19 @@ class GeminiConfig {
   // ============================================================================
   
   /// Default Gemini model for general tasks (Gemini 2.5 Flash)
-  static const String defaultModel = 'gemini-2.5-flash';
+  static const String defaultModel = 'gemini-3-flash-preview';
   
   /// Gemini model for complex analysis and insights
-  static const String insightModel = 'gemini-2.5-flash';
+  static const String insightModel = 'gemini-3-flash-preview';
   
   /// Gemini model for coaching recommendations
-  static const String coachingModel = 'gemini-2.5-flash';
+  static const String coachingModel = 'gemini-3-flash-preview';
   
   /// Gemini model for content generation
-  static const String contentModel = 'gemini-2.5-flash';
+  static const String contentModel = 'gemini-3-flash-preview';
   
   /// Gemini model for session feedback
-  static const String feedbackModel = 'gemini-2.5-flash';
+  static const String feedbackModel = 'gemini-3-flash-preview';
   
   /// Voice AI models
   static const String voiceFlashLiteModel = 'gemini-2.5-flash-lite';

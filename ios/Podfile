@@ -42,4 +42,8 @@ post_install do |installer|
       
     end
   end
+  
+  # Remove extended attributes that can cause code signing issues
+  system("find #{installer.sandbox.root}/Pods -type f -exec xattr -c {} \\; 2>/dev/null || true")
+  system("find #{installer.sandbox.root}/Pods -type d -exec xattr -rc {} \\; 2>/dev/null || true")
 end

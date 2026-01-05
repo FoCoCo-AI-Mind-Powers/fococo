@@ -3,3 +3,8 @@ export 'scorecard_record.dart';
 export 'dashboard_data_record.dart';
 export 'activity_record.dart';
 export 'golf_rounds_record.dart';
+export 'notifications_record.dart';
+export 'mental_sessions_record.dart';
+export 'mindcoach_sessions_record.dart';
+export 'mindcoach_templates_record.dart';
+export 'ai_validator_logs_record.dart';

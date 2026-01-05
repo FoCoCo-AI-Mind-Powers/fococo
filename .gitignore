@@ -84,3 +84,8 @@ coverage/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Android Keystore files (DO NOT COMMIT)
+android/*.jks
+android/*.keystore
+android/key.properties

@@ -440,7 +440,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
       child: SafeArea(
         child: Center(
           child: Image.asset(
-            'assets/images/logo/FoCoCo - Logo 1 - Final 3.0.png',
+            'assets/images/logo/Logo.png',
             width: 80,
             height: 80,
             fit: BoxFit.contain,
@@ -983,7 +983,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                   SafeArea(
                     child: Center(
                       child: Image.asset(
-                        'assets/images/logo/FoCoCo - Logo 1 - Final 3.0.png',
+                        'assets/images/logo/Logo.png',
                         width: 80,
                         height: 80,
                         fit: BoxFit.contain,
@@ -2553,7 +2553,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
             ),
             child: Center(
               child: Image.asset(
-                'assets/images/logo/FoCoCo - Logo 1 - Final 3.0.png',
+                'assets/images/logo/Logo.png',
                 width: 70,
                 height: 70,
                 fit: BoxFit.contain,
@@ -2954,7 +2954,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
             ),
             child: Center(
               child: Image.asset(
-                'assets/images/logo/FoCoCo - Logo 1 - Final 3.0.png',
+                'assets/images/logo/Logo.png',
                 width: 80,
                 height: 80,
                 fit: BoxFit.contain,

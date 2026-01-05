@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart'
@@ -26,6 +27,7 @@ enum MarkerType {
 class FoCoMapCustomMarkers {
   static final Map<String, ui.Image> _imageCache = {};
   static final Map<String, BitmapDescriptor> _markerCache = {};
+  static final Map<String, Uint8List> _bytesCache = {}; // Cache for Apple Maps
 
   /// Initialize marker assets
   static Future<void> initialize() async {
@@ -152,8 +154,10 @@ class FoCoMapCustomMarkers {
     final image = await picture.toImage(size.toInt(), size.toInt());
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
 
-    final descriptor = BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+    final bytesList = bytes!.buffer.asUint8List();
+    final descriptor = BitmapDescriptor.bytes(bytesList);
     _markerCache[cacheKey] = descriptor;
+    _bytesCache[cacheKey] = bytesList; // Cache bytes for Apple Maps
 
     return descriptor;
   }
@@ -243,10 +247,38 @@ class FoCoMapCustomMarkers {
     final image = await picture.toImage(size.toInt(), size.toInt());
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
 
-    final descriptor = BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+    final bytesList = bytes!.buffer.asUint8List();
+    final descriptor = BitmapDescriptor.bytes(bytesList);
     _markerCache[cacheKey] = descriptor;
+    _bytesCache[cacheKey] = bytesList; // Cache bytes for Apple Maps
 
     return descriptor;
+  }
+  
+  /// Get round log marker bytes for Apple Maps
+  static Future<Uint8List?> getRoundLogMarkerBytes({
+    required RoundLogsRecord round,
+    bool isSelected = false,
+  }) async {
+    final cacheKey = 'round_log_${round.mindsetColor}_${round.overallMindsetEmoji}_$isSelected';
+    if (_bytesCache.containsKey(cacheKey)) {
+      return _bytesCache[cacheKey];
+    }
+    await createRoundLogMarker(round: round, isSelected: isSelected);
+    return _bytesCache[cacheKey];
+  }
+  
+  /// Get golf round marker bytes for Apple Maps
+  static Future<Uint8List?> getGolfRoundMarkerBytes({
+    required GolfRoundsRecord round,
+    bool isSelected = false,
+  }) async {
+    final cacheKey = 'golf_round_${round.score}_${round.scoreToPar}_$isSelected';
+    if (_bytesCache.containsKey(cacheKey)) {
+      return _bytesCache[cacheKey];
+    }
+    await createGolfRoundMarker(round: round, isSelected: isSelected);
+    return _bytesCache[cacheKey];
   }
 
   /// Create custom marker for scorecard
@@ -354,10 +386,25 @@ class FoCoMapCustomMarkers {
     final image = await picture.toImage(size.toInt(), size.toInt());
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
 
-    final descriptor = BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+    final bytesList = bytes!.buffer.asUint8List();
+    final descriptor = BitmapDescriptor.bytes(bytesList);
     _markerCache[cacheKey] = descriptor;
+    _bytesCache[cacheKey] = bytesList; // Cache bytes for Apple Maps
 
     return descriptor;
+  }
+  
+  /// Get scorecard marker bytes for Apple Maps
+  static Future<Uint8List?> getScorecardMarkerBytes({
+    required ScorecardRecord scorecard,
+    bool isSelected = false,
+  }) async {
+    final cacheKey = 'scorecard_${scorecard.totalScore}_${scorecard.scoreDifferential}_$isSelected';
+    if (_bytesCache.containsKey(cacheKey)) {
+      return _bytesCache[cacheKey];
+    }
+    await createScorecardMarker(scorecard: scorecard, isSelected: isSelected);
+    return _bytesCache[cacheKey];
   }
 
   /// Create custom marker for shot log
@@ -444,10 +491,25 @@ class FoCoMapCustomMarkers {
     final image = await picture.toImage(size.toInt(), size.toInt());
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
 
-    final descriptor = BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+    final bytesList = bytes!.buffer.asUint8List();
+    final descriptor = BitmapDescriptor.bytes(bytesList);
     _markerCache[cacheKey] = descriptor;
+    _bytesCache[cacheKey] = bytesList; // Cache bytes for Apple Maps
 
     return descriptor;
+  }
+  
+  /// Get shot log marker bytes for Apple Maps
+  static Future<Uint8List?> getShotLogMarkerBytes({
+    required ShotLogsRecord shot,
+    bool isSelected = false,
+  }) async {
+    final cacheKey = 'shot_log_${shot.clubUsed}_${shot.shotOutcome}_$isSelected';
+    if (_bytesCache.containsKey(cacheKey)) {
+      return _bytesCache[cacheKey];
+    }
+    await createShotLogMarker(shot: shot, isSelected: isSelected);
+    return _bytesCache[cacheKey];
   }
 
   /// Create cluster marker
@@ -526,10 +588,26 @@ class FoCoMapCustomMarkers {
     final image = await picture.toImage(size.toInt(), size.toInt());
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
 
-    final descriptor = BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+    final bytesList = bytes!.buffer.asUint8List();
+    final descriptor = BitmapDescriptor.bytes(bytesList);
     _markerCache[cacheKey] = descriptor;
+    _bytesCache[cacheKey] = bytesList; // Cache bytes for Apple Maps
 
     return descriptor;
+  }
+  
+  /// Get cluster marker bytes for Apple Maps
+  static Future<Uint8List?> getClusterMarkerBytes({
+    required int count,
+    required MarkerType primaryType,
+    bool isSelected = false,
+  }) async {
+    final cacheKey = 'cluster_${count}_${primaryType.name}_$isSelected';
+    if (_bytesCache.containsKey(cacheKey)) {
+      return _bytesCache[cacheKey];
+    }
+    await createClusterMarker(count: count, primaryType: primaryType, isSelected: isSelected);
+    return _bytesCache[cacheKey];
   }
 
   /// Create hotspot marker
@@ -590,8 +668,10 @@ class FoCoMapCustomMarkers {
     final image = await picture.toImage(size.toInt(), size.toInt());
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
 
-    final descriptor = BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+    final bytesList = bytes!.buffer.asUint8List();
+    final descriptor = BitmapDescriptor.bytes(bytesList);
     _markerCache[cacheKey] = descriptor;
+    _bytesCache[cacheKey] = bytesList; // Cache bytes for Apple Maps
 
     return descriptor;
   }
@@ -655,8 +735,10 @@ class FoCoMapCustomMarkers {
     final image = await picture.toImage(size.toInt(), size.toInt());
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
 
-    final descriptor = BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+    final bytesList = bytes!.buffer.asUint8List();
+    final descriptor = BitmapDescriptor.bytes(bytesList);
     _markerCache[cacheKey] = descriptor;
+    _bytesCache[cacheKey] = bytesList; // Cache bytes for Apple Maps
 
     return descriptor;
   }
@@ -809,5 +891,17 @@ class FoCoMapCustomMarkers {
   static void clearCache() {
     _imageCache.clear();
     _markerCache.clear();
+    _bytesCache.clear();
+  }
+  
+  /// Get bytes from BitmapDescriptor (helper for Apple Maps)
+  static Uint8List? getBytesFromDescriptor(BitmapDescriptor descriptor) {
+    // Try to find in cache by matching descriptor
+    for (final entry in _markerCache.entries) {
+      if (entry.value == descriptor) {
+        return _bytesCache[entry.key];
+      }
+    }
+    return null;
   }
 }

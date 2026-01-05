@@ -246,16 +246,7 @@ class _FloatingVoiceButtonState extends State<FloatingVoiceButton>
                       margin: const EdgeInsets.symmetric(horizontal: 20),
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            theme.glassBackground.withValues(
-                                alpha: GlassDesignSystem.glassOpacity + 0.2),
-                            theme.glassTint.withValues(
-                                alpha: GlassDesignSystem.glassOpacity + 0.15),
-                          ],
-                        ),
+                        color: theme.primaryBackground,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: theme.glassBorder.withValues(

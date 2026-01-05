@@ -7,6 +7,9 @@ admin.initializeApp();
 // Import coaching admin functions
 const coachingAdmin = require('./coaching_admin');
 
+// Import LiveKit token generation
+const livekitToken = require('./livekit_token');
+
 // ============================================================================
 // STRIPE SUBSCRIPTION MANAGEMENT FUNCTIONS
 // ============================================================================
@@ -283,6 +286,12 @@ exports.listCoachingModules = coachingAdmin.listCoachingModules;
 exports.bulkImportModules = coachingAdmin.bulkImportModules;
 exports.updateModuleAnalytics = coachingAdmin.updateModuleAnalytics;
 exports.getModuleStatistics = coachingAdmin.getModuleStatistics;
+
+// ============================================================================
+// LIVEKIT TOKEN GENERATION
+// ============================================================================
+
+exports.generateLiveKitToken = livekitToken.generateLiveKitToken;
 
 // ============================================================================
 // STRIPE WEBHOOK EVENT HANDLERS

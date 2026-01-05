@@ -7,6 +7,7 @@ import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:shimmer/shimmer.dart';
 import 'dart:math' as math;
 
@@ -23,6 +24,7 @@ import '../services/gemini_native_audio_service.dart';
 import '../services/voice_chat_database_service.dart';
 import '../services/enhanced_ai_coaching_service.dart';
 import '../services/vertex_ai_gemini_live_service.dart';
+import '../config/gemini_live_config.dart';
 
 import '/backend/schema/structs/vark_preferences_struct.dart';
 
@@ -282,9 +284,26 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
     _scrollController.dispose();
     _textController.dispose();
 
-    // Clean up voice services
-    _nativeAudioService.dispose();
-    _vertexAILiveService.dispose();
+    // Disconnect voice services (don't dispose singletons)
+    try {
+      if (_vertexAILiveService.isConnected) {
+        _vertexAILiveService.disconnect();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error disconnecting Vertex AI Live: $e');
+      }
+    }
+
+    try {
+      if (_nativeAudioService.isConnected) {
+        _nativeAudioService.disconnect();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error disconnecting native audio: $e');
+      }
+    }
 
     // End database session
     _endCurrentSession();
@@ -407,7 +426,11 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
   /// Initialize Vertex AI Gemini Live service for speech-to-speech
   Future<void> _initializeVertexAILiveService() async {
     try {
+      // Get project ID from Firebase configuration
+      final projectId = Firebase.app().options.projectId;
+      
       await _vertexAILiveService.initialize(
+        projectId: projectId,
         varkPreferences: _varkPrefs,
       );
 
@@ -481,21 +504,11 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
             messageType: 'vertex_ai_live',
           );
 
-          // Show thinking process if available
-          if (response.isThinking && response.thinkingProcess != null) {
-            final thinkingMessage = ChatMessage(
-              id: '${DateTime.now().millisecondsSinceEpoch}_thinking',
-              content: '🧠 **Thinking Process:** ${response.thinkingProcess}',
-              isUser: false,
-              timestamp: DateTime.now(),
-              isSystem: true,
-            );
-            _addMessage(thinkingMessage);
-          }
+          // Thinking process removed - body should only show responses
 
           // Convert text response to speech using Cartesia TTS
-          if (_isVoiceEnabled &&
-              _isAutoReadEnabled &&
+          // Auto-play response when voice mode is active or auto-read is enabled
+          if ((_isVoiceMode || (_isVoiceEnabled && _isAutoReadEnabled)) &&
               _cartesiaService.isInitialized) {
             setState(() {
               _isAISpeaking = true;
@@ -621,17 +634,7 @@ class _FoCoCoVoiceChatModalState extends State<FoCoCoVoiceChatModal>
           messageType: 'native_audio',
         );
 
-        // Show thinking process if available
-        if (response.isThinking && response.thinkingProcess != null) {
-          final thinkingMessage = ChatMessage(
-            id: '${DateTime.now().millisecondsSinceEpoch}_thinking',
-            content: '🧠 **Thinking Process:** ${response.thinkingProcess}',
-            isUser: false,
-            timestamp: DateTime.now(),
-            isSystem: true,
-          );
-          _addMessage(thinkingMessage);
-        }
+        // Thinking process removed - body should only show responses
       }
     });
 
@@ -965,7 +968,7 @@ You are an AI mental performance coach for golf. Respond with rich markdown form
 - Use tables when presenting data or comparisons
 - Use `code blocks` for specific techniques or exercises
 
-${_isDeepThinking ? 'DEEP THINKING MODE: Provide thorough analysis with detailed explanations, structured content, and actionable insights.' : 'QUICK CHAT MODE: Provide concise, focused advice with key highlights.'}
+${_isDeepThinking ? 'DEEP THINKING MODE: Provide thorough analysis with detailed explanations, structured content, and actionable insights. Keep responses under 500 words.' : 'QUICK CHAT MODE: Provide concise, focused advice with key highlights. Keep responses brief and under 300 words.'}
 
 VARK Learning Style: ${_getVarkDescription()}
 
@@ -980,6 +983,15 @@ Respond as a professional golf mental coach with expertise in sports psychology:
       interactionType: interactionType,
       userInsights: userInsights,
     );
+
+    // Limit response length - keep responses concise
+    // For quick chat: max 300 words, for deep thinking: max 500 words
+    final maxWords = _isDeepThinking ? 500 : 300;
+    final words = response.split(' ');
+    if (words.length > maxWords) {
+      final truncated = words.take(maxWords).join(' ');
+      return '$truncated...\n\n[Response truncated for brevity]';
+    }
 
     return response;
   }
@@ -1944,6 +1956,7 @@ Respond as a professional golf mental coach with expertise in sports psychology:
               ],
             ),
           ),
+          const SizedBox(width: 12),
           GestureDetector(
             onTap: _toggleDeepThinking,
             child: AnimatedContainer(
@@ -2008,12 +2021,19 @@ Respond as a professional golf mental coach with expertise in sports psychology:
       return _buildEmptyState(theme);
     }
 
+    // Filter out system messages - body should only show responses
+    final responseMessages = _messages.where((msg) => msg.isSystem != true).toList();
+    
+    if (responseMessages.isEmpty) {
+      return _buildEmptyState(theme);
+    }
+    
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      itemCount: _messages.length,
+      itemCount: responseMessages.length,
       itemBuilder: (context, index) {
-        final message = _messages[index];
+        final message = responseMessages[index];
         return _buildSimpleMessageBubble(theme, message, index);
       },
     );
@@ -2061,26 +2081,9 @@ Respond as a professional golf mental coach with expertise in sports psychology:
     final isUser = message.isUser;
     final isSystem = message.isSystem ?? false;
 
+    // Hide system messages - body should only show responses
     if (isSystem) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: theme.accent4.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              _cleanMarkdownText(message.content),
-              style: theme.bodySmall.copyWith(
-                color: theme.secondaryText,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     return Padding(
@@ -2097,32 +2100,34 @@ Respond as a professional golf mental coach with expertise in sports psychology:
               crossAxisAlignment:
                   isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isUser
-                        ? theme.primary
-                        : theme.accent4.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20).copyWith(
-                      bottomRight: isUser
-                          ? const Radius.circular(4)
-                          : const Radius.circular(20),
-                      bottomLeft: !isUser
-                          ? const Radius.circular(4)
-                          : const Radius.circular(20),
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
                     ),
-                  ),
-                  child: !isUser
-                      ? _buildRichMarkdownText(theme, message.content)
-                      : Text(
-                          _cleanMarkdownText(message.content),
-                          style: theme.bodyMedium.copyWith(
-                            color: Colors.white,
+                    decoration: BoxDecoration(
+                      color: isUser
+                          ? theme.primary
+                          : theme.accent4.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20).copyWith(
+                        bottomRight: isUser
+                            ? const Radius.circular(4)
+                            : const Radius.circular(20),
+                        bottomLeft: !isUser
+                            ? const Radius.circular(4)
+                            : const Radius.circular(20),
+                      ),
+                    ),
+                    child: !isUser
+                        ? _buildRichMarkdownText(theme, message.content)
+                        : Text(
+                            _cleanMarkdownText(message.content),
+                            style: theme.bodyMedium.copyWith(
+                              color: Colors.white,
+                            ),
                           ),
-                        ),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -2430,10 +2435,31 @@ Respond as a professional golf mental coach with expertise in sports psychology:
     try {
       // Use Vertex AI Live for speech-to-speech if voice mode is enabled
       if (_isVoiceMode) {
-        if (!_vertexAILiveService.isConnected) {
-          await _vertexAILiveService.connect();
+        try {
+          if (!_vertexAILiveService.isConnected) {
+            await _vertexAILiveService.connect();
+          }
+          await _vertexAILiveService.startListening();
+        } catch (e) {
+          if (kDebugMode) {
+            print('❌ Error starting listening: $e');
+          }
+          // If service is disposed, try to reconnect
+          if (e.toString().contains('close') || e.toString().contains('disposed')) {
+            // Service was disposed, need to reinitialize
+            _addMessage(
+              ChatMessage(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                content: '⚠️ Voice service needs to be reinitialized. Please close and reopen the chat.',
+                isUser: false,
+                timestamp: DateTime.now(),
+                isSystem: true,
+              ),
+            );
+            return;
+          }
+          rethrow;
         }
-        await _vertexAILiveService.startListening();
 
         // Add Vertex AI Live listening indicator
         _addMessage(
@@ -2453,26 +2479,59 @@ Respond as a professional golf mental coach with expertise in sports psychology:
       }
 
       // Fallback to native audio service for speech-to-speech if available
-      if (_nativeAudioService.isConnected ||
-          await _nativeAudioService.connect()) {
-        await _nativeAudioService.startListening();
-
-        // Add native listening indicator
-        _addMessage(
-          ChatMessage(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            content:
-                '🎤 **Native Audio Listening** - Speak your question for direct speech-to-speech conversation!',
-            isUser: false,
-            timestamp: DateTime.now(),
-            isSystem: true,
-          ),
-        );
-
-        if (kDebugMode) {
-          print('🎤 Started native audio listening');
+      try {
+        // Initialize native audio service with API key if not already initialized
+        if (!_nativeAudioService.isConnected) {
+          final apiKey = GeminiLiveAPIConfig.apiKey;
+          if (apiKey.isEmpty) {
+            throw Exception('Gemini API key not configured. Please set GEMINI_API_KEY environment variable.');
+          }
+          await _nativeAudioService.initialize(
+            apiKey: apiKey,
+            thinkingMode: _isDeepThinking,
+            varkPreferences: _varkPrefs,
+          );
         }
-      } else {
+        
+        if (_nativeAudioService.isConnected ||
+            await _nativeAudioService.connect()) {
+          await _nativeAudioService.startListening();
+
+          // Add native listening indicator
+          _addMessage(
+            ChatMessage(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              content:
+                  '🎤 **Native Audio Listening** - Speak your question for direct speech-to-speech conversation!',
+              isUser: false,
+              timestamp: DateTime.now(),
+              isSystem: true,
+            ),
+          );
+
+          if (kDebugMode) {
+            print('🎤 Started native audio listening');
+          }
+        } else {
+          throw Exception('Failed to connect native audio service');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('❌ Error starting native audio listening: $e');
+        }
+        // If service is disposed, handle gracefully
+        if (e.toString().contains('close') || e.toString().contains('disposed')) {
+          _addMessage(
+            ChatMessage(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              content: '⚠️ Audio service needs to be reinitialized. Please close and reopen the chat.',
+              isUser: false,
+              timestamp: DateTime.now(),
+              isSystem: true,
+            ),
+          );
+          return;
+        }
         // Fallback to simulated listening
         setState(() {
           _isListening = true;
@@ -2742,9 +2801,8 @@ Respond as a professional golf mental coach with expertise in sports psychology:
 
       // Start TTS generation in parallel (don't wait for it)
       // This makes text and voice work simultaneously
-      // Only auto-read if toggle is enabled
-      if (_isVoiceEnabled &&
-          _isAutoReadEnabled &&
+      // Auto-play response when voice mode is active or auto-read is enabled
+      if ((_isVoiceMode || (_isVoiceEnabled && _isAutoReadEnabled)) &&
           _cartesiaService.isInitialized) {
         // Set speaking state immediately
         setState(() {
@@ -2783,8 +2841,9 @@ Respond as a professional golf mental coach with expertise in sports psychology:
             });
           }
         });
-      } else if (_isVoiceEnabled && _isAutoReadEnabled) {
-        // Fallback to system TTS (also in parallel)
+      } else if (_isVoiceEnabled) {
+        // Fallback to system TTS when voice is enabled (even without auto-read)
+        // This ensures responses are played when user uses voice input
         final cleanTextForTTS = _stripMarkdownForTTS(aiResponse);
         setState(() {
           _isAISpeaking = true;
@@ -2827,13 +2886,13 @@ Respond as a professional golf mental coach with expertise in sports psychology:
     if (text.isEmpty) return text;
 
     // Remove bold formatting (**text** and ***text***)
-    String cleaned = text.replaceAll(RegExp(r'\*{2,3}([^*]+)\*{2,3}'), r'$1');
+    String cleaned = text.replaceAll(RegExp(r'\*{2,3}([^*]+)\*{2,3}'), r'\$1');
 
     // Remove italic formatting (*text*)
-    cleaned = cleaned.replaceAll(RegExp(r'(?<!\*)\*([^*]+)\*(?!\*)'), r'$1');
+    cleaned = cleaned.replaceAll(RegExp(r'(?<!\*)\*([^*]+)\*(?!\*)'), r'\$1');
 
     // Remove code formatting (`text`)
-    cleaned = cleaned.replaceAll(RegExp(r'`([^`]+)`'), r'$1');
+    cleaned = cleaned.replaceAll(RegExp(r'`([^`]+)`'), r'\$1');
 
     // Remove heading symbols (# ## ###)
     cleaned = cleaned.replaceAll(RegExp(r'^#{1,6}\s*', multiLine: true), '');
@@ -2853,15 +2912,15 @@ Respond as a professional golf mental coach with expertise in sports psychology:
     String cleaned = text;
 
     // Remove all bold formatting (**text**, ***text***, __text__)
-    cleaned = cleaned.replaceAll(RegExp(r'\*{2,3}([^*]+)\*{2,3}'), r'$1');
-    cleaned = cleaned.replaceAll(RegExp(r'_{2}([^_]+)_{2}'), r'$1');
+    cleaned = cleaned.replaceAll(RegExp(r'\*{2,3}([^*]+)\*{2,3}'), r'\$1');
+    cleaned = cleaned.replaceAll(RegExp(r'_{2}([^_]+)_{2}'), r'\$1');
 
     // Remove all italic formatting (*text*, _text_)
-    cleaned = cleaned.replaceAll(RegExp(r'(?<!\*)\*([^*\n]+)\*(?!\*)'), r'$1');
-    cleaned = cleaned.replaceAll(RegExp(r'(?<!_)_([^_\n]+)_(?!_)'), r'$1');
+    cleaned = cleaned.replaceAll(RegExp(r'(?<!\*)\*([^*\n]+)\*(?!\*)'), r'\$1');
+    cleaned = cleaned.replaceAll(RegExp(r'(?<!_)_([^_\n]+)_(?!_)'), r'\$1');
 
     // Remove all code formatting (`text`, ```text```)
-    cleaned = cleaned.replaceAll(RegExp(r'`+([^`]+)`+'), r'$1');
+    cleaned = cleaned.replaceAll(RegExp(r'`+([^`]+)`+'), r'\$1');
 
     // Remove all heading symbols (# ## ### #### ##### ######)
     cleaned = cleaned.replaceAll(RegExp(r'^#{1,6}\s+', multiLine: true), '');
@@ -2870,10 +2929,10 @@ Respond as a professional golf mental coach with expertise in sports psychology:
     cleaned = cleaned.replaceAll(RegExp(r'^>\s+', multiLine: true), '');
 
     // Remove links [text](url) -> text
-    cleaned = cleaned.replaceAll(RegExp(r'\[([^\]]+)\]\([^\)]+\)'), r'$1');
+    cleaned = cleaned.replaceAll(RegExp(r'\[([^\]]+)\]\([^\)]+\)'), r'\$1');
 
     // Remove images ![alt](url) -> alt
-    cleaned = cleaned.replaceAll(RegExp(r'!\[([^\]]+)\]\([^\)]+\)'), r'$1');
+    cleaned = cleaned.replaceAll(RegExp(r'!\[([^\]]+)\]\([^\)]+\)'), r'\$1');
 
     // Remove horizontal rules (---, ***)
     cleaned = cleaned.replaceAll(RegExp(r'^[-*]{3,}$', multiLine: true), '');
@@ -2905,8 +2964,7 @@ Respond as a professional golf mental coach with expertise in sports psychology:
       );
     }
 
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 500),
+    return SingleChildScrollView(
       child: Markdown(
         data: text,
         shrinkWrap: true,

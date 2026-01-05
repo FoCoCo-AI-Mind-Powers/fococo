@@ -10,22 +10,33 @@ class GeminiLiveAPIConfig {
   static const String websocketEndpoint =
       'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent';
 
+  /// Hardcoded API key for development (replace with your actual key)
+  /// In production, this should be set via --dart-define or secure storage
+  static const String _hardcodedApiKey = 'AIzaSyDFBlHJPrjGsdpbHAo8ZEDXQC3tNrjG9iA';
+
   /// Get API key from environment or secure storage
   static String get apiKey {
-    // In production, use secure storage or environment variables
-    const key = String.fromEnvironment('GEMINI_API_KEY');
-
-    if (key.isEmpty) {
-      if (kDebugMode) {
-        print('⚠️ GEMINI_API_KEY not set. Please configure your API key.');
-        print(
-            '💡 Add --dart-define=GEMINI_API_KEY=your_key_here to flutter run command');
-      }
-      // Return empty string to prevent crashes during development
-      return '';
+    // First, try to get from dart-define (for production builds)
+    const keyFromEnv = String.fromEnvironment('GEMINI_API_KEY');
+    
+    if (keyFromEnv.isNotEmpty) {
+      return keyFromEnv;
     }
 
-    return key;
+    // Fallback to hardcoded key for development
+    // TODO: In production, remove this and use secure storage or environment variables
+    if (kDebugMode && _hardcodedApiKey.isNotEmpty && _hardcodedApiKey != 'your_gemini_api_key_here') {
+      return _hardcodedApiKey;
+    }
+
+    if (kDebugMode) {
+      print('⚠️ GEMINI_API_KEY not set. Please configure your API key.');
+      print(
+          '💡 Add --dart-define=GEMINI_API_KEY=your_key_here to flutter run command');
+      print('💡 Or update _hardcodedApiKey in gemini_live_config.dart for development');
+    }
+    // Return empty string to prevent crashes during development
+    return '';
   }
 
   /// Check if API key is configured

@@ -11,6 +11,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '/flutter_flow/flutter_flow_util.dart';
 import '/auth/firebase_auth/auth_util.dart';
+import '/ai_integration/config/gemini_live_config.dart';
 
 /// Advanced FoCo Map Voice Service using only Gemini models
 /// Implements the 4-stage pipeline: Audio Capture → STT → NLU → Instruction Generation
@@ -21,7 +22,15 @@ class FoCoMapGeminiVoiceService {
   FoCoMapGeminiVoiceService._internal();
 
   // Gemini API Configuration
-  static const String _geminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
+  // Get API key from GeminiLiveAPIConfig for consistency
+  static String get _geminiApiKey {
+    final key = GeminiLiveAPIConfig.apiKey;
+    if (key.isEmpty) {
+      // Fallback to hardcoded key if config returns empty
+      return 'AIzaSyDFBlHJPrjGsdpbHAo8ZEDXQC3tNrjG9iA';
+    }
+    return key;
+  }
   static const String _baseUrl = 'https://generativelanguage.googleapis.com';
 
   // Gemini Models for different stages

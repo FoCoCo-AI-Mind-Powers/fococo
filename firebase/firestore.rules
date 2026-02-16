@@ -47,31 +47,38 @@ service cloud.firestore {
     }
     
     match /mental_sessions/{document} {
-      allow create: if request.auth != null && request.auth.token.email_verified;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow write: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
-    }
-    
-    match /ai_insights/{document} {
-      allow create: if request.auth != null && request.auth.token.email_verified;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow write: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
-    }
-    
-    match /user_subscriptions/{document} {
       allow create: if request.auth != null && 
-                     request.auth.token.email_verified &&
                      request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && 
                    resource.data.userId == request.auth.uid;
       allow update: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid &&
                      request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && 
-                     request.auth.token.email_verified && 
+                     resource.data.userId == request.auth.uid;
+    }
+    
+    match /ai_insights/{document} {
+      allow create: if request.auth != null && 
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     resource.data.userId == request.auth.uid;
+    }
+    
+    match /user_subscriptions/{document} {
+      allow create: if request.auth != null && 
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
                      resource.data.userId == request.auth.uid;
     }
     
@@ -85,34 +92,54 @@ service cloud.firestore {
     
     // Conversation Sessions - For AI memory management
     match /conversation_sessions/{document} {
-      allow create: if request.auth != null && request.auth.token.email_verified;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow write: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && 
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     resource.data.userId == request.auth.uid;
     }
     
     // Voice Chat Sessions - For voice chat conversation management
     match /voice_chat_sessions/{document} {
-      allow create: if request.auth != null && request.auth.token.email_verified && request.resource.data.userId == request.auth.uid;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && 
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     resource.data.userId == request.auth.uid;
     }
     
     // Voice Chat Messages - For individual voice chat messages
     match /voice_chat_messages/{document} {
-      allow create: if request.auth != null && request.auth.token.email_verified && request.resource.data.userId == request.auth.uid;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && 
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     resource.data.userId == request.auth.uid;
     }
     
     // User Voice Chat Stats - For voice chat analytics
     match /user_voice_chat_stats/{document} {
-      allow create: if request.auth != null && request.auth.token.email_verified && request.resource.data.userId == request.auth.uid;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && 
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     resource.data.userId == request.auth.uid;
     }
     
     // ============================================================================
@@ -130,46 +157,38 @@ service cloud.firestore {
     // Module Progress Tracking - User-specific progress and completion data
     match /user_module_progress/{document} {
       allow create: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && 
                    resource.data.userId == request.auth.uid;
       allow update: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid &&
                      request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid;
     }
     
     // Module Ratings & Reviews - User feedback on coaching modules
     match /module_reviews/{document} {
       allow create: if request.auth != null && 
-                     request.auth.token.email_verified &&
-                     request.auth.uid == resource.data.userId;
+                     request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null; // Anyone can read reviews
-      allow write: if request.auth != null && 
-                    request.auth.token.email_verified && 
-                    request.auth.uid == resource.data.userId;
+      allow update: if request.auth != null && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && 
-                     request.auth.token.email_verified && 
-                     request.auth.uid == resource.data.userId;
+                     resource.data.userId == request.auth.uid;
     }
     
     // Training Plans - User-specific training plans
     match /training_plans/{document} {
       allow create: if request.auth != null && 
-                     request.auth.token.email_verified &&
                      request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && 
-                   request.auth.token.email_verified &&
                    resource.data.userId == request.auth.uid;
       allow update: if request.auth != null && 
-                     request.auth.token.email_verified && 
-                     resource.data.userId == request.auth.uid;
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid;
     }
     
@@ -189,18 +208,13 @@ service cloud.firestore {
     
     // MindCoach Sessions - User-specific AI coaching sessions
     match /mindcoach_sessions/{document} {
-      allow create: if request.auth != null && 
-                     request.auth.token.email_verified &&
-                     request.resource.data.userId == request.auth.uid;
-      allow read: if request.auth != null && 
-                   resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && 
-                     request.auth.token.email_verified && 
-                     resource.data.userId == request.auth.uid &&
-                     request.resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && 
-                     request.auth.token.email_verified && 
-                     resource.data.userId == request.auth.uid;
+      // Immutable write path: backend only (Admin SDK bypasses rules).
+      allow create: if false;
+      allow read: if request.auth != null &&
+                   (resource.data.user_id == request.auth.uid ||
+                    resource.data.userId == request.auth.uid);
+      allow update: if false;
+      allow delete: if false;
     }
     
     // MindCoach Templates - Read-only for authenticated users, admin-only writes
@@ -211,11 +225,67 @@ service cloud.firestore {
       allow delete: if false; // Only admins can delete templates (via Admin SDK/Cloud Functions)
     }
     
+    // MindCoach Content Library - Read-only for authenticated users, admin-only writes
+    match /mindcoach_content_library/{document} {
+      allow read: if request.auth != null; // All authenticated users can read content library
+      allow create: if false; // Only admins can create content (via Admin SDK/Cloud Functions)
+      allow update: if false; // Only admins can update content (via Admin SDK/Cloud Functions)
+      allow delete: if false; // Only admins can delete content (via Admin SDK/Cloud Functions)
+    }
+
+    // MindCoach Scenario Tags - Read-only for authenticated users, admin-only writes.
+    match /mindcoach_scenario_tags/{document} {
+      allow read: if request.auth != null;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // MindCoach session runs - owner scoped read/write.
+    match /mindcoach_session_runs/{document} {
+      allow create: if request.auth != null &&
+                     request.resource.data.user_id == request.auth.uid;
+      allow read: if request.auth != null &&
+                   resource.data.user_id == request.auth.uid;
+      allow update: if request.auth != null &&
+                     resource.data.user_id == request.auth.uid &&
+                     request.resource.data.user_id == request.auth.uid;
+      allow delete: if request.auth != null &&
+                     resource.data.user_id == request.auth.uid;
+    }
+
+    // MindCoach favorites - owner scoped read/write.
+    match /mindcoach_favorites/{document} {
+      allow create: if request.auth != null &&
+                     request.resource.data.user_id == request.auth.uid;
+      allow read: if request.auth != null &&
+                   resource.data.user_id == request.auth.uid;
+      allow update: if request.auth != null &&
+                     resource.data.user_id == request.auth.uid &&
+                     request.resource.data.user_id == request.auth.uid;
+      allow delete: if request.auth != null &&
+                     resource.data.user_id == request.auth.uid;
+    }
+
+    // MindCoach user profiles - owner scoped read/write.
+    match /mindcoach_user_profiles/{document} {
+      allow create: if request.auth != null &&
+                     request.resource.data.user_id == request.auth.uid &&
+                     document == request.auth.uid;
+      allow read: if request.auth != null &&
+                   document == request.auth.uid;
+      allow update: if request.auth != null &&
+                     document == request.auth.uid &&
+                     resource.data.user_id == request.auth.uid &&
+                     request.resource.data.user_id == request.auth.uid;
+      allow delete: if request.auth != null &&
+                     document == request.auth.uid;
+    }
+    
     // AI Validator Logs - Backend-only writes, admin-only reads
     match /ai_validator_logs/{document} {
       allow read: if false; // Admin-only reads (via Cloud Functions/Admin SDK)
-      allow create: if request.auth != null && 
-                     request.auth.token.email_verified;
+      allow create: if false;
       allow update: if false; // Logs are immutable
       allow delete: if false; // Logs should not be deleted
     }
@@ -231,7 +301,6 @@ service cloud.firestore {
     // AI Usage Tracking - Track AI token usage and costs per user
     match /ai_usage_tracking/{document} {
       allow create: if request.auth != null && 
-                     request.auth.token.email_verified &&
                      request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && 
                    resource.data.userId == request.auth.uid;
@@ -242,12 +311,10 @@ service cloud.firestore {
     // User Tokens - Track user token balances and limits
     match /user_tokens/{document} {
       allow create: if request.auth != null && 
-                     request.auth.token.email_verified &&
                      request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && 
                    resource.data.userId == request.auth.uid;
       allow update: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid &&
                      request.resource.data.userId == request.auth.uid;
       allow delete: if false; // Token records should not be deleted
@@ -256,7 +323,6 @@ service cloud.firestore {
     // Token Purchases - Track token purchase transactions
     match /token_purchases/{document} {
       allow create: if request.auth != null && 
-                     request.auth.token.email_verified &&
                      request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && 
                    resource.data.userId == request.auth.uid;
@@ -275,16 +341,13 @@ service cloud.firestore {
     // Assessment Results - Store VARK assessment results per user
     match /assessment_results/{document} {
       allow create: if request.auth != null && 
-                     request.auth.token.email_verified &&
                      request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && 
                    resource.data.userId == request.auth.uid;
       allow update: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid &&
                      request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid;
     }
     
@@ -294,80 +357,115 @@ service cloud.firestore {
     
     // FoCoMap Collections - Enhanced security for golf data
     match /round_logs/{document} {
-      allow create: if request.auth != null && request.auth.token.email_verified;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow write: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && 
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     resource.data.userId == request.auth.uid;
     }
     
     match /shot_logs/{document} {
-      allow create: if request.auth != null && request.auth.token.email_verified;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow write: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && request.auth.token.email_verified && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && 
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && 
+                     resource.data.userId == request.auth.uid;
+    }
+
+    // CaddyPlay session capture collections
+    match /caddyplay_sessions/{document} {
+      allow create: if request.auth != null &&
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null &&
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null &&
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null &&
+                     resource.data.userId == request.auth.uid;
+
+      // Hole control/edit docs inside each session
+      match /holes/{holeNumber} {
+        allow create: if request.auth != null &&
+                       get(/databases/$(database)/documents/caddyplay_sessions/$(document)).data.userId == request.auth.uid;
+        allow read: if request.auth != null &&
+                     get(/databases/$(database)/documents/caddyplay_sessions/$(document)).data.userId == request.auth.uid;
+        allow update: if request.auth != null &&
+                       get(/databases/$(database)/documents/caddyplay_sessions/$(document)).data.userId == request.auth.uid;
+        allow delete: if request.auth != null &&
+                       get(/databases/$(database)/documents/caddyplay_sessions/$(document)).data.userId == request.auth.uid;
+      }
+    }
+
+    match /caddyplay_logs/{document} {
+      allow create: if request.auth != null &&
+                     request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null &&
+                   resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null &&
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null &&
+                     resource.data.userId == request.auth.uid;
     }
     
     // Notifications - User-specific notifications from push notifications or system
     match /notifications/{document} {
       allow create: if request.auth != null && 
-                     request.auth.token.email_verified &&
                      request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && 
-                   request.auth.token.email_verified &&
                    resource.data.userId == request.auth.uid;
       allow update: if request.auth != null && 
-                     request.auth.token.email_verified && 
-                     resource.data.userId == request.auth.uid;
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid;
     }
     
     // Dashboard Data - User-specific dashboard analytics and summaries
     match /dashboard_data/{document} {
       allow create: if request.auth != null && 
-                     request.auth.token.email_verified &&
                      request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && 
                    resource.data.userId == request.auth.uid;
       allow update: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid &&
                      request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid;
     }
     
     // Home Data - User-specific home page data cache
     match /home_data/{document} {
       allow create: if request.auth != null && 
-                     request.auth.token.email_verified &&
                      request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && 
                    resource.data.userId == request.auth.uid;
       allow update: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid &&
                      request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid;
     }
     
     // Scorecards - User-specific golf scorecard data (Prime tier feature)
     match /scorecards/{document} {
       allow create: if request.auth != null && 
-                     request.auth.token.email_verified &&
                      request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && 
                    resource.data.userId == request.auth.uid;
       allow update: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid &&
                      request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && 
-                     request.auth.token.email_verified && 
                      resource.data.userId == request.auth.uid;
     }
   }

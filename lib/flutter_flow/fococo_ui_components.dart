@@ -1821,40 +1821,22 @@ class _FoCoCoAnimatedBottomNavBarState extends State<FoCoCoAnimatedBottomNavBar>
   // Navigation items configuration
   final List<NavigationItem> _navItems = [
     NavigationItem(
-      icon: Icons.home_rounded,
-      activeIcon: Icons.home,
-      label: 'Home',
-      route: 'dashboard',
+      icon: Icons.people_outline_rounded,
+      activeIcon: Icons.people_rounded,
+      label: 'MindCoach',
+      route: 'mind_coach',
     ),
     NavigationItem(
       icon: FontAwesomeIcons.golfBallTee,
       activeIcon: FontAwesomeIcons.golfBallTee,
-      label: 'Rounds',
-      route: 'golf_sync',
+      label: 'CaddyPlay',
+      route: 'caddy_play',
     ),
     NavigationItem(
-      icon: Icons.psychology_outlined,
-      activeIcon: Icons.psychology,
-      label: 'Train',
-      route: 'coaching_modules',
-    ),
-    NavigationItem(
-      icon: Icons.trending_up_outlined,
-      activeIcon: Icons.trending_up,
-      label: 'Progress',
-      route: 'progress',
-    ),
-    NavigationItem(
-      icon: Icons.insights_outlined,
-      activeIcon: Icons.insights,
-      label: 'Insights',
-      route: 'ai_insights',
-    ),
-    NavigationItem(
-      icon: Icons.person_outline,
-      activeIcon: Icons.person,
-      label: 'Profile',
-      route: 'profile',
+      icon: Icons.chat_bubble_outline_rounded,
+      activeIcon: Icons.chat_bubble_rounded,
+      label: 'GolfChat',
+      route: 'golf_chat',
     ),
   ];
 
@@ -2140,40 +2122,22 @@ class _FoCoCoIndicatorBottomNavBarState
   // Navigation items configuration
   final List<NavigationItem> _navItems = [
     NavigationItem(
-      icon: Icons.home_outlined,
-      activeIcon: Icons.home_rounded,
-      label: 'Home',
-      route: 'dashboard',
+      icon: Icons.people_outline_rounded,
+      activeIcon: Icons.people_rounded,
+      label: 'MindCoach',
+      route: 'mind_coach',
     ),
     NavigationItem(
       icon: FontAwesomeIcons.golfBallTee,
       activeIcon: FontAwesomeIcons.golfBallTee,
-      label: 'Rounds',
-      route: 'golf_sync',
+      label: 'CaddyPlay',
+      route: 'caddy_play',
     ),
     NavigationItem(
-      icon: Icons.psychology_outlined,
-      activeIcon: Icons.psychology_rounded,
-      label: 'Train',
-      route: 'coaching_modules',
-    ),
-    NavigationItem(
-      icon: Icons.trending_up_outlined,
-      activeIcon: Icons.trending_up_rounded,
-      label: 'Progress',
-      route: 'progress',
-    ),
-    NavigationItem(
-      icon: Icons.insights_outlined,
-      activeIcon: Icons.insights_rounded,
-      label: 'Insights',
-      route: 'ai_insights',
-    ),
-    NavigationItem(
-      icon: Icons.person_outline_rounded,
-      activeIcon: Icons.person_rounded,
-      label: 'Profile',
-      route: 'profile',
+      icon: Icons.chat_bubble_outline_rounded,
+      activeIcon: Icons.chat_bubble_rounded,
+      label: 'GolfChat',
+      route: 'golf_chat',
     ),
   ];
 

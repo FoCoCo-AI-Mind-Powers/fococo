@@ -4,7 +4,6 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_components.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
-import '/widgets/floating_voice_button.dart';
 import 'support_model.dart';
 export 'support_model.dart';
 
@@ -156,9 +155,6 @@ class _SupportWidgetState extends State<SupportWidget>
                 ),
               ),
             ),
-
-            // Floating Voice Button
-            const FloatingVoiceButton(),
           ],
         ),
         bottomNavigationBar: EnhancedFoCoCoNavBar(
@@ -250,19 +246,19 @@ class _SupportWidgetState extends State<SupportWidget>
                   child: _buildQuickHelpCard(
                     theme,
                     Icons.golf_course,
-                    'Log a Round',
-                    'Record your golf performance',
-                    () => context.goNamed('golf_sync'),
+                    'Open CaddyPlay',
+                    'Capture a round or practice session',
+                    () => context.goNamed('caddy_play'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildQuickHelpCard(
                     theme,
-                    Icons.psychology,
-                    'Start Coaching',
-                    'Begin mental training',
-                    () => context.goNamed('coaching_modules'),
+                    Icons.chat_bubble_outline_rounded,
+                    'Open GolfChat',
+                    'Reflect on what happened',
+                    () => context.goNamed('golf_chat'),
                   ),
                 ),
               ],

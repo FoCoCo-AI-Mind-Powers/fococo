@@ -46,6 +46,9 @@ class MindCoachAnalysisService {
   /// Analyze training consistency (focus routines, etc.)
   Future<MindCoachInsight?> analyzeTrainingConsistency(String userId) async {
     try {
+      // Guard against empty userId - would cause permission denied
+      if (userId.isEmpty) return null;
+      
       // Get recent training sessions (last 14 days)
       final sessions = await MentalSessionsRecord.collection
           .where('userId', isEqualTo: userId)
@@ -53,6 +56,7 @@ class MindCoachAnalysisService {
               isGreaterThanOrEqualTo: Timestamp.fromDate(
                 DateTime.now().subtract(const Duration(days: 14)),
               ))
+          .orderBy('dateStarted', descending: true)
           .get();
 
       if (sessions.docs.isEmpty) return null;
@@ -75,6 +79,12 @@ class MindCoachAnalysisService {
 
       return null;
     } catch (e) {
+      // Handle permission errors gracefully - don't log them as errors
+      final errorStr = e.toString();
+      if (errorStr.contains('permission-denied')) {
+        // Permission denied is expected in some cases, silently return null
+        return null;
+      }
       if (kDebugMode) {
         print('❌ Error analyzing training consistency: $e');
       }
@@ -85,6 +95,9 @@ class MindCoachAnalysisService {
   /// Analyze recovery patterns (resets after tough shots)
   Future<MindCoachInsight?> analyzeRecoveryPatterns(String userId) async {
     try {
+      // Guard against empty userId - would cause permission denied
+      if (userId.isEmpty) return null;
+      
       // Get recent round logs
       final rounds = await RoundLogsRecord.collection
           .where('userId', isEqualTo: userId)
@@ -122,6 +135,12 @@ class MindCoachAnalysisService {
 
       return null;
     } catch (e) {
+      // Handle permission errors gracefully - don't log them as errors
+      final errorStr = e.toString();
+      if (errorStr.contains('permission-denied')) {
+        // Permission denied is expected in some cases, silently return null
+        return null;
+      }
       if (kDebugMode) {
         print('❌ Error analyzing recovery patterns: $e');
       }

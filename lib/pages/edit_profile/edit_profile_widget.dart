@@ -3,7 +3,6 @@ import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
-import '/widgets/floating_voice_button.dart';
 import '/services/profile_service.dart';
 import 'edit_profile_model.dart';
 export 'edit_profile_model.dart';
@@ -333,9 +332,6 @@ class _EditProfileWidgetState extends State<EditProfileWidget>
                 ),
               ),
             ),
-
-            // Floating Voice Button
-            const FloatingVoiceButton(),
           ],
         ),
         bottomNavigationBar: EnhancedFoCoCoNavBar(
@@ -892,29 +888,36 @@ class _EditProfileWidgetState extends State<EditProfileWidget>
             items: _nearbyClubs.map((club) {
               return DropdownMenuItem<GolfClub>(
                 value: club,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      club.name,
-                      style: theme.bodyMedium.copyWith(
-                        color: theme.primaryText,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (club.address.isNotEmpty)
+                child: SizedBox(
+                  height: club.address.isNotEmpty ? 50 : 30,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
                       Text(
-                        '${club.address} • ${club.distance.toStringAsFixed(1)} km',
-                        style: theme.bodySmall.copyWith(
-                          color: theme.secondaryText,
+                        club.name,
+                        style: theme.bodyMedium.copyWith(
+                          color: theme.primaryText,
+                          fontWeight: FontWeight.w500,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                  ],
+                      if (club.address.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '${club.address} • ${club.distance.toStringAsFixed(1)} km',
+                          style: theme.bodySmall.copyWith(
+                            color: theme.secondaryText,
+                            fontSize: 11,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               );
             }).toList(),

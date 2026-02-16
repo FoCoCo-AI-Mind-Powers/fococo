@@ -1,6 +1,7 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/services/auth_flow_service.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'register_model.dart';
@@ -52,6 +53,16 @@ class _RegisterWidgetState extends State<RegisterWidget> {
         backgroundColor: Colors.red.shade400,
         behavior: SnackBarBehavior.floating,
       ),
+    );
+  }
+
+  Future<void> _navigateAfterAuth() async {
+    final decision = await AuthFlowService.instance.resolvePostAuthDecision();
+    if (!mounted) return;
+    GoRouter.of(context).clearRedirectLocation();
+    context.goNamed(
+      decision.routeName,
+      extra: decision.extra,
     );
   }
 
@@ -176,8 +187,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                               .withValues(alpha: 0.1),
                                         ],
                                       ),
-                                      borderRadius:
-                                          BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
                                         color: const Color(0xFF1B5E20)
                                             .withValues(alpha: 0.2),
@@ -231,16 +241,13 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                         .signInWithGoogle(context);
                                     if (user == null) return;
 
-                                    context.goNamedAuth(
-                                        'dashboard', context.mounted);
+                                    await _navigateAfterAuth();
                                   } catch (e) {
-                                    ScaffoldMessenger.of(context)
-                                        .showSnackBar(
+                                    ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
                                             'Google Sign In failed. Please try again or use another method.'),
-                                        backgroundColor:
-                                            Colors.red.shade400,
+                                        backgroundColor: Colors.red.shade400,
                                       ),
                                     );
                                   }
@@ -265,22 +272,19 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                 _buildAuthButton(
                                   onTap: () async {
                                     try {
-                                      GoRouter.of(context)
-                                          .prepareAuthEvent();
+                                      GoRouter.of(context).prepareAuthEvent();
                                       final user = await authManager
                                           .signInWithApple(context);
                                       if (user == null) return;
 
-                                      context.goNamedAuth(
-                                          'dashboard', context.mounted);
+                                      await _navigateAfterAuth();
                                     } catch (e) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
                                         SnackBar(
                                           content: Text(
                                               'Apple Sign In failed. Please try again or use another method.'),
-                                          backgroundColor:
-                                              Colors.red.shade400,
+                                          backgroundColor: Colors.red.shade400,
                                         ),
                                       );
                                     }
@@ -380,8 +384,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                   fontSize: 14,
                                   height: 1.4,
                                 ),
-                                validator: _model
-                                    .nameTextControllerValidator
+                                validator: _model.nameTextControllerValidator
                                     .asValidator(context),
                               ),
 
@@ -455,8 +458,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                   height: 1.4,
                                 ),
                                 keyboardType: TextInputType.emailAddress,
-                                validator: _model
-                                    .emailTextControllerValidator
+                                validator: _model.emailTextControllerValidator
                                     .asValidator(context),
                               ),
 
@@ -527,8 +529,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                       () => _model.passwordVisibility =
                                           !_model.passwordVisibility,
                                     ),
-                                    focusNode:
-                                        FocusNode(skipTraversal: true),
+                                    focusNode: FocusNode(skipTraversal: true),
                                     child: Icon(
                                       _model.passwordVisibility
                                           ? Icons.visibility_outlined
@@ -557,8 +558,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                     _model.confirmPasswordTextController,
                                 focusNode: _model.confirmPasswordFocusNode,
                                 autofocus: false,
-                                obscureText:
-                                    !_model.confirmPasswordVisibility,
+                                obscureText: !_model.confirmPasswordVisibility,
                                 decoration: InputDecoration(
                                   labelText: 'Confirm Password',
                                   labelStyle: theme.bodyMedium.override(
@@ -618,8 +618,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                       () => _model.confirmPasswordVisibility =
                                           !_model.confirmPasswordVisibility,
                                     ),
-                                    focusNode:
-                                        FocusNode(skipTraversal: true),
+                                    focusNode: FocusNode(skipTraversal: true),
                                     child: Icon(
                                       _model.confirmPasswordVisibility
                                           ? Icons.visibility_outlined
@@ -667,12 +666,9 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                   color: Colors.transparent,
                                   child: InkWell(
                                     onTap: () async {
-                                      GoRouter.of(context)
-                                          .prepareAuthEvent();
-                                      if (_model.passwordTextController
-                                              .text !=
-                                          _model
-                                              .confirmPasswordTextController
+                                      GoRouter.of(context).prepareAuthEvent();
+                                      if (_model.passwordTextController.text !=
+                                          _model.confirmPasswordTextController
                                               .text) {
                                         _showErrorSnackBar(
                                             'Passwords don\'t match!');
@@ -705,10 +701,8 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                             ),
                                             backgroundColor:
                                                 Colors.green.shade600,
-                                            behavior: SnackBarBehavior
-                                                .floating,
-                                            duration:
-                                                Duration(seconds: 5),
+                                            behavior: SnackBarBehavior.floating,
+                                            duration: Duration(seconds: 5),
                                           ),
                                         );
                                       } catch (e) {
@@ -723,17 +717,13 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                             ),
                                             backgroundColor:
                                                 Colors.orange.shade600,
-                                            behavior: SnackBarBehavior
-                                                .floating,
-                                            duration:
-                                                Duration(seconds: 5),
+                                            behavior: SnackBarBehavior.floating,
+                                            duration: Duration(seconds: 5),
                                           ),
                                         );
                                       }
 
-                                      context.goNamedAuth(
-                                          'vark_onboarding',
-                                          context.mounted);
+                                      await _navigateAfterAuth();
                                     },
                                     borderRadius: BorderRadius.circular(12),
                                     child: Container(
@@ -769,8 +759,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                     ),
                                   ),
                                   InkWell(
-                                    onTap: () =>
-                                        context.goNamed('login'),
+                                    onTap: () => context.goNamed('login'),
                                     child: Text(
                                       'Sign In',
                                       style: theme.bodyMedium.override(
@@ -778,8 +767,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                         color: const Color(0xFF1B5E20),
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
-                                        decoration:
-                                            TextDecoration.underline,
+                                        decoration: TextDecoration.underline,
                                         height: 1.4,
                                       ),
                                     ),
@@ -798,8 +786,7 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                                     decoration: BoxDecoration(
                                       color: const Color(0xFFFFD54F)
                                           .withValues(alpha: 0.2),
-                                      borderRadius:
-                                          BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Icon(
                                       Icons.flag,

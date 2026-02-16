@@ -1,14 +1,41 @@
-const functions = require("firebase-functions");
+const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
-const stripe = require("stripe")(functions.config().stripe?.secret_key || "sk_test_your_secret_key");
+const { defineString } = require("firebase-functions/params");
 
 admin.initializeApp();
+
+const STRIPE_SECRET_KEY_PARAM = defineString("STRIPE_SECRET_KEY", {
+  default: "sk_test_your_secret_key",
+});
+
+let _stripeClient = null;
+let _stripeClientKey = null;
+
+function getStripeClient() {
+  const stripeSecretKey =
+    STRIPE_SECRET_KEY_PARAM.value() ||
+    process.env.STRIPE_SECRET_KEY ||
+    "sk_test_your_secret_key";
+
+  if (_stripeClient && _stripeClientKey === stripeSecretKey) {
+    return _stripeClient;
+  }
+
+  _stripeClient = require("stripe")(stripeSecretKey);
+  _stripeClientKey = stripeSecretKey;
+  return _stripeClient;
+}
 
 // Import coaching admin functions
 const coachingAdmin = require('./coaching_admin');
 
 // Import LiveKit token generation
 const livekitToken = require('./livekit_token');
+
+// Import MindCoach data seeding
+const seedMindCoachData = require('./seed_mindcoach_data');
+const mindCoachGenerateV2 = require('./mindcoach_v2/generate_session_v2');
+const mindCoachCompleteRunV2 = require('./mindcoach_v2/complete_run_v2');
 
 // ============================================================================
 // STRIPE SUBSCRIPTION MANAGEMENT FUNCTIONS
@@ -31,6 +58,7 @@ exports.createSubscription = functions.https.onCall(async (data, context) => {
 
   try {
     console.log(`Creating subscription for user: ${userId}, email: ${email}, priceId: ${priceId}`);
+    const stripe = getStripeClient();
 
     // Create or retrieve customer
     let customer;
@@ -103,6 +131,7 @@ exports.confirmSubscription = functions.https.onCall(async (data, context) => {
 
   try {
     console.log(`Confirming subscription: ${subscriptionId} for user: ${userId}`);
+    const stripe = getStripeClient();
 
     // Retrieve subscription from Stripe
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -175,6 +204,7 @@ exports.cancelSubscription = functions.https.onCall(async (data, context) => {
 
   try {
     console.log(`Canceling subscription: ${subscriptionId} for user: ${userId}`);
+    const stripe = getStripeClient();
 
     // Cancel subscription in Stripe (at period end)
     const subscription = await stripe.subscriptions.update(subscriptionId, {
@@ -228,6 +258,7 @@ exports.reactivateSubscription = functions.https.onCall(async (data, context) =>
 
   try {
     console.log(`Reactivating subscription: ${subscriptionId} for user: ${userId}`);
+    const stripe = getStripeClient();
 
     // Reactivate subscription in Stripe
     const subscription = await stripe.subscriptions.update(subscriptionId, {
@@ -294,6 +325,21 @@ exports.getModuleStatistics = coachingAdmin.getModuleStatistics;
 exports.generateLiveKitToken = livekitToken.generateLiveKitToken;
 
 // ============================================================================
+// MINDCOACH DATA SEEDING
+// ============================================================================
+
+exports.seedMindCoachData = seedMindCoachData.seedMindCoachData;
+
+// ============================================================================
+// MINDCOACH V2 - GENERATION & SESSION RUNS
+// ============================================================================
+
+exports.generateMindCoachSessionV2 =
+    mindCoachGenerateV2.generateMindCoachSessionV2;
+exports.completeMindCoachSessionRunV2 =
+    mindCoachCompleteRunV2.completeMindCoachSessionRunV2;
+
+// ============================================================================
 // STRIPE WEBHOOK EVENT HANDLERS
 // ============================================================================
 
@@ -301,6 +347,7 @@ async function handlePaymentSucceeded(invoice) {
   console.log(`Payment succeeded for invoice: ${invoice.id}`);
   
   if (invoice.subscription) {
+    const stripe = getStripeClient();
     const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
     const userId = subscription.metadata?.userId;
 
@@ -329,6 +376,7 @@ async function handlePaymentFailed(invoice) {
   console.log(`Payment failed for invoice: ${invoice.id}`);
   
   if (invoice.subscription) {
+    const stripe = getStripeClient();
     const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
     const userId = subscription.metadata?.userId;
 

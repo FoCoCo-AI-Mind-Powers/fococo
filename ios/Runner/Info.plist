@@ -98,10 +98,15 @@
 		<false/>
 		<key>FirebaseAppDelegateProxyEnabled</key>
 		<false/>
-		<key>FirebaseMessagingAutoInitEnabled</key>
-		<true/>
-		<!-- Google Maps API Key for iOS -->
-		<key>GMSApiKey</key>
-		<string>AIzaSyAYkQKNgnVZUj5Yd9C3Iyjjg0lwc4TJXuA</string>
-	</dict>
+	<key>FirebaseMessagingAutoInitEnabled</key>
+	<true/>
+	<!-- Google Maps API Key for iOS -->
+	<key>GMSApiKey</key>
+	<string>AIzaSyAYkQKNgnVZUj5Yd9C3Iyjjg0lwc4TJXuA</string>
+	<!-- Background Modes for Voice-First MindCoach Sessions -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+</dict>
 </plist>

@@ -778,7 +778,7 @@ class FoCoCoGlassNavBar extends StatelessWidget {
 class FoCoCoNavigation {
   // Route constants
   static const String dashboard = '/dashboard';
-  static const String golfRounds = '/golf_sync';
+  static const String golfRounds = '/caddy_play';
   static const String focoMap = '/foco_map';
   static const String profile = '/profile';
   static const String aiInsights = '/ai_insights';
@@ -791,10 +791,10 @@ class FoCoCoNavigation {
   static void navigateTo(BuildContext context, String route) {
     switch (route) {
       case dashboard:
-        Navigator.pushReplacementNamed(context, '/dashboard');
+        Navigator.pushReplacementNamed(context, '/mind_coach');
         break;
       case golfRounds:
-        Navigator.pushReplacementNamed(context, '/golf_sync');
+        Navigator.pushReplacementNamed(context, '/caddy_play');
         break;
       case focoMap:
         Navigator.pushReplacementNamed(context, '/foco_map');
@@ -818,14 +818,14 @@ class FoCoCoNavigation {
         Navigator.pushNamed(context, '/vark_onboarding');
         break;
       default:
-        Navigator.pushReplacementNamed(context, '/dashboard');
+        Navigator.pushReplacementNamed(context, '/mind_coach');
     }
   }
 
   /// Get current route from context
   static String getCurrentRoute(BuildContext context) {
     final route = ModalRoute.of(context);
-    return route?.settings.name ?? '/dashboard';
+    return route?.settings.name ?? '/mind_coach';
   }
 
   /// Check if route is a main navigation route

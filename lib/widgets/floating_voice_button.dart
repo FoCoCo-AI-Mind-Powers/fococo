@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:ui';
 import '../flutter_flow/flutter_flow_theme.dart';
 import '../flutter_flow/glass_design_system.dart';
 import '../ai_integration/services/fococo_voice_service.dart';
-import '../ai_integration/widgets/voice_chat_modal.dart';
+import '../pages/just_talk/just_talk_widget.dart';
 
 class FloatingVoiceButton extends StatefulWidget {
   final VoidCallback? onPressed;
@@ -188,33 +189,87 @@ class _FloatingVoiceButtonState extends State<FloatingVoiceButton>
   }
 
   void _onPressed() async {
-    HapticFeedback.mediumImpact();
+    if (!mounted) return;
+    
+    try {
+      HapticFeedback.mediumImpact();
 
-    // Hide tooltip when button is pressed
-    if (_showTooltip) {
-      _hideTooltip();
+      // Hide tooltip when button is pressed
+      if (_showTooltip) {
+        _hideTooltip();
+      }
+
+      if (widget.onPressed != null) {
+        widget.onPressed!();
+        return;
+      }
+
+      // Show just_talk as bottom sheet
+      if (mounted) {
+        _showJustTalkBottomSheet();
+      }
+    } catch (e) {
+      debugPrint('Failed to show just_talk bottom sheet: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to open Just Talk: ${e.toString()}'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     }
+  }
 
-    if (widget.onPressed != null) {
-      widget.onPressed!();
-      return;
-    }
-
-    // Default behavior: Show voice chat modal with voice mode enabled
-    if (mounted) {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        barrierColor: Colors.black.withValues(alpha: 0.6),
-        enableDrag: true,
-        isDismissible: true,
-        builder: (context) => const FoCoCoVoiceChatModal(
-          initialVoiceMode:
-              true, // Start in voice mode when opened from floating button
+  void _showJustTalkBottomSheet() {
+    final theme = FlutterFlowTheme.of(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      enableDrag: true,
+      isDismissible: true,
+      useSafeArea: false,
+      builder: (context) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            height: screenHeight * 0.95,
+            decoration: BoxDecoration(
+              color: theme.glassBackground.withValues(alpha: 0.9),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border.all(
+                color: theme.glassBorder.withValues(alpha: GlassDesignSystem.glassBorderOpacity),
+                width: 1.0,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle bar
+                Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.secondaryText.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // JustTalkWidget content - takes remaining space
+                Expanded(
+                  child: const JustTalkWidget(),
+                ),
+              ],
+            ),
+          ),
         ),
-      );
-    }
+      ),
+    );
   }
 
   Widget _buildTooltip(FlutterFlowTheme theme) {

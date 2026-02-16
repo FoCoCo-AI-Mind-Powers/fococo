@@ -40,6 +40,8 @@ class GeminiLiveConfig {
   final AudioArchitecture audioArchitecture;
   final bool enableThinking;
   final Map<String, dynamic>? tools;
+  final bool enableMapsGrounding;
+  final Map<String, dynamic>? locationContext;
 
   const GeminiLiveConfig({
     this.model = 'gemini-2.5-flash-preview-native-audio-dialog',
@@ -53,6 +55,8 @@ Keep responses concise and conversational for voice interactions.''',
     this.audioArchitecture = AudioArchitecture.nativeAudio,
     this.enableThinking = false,
     this.tools,
+    this.enableMapsGrounding = false,
+    this.locationContext,
   });
 
   /// Get the appropriate model based on configuration
@@ -74,6 +78,9 @@ Keep responses concise and conversational for voice interactions.''',
         'response_modalities': responseModalities,
         'system_instruction': systemInstruction,
         if (tools != null) 'tools': tools,
+        if (enableMapsGrounding) 'grounding': {
+          'googleMaps': <String, dynamic>{}
+        },
       };
 }
 
@@ -111,6 +118,9 @@ class GeminiLiveAPIService {
 
   // Session management
   List<Map<String, dynamic>> _conversationHistory = [];
+  
+  // Maps Grounding location context
+  Map<String, dynamic>? _currentLocationContext;
 
   // Getters
   Stream<GeminiLiveState> get stateStream => _stateController.stream;
@@ -373,15 +383,100 @@ class GeminiLiveAPIService {
 
   /// Send initial setup message to configure the session
   Future<void> _sendSetupMessage() async {
+    final setupConfig = _config.toJson();
+    
+    // Add location context to setup if Maps Grounding is enabled
+    if (_config.enableMapsGrounding && _currentLocationContext != null) {
+      setupConfig['location'] = _currentLocationContext;
+    }
+    
     final setupMessage = {
-      'setup': _config.toJson(),
+      'setup': setupConfig,
     };
 
     _channel!.sink.add(jsonEncode(setupMessage));
 
     if (kDebugMode) {
       print('📤 Sent setup message: ${_config.effectiveModel}');
+      if (_config.enableMapsGrounding && _currentLocationContext != null) {
+        print('📍 Maps Grounding enabled with location context');
+      }
     }
+  }
+  
+  /// Update location context for Maps Grounding
+  /// Call this during an active session to update location
+  void updateLocationContext({
+    required double latitude,
+    required double longitude,
+    double? accuracy,
+    double? altitude,
+    double? heading,
+    double? speed,
+  }) {
+    _currentLocationContext = {
+      'latitude': latitude,
+      'longitude': longitude,
+      if (accuracy != null) 'accuracy': accuracy,
+      if (altitude != null) 'altitude': altitude,
+      if (heading != null) 'heading': heading,
+      if (speed != null) 'speed': speed,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+
+    // If connected and Maps Grounding is enabled, send location update
+    if (isConnected && _config.enableMapsGrounding && _channel != null) {
+      try {
+        final locationUpdate = {
+          'realtime_input': {
+            'location': _currentLocationContext,
+          },
+        };
+        _channel!.sink.add(jsonEncode(locationUpdate));
+        
+        if (kDebugMode) {
+          print('📍 Sent location update: $latitude, $longitude');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('❌ Error sending location update: $e');
+        }
+      }
+    }
+  }
+  
+  /// Initialize with location context for Maps Grounding
+  Future<void> initializeWithLocation({
+    required double latitude,
+    required double longitude,
+    double? accuracy,
+    GeminiLiveConfig? config,
+    VarkPreferencesStruct? varkPreferences,
+  }) async {
+    _currentLocationContext = {
+      'latitude': latitude,
+      'longitude': longitude,
+      if (accuracy != null) 'accuracy': accuracy,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    
+    // Enable Maps Grounding if not explicitly disabled
+    final finalConfig = config ?? const GeminiLiveConfig();
+    final configWithMaps = GeminiLiveConfig(
+      model: finalConfig.model,
+      responseModalities: finalConfig.responseModalities,
+      systemInstruction: finalConfig.systemInstruction,
+      audioArchitecture: finalConfig.audioArchitecture,
+      enableThinking: finalConfig.enableThinking,
+      tools: finalConfig.tools,
+      enableMapsGrounding: true,
+      locationContext: _currentLocationContext,
+    );
+    
+    await initialize(
+      config: configWithMaps,
+      varkPreferences: varkPreferences,
+    );
   }
 
   /// Start streaming audio data to the API
@@ -436,6 +531,30 @@ class GeminiLiveAPIService {
                   final audioData = base64Decode(inlineData['data']);
                   _audioDataController.add(audioData);
                   _playAudioResponse(audioData);
+                }
+              }
+              
+              // Handle Maps Grounding responses (function calls, places, navigation)
+              if (part['function_call'] != null && _config.enableMapsGrounding) {
+                final functionCall = part['function_call'];
+                if (kDebugMode) {
+                  print('🗺️ Maps Grounding function call: ${functionCall['name']}');
+                }
+                // Function calls from Maps Grounding can be processed here
+                // For example: get_place_details, search_nearby, get_directions, etc.
+              }
+              
+              // Handle grounding metadata (places, routes, etc.)
+              if (part['grounding_metadata'] != null && _config.enableMapsGrounding) {
+                final groundingMeta = part['grounding_metadata'];
+                if (kDebugMode) {
+                  print('🗺️ Maps Grounding metadata received');
+                  if (groundingMeta['search_entry_point'] != null) {
+                    print('   Search entry point: ${groundingMeta['search_entry_point']}');
+                  }
+                  if (groundingMeta['grounding_chunks'] != null) {
+                    print('   Grounding chunks: ${groundingMeta['grounding_chunks'].length}');
+                  }
                 }
               }
             }

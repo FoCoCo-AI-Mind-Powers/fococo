@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 // Audio recording will be implemented with platform-specific packages
 // import 'package:record/record.dart';
@@ -26,8 +27,12 @@ class FoCoMapGeminiVoiceService {
   static String get _geminiApiKey {
     final key = GeminiLiveAPIConfig.apiKey;
     if (key.isEmpty) {
-      // Fallback to hardcoded key if config returns empty
-      return 'AIzaSyDFBlHJPrjGsdpbHAo8ZEDXQC3tNrjG9iA';
+      if (kDebugMode) {
+        print('⚠️ GEMINI_API_KEY not configured for FoCoMap voice service');
+        print('💡 Set GEMINI_API_KEY via --dart-define or environment variable');
+      }
+      // Return empty string - service will handle gracefully
+      return '';
     }
     return key;
   }
@@ -777,10 +782,6 @@ Recent topics: mental exercises, course strategy planning, confidence building.
     debugPrint('Starting practice drill: $data');
   }
 
-  void _handleError(dynamic error) {
-    debugPrint('Audio stream error: $error');
-    _stateController.add(VoiceState.error);
-  }
 
   /// Dispose resources
   Future<void> dispose() async {

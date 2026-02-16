@@ -9,6 +9,7 @@ import '/backend/schema/round_logs_record.dart';
 import '/backend/schema/scorecard_record.dart';
 import '/backend/schema/shot_logs_record.dart';
 import '/pages/foco_map/platform_map_widget.dart';
+import '/ai_integration/config/gemini_live_config.dart';
 
 /// AI-powered spatial analysis and embeddings for FoCo Map
 /// Integrates Gemini Embedding and Robotics-ER 1.5 models for enhanced map intelligence
@@ -19,8 +20,8 @@ class FoCoMapAIService {
   static const String _baseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models';
 
-  // Your API key should be stored securely
-  final String _apiKey;
+  // Get API key from centralized config
+  String get _apiKey => GeminiLiveAPIConfig.apiKey;
 
   // Embedding cache for performance
   final Map<String, List<double>> _embeddingCache = {};
@@ -42,7 +43,7 @@ class FoCoMapAIService {
   Stream<PatternInsight> get patternStream => _patternController.stream;
   Stream<RealtimeGuidance> get guidanceStream => _guidanceController.stream;
 
-  FoCoMapAIService({required String apiKey}) : _apiKey = apiKey;
+  FoCoMapAIService();
 
   /// Initialize the AI service
   Future<void> initialize() async {
@@ -56,8 +57,8 @@ class FoCoMapAIService {
     String taskType = 'SEMANTIC_SIMILARITY',
     int outputDimensionality = 768,
   }) async {
-    // Skip if API key is not set
-    if (_apiKey.isEmpty) {
+    // Skip if API key is not set or is placeholder
+    if (_apiKey.isEmpty || _apiKey == 'YOUR_GEMINI_API_KEY_HERE') {
       debugPrint(
           '⚠️ FoCoMapAIService: API key not set, skipping embedding generation');
       return [];
@@ -119,8 +120,8 @@ class FoCoMapAIService {
     required List<LatLng> positions,
     required Map<String, dynamic> contextData,
   }) async {
-    // Skip if API key is not set
-    if (_apiKey.isEmpty) {
+    // Skip if API key is not set or is placeholder
+    if (_apiKey.isEmpty || _apiKey == 'YOUR_GEMINI_API_KEY_HERE') {
       debugPrint(
           '⚠️ FoCoMapAIService: API key not set, skipping spatial analysis');
       return RoboticsAnalysis.empty();

@@ -59,10 +59,15 @@ class UnifiedAIService {
   /// Initialize Firebase AI with proper error handling
   Future<void> _initializeFirebaseAI() async {
     try {
-      // Create Firebase AI model
+      // Create Firebase AI model with enhanced generation config for unique responses
       _firebaseModel = FirebaseAI.googleAI().generativeModel(
         model: GeminiConfig.defaultModel,
-        generationConfig: GeminiConfig.conversationGenerationConfig,
+        generationConfig: GenerationConfig(
+          temperature: 0.9, // Higher temperature for more varied responses
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+        ),
         safetySettings: GeminiConfig.defaultSafetySettings,
       );
 
@@ -75,8 +80,10 @@ class UnifiedAIService {
     } catch (e) {
       if (kDebugMode) {
         print('⚠️ Firebase AI initialization failed: $e');
+        print('Stack trace: ${StackTrace.current}');
       }
       _firebaseModel = null;
+      rethrow; // Rethrow to allow fallback to GeminiAIClient
     }
   }
 
@@ -139,38 +146,56 @@ class UnifiedAIService {
         userInsights: userInsights,
       );
 
-      // Build full prompt with context and personalization
-      final fullPrompt = _buildFullPrompt(
+      // Build conversation content with proper history format
+      final conversationContent = _buildConversationContent(
         systemPrompt: systemPrompt,
         userMessage: userMessage,
         conversationContext: conversationContext,
       );
 
-      // Try Firebase AI first
+      // Try Firebase AI - retry up to 3 times if it fails
       if (_firebaseModel != null) {
-        try {
-          final response =
-              await _firebaseModel!.generateContent([Content.text(fullPrompt)]);
+        int retries = 3;
+        while (retries > 0) {
+          try {
+            final response = await _firebaseModel!.generateContent(conversationContent);
 
-          final responseText = response.text;
-          if (responseText != null && responseText.isNotEmpty) {
-            return _cleanResponse(responseText);
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print('Firebase AI failed, trying fallback: $e');
+            final responseText = response.text;
+            if (responseText != null && responseText.isNotEmpty) {
+              final cleanedResponse = _cleanResponse(responseText);
+              if (kDebugMode) {
+                print('✅ Firebase AI generated response: ${cleanedResponse.substring(0, cleanedResponse.length > 50 ? 50 : cleanedResponse.length)}...');
+              }
+              return cleanedResponse;
+            }
+          } catch (e) {
+            retries--;
+            if (kDebugMode) {
+              print('⚠️ Firebase AI attempt failed (${4 - retries}/3): $e');
+            }
+            if (retries > 0) {
+              // Wait a bit before retrying
+              await Future.delayed(Duration(milliseconds: 500));
+              continue;
+            }
+            // If all retries failed, rethrow to use GeminiAIClient fallback
+            if (kDebugMode) {
+              print('❌ Firebase AI failed after 3 attempts, will try GeminiAIClient');
+            }
+            rethrow;
           }
         }
       }
 
-      // Fallback to hardcoded intelligent responses with user insights
-      return _generateFallbackResponse(
-          userMessage, varkPreferences, userInsights);
+      // If Firebase AI is not available, throw to use GeminiAIClient fallback
+      throw Exception('Firebase AI model not initialized');
     } catch (e) {
       if (kDebugMode) {
         print('❌ Error generating AI response: $e');
       }
-      return _generateErrorResponse();
+      // Rethrow exception to allow caller to use fallback (GeminiAIClient)
+      // Don't return hardcoded response - always use AI generation
+      rethrow;
     }
   }
 
@@ -366,7 +391,37 @@ Remember: You're not just answering questions - you're building a coaching relat
     return buffer.toString();
   }
 
-  /// Build full prompt with context
+  /// Build conversation content with proper format for Firebase AI
+  /// Creates a single prompt with all context for better AI understanding
+  List<Content> _buildConversationContent({
+    required String systemPrompt,
+    required String userMessage,
+    String? conversationContext,
+  }) {
+    // Build a comprehensive prompt that includes system instruction, 
+    // conversation history, and current message
+    final buffer = StringBuffer();
+    
+    buffer.writeln(systemPrompt);
+    buffer.writeln();
+    buffer.writeln('--- CONVERSATION HISTORY ---');
+    
+    if (conversationContext != null && conversationContext.isNotEmpty) {
+      buffer.writeln(conversationContext);
+    } else {
+      buffer.writeln('(This is the start of our conversation)');
+    }
+    
+    buffer.writeln();
+    buffer.writeln('--- CURRENT MESSAGE ---');
+    buffer.writeln('Golfer: $userMessage');
+    buffer.writeln();
+    buffer.writeln('Coach: (Generate a unique, personalized response based on the conversation history and current message)');
+    
+    return [Content.text(buffer.toString())];
+  }
+
+  /// Build full prompt with context (kept for backward compatibility)
   String _buildFullPrompt({
     required String systemPrompt,
     required String userMessage,

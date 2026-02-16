@@ -2,6 +2,7 @@ import '/auth/firebase_auth/auth_util.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/services/biometric_auth_service.dart';
+import '/services/auth_flow_service.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'login_model.dart';
@@ -103,7 +104,7 @@ class _LoginWidgetState extends State<LoginWidget>
 
         // For biometric login, we need to handle this differently since we don't have password
         // We'll assume the user is already authenticated via biometric and redirect
-        context.goNamedAuth('dashboard', context.mounted);
+        await _navigateAfterAuth();
       } else {
         _showErrorSnackBar(
             '${_biometricName} authentication failed or cancelled');
@@ -118,6 +119,16 @@ class _LoginWidgetState extends State<LoginWidget>
         });
       }
     }
+  }
+
+  Future<void> _navigateAfterAuth() async {
+    final decision = await AuthFlowService.instance.resolvePostAuthDecision();
+    if (!mounted) return;
+    GoRouter.of(context).clearRedirectLocation();
+    context.goNamed(
+      decision.routeName,
+      extra: decision.extra,
+    );
   }
 
   Future<void> _showPasswordRecoveryDialog() async {
@@ -514,8 +525,7 @@ class _LoginWidgetState extends State<LoginWidget>
                                         .signInWithGoogle(context);
                                     if (user == null) return;
 
-                                    context.goNamedAuth(
-                                        'dashboard', context.mounted);
+                                    await _navigateAfterAuth();
                                   } catch (e) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
@@ -551,8 +561,7 @@ class _LoginWidgetState extends State<LoginWidget>
                                           .signInWithApple(context);
                                       if (user == null) return;
 
-                                      context.goNamedAuth(
-                                          'dashboard', context.mounted);
+                                      await _navigateAfterAuth();
                                     } catch (e) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
@@ -844,8 +853,7 @@ class _LoginWidgetState extends State<LoginWidget>
                                         return;
                                       }
 
-                                      context.goNamedAuth(
-                                          'dashboard', context.mounted);
+                                      await _navigateAfterAuth();
                                     },
                                     borderRadius: BorderRadius.circular(12),
                                     child: Container(

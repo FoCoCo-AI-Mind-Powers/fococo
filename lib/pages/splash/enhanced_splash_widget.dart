@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/auth/firebase_auth/auth_util.dart';
+import '/services/auth_flow_service.dart';
 import 'package:flutter/foundation.dart';
 
 class EnhancedSplashWidget extends StatefulWidget {
@@ -280,14 +281,17 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
 
       if (user != null && user.loggedIn) {
         if (kDebugMode) {
-          print('✅ Enhanced Splash: User logged in, navigating to dashboard');
+          print('✅ Enhanced Splash: User logged in, resolving destination');
         }
-        context.go('/dashboard');
+        final decision =
+            await AuthFlowService.instance.resolvePostAuthDecision();
+        if (!mounted) return;
+        context.goNamed(decision.routeName, extra: decision.extra);
       } else {
         if (kDebugMode) {
           print('✅ Enhanced Splash: User not logged in, navigating to home');
         }
-        context.go('/home');
+        context.go('/login');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -295,7 +299,7 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
       }
       // Fallback navigation
       if (mounted) {
-        context.go('/home');
+        context.go('/login');
       }
     }
   }

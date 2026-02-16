@@ -209,6 +209,9 @@ class MindBalanceService {
   /// Get recent round logs
   Future<List<RoundLogsRecord>> _getRecentRounds(String userId,
       {int limit = 5}) async {
+    // Guard against empty userId - would cause permission denied
+    if (userId.isEmpty) return [];
+    
     try {
       final rounds = await RoundLogsRecord.collection
           .where('userId', isEqualTo: userId)
@@ -220,6 +223,12 @@ class MindBalanceService {
           .map((doc) => RoundLogsRecord.fromSnapshot(doc))
           .toList();
     } catch (e) {
+      // Handle permission errors gracefully - don't log them as errors
+      final errorStr = e.toString();
+      if (errorStr.contains('permission-denied')) {
+        // Permission denied is expected in some cases, silently return empty
+        return [];
+      }
       if (kDebugMode) {
         print('❌ Error getting recent rounds: $e');
       }
@@ -230,6 +239,9 @@ class MindBalanceService {
   /// Get recent training sessions
   Future<List<MentalSessionsRecord>> _getRecentSessions(String userId,
       {int days = 7}) async {
+    // Guard against empty userId - would cause permission denied
+    if (userId.isEmpty) return [];
+    
     try {
       final cutoffDate = DateTime.now().subtract(Duration(days: days));
       final sessions = await MentalSessionsRecord.collection
@@ -243,6 +255,12 @@ class MindBalanceService {
           .map((doc) => MentalSessionsRecord.fromSnapshot(doc))
           .toList();
     } catch (e) {
+      // Handle permission errors gracefully - don't log them as errors
+      final errorStr = e.toString();
+      if (errorStr.contains('permission-denied')) {
+        // Permission denied is expected in some cases, silently return empty
+        return [];
+      }
       if (kDebugMode) {
         print('❌ Error getting recent sessions: $e');
       }

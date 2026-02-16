@@ -106,6 +106,14 @@ class GeminiCostTracker {
     String? sessionId,
     String? contentType = 'personalized_content',
   }) async {
+    // Guard against empty userId - would cause permission denied
+    if (userId.isEmpty) {
+      if (kDebugMode) {
+        print('⚠️ Skipping content tracking: userId is empty');
+      }
+      return;
+    }
+    
     try {
       await _recordUsage(
         userId: userId,
@@ -186,6 +194,11 @@ class GeminiCostTracker {
 
   /// Get user's token balance and limits
   Future<UserTokenBalance> getUserTokenBalance(String userId) async {
+    // Guard against empty userId - would cause permission denied
+    if (userId.isEmpty) {
+      throw Exception('User ID is required to get token balance');
+    }
+    
     try {
       final doc = await FirebaseFirestore.instance
           .collection(_userTokensCollection)
@@ -452,6 +465,11 @@ class GeminiCostTracker {
 
   /// Create new user token balance
   Future<UserTokenBalance> _createUserTokenBalance(String userId) async {
+    // Guard against empty userId - would cause permission denied
+    if (userId.isEmpty) {
+      throw Exception('User ID is required to create token balance');
+    }
+    
     final userDoc = await UserRecord.collection.doc(userId).get();
     final subscriptionTier = userDoc.exists 
         ? (userDoc.data() as Map<String, dynamic>)['subscriptionTier'] ?? 'BASE'

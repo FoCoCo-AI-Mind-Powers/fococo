@@ -8,7 +8,6 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/glass_components.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
-import '/widgets/floating_voice_button.dart';
 import 'dashboard_model.dart';
 export 'dashboard_model.dart';
 
@@ -238,9 +237,6 @@ class _DashboardWidgetState extends State<DashboardWidget>
                 ),
               ),
             ),
-
-            // Floating Voice Button
-            const FloatingVoiceButton(),
           ],
         ),
         bottomNavigationBar: EnhancedFoCoCoNavBar(
@@ -263,9 +259,8 @@ class _DashboardWidgetState extends State<DashboardWidget>
           : null,
       builder: (context, userSnapshot) {
         final user = userSnapshot.data;
-        final displayName = user?.displayName.isNotEmpty == true
-            ? user!.displayName
-            : 'Golfer';
+        final displayName =
+            user?.displayName.isNotEmpty == true ? user!.displayName : 'Golfer';
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -903,7 +898,8 @@ class _DashboardWidgetState extends State<DashboardWidget>
                       const SizedBox(height: 24),
                     ]
                   : sessions
-                      .map((session) => _buildMindcoachSessionItem(theme, session))
+                      .map((session) =>
+                          _buildMindcoachSessionItem(theme, session))
                       .toList(),
             )
           ],
@@ -1026,7 +1022,8 @@ class _DashboardWidgetState extends State<DashboardWidget>
                             text: 'Generate Insights',
                             options: FFButtonOptions(
                               height: 40,
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
                               color: theme.primary,
                               textStyle: theme.bodyMedium.copyWith(
                                 color: Colors.white,
@@ -1058,7 +1055,8 @@ class _DashboardWidgetState extends State<DashboardWidget>
               builder: (context, snapshot) {
                 final activePlans = snapshot.data ?? [];
                 final goals = activePlans
-                    .map((plan) => plan.title.isNotEmpty ? plan.title : 'Training Plan')
+                    .map((plan) =>
+                        plan.title.isNotEmpty ? plan.title : 'Training Plan')
                     .toList();
 
                 return GlassDashboardCard(
@@ -1082,7 +1080,8 @@ class _DashboardWidgetState extends State<DashboardWidget>
                                 text: 'Set Your Goals',
                                 options: FFButtonOptions(
                                   height: 40,
-                                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20),
                                   color: theme.primary,
                                   textStyle: theme.bodyMedium.copyWith(
                                     color: Colors.white,
@@ -1253,12 +1252,15 @@ class _DashboardWidgetState extends State<DashboardWidget>
     );
   }
 
-
-  Widget _buildMindcoachSessionItem(FlutterFlowTheme theme, MindcoachSessionsRecord session) {
+  Widget _buildMindcoachSessionItem(
+      FlutterFlowTheme theme, MindcoachSessionsRecord session) {
     final timestamp = session.timestamp ?? session.createdTime;
-    final routineType = session.routineType.isNotEmpty ? session.routineType : 'Mind Coach Session';
-    final deliveryLength = session.deliveryLength.isNotEmpty ? session.deliveryLength : '';
-    
+    final routineType = session.routineType.isNotEmpty
+        ? session.routineType
+        : 'Mind Coach Session';
+    final deliveryLength =
+        session.deliveryLength.isNotEmpty ? session.deliveryLength : '';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -1342,7 +1344,7 @@ class _DashboardWidgetState extends State<DashboardWidget>
   String _formatSessionDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays == 0) {
       return 'Today';
     } else if (difference.inDays == 1) {
@@ -1383,7 +1385,25 @@ class _DashboardWidgetState extends State<DashboardWidget>
                   const Spacer(),
                   IconButton(
                     icon: Icon(Icons.close, color: theme.primaryText),
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      // Safely close end drawer
+                      try {
+                        final scaffold = Scaffold.of(context);
+                        if (scaffold.isEndDrawerOpen) {
+                          scaffold.closeEndDrawer();
+                        }
+                      } catch (e) {
+                        // Fallback to Navigator if Scaffold is not available
+                        try {
+                          if (Navigator.of(context, rootNavigator: false)
+                              .canPop()) {
+                            Navigator.of(context, rootNavigator: false).pop();
+                          }
+                        } catch (navError) {
+                          debugPrint('Note: Could not close drawer: $navError');
+                        }
+                      }
+                    },
                   ),
                 ],
               ),
@@ -1395,22 +1415,23 @@ class _DashboardWidgetState extends State<DashboardWidget>
                     .where('userId', isEqualTo: currentUserUid)
                     .snapshots()
                     .map((snapshot) {
-                      final notifications = snapshot.docs
-                          .map((doc) => NotificationsRecord.fromSnapshot(doc))
-                          .toList();
-                      // Sort by createdTime descending
-                      notifications.sort((a, b) {
-                        final aTime = a.createdTime ?? DateTime(1970);
-                        final bTime = b.createdTime ?? DateTime(1970);
-                        return bTime.compareTo(aTime);
-                      });
-                      return notifications.take(50).toList();
-                    }),
+                  final notifications = snapshot.docs
+                      .map((doc) => NotificationsRecord.fromSnapshot(doc))
+                      .toList();
+                  // Sort by createdTime descending
+                  notifications.sort((a, b) {
+                    final aTime = a.createdTime ?? DateTime(1970);
+                    final bTime = b.createdTime ?? DateTime(1970);
+                    return bTime.compareTo(aTime);
+                  });
+                  return notifications.take(50).toList();
+                }),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(
                       child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(theme.primary),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(theme.primary),
                       ),
                     );
                   }
@@ -1456,9 +1477,10 @@ class _DashboardWidgetState extends State<DashboardWidget>
     );
   }
 
-  Widget _buildNotificationItem(FlutterFlowTheme theme, NotificationsRecord notification) {
+  Widget _buildNotificationItem(
+      FlutterFlowTheme theme, NotificationsRecord notification) {
     final isUnread = !notification.isRead;
-    
+
     return InkWell(
       onTap: () async {
         // Mark as read
@@ -1468,7 +1490,7 @@ class _DashboardWidgetState extends State<DashboardWidget>
             'readTime': FieldValue.serverTimestamp(),
           });
         }
-        
+
         // Handle action if available
         if (notification.actionUrl.isNotEmpty) {
           // Navigate or handle action
@@ -1587,7 +1609,7 @@ class _DashboardWidgetState extends State<DashboardWidget>
   String _formatNotificationDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inMinutes < 1) {
       return 'Just now';
     } else if (difference.inMinutes < 60) {

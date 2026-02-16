@@ -81,13 +81,6 @@ class _EnhancedFoCoCoNavBarState extends State<EnhancedFoCoCoNavBar>
   // Enhanced navigation items matching the image design
   final List<EnhancedNavigationItem> _navItems = [
     EnhancedNavigationItem(
-      icon: Icons.access_time_outlined,
-      activeIcon: Icons.access_time_rounded,
-      label: 'Today',
-      route: 'dashboard',
-      color: const Color(0xFF0A3669), // Brand navy
-    ),
-    EnhancedNavigationItem(
       icon: Icons.people_outline_rounded,
       activeIcon: Icons.people_rounded,
       label: 'MindCoach',
@@ -95,25 +88,18 @@ class _EnhancedFoCoCoNavBarState extends State<EnhancedFoCoCoNavBar>
       color: const Color(0xFF017B3D), // Brand green
     ),
     EnhancedNavigationItem(
-      icon: Icons.auto_awesome_outlined,
-      activeIcon: Icons.auto_awesome_rounded,
-      label: 'Insights',
-      route: 'ai_insights',
-      color: const Color(0xFF7C3AED), // Purple - mindfulness/meditation color
-    ),
-    EnhancedNavigationItem(
-      icon: Icons.location_on_outlined,
-      activeIcon: Icons.location_on_rounded,
-      label: 'FoCoMap',
-      route: 'foco_map',
-      color: const Color(0xFFFEA400), // Brand orange
-    ),
-    EnhancedNavigationItem(
       icon: FontAwesomeIcons.flag,
       activeIcon: FontAwesomeIcons.flag,
-      label: 'GolfSync',
-      route: 'golf_sync',
+      label: 'CaddyPlay',
+      route: 'caddy_play',
       color: const Color(0xFF0EA5E9), // Calm blue - different from navy
+    ),
+    EnhancedNavigationItem(
+      icon: Icons.chat_bubble_outline_rounded,
+      activeIcon: Icons.chat_bubble_rounded,
+      label: 'GolfChat',
+      route: 'golf_chat',
+      color: const Color(0xFFFEA400), // Brand orange
     ),
   ];
 
@@ -181,7 +167,7 @@ class _EnhancedFoCoCoNavBarState extends State<EnhancedFoCoCoNavBar>
   /// Makes dark blue lighter in dark mode for better visibility
   Color _getAdjustedColor(Color originalColor, FlutterFlowTheme theme) {
     // Check if it's the navy blue color (0xFF0A3669) and we're in dark mode
-    if (originalColor.value == 0xFF0A3669) {
+    if (originalColor.toARGB32() == 0xFF0A3669) {
       final brightness = Theme.of(context).brightness;
       if (brightness == Brightness.dark) {
         // Use a lighter blue for dark mode (0xFF1E5A9E - lighter navy)
@@ -720,7 +706,7 @@ class _EnhancedFoCoCoDrawerState extends State<EnhancedFoCoCoDrawer> {
     final subscriptionProvider = SubscriptionStateProvider();
     final isWithinTrial = subscriptionProvider.isWithinTrialPeriod();
     final trialDaysRemaining = subscriptionProvider.getTrialDaysRemaining();
-    
+
     String upgradeText;
 
     switch (membershipTier.toLowerCase()) {
@@ -741,12 +727,14 @@ class _EnhancedFoCoCoDrawerState extends State<EnhancedFoCoCoDrawer> {
 
     // Add trial days info if in trial
     if (isWithinTrial && trialDaysRemaining > 0) {
-      upgradeText = '$upgradeText ($trialDaysRemaining ${trialDaysRemaining == 1 ? 'day' : 'days'} left in trial)';
+      upgradeText =
+          '$upgradeText ($trialDaysRemaining ${trialDaysRemaining == 1 ? 'day' : 'days'} left in trial)';
     }
 
     String upgradeButtonText = 'Upgrade';
     if (isWithinTrial && trialDaysRemaining > 0) {
-      upgradeButtonText = 'Upgrade ($trialDaysRemaining${trialDaysRemaining == 1 ? 'd' : 'd'} left)';
+      upgradeButtonText =
+          'Upgrade ($trialDaysRemaining${trialDaysRemaining == 1 ? 'd' : 'd'} left)';
     }
 
     return Container(
@@ -783,7 +771,7 @@ class _EnhancedFoCoCoDrawerState extends State<EnhancedFoCoCoDrawer> {
                 } catch (e) {
                   debugPrint('Note: Could not close drawer: $e');
                 }
-                
+
                 if (!context.mounted) return;
                 widget.onNavigate?.call('subscription_management');
               },
@@ -829,6 +817,12 @@ class _EnhancedFoCoCoDrawerState extends State<EnhancedFoCoCoDrawer> {
         title: 'Help & Support',
         route: 'support',
         subtitle: 'FAQ, Contact, Feedback',
+      ),
+      DrawerItem(
+        icon: Icons.chat_bubble_outline_rounded,
+        title: 'GolfChat',
+        route: 'golf_chat',
+        subtitle: 'Reflect • Understand • Reset',
       ),
       DrawerItem(
         icon: Icons.star_outline,
@@ -894,8 +888,22 @@ class _EnhancedFoCoCoDrawerState extends State<EnhancedFoCoCoDrawer> {
                   )
                 : null,
             onTap: () {
-              if (Navigator.of(context).canPop()) {
-                Navigator.of(context).pop();
+              // Safely close drawer
+              try {
+                // Try to close drawer using Scaffold first
+                final scaffold = Scaffold.of(context);
+                if (scaffold.isDrawerOpen) {
+                  scaffold.closeDrawer();
+                }
+              } catch (e) {
+                // Fallback to Navigator if Scaffold is not available
+                try {
+                  if (Navigator.of(context, rootNavigator: false).canPop()) {
+                    Navigator.of(context, rootNavigator: false).pop();
+                  }
+                } catch (navError) {
+                  debugPrint('Note: Could not close drawer: $navError');
+                }
               }
 
               // Special handling for Rate App and About
@@ -985,7 +993,7 @@ class _EnhancedFoCoCoDrawerState extends State<EnhancedFoCoCoDrawer> {
                 const SizedBox(height: 16),
                 GestureDetector(
                   onTap: () async {
-                    final url = Uri.parse('https://fococo.app');
+                    final url = Uri.parse('https://fococo.ai');
                     if (await canLaunchUrl(url)) {
                       await launchUrl(url,
                           mode: LaunchMode.externalApplication);
@@ -1060,9 +1068,9 @@ class _EnhancedFoCoCoDrawerState extends State<EnhancedFoCoCoDrawer> {
       // Ignore errors when closing drawer
       debugPrint('Note: Could not close drawer: $e');
     }
-    
+
     if (!context.mounted) return;
-    
+
     final confirmed = await GlassDesignSystem.showGlassModal<bool>(
       context: context,
       barrierDismissible: true,

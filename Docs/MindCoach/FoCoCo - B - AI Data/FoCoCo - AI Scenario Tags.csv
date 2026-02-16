@@ -1,0 +1,41 @@
+scenario_tag,description
+first_tee_nerves,Nerves/pressure on the first tee or early holes.
+warmup_intention,Setting intention during warm-up or pre-round.
+new_course,Playing an unfamiliar course or conditions.
+fast_group_behind,Feeling rushed due to pace of play.
+indecision_over_ball,Second-guessing target/club/shot.
+club_choice_confusion,Unsure club selection or strategy.
+wind_adjustment,Wind affecting decision and commitment.
+tight_lie,Difficult lie requiring clarity and commitment.
+slow_play_rumination,Mind wandering during slow play.
+waiting_on_tee,Waiting to hit; staying calm and ready.
+walking_reset,Using walk/ride to reset attention.
+after_good_shot_stay_present,Avoiding hype/rush after a good shot.
+after_bad_shot_release,Releasing frustration after a miss.
+missed_short_putt,Handling a missed short putt.
+three_putt_frustration,Handling frustration after three-putt.
+bunker_miss,Poor bunker shot recovery.
+penalty_recovery,Reset after penalty stroke.
+double_bogey_stop_bleed,Stop spiral after a big hole.
+lost_ball_reset,Reset after losing ball / provisional.
+chunked_wedge_recover,Recovery after chunk/thin wedge.
+closing_holes_pressure,Pressure on closing holes.
+match_play_moment,Match play decision moments.
+playing_with_better_golfers,Intimidation playing with stronger golfers.
+being_watched,Spectators / friends watching.
+protecting_lead,Leading and protecting advantage.
+protecting_score,Protecting a target score.
+after_birdie_rush,Avoid rushing after birdie.
+great_start_discipline,Keeping discipline after a great start.
+momentum_swing_back_nine,Managing momentum shifts on back nine.
+nerves_on_green,Putting under nerves/tension.
+tee_shot_commitment,Commitment on tee shot.
+approach_commitment,Commitment on approach shot.
+short_game_touch,Short-game feel moments.
+putting_commitment,Commitment in putting routine.
+post_round_learn,Post-round review focused on learning.
+post_round_next_step,Choosing next-step focus after round.
+tournament_round,Tournament context.
+casual_social_round,Casual/social round context.
+junior_competition,Junior competitive context (13+).
+practice_round,Practice / training round context.

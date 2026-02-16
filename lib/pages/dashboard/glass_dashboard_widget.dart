@@ -636,7 +636,7 @@ class _GlassDashboardWidgetState extends State<GlassDashboardWidget>
             ),
           ],
           onTap: () {
-            context.pushNamed('coaching_modules');
+            context.pushNamed('mind_coach');
           },
         ),
       ],

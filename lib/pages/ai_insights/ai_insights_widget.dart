@@ -1174,7 +1174,7 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget>
                       } else if (action == 'Train') {
                         context.goNamed('mind_coach');
                       } else if (action == 'Review') {
-                        context.goNamed('golf_sync');
+                        context.goNamed('caddy_play');
                       }
                     },
                     text: action,
@@ -1365,7 +1365,7 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget>
                       const SizedBox(width: 8),
                       Expanded(
                         child: FFButtonWidget(
-                          onPressed: () => context.goNamed('golf_sync'),
+                          onPressed: () => context.goNamed('caddy_play'),
                           text: 'Open LogBook',
                           options: FFButtonOptions(
                             height: 36,
@@ -2111,7 +2111,7 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget>
                         rec['title'] == 'Learn Next') {
                       context.goNamed('mind_coach');
                     } else {
-                      context.goNamed('golf_sync');
+                      context.goNamed('caddy_play');
                     }
                   },
                 ),

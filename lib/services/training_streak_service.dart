@@ -11,6 +11,9 @@ class TrainingStreakService {
   /// Get current training streak (consecutive days with completed sessions)
   Future<int> getCurrentStreak(String userId) async {
     try {
+      // Guard against empty userId - would cause permission denied
+      if (userId.isEmpty) return 0;
+      
       final sessions = await MentalSessionsRecord.collection
           .where('userId', isEqualTo: userId)
           .where('isCompleted', isEqualTo: true)
@@ -55,6 +58,16 @@ class TrainingStreakService {
   /// Get weekly progress (sessions completed out of 7 target)
   Future<WeeklyProgress> getWeeklyProgress(String userId) async {
     try {
+      // Guard against empty userId - would cause permission denied
+      if (userId.isEmpty) {
+        return WeeklyProgress(
+          completed: 0,
+          target: 7,
+          percentage: 0.0,
+          currentStreak: 0,
+        );
+      }
+      
       final now = DateTime.now();
       final weekStart = _getWeekStart(now);
 
@@ -64,6 +77,7 @@ class TrainingStreakService {
           .where('isCompleted', isEqualTo: true)
           .where('dateCompleted',
               isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart))
+          .orderBy('dateCompleted', descending: true)
           .get();
 
       final completed = sessions.docs.length;
@@ -77,6 +91,17 @@ class TrainingStreakService {
         currentStreak: streak,
       );
     } catch (e) {
+      // Handle permission errors gracefully - don't log them as errors
+      final errorStr = e.toString();
+      if (errorStr.contains('permission-denied')) {
+        // Permission denied is expected in some cases, silently return default
+        return WeeklyProgress(
+          completed: 0,
+          target: 7,
+          percentage: 0.0,
+          currentStreak: 0,
+        );
+      }
       if (kDebugMode) {
         print('❌ Error calculating weekly progress: $e');
       }
@@ -92,6 +117,9 @@ class TrainingStreakService {
   /// Get next incomplete session that needs to be completed
   Future<MentalSessionsRecord?> getNextIncompleteSession(String userId) async {
     try {
+      // Guard against empty userId - would cause permission denied
+      if (userId.isEmpty) return null;
+      
       final now = DateTime.now();
       final weekStart = _getWeekStart(now);
 
@@ -118,6 +146,9 @@ class TrainingStreakService {
 
   /// Get sessions completed this week (for progress calculation)
   Future<List<MentalSessionsRecord>> getThisWeekSessions(String userId) async {
+    // Guard against empty userId - would cause permission denied
+    if (userId.isEmpty) return [];
+    
     try {
       final now = DateTime.now();
       final weekStart = _getWeekStart(now);

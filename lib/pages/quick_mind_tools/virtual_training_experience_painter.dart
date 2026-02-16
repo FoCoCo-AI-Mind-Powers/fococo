@@ -115,6 +115,7 @@ class PremiumAmbientPainter extends CustomPainter {
             colors[wave.colorIndex].withValues(alpha: 0.05),
             Colors.transparent,
           ],
+          [0.0, 0.5, 1.0],
         )
         ..style = PaintingStyle.fill;
 

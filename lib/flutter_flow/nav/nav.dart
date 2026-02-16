@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '/backend/backend.dart';
@@ -11,25 +12,24 @@ import '/flutter_flow/flutter_flow_util.dart';
 
 import '/index.dart';
 
-import '/pages/dashboard/dashboard_widget.dart';
-import '/pages/login/login_widget.dart';
 import '/pages/vark_onboarding/vark_onboarding_widget.dart';
 import '/pages/subscription/subscription_onboarding_widget.dart';
-import '/pages/onboarding/comprehensive_onboarding_widget.dart';
 import '/pages/subscription/subscription_management_widget.dart';
 import '/pages/foco_map/foco_map_conditional_widget.dart';
 import '/pages/splash/enhanced_splash_widget.dart';
+import '/pages/golf_rounds/caddyplay_widget.dart';
 import '/pages/security/face_id_settings_widget.dart';
 import '/pages/edit_profile/edit_profile_widget.dart';
 import '/pages/settings/settings_widget.dart';
 import '/pages/support/support_widget.dart';
-import '/pages/ai_insights/ai_insights_widget.dart';
 import '/pages/quick_mind_tools/breathing_tool_widget.dart';
 import '/pages/quick_mind_tools/visualize_tool_widget.dart';
 import '/pages/quick_mind_tools/reset_tool_widget.dart';
 import '/pages/quick_mind_tools/rebalance_tool_widget.dart';
 import '/pages/quick_mind_tools/virtual_training_experience_widget.dart';
 import '/pages/just_talk/just_talk_widget.dart';
+import '/features/mindcoach_v2/app/mindcoach_v2_entry_widget.dart';
+import '/config/app_feature_flags.dart';
 
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
@@ -96,8 +96,9 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       debugLogDiagnostics: true,
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
-      errorBuilder: (context, state) =>
-          appStateNotifier.loggedIn ? DashboardWidget() : LoginWidget(),
+      errorBuilder: (context, state) => appStateNotifier.loggedIn
+          ? const MindCoachV2EntryWidget()
+          : LoginWidget(),
       routes: [
         FFRoute(
           name: '_initialize',
@@ -108,12 +109,6 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           name: LoginWidget.routeName,
           path: LoginWidget.routePath,
           builder: (context, params) => LoginWidget(),
-        ),
-        FFRoute(
-          name: DashboardWidget.routeName,
-          path: DashboardWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => DashboardWidget(),
         ),
         FFRoute(
           name: ProfileWidget.routeName,
@@ -134,18 +129,30 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => const AiInsightsWidget(),
         ),
         FFRoute(
-          name: GolfSyncWidget.routeName,
-          path: GolfSyncWidget.routePath,
+          name: CaddyPlayWidget.routeName,
+          path: CaddyPlayWidget.routePath,
           requireAuth: true,
-          builder: (context, params) => GolfSyncWidget(),
+          builder: (context, params) => const CaddyPlayWidget(),
         ),
         FFRoute(
           name: MindCoachWidget.routeName,
           path: MindCoachWidget.routePath,
           requireAuth: true,
-          builder: (context, params) => MindCoachWidget(
+          builder: (context, params) => MindCoachV2EntryWidget(
             initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
           ),
+        ),
+        FFRoute(
+          name: 'mind_coach_legacy',
+          path: '/mind_coach_legacy',
+          requireAuth: true,
+          builder: (context, params) => kDebugMode
+              ? MindCoachWidget(
+                  initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
+                )
+              : MindCoachV2EntryWidget(
+                  initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
+                ),
         ),
         FFRoute(
           name: ProgressWidget.routeName,
@@ -164,21 +171,25 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           path: RegisterWidget.routePath,
           builder: (context, params) => RegisterWidget(),
         ),
-        FFRoute(
-          name: VarkOnboardingWidget.routeName,
-          path: VarkOnboardingWidget.routePath,
-          builder: (context, params) => const VarkOnboardingWidget(),
-        ),
-        FFRoute(
-          name: ComprehensiveOnboardingWidget.routeName,
-          path: ComprehensiveOnboardingWidget.routePath,
-          builder: (context, params) => const ComprehensiveOnboardingWidget(),
-        ),
+        if (AppFeatureFlags.varkEnabled)
+          FFRoute(
+            name: VarkOnboardingWidget.routeName,
+            path: VarkOnboardingWidget.routePath,
+            builder: (context, params) => const VarkOnboardingWidget(),
+          ),
+        if (AppFeatureFlags.varkEnabled)
+          FFRoute(
+            name: ComprehensiveOnboardingWidget.routeName,
+            path: ComprehensiveOnboardingWidget.routePath,
+            builder: (context, params) => const ComprehensiveOnboardingWidget(),
+          ),
         FFRoute(
           name: 'subscription_onboarding',
           path: '/subscription_onboarding',
           requireAuth: true,
-          builder: (context, params) => const SubscriptionOnboardingWidget(),
+          builder: (context, params) => SubscriptionOnboardingWidget(
+            isMandatory: params.state.extraMap['mandatory'] == true,
+          ),
         ),
         FFRoute(
           name: 'subscription_management',
@@ -248,7 +259,8 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
             moduleTitle: params.state.extraMap['moduleTitle'] as String?,
             moduleId: params.state.extraMap['moduleId'] as String?,
             description: params.state.extraMap['description'] as String?,
-            estimatedDuration: params.state.extraMap['estimatedDuration'] as int?,
+            estimatedDuration:
+                params.state.extraMap['estimatedDuration'] as int?,
           ),
         ),
         FFRoute(
@@ -257,8 +269,63 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           requireAuth: true,
           builder: (context, params) => const JustTalkWidget(),
         ),
-      ].map((r) => r.toRoute(appStateNotifier)).toList(),
+        FFRoute(
+          name: GolfChatWidget.routeName,
+          path: GolfChatWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => const GolfChatWidget(),
+        ),
+      ].map((r) => r.toRoute(appStateNotifier)).toList()
+        ..addAll([
+          _buildAliasRoute(
+            appStateNotifier: appStateNotifier,
+            name: DashboardWidget.routeName,
+            path: DashboardWidget.routePath,
+            targetPath: MindCoachWidget.routePath,
+          ),
+          _buildAliasRoute(
+            appStateNotifier: appStateNotifier,
+            name: GolfSyncWidget.routeName,
+            path: GolfSyncWidget.routePath,
+            targetPath: CaddyPlayWidget.routePath,
+          ),
+          if (!AppFeatureFlags.varkEnabled)
+            _buildAliasRoute(
+              appStateNotifier: appStateNotifier,
+              name: VarkOnboardingWidget.routeName,
+              path: VarkOnboardingWidget.routePath,
+              targetPath: MindCoachWidget.routePath,
+            ),
+          if (!AppFeatureFlags.varkEnabled)
+            _buildAliasRoute(
+              appStateNotifier: appStateNotifier,
+              name: ComprehensiveOnboardingWidget.routeName,
+              path: ComprehensiveOnboardingWidget.routePath,
+              targetPath: MindCoachWidget.routePath,
+            ),
+        ]),
     );
+
+GoRoute _buildAliasRoute({
+  required AppStateNotifier appStateNotifier,
+  required String name,
+  required String path,
+  required String targetPath,
+}) {
+  return GoRoute(
+    name: name,
+    path: path,
+    redirect: (context, state) {
+      if (appStateNotifier.shouldRedirect) {
+        final redirectLocation = appStateNotifier.getRedirectLocation();
+        appStateNotifier.clearRedirectLocation();
+        return redirectLocation;
+      }
+
+      return targetPath;
+    },
+  );
+}
 
 extension NavParamExtensions on Map<String, String?> {
   Map<String, String> get withoutNulls => Map.fromEntries(
@@ -434,7 +501,7 @@ class FFRoute {
         },
         pageBuilder: (context, state) {
           fixStatusBarOniOS16AndBelow(context);
-          
+
           final ffParams = FFParameters(state, asyncParams);
           final page = ffParams.hasFutures
               ? FutureBuilder(

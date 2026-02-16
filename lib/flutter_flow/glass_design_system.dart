@@ -639,14 +639,14 @@ class _FoCoCoGlassNavBarWidgetState extends State<_FoCoCoGlassNavBarWidget>
     FoCoCoNavItem(
       icon: Icons.home_outlined,
       activeIcon: Icons.home_rounded,
-      label: 'Home',
-      route: '/dashboard',
+      label: 'MindCoach',
+      route: '/mind_coach',
     ),
     FoCoCoNavItem(
       icon: Icons.favorite_outline,
       activeIcon: Icons.favorite_rounded,
-      label: 'Rounds',
-      route: '/golf_sync',
+      label: 'CaddyPlay',
+      route: '/caddy_play',
     ),
     // Center space for voice button
     FoCoCoNavItem(

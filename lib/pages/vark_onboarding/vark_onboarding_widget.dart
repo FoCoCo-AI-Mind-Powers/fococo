@@ -256,7 +256,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
         await _clearLocalStorage();
 
         if (mounted) {
-          context.go('/home');
+          context.go('/dashboard');
         }
       } catch (e) {
         if (mounted) {

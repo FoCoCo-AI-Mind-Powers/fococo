@@ -44,6 +44,41 @@ class MindcoachSessionsRecord extends FirestoreRecord {
   String get deliveryLength => _deliveryLength ?? '';
   bool hasDeliveryLength() => _deliveryLength != null;
 
+  // "contentId" field.
+  String? _contentId;
+  String get contentId => _contentId ?? '';
+  bool hasContentId() => _contentId != null;
+
+  // "scenarioTag" field.
+  String? _scenarioTag;
+  String get scenarioTag => _scenarioTag ?? '';
+  bool hasScenarioTag() => _scenarioTag != null;
+
+  // "varkMode" field.
+  String? _varkMode;
+  String get varkMode => _varkMode ?? 'ReadWrite';
+  bool hasVarkMode() => _varkMode != null;
+
+  // "level" field.
+  String? _level;
+  String get level => _level ?? 'Foundation';
+  bool hasLevel() => _level != null;
+
+  // "length" field (alternative to deliveryLength).
+  String? _length;
+  String get length => _length ?? _deliveryLength ?? 'standard';
+  bool hasLength() => _length != null;
+
+  // "sessionType" field.
+  String? _sessionType;
+  String get sessionType => _sessionType ?? 'coaching';
+  bool hasSessionType() => _sessionType != null;
+
+  // "userResponse" field.
+  String? _userResponse;
+  String get userResponse => _userResponse ?? '';
+  bool hasUserResponse() => _userResponse != null;
+
   // "coachingText" field.
   String? _coachingText;
   String get coachingText => _coachingText ?? '';
@@ -54,14 +89,30 @@ class MindcoachSessionsRecord extends FirestoreRecord {
   String get followUpQuestion => _followUpQuestion ?? '';
   bool hasFollowUpQuestion() => _followUpQuestion != null;
 
-  // "mindsetBefore" field.
-  String? _mindsetBefore;
-  String get mindsetBefore => _mindsetBefore ?? '';
+  // "mindsetBefore" field - now supports both int and String for migration
+  dynamic _mindsetBefore;
+  int get mindsetBeforeInt {
+    if (_mindsetBefore is int) return _mindsetBefore as int;
+    if (_mindsetBefore is String) {
+      final parsed = int.tryParse(_mindsetBefore);
+      return parsed ?? 3; // Default to 3
+    }
+    return 3;
+  }
+  String get mindsetBefore => _mindsetBefore?.toString() ?? '3';
   bool hasMindsetBefore() => _mindsetBefore != null;
 
-  // "mindsetAfter" field.
-  String? _mindsetAfter;
-  String get mindsetAfter => _mindsetAfter ?? '';
+  // "mindsetAfter" field - now supports both int and String for migration
+  dynamic _mindsetAfter;
+  int? get mindsetAfterInt {
+    if (_mindsetAfter == null) return null;
+    if (_mindsetAfter is int) return _mindsetAfter as int;
+    if (_mindsetAfter is String) {
+      return int.tryParse(_mindsetAfter);
+    }
+    return null;
+  }
+  String get mindsetAfter => _mindsetAfter?.toString() ?? '';
   bool hasMindsetAfter() => _mindsetAfter != null;
 
   // "context" field - stored as Map
@@ -93,12 +144,21 @@ class MindcoachSessionsRecord extends FirestoreRecord {
     _deliveryLength = snapshotData['deliveryLength'] as String?;
     _coachingText = snapshotData['coachingText'] as String?;
     _followUpQuestion = snapshotData['followUpQuestion'] as String?;
-    _mindsetBefore = snapshotData['mindsetBefore'] as String?;
-    _mindsetAfter = snapshotData['mindsetAfter'] as String?;
+    // Support both int and String for mindsetBefore/After during migration
+    _mindsetBefore = snapshotData['mindsetBefore'];
+    _mindsetAfter = snapshotData['mindsetAfter'];
     _context = snapshotData['context'] as Map<String, dynamic>?;
     _successSignalFlags = snapshotData['successSignalFlags'] as Map<String, dynamic>?;
     _createdTime = snapshotData['createdTime'] as DateTime?;
     _updatedTime = snapshotData['updatedTime'] as DateTime?;
+    // New fields
+    _contentId = snapshotData['contentId'] as String?;
+    _scenarioTag = snapshotData['scenarioTag'] as String?;
+    _varkMode = snapshotData['varkMode'] as String?;
+    _level = snapshotData['level'] as String?;
+    _length = snapshotData['length'] as String?;
+    _sessionType = snapshotData['sessionType'] as String?;
+    _userResponse = snapshotData['userResponse'] as String?;
   }
 
   static CollectionReference get collection =>

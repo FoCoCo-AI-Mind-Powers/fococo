@@ -2,7 +2,6 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_components.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
-import '/widgets/floating_voice_button.dart';
 import '/ai_integration/services/ai_coaching_service.dart';
 import '/ai_integration/models/gemini_models.dart';
 import '/backend/backend.dart';
@@ -10,6 +9,7 @@ import '/backend/schema/coaching_modules_record.dart';
 import '/backend/schema/mental_sessions_record.dart';
 import '/backend/schema/training_plans_record.dart';
 import '/backend/schema/mindcoach_sessions_record.dart';
+import '/backend/schema/structs/vark_preferences_struct.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/services/app_tutorial_service.dart';
 import '/services/training_plan_service.dart';
@@ -17,10 +17,16 @@ import '/services/training_streak_service.dart';
 import '/services/mind_balance_service.dart';
 import '/ai_integration/services/mind_coach_analysis_service.dart';
 import '/ai_integration/models/mind_coach_models.dart';
+import '/ai_integration/services/mind_coach_session_service.dart';
+import '/ai_integration/services/mind_coach_content_selector.dart';
+import '/ai_integration/services/mind_coach_scenario_detector.dart';
+import '/ai_integration/services/gemini_interactions_service.dart';
+import 'mind_coach_ai_session_widget.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:ui';
 
 import 'mind_coach_model.dart';
 export 'mind_coach_model.dart';
@@ -69,6 +75,12 @@ class _MindCoachWidgetState extends State<MindCoachWidget>
   final MindBalanceService _balanceService = MindBalanceService.instance;
   final MindCoachAnalysisService _mindCoachAnalysis =
       MindCoachAnalysisService.instance;
+  final MindCoachSessionService _sessionService =
+      MindCoachSessionService.instance;
+  final MindCoachContentSelector _contentSelector =
+      MindCoachContentSelector.instance;
+  final MindCoachScenarioDetector _scenarioDetector =
+      MindCoachScenarioDetector.instance;
   bool _isLoadingAIRecommendations = false;
   String? _aiRecommendationError;
 
@@ -332,9 +344,6 @@ class _MindCoachWidgetState extends State<MindCoachWidget>
                 ),
               ),
             ),
-
-            // Floating Voice Button
-            const FloatingVoiceButton(),
           ],
         ),
         bottomNavigationBar: EnhancedFoCoCoNavBar(
@@ -1756,15 +1765,73 @@ class _MindCoachWidgetState extends State<MindCoachWidget>
     );
   }
 
-  /// Set adaptive mode
+  /// Set adaptive mode and trigger AI recommendations
   Future<void> _setAdaptiveMode(String mode) async {
     try {
       await UserRecord.collection.doc(currentUserUid).update({
         'currentAdaptiveMode': mode,
       });
       setState(() {});
+
+      // Trigger AI recommendations refresh when adaptive mode changes
+      if (mounted) {
+        await _refreshAIRecommendationsForAdaptiveMode(mode);
+      }
     } catch (e) {
-      print('❌ Error setting adaptive mode: $e');
+      if (kDebugMode) {
+        print('❌ Error setting adaptive mode: $e');
+      }
+    }
+  }
+
+  /// Refresh AI recommendations based on adaptive mode
+  Future<void> _refreshAIRecommendationsForAdaptiveMode(
+      String adaptiveMode) async {
+    if (currentUser == null) return;
+
+    try {
+      // Get user context for AI recommendations
+      final userDoc = await UserRecord.collection.doc(currentUserUid).get();
+      final user = userDoc.exists ? UserRecord.fromSnapshot(userDoc) : null;
+
+      if (user == null) return;
+
+      // Generate AI recommendations using Interactions API
+      final interactionsService = GeminiInteractionsService();
+
+      final userContext = {
+        'userId': currentUserUid,
+        'adaptiveMode': adaptiveMode,
+        'varkPreferences': user.varkPreferences?.toMap() ?? {},
+        'golfExperience': user.golfExperience,
+        'handicap': user.handicap,
+        'currentMembershipTier': user.currentMembershipTier,
+      };
+
+      final recommendations = await interactionsService.generateRecommendations(
+        userId: currentUserUid,
+        userContext: userContext,
+        adaptiveMode: adaptiveMode,
+        count: 5,
+      );
+
+      // Update recommendations in Firestore
+      if (recommendations.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('user')
+            .doc(currentUserUid)
+            .collection('ai_recommendations')
+            .doc('current')
+            .set({
+          'recommendations': recommendations,
+          'adaptiveMode': adaptiveMode,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error refreshing recommendations for adaptive mode: $e');
+      }
     }
   }
 
@@ -3596,10 +3663,9 @@ class _MindCoachWidgetState extends State<MindCoachWidget>
 
         await MentalSessionsRecord.collection.add(sessionData);
 
-        // Update module completion count
-        await CoachingModulesRecord.collection.doc(module.reference.id).update({
-          'completionCount': FieldValue.increment(1),
-        });
+        // Note: Module completion count updates are handled via Cloud Functions
+        // to maintain data integrity and prevent permission issues.
+        // The completion count can be tracked via mental_sessions queries instead.
 
         // Store session reference for potential completion tracking
         // If session is part of a training plan, plan progress will be updated
@@ -3659,8 +3725,18 @@ class _MindCoachWidgetState extends State<MindCoachWidget>
           ),
         );
 
-        // TODO: Navigate to actual module content page when implemented
-        // For now, just show the success message
+        // Navigate to module content page
+        if (mounted) {
+          context.pushNamed(
+            'virtual_training_experience',
+            extra: <String, dynamic>{
+              'moduleTitle': module.title,
+              'moduleId': module.moduleId,
+              'description': module.description,
+              'estimatedDuration': module.duration,
+            },
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -4958,27 +5034,129 @@ Keep practicing consistently and trust the process! Your mental game will streng
   Stream<List<MindcoachSessionsRecord>> _getMindcoachSessionsStream() {
     if (currentUser == null) return Stream.value([]);
 
-    return MindcoachSessionsRecord.collection
-        .where('userId', isEqualTo: currentUserUid)
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => MindcoachSessionsRecord.fromSnapshot(doc))
-            .toList());
+    // Use new service for streaming, but convert to MindcoachSessionsRecord for compatibility
+    return _sessionService
+        .streamUserSessions(
+      userId: currentUserUid!,
+      limit: 50,
+    )
+        .asyncMap((sessions) async {
+      // Convert MindCoachSession to MindcoachSessionsRecord for UI compatibility
+      // This maintains backward compatibility while using new service
+      return sessions.map((session) {
+        // Create a temporary record from the session data
+        final data = session.toFirestoreMap();
+        return MindcoachSessionsRecord.getDocumentFromData(
+          data,
+          FirebaseFirestore.instance
+              .collection('mindcoach_sessions')
+              .doc(session.sessionId),
+        );
+      }).toList();
+    });
   }
 
   /// Get recent MindCoach sessions stream
   Stream<List<MindcoachSessionsRecord>> _getRecentMindcoachSessionsStream() {
     if (currentUser == null) return Stream.value([]);
 
-    return MindcoachSessionsRecord.collection
-        .where('userId', isEqualTo: currentUserUid)
-        .orderBy('timestamp', descending: true)
-        .limit(20)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => MindcoachSessionsRecord.fromSnapshot(doc))
-            .toList());
+    return _sessionService
+        .streamUserSessions(
+      userId: currentUserUid!,
+      limit: 20,
+    )
+        .asyncMap((sessions) async {
+      return sessions.map((session) {
+        final data = session.toFirestoreMap();
+        return MindcoachSessionsRecord.getDocumentFromData(
+          data,
+          FirebaseFirestore.instance
+              .collection('mindcoach_sessions')
+              .doc(session.sessionId),
+        );
+      }).toList();
+    });
+  }
+
+  /// Create a new MindCoach session using the new service
+  /// This method integrates content selection and scenario detection
+  Future<String?> createMindCoachSession({
+    required String templateId,
+    required int mindsetBefore,
+    String? userMessage,
+    Map<String, dynamic>? context,
+    String? varkMode,
+    String? level,
+    String? length,
+  }) async {
+    if (currentUser == null) return null;
+
+    try {
+      // Detect scenarios from user input and context
+      final scenarioTags = await _scenarioDetector.detectScenarios(
+        userMessage: userMessage,
+        context: context,
+        mindsetRating: mindsetBefore,
+      );
+
+      // Get user's VARK preference if not provided
+      final userDoc = await UserRecord.collection.doc(currentUserUid).get();
+      final user = userDoc.exists ? UserRecord.fromSnapshot(userDoc) : null;
+
+      // Determine dominant VARK style from user preferences
+      String determineVarkMode(VarkPreferencesStruct? prefs) {
+        if (prefs == null) return 'ReadWrite';
+        if (prefs.visual) return 'Visual';
+        if (prefs.aural) return 'Aural';
+        if (prefs.readWrite) return 'ReadWrite';
+        if (prefs.kinesthetic) return 'Kinesthetic';
+        return 'ReadWrite'; // Default
+      }
+
+      final userVarkMode = varkMode ?? determineVarkMode(user?.varkPreferences);
+
+      // Select content from library
+      final content = await _contentSelector.selectContent(
+        templateId: templateId,
+        varkMode: userVarkMode,
+        level: level ?? 'Foundation',
+        length: length ?? 'standard',
+        scenarioTags: scenarioTags.isNotEmpty ? scenarioTags : null,
+      );
+
+      if (content == null) {
+        throw Exception('No content found for template: $templateId');
+      }
+
+      // Create session
+      final session = MindCoachSession(
+        sessionId: '', // Will be generated by service
+        userId: currentUserUid!,
+        timestamp: DateTime.now(),
+        templateId: templateId,
+        contentId: content.contentId,
+        scenarioTag: scenarioTags.isNotEmpty ? scenarioTags.first : null,
+        varkMode: userVarkMode,
+        level: level ?? 'Foundation',
+        length: length ?? 'standard',
+        cueUsed: '', // Will be set based on template
+        routineType: '', // Will be set based on template
+        mindsetBefore: mindsetBefore,
+        context: context ?? {},
+        coachingTextDelivered: content.scriptText,
+        followUpQuestion: content.followUpPrompt,
+        successSignals: _sessionService.calculateSuccessSignals(
+          mindsetBefore: mindsetBefore,
+          sessionCompleted: false,
+        ),
+      );
+
+      final sessionId = await _sessionService.createSession(session);
+      return sessionId;
+    } catch (e) {
+      print('Error creating MindCoach session: $e');
+      return null;
+    }
   }
 
   /// Build dynamic mental performance overview
@@ -6168,16 +6346,106 @@ Keep practicing consistently and trust the process! Your mental game will streng
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            if (sessionSnapshot.hasData &&
+                          onPressed: () async {
+                            // Check for incomplete MindCoach session first
+                            final mindCoachSessionService =
+                                MindCoachSessionService.instance;
+                            final incompleteMindCoachSession = currentUserUid
+                                    .isNotEmpty
+                                ? await mindCoachSessionService
+                                    .getNextIncompleteSession(currentUserUid)
+                                : null;
+
+                            if (incompleteMindCoachSession != null) {
+                              // Show MindCoach AI session widget to resume with premium glassmorphic modal
+                              if (mounted) {
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  barrierColor:
+                                      Colors.black.withValues(alpha: 0.6),
+                                  enableDrag: true,
+                                  isDismissible: true,
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(28),
+                                    ),
+                                  ),
+                                  builder: (context) => ClipRRect(
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(28),
+                                    ),
+                                    child: BackdropFilter(
+                                      filter: ImageFilter.blur(
+                                          sigmaX: 20, sigmaY: 20),
+                                      child: Container(
+                                        height:
+                                            MediaQuery.of(context).size.height *
+                                                0.92,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              theme.primaryBackground,
+                                              theme.primaryBackground
+                                                  .withValues(alpha: 0.98),
+                                            ],
+                                          ),
+                                          borderRadius:
+                                              const BorderRadius.vertical(
+                                            top: Radius.circular(28),
+                                          ),
+                                          border: Border(
+                                            top: BorderSide(
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.2),
+                                              width: 1.5,
+                                            ),
+                                          ),
+                                        ),
+                                        child: Stack(
+                                          children: [
+                                            // Content
+                                            MindCoachAISessionWidget(
+                                              existingSession:
+                                                  incompleteMindCoachSession,
+                                            ),
+                                            // Drag handle
+                                            Positioned(
+                                              top: 12,
+                                              left: 0,
+                                              right: 0,
+                                              child: Center(
+                                                child: Container(
+                                                  width: 40,
+                                                  height: 4,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white
+                                                        .withValues(alpha: 0.3),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            2),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                            } else if (sessionSnapshot.hasData &&
                                 sessionSnapshot.data != null) {
-                              // Navigate to incomplete session
-                              // TODO: Implement navigation to session
-                              _tabController
-                                  .animateTo(2); // Fallback to Train tab
-                            } else {
+                              // Navigate to incomplete MentalSessionsRecord session
                               _tabController
                                   .animateTo(2); // Navigate to Train tab
+                            } else {
+                              // No incomplete sessions, navigate to Train tab to start new
+                              _tabController.animateTo(2);
                             }
                           },
                           style: ElevatedButton.styleFrom(
@@ -6292,12 +6560,47 @@ Keep practicing consistently and trust the process! Your mental game will streng
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
+                      onPressed: () async {
                         if (insights.isNotEmpty &&
                             insights.first.recommendedModuleId != null) {
-                          // Navigate to recommended module
-                          // TODO: Implement navigation to module
-                          _tabController.animateTo(2); // Fallback to Train tab
+                          // Fetch and navigate to recommended module
+                          final recommendedModuleId =
+                              insights.first.recommendedModuleId!;
+                          try {
+                            final moduleQuerySnapshot =
+                                await CoachingModulesRecord.collection
+                                    .where('moduleId',
+                                        isEqualTo: recommendedModuleId)
+                                    .limit(1)
+                                    .get();
+
+                            if (moduleQuerySnapshot.docs.isNotEmpty &&
+                                mounted) {
+                              final module = CoachingModulesRecord.fromSnapshot(
+                                moduleQuerySnapshot.docs.first,
+                              );
+
+                              context.pushNamed(
+                                'virtual_training_experience',
+                                extra: <String, dynamic>{
+                                  'moduleTitle': module.title,
+                                  'moduleId': module.moduleId,
+                                  'description': module.description,
+                                  'estimatedDuration': module.duration,
+                                },
+                              );
+                            } else {
+                              // Module not found, fallback to Train tab
+                              _tabController.animateTo(2);
+                            }
+                          } catch (e) {
+                            if (kDebugMode) {
+                              print(
+                                  'Error navigating to recommended module: $e');
+                            }
+                            // Fallback to Train tab on error
+                            _tabController.animateTo(2);
+                          }
                         } else {
                           _tabController.animateTo(2); // Navigate to Train tab
                         }

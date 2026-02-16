@@ -33,6 +33,10 @@ class PermissionService {
 
   PermissionServiceState _microphoneState = PermissionServiceState.unknown;
   
+  // Guard to prevent concurrent permission checks
+  bool _isCheckingPermission = false;
+  Completer<PermissionServiceState>? _pendingPermissionCheck;
+  
   // AudioRecorder instance for reliable permission checking
   // Using recorder's permission check as primary source of truth
   AudioRecorder? _audioRecorder;
@@ -59,11 +63,19 @@ class PermissionService {
       _microphoneState == PermissionServiceState.granted;
 
   /// Initialize permission service
+  /// LAZY INITIALIZATION: Does NOT check permissions automatically
+  /// Permissions are only checked when explicitly requested (e.g., user clicks microphone)
   Future<void> initialize() async {
-    await checkMicrophonePermission();
-
     if (kDebugMode) {
-      print('🔐 Permission Service initialized');
+      print('🔐 Permission Service initializing (lazy - no permission check)');
+    }
+    
+    // Just initialize the service structure without checking permissions
+    // Permissions will be checked on-demand when user interacts with voice features
+    // This prevents unnecessary permission prompts on app startup
+    
+    if (kDebugMode) {
+      print('🔐 Permission Service initialized (permissions will be checked on-demand)');
     }
   }
 
@@ -71,10 +83,31 @@ class PermissionService {
   /// Uses permission_handler as PRIMARY source (per official documentation)
   /// Adds robust timeout to prevent hanging in "checking" state
   /// Verifies with AudioRecorder after permission_handler check (if available)
+  /// Prevents concurrent checks to avoid deadlocks
   Future<PermissionServiceState> checkMicrophonePermission() async {
+    // If already checking, return the pending check result
+    if (_isCheckingPermission && _pendingPermissionCheck != null) {
+      if (kDebugMode) {
+        print('🔍 [DEBUG] Permission check already in progress, waiting for result');
+      }
+      return await _pendingPermissionCheck!.future;
+    }
+    
+    // If already granted, return immediately
+    if (_microphoneState == PermissionServiceState.granted) {
+      if (kDebugMode) {
+        print('🔍 [DEBUG] Permission already granted, returning immediately');
+      }
+      return PermissionServiceState.granted;
+    }
+    
     if (kDebugMode) {
       print('🔍 [DEBUG] checkMicrophonePermission ENTRY - currentState: $_microphoneState');
     }
+    
+    // Set up guard and completer
+    _isCheckingPermission = true;
+    _pendingPermissionCheck = Completer<PermissionServiceState>();
     
     // Immediately set state to checking
     _updateMicrophoneState(PermissionServiceState.checking);
@@ -113,27 +146,34 @@ class PermissionService {
       }
       
       // Handle granted or limited status immediately
+      PermissionServiceState resultState;
       if (status.isGranted || status.isLimited) {
-        _updateMicrophoneState(PermissionServiceState.granted);
+        resultState = PermissionServiceState.granted;
+        _updateMicrophoneState(resultState);
         if (kDebugMode) {
           print('✅ Microphone permission granted (verified by permission_handler)');
         }
         
         // Optional verification with AudioRecorder (non-blocking)
         _verifyWithAudioRecorder();
-        
-        return PermissionServiceState.granted;
+      } else {
+        // Convert to our internal state for denied/permanentlyDenied cases
+        resultState = _convertPermissionStatus(status);
+        _updateMicrophoneState(resultState);
+
+        if (kDebugMode) {
+          print('🎤 Microphone permission status: $status (isGranted: ${status.isGranted})');
+        }
       }
-
-      // Convert to our internal state for denied/permanentlyDenied cases
-      final state = _convertPermissionStatus(status);
-      _updateMicrophoneState(state);
-
-      if (kDebugMode) {
-        print('🎤 Microphone permission status: $status (isGranted: ${status.isGranted})');
+      
+      // Complete the pending check and clear guard
+      _isCheckingPermission = false;
+      if (!_pendingPermissionCheck!.isCompleted) {
+        _pendingPermissionCheck!.complete(resultState);
       }
-
-      return state;
+      _pendingPermissionCheck = null;
+      
+      return resultState;
     } catch (e, stackTrace) {
       if (kDebugMode) {
         print('❌ [DEBUG] EXCEPTION in checkMicrophonePermission: $e');
@@ -141,8 +181,17 @@ class PermissionService {
       }
       
       // Ensure we always update state even on error
-      _updateMicrophoneState(PermissionServiceState.denied);
-      return PermissionServiceState.denied;
+      final errorState = PermissionServiceState.denied;
+      _updateMicrophoneState(errorState);
+      
+      // Complete the pending check and clear guard
+      _isCheckingPermission = false;
+      if (_pendingPermissionCheck != null && !_pendingPermissionCheck!.isCompleted) {
+        _pendingPermissionCheck!.complete(errorState);
+      }
+      _pendingPermissionCheck = null;
+      
+      return errorState;
     }
   }
   

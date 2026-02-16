@@ -1,13 +1,18 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/backend/schema/structs/vark_preferences_struct.dart';
+import '/backend/schema/user_subscriptions_record.dart';
+import '/config/app_feature_flags.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_design_system.dart';
 import '/flutter_flow/glass_components.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
+import '/services/revenuecat_service.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import 'dart:ui';
 
 class ProfileWidget extends StatefulWidget {
@@ -40,6 +45,10 @@ class _ProfileWidgetState extends State<ProfileWidget>
   bool _useMetricUnits = true; // Default to metric
   bool _aiVoiceEnabled = true; // Default to enabled
 
+  // Subscription state
+  final RevenueCatService _revenueCatService = RevenueCatService();
+  Offerings? _offerings;
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +70,71 @@ class _ProfileWidgetState extends State<ProfileWidget>
 
     // Initialize user data stream
     _initializeUserStream();
+
+    // Load subscription offerings and check premium status
+    _loadSubscriptionData();
+  }
+
+  Future<void> _loadSubscriptionData() async {
+    try {
+      // Load RevenueCat offerings
+      await _revenueCatService.initialize();
+      final offerings = await Purchases.getOfferings();
+      if (mounted) {
+        setState(() {
+          _offerings = offerings;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading subscription data: $e');
+    }
+  }
+
+  Future<void> _showPaywall() async {
+    if (_offerings?.current == null) {
+      // Fallback: navigate to subscription onboarding
+      if (mounted) {
+        context.pushNamed('subscription_onboarding');
+      }
+      return;
+    }
+
+    if (mounted) {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          height: MediaQuery.of(context).size.height * 0.9,
+          decoration: BoxDecoration(
+            color: FlutterFlowTheme.of(context).primaryBackground,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: FlutterFlowTheme.of(context)
+                      .secondaryText
+                      .withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Paywall View
+              Expanded(
+                child: PaywallView(
+                  offering: _offerings!.current!,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   void _initializeUserStream() {
@@ -190,72 +264,82 @@ class _ProfileWidgetState extends State<ProfileWidget>
           position: _slideAnimation,
           child: CustomScrollView(
             slivers: [
-              // Glass App Bar
+              // Enhanced App Bar
               SliverAppBar(
-                expandedHeight: 120,
-                floating: true,
+                expandedHeight: 140,
+                floating: false,
                 pinned: true,
-                backgroundColor: Colors.transparent,
+                backgroundColor: theme.primaryBackground,
                 elevation: 0,
-                leading: IconButton(
-                  icon: Icon(
-                    Icons.menu_rounded,
-                    color: theme.primaryText,
-                    size: 28,
-                  ),
-                  onPressed: () => scaffoldKey.currentState?.openDrawer(),
-                ),
+                surfaceTintColor: Colors.transparent,
+                automaticallyImplyLeading: false,
                 flexibleSpace: FlexibleSpaceBar(
-                  background: ClipRRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              theme.glassBackground.withValues(alpha: 0.2),
-                              theme.glassTint.withValues(alpha: 0.1),
-                            ],
-                          ),
-                          border: Border(
-                            bottom: BorderSide(
-                              color: theme.glassBorder.withValues(alpha: 0.3),
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 60, 20, 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Profile',
-                                style: theme.headlineLarge.copyWith(
-                                  color: theme.primaryText,
-                                  fontWeight: FontWeight.w700,
-                                  fontFamily: 'Montserrat',
+                  background: Container(
+                    decoration: BoxDecoration(
+                      color: theme.primaryBackground,
+                    ),
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Row with drawer icon and title
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                // Drawer icon
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.menu_rounded,
+                                    color: theme.primaryText,
+                                    size: 28,
+                                  ),
+                                  onPressed: () =>
+                                      scaffoldKey.currentState?.openDrawer(),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
                                 ),
-                                maxLines: 1,
+                                const SizedBox(width: 12),
+                                // Profile title
+                                Expanded(
+                                  child: Text(
+                                    'Profile',
+                                    style: theme.headlineLarge.copyWith(
+                                      color: theme.primaryText,
+                                      fontWeight: FontWeight.w700,
+                                      fontFamily: 'Montserrat',
+                                      fontSize: 32,
+                                      height: 1.2,
+                                      letterSpacing: -0.5,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Subtitle in 2 lines
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                  left: 40), // Align with title text
+                              child: Text(
+                                'Personalize your experience. Your profile settings shape how FoCoCo thinks, responds, and coaches you.',
+                                style: theme.bodyMedium.copyWith(
+                                  color: theme.secondaryText,
+                                  fontSize: 15,
+                                  height: 1.4,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 4),
-                              Flexible(
-                                child: Text(
-                                  'Personalize your experience. Your profile settings shape how FoCoCo thinks, responds, and coaches you.',
-                                  style: theme.bodyMedium.copyWith(
-                                    color: theme.secondaryText,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -272,9 +356,11 @@ class _ProfileWidgetState extends State<ProfileWidget>
                     _buildOverviewSection(theme, user, isDefaultData),
                     const SizedBox(height: 20),
 
-                    // Section 2: Learning Style
-                    _buildLearningStyleSection(theme, user),
-                    const SizedBox(height: 20),
+                    if (AppFeatureFlags.varkEnabled) ...[
+                      // Section 2: Learning Style
+                      _buildLearningStyleSection(theme, user),
+                      const SizedBox(height: 20),
+                    ],
 
                     // Section 3: Preferences
                     _buildPreferencesSection(theme),
@@ -327,15 +413,28 @@ class _ProfileWidgetState extends State<ProfileWidget>
                 gradient: theme.primaryBrandGradient,
                 boxShadow: theme.glassCardShadows,
               ),
-              child: user.profileImageUrl.isNotEmpty
+              child: _getProfileImageUrl(user).isNotEmpty
                   ? ClipOval(
                       child: Image.network(
-                        user.profileImageUrl,
+                        _getProfileImageUrl(user),
                         width: 80,
                         height: 80,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) =>
                             _buildDefaultAvatar(theme),
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                      loadingProgress.expectedTotalBytes!
+                                  : null,
+                              color: theme.primary,
+                              strokeWidth: 2,
+                            ),
+                          );
+                        },
                       ),
                     )
                   : _buildDefaultAvatar(theme),
@@ -405,7 +504,7 @@ class _ProfileWidgetState extends State<ProfileWidget>
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
-                    children: [
+                      children: [
                         Icon(
                           user.currentMembershipTier == 'premium'
                               ? FontAwesomeIcons.crown
@@ -426,21 +525,56 @@ class _ProfileWidgetState extends State<ProfileWidget>
                           ),
                         ),
                       ],
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
+                ],
+              ),
             ),
           ],
         ),
         const SizedBox(height: 16),
         Column(
           children: [
-            GlassDesignSystem.glassButton(
-              text: 'Manage Subscription',
-              onPressed: () => context.pushNamed('subscription_management'),
-              icon: FontAwesomeIcons.creditCard,
-              theme: theme,
+            StreamBuilder<List<UserSubscriptionsRecord>>(
+              stream: UserSubscriptionsRecord.collection
+                  .where('userId', isEqualTo: currentUserUid)
+                  .where('status', whereIn: ['active', 'trialing'])
+                  .orderBy('currentPeriodEnd', descending: true)
+                  .limit(1)
+                  .snapshots()
+                  .map((snapshot) => snapshot.docs
+                      .map((doc) => UserSubscriptionsRecord.fromSnapshot(doc))
+                      .toList()),
+              builder: (context, snapshot) {
+                final hasActiveSubscription =
+                    snapshot.hasData && snapshot.data!.isNotEmpty;
+
+                if (hasActiveSubscription) {
+                  final subscription = snapshot.data!.first;
+                  final membershipTier =
+                      subscription.membershipTier.toLowerCase();
+                  final isPremium =
+                      membershipTier == 'premium' || membershipTier == 'prime';
+
+                  return GlassDesignSystem.glassButton(
+                    text: isPremium
+                        ? 'Manage Subscription'
+                        : 'Upgrade to Premium',
+                    onPressed: _showPaywall,
+                    icon: isPremium
+                        ? FontAwesomeIcons.creditCard
+                        : FontAwesomeIcons.crown,
+                    theme: theme,
+                  );
+                } else {
+                  return GlassDesignSystem.glassButton(
+                    text: 'Upgrade to Premium',
+                    onPressed: _showPaywall,
+                    icon: FontAwesomeIcons.crown,
+                    theme: theme,
+                  );
+                }
+              },
             ),
             const SizedBox(height: 12),
             GlassDesignSystem.glassButton(
@@ -472,7 +606,19 @@ class _ProfileWidgetState extends State<ProfileWidget>
     );
   }
 
-
+  /// Get profile image URL - checks user.profileImageUrl first, then falls back to Firebase Auth photoUrl
+  String _getProfileImageUrl(UserRecord user) {
+    // First check user record profileImageUrl
+    if (user.profileImageUrl.isNotEmpty) {
+      return user.profileImageUrl;
+    }
+    // Fallback to Firebase Auth photo URL
+    final authPhotoUrl = currentUserPhoto;
+    if (authPhotoUrl.isNotEmpty) {
+      return authPhotoUrl;
+    }
+    return '';
+  }
 
   /// Section 2: Learning Style
   Widget _buildLearningStyleSection(FlutterFlowTheme theme, UserRecord user) {
@@ -485,21 +631,21 @@ class _ProfileWidgetState extends State<ProfileWidget>
       children: [
         Container(
           padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
                 theme.primary.withValues(alpha: 0.1),
                 theme.primary.withValues(alpha: 0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
               color: theme.primary.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
+              width: 1,
+            ),
+          ),
           child: Row(
             children: [
               Icon(
@@ -509,29 +655,29 @@ class _ProfileWidgetState extends State<ProfileWidget>
               ),
               const SizedBox(width: 16),
               Expanded(
-      child: Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+                  children: [
                     Text(
                       'VARK Type',
                       style: theme.labelSmall.copyWith(
                         color: theme.secondaryText,
                       ),
                     ),
-          const SizedBox(height: 4),
-          Text(
+                    const SizedBox(height: 4),
+                    Text(
                       dominantStyle,
                       style: theme.titleLarge.copyWith(
                         color: theme.primaryText,
-              fontWeight: FontWeight.w700,
-              fontFamily: 'Montserrat',
-            ),
-          ),
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Montserrat',
+                      ),
+                    ),
                   ],
-            ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
         ),
         const SizedBox(height: 12),
         GlassDesignSystem.glassButton(
@@ -552,7 +698,7 @@ class _ProfileWidgetState extends State<ProfileWidget>
       children: [
         // Units Preference
         _buildPreferenceRow(
-                    theme,
+          theme,
           'Units',
           _useMetricUnits ? 'Metric' : 'Imperial',
           FontAwesomeIcons.ruler,
@@ -565,7 +711,7 @@ class _ProfileWidgetState extends State<ProfileWidget>
         const SizedBox(height: 12),
         // AI Voice Preference
         _buildPreferenceRow(
-                    theme,
+          theme,
           'AI Voice',
           _aiVoiceEnabled ? 'On' : 'Off',
           FontAwesomeIcons.volumeHigh,
@@ -590,61 +736,61 @@ class _ProfileWidgetState extends State<ProfileWidget>
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
               theme.glassTint.withValues(alpha: 0.1),
               theme.glassTint.withValues(alpha: 0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
             color: theme.glassBorder.withValues(alpha: 0.2),
-          width: 1,
+            width: 1,
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
+        child: Row(
+          children: [
+            Container(
               padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
+              decoration: BoxDecoration(
                 color: theme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-            ),
+              ),
               child: Icon(icon, color: theme.primary, size: 20),
-          ),
+            ),
             const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
                     label,
                     style: theme.titleSmall.copyWith(
-                    color: theme.primaryText,
-                    fontWeight: FontWeight.w600,
+                      color: theme.primaryText,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
                 ],
               ),
             ),
-                    Text(
+            Text(
               value,
               style: theme.bodyMedium.copyWith(
                 color: theme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(width: 8),
             Icon(
               Icons.chevron_right_rounded,
               color: theme.secondaryText,
               size: 20,
-                ),
-              ],
             ),
+          ],
+        ),
       ),
     );
   }
@@ -660,14 +806,14 @@ class _ProfileWidgetState extends State<ProfileWidget>
       subtitle: 'Define what you\'re working towards',
       children: [
         _buildGoalRow(
-                theme,
+          theme,
           'Current Goal to Improve',
           currentGoal,
           FontAwesomeIcons.bullseye,
         ),
         const SizedBox(height: 12),
         _buildGoalRow(
-                theme,
+          theme,
           'Goal Timeline',
           goalTimeline,
           FontAwesomeIcons.calendar,
@@ -718,18 +864,18 @@ class _ProfileWidgetState extends State<ProfileWidget>
           ),
           const SizedBox(width: 16),
           Expanded(
-      child: Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+              children: [
                 Text(
                   label,
                   style: theme.titleSmall.copyWith(
                     color: theme.primaryText,
                     fontWeight: FontWeight.w600,
                   ),
-          ),
-          const SizedBox(height: 4),
-          Text(
+                ),
+                const SizedBox(height: 4),
+                Text(
                   value,
                   style: theme.bodyMedium.copyWith(
                     color: theme.primary,
@@ -762,8 +908,8 @@ class _ProfileWidgetState extends State<ProfileWidget>
               ? _formatDate(user.createdTime!)
               : 'Recently',
           FontAwesomeIcons.calendarCheck,
-                ),
-                const SizedBox(height: 12),
+        ),
+        const SizedBox(height: 12),
         // Total Modules Completed
         _buildJourneyRow(
           theme,
@@ -781,7 +927,7 @@ class _ProfileWidgetState extends State<ProfileWidget>
         ),
         const SizedBox(height: 20),
         // Mind Power Index (MPI)
-                Text(
+        Text(
           'Mind Power Index (MPI)',
           style: theme.titleMedium.copyWith(
             color: theme.primaryText,
@@ -790,8 +936,8 @@ class _ProfileWidgetState extends State<ProfileWidget>
           ),
         ),
         const SizedBox(height: 12),
-        _buildMPIMetric(theme, 'Focus', 85, FontAwesomeIcons.bullseye,
-            theme.aiPrimary),
+        _buildMPIMetric(
+            theme, 'Focus', 85, FontAwesomeIcons.bullseye, theme.aiPrimary),
         const SizedBox(height: 8),
         _buildMPIMetric(theme, 'Confidence', 78, FontAwesomeIcons.trophy,
             theme.coachingPrimary),
@@ -834,7 +980,7 @@ class _ProfileWidgetState extends State<ProfileWidget>
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: theme.primary, size: 20),
-            ),
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -852,14 +998,14 @@ class _ProfileWidgetState extends State<ProfileWidget>
                   value,
                   style: theme.bodyMedium.copyWith(
                     color: theme.primary,
-                  fontWeight: FontWeight.w600,
-              ),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
+          ),
         ],
-              ),
-            ),
-          ],
-        ),
+      ),
     );
   }
 
@@ -901,7 +1047,7 @@ class _ProfileWidgetState extends State<ProfileWidget>
           Expanded(
             child: Text(
               title,
-            style: theme.bodySmall.copyWith(
+              style: theme.bodySmall.copyWith(
                 color: theme.primaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -950,12 +1096,12 @@ class _ProfileWidgetState extends State<ProfileWidget>
               size: 16,
             ),
             const SizedBox(width: 8),
-                  Text(
+            Text(
               'Manage your data and privacy in Settings',
               style: theme.bodyMedium.copyWith(
                 color: theme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -980,8 +1126,6 @@ class _ProfileWidgetState extends State<ProfileWidget>
     ];
     return '${months[date.month - 1]} ${date.year}';
   }
-
-
 
   // Helper Methods
   String _getDominantVarkStyle(VarkPreferencesStruct vark) {
@@ -1149,9 +1293,6 @@ class _ProfileWidgetState extends State<ProfileWidget>
     );
   }
 
-
-
-
   UserRecord _createDefaultUserRecord() {
     // Create a mock document reference for the default user
     final mockRef = FirebaseFirestore.instance
@@ -1305,7 +1446,4 @@ class _ProfileWidgetState extends State<ProfileWidget>
       }
     });
   }
-
-
 }
-

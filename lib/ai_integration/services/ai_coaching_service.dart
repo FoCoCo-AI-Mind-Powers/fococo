@@ -542,7 +542,17 @@ class AICoachingService {
       return GeminiRecommendationResponse.fromJson(jsonResponse);
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Error generating Gemini coaching recommendations: $e');
+        final errorMessage = e.toString();
+        if (errorMessage.contains('leaked') || errorMessage.contains('API key')) {
+          print('❌ Error generating Gemini coaching recommendations: $e');
+          print('⚠️ API key issue detected. Please:');
+          print('   1. Get a new API key from https://aistudio.google.com/');
+          print('   2. Configure it in Firebase AI Logic settings');
+          print('   3. Or set GEMINI_API_KEY environment variable');
+          print('   4. Rebuild the app');
+        } else {
+          print('❌ Error generating Gemini coaching recommendations: $e');
+        }
       }
       rethrow;
     }

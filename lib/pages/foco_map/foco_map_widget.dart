@@ -13,10 +13,13 @@ import '/auth/firebase_auth/auth_util.dart';
 import '/services/focomap_voice_service.dart' as voice;
 import '/services/foco_map_live_service.dart';
 import '/services/live_location_service.dart';
+import '/services/location_permission_service.dart';
+import '/services/map_style_controller.dart';
+import '/services/voice_coach_service.dart';
 import '/services/focomap_tutorial_service.dart';
 import '/services/focomap_ai_service.dart';
 import '/services/focomap_custom_markers.dart';
-import '/ai_integration/config/gemini_live_config.dart';
+import '/widgets/voice_coach_overlay.dart';
 import '/ai_integration/services/gemini_live_api_service.dart';
 import 'platform_map_widget.dart';
 import 'advanced_map_view.dart';
@@ -28,7 +31,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:ui';
-import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
@@ -91,7 +93,12 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
   final FoCoMapLiveService _liveService = FoCoMapLiveService();
   final LiveLocationService _locationService = LiveLocationService();
   final FoCoMapTutorialService _tutorialService = FoCoMapTutorialService();
+  final MapStyleController _mapStyleController = MapStyleController();
+  final VoiceCoachService _voiceCoachService = VoiceCoachService();
   late FoCoMapAIService _aiService;
+
+  // Voice session state
+  bool _isVoiceSessionActive = false;
 
   // AI analysis data
   List<HeatmapData> _heatmapData = [];
@@ -163,17 +170,19 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
       curve: Curves.easeInOut,
     ));
 
-    // Initialize AI service with API key from centralized config
-    final apiKey = GeminiLiveAPIConfig.apiKey;
-    if (apiKey.isEmpty) {
-      debugPrint(
-          '⚠️ FoCoMap: GEMINI_API_KEY not set. AI features will be disabled.');
-    }
-    _aiService = FoCoMapAIService(apiKey: apiKey);
+    // Initialize AI service (uses centralized config automatically)
+    _aiService = FoCoMapAIService();
 
     // Initialize custom markers (lightweight, can be done immediately)
     debugPrint('🎯 FoCoMap: Initializing custom markers...');
     FoCoMapCustomMarkers.initialize();
+
+    // Initialize map style controller
+    _mapStyleController.initialize();
+    _mapStyleController.addListener(_onMapStyleChanged);
+
+    // Listen to voice coach service changes
+    _voiceCoachService.addListener(_onVoiceSessionChanged);
 
     // Load cached location first, then get fresh location
     _loadCachedLocation();
@@ -193,9 +202,72 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
         '✅ FoCoMap: Map initialization complete - map will display immediately');
   }
 
+  /// Handle map style changes
+  void _onMapStyleChanged() {
+    setState(() {
+      // Update model based on current style
+      final styleName = _mapStyleController.currentStyleName;
+      _model.selectLayer(styleName);
+      _updateMarkers();
+    });
+  }
+
+  /// Handle voice session state changes
+  void _onVoiceSessionChanged() {
+    setState(() {
+      _isVoiceSessionActive = _voiceCoachService.isSessionActive;
+    });
+  }
+
+  /// Start voice coaching session
+  Future<void> _startVoiceCoaching() async {
+    try {
+      if (currentLocation != null) {
+        await _voiceCoachService.startVoiceCoaching(
+          initialLatitude: currentLocation!.latitude,
+          initialLongitude: currentLocation!.longitude,
+        );
+      } else {
+        // Get location first
+        await _getCurrentLocation();
+        if (currentLocation != null) {
+          await _voiceCoachService.startVoiceCoaching(
+            initialLatitude: currentLocation!.latitude,
+            initialLongitude: currentLocation!.longitude,
+          );
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Unable to get location for voice coaching'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ FoCoMap: Error starting voice coaching: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error starting voice coaching: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     debugPrint('🎯 FoCoMap: Disposing...');
+
+    // Remove map style controller listener
+    _mapStyleController.removeListener(_onMapStyleChanged);
+    
+    // Remove voice coach service listener
+    _voiceCoachService.removeListener(_onVoiceSessionChanged);
 
     // Cancel all stream subscriptions to prevent memory leaks
     _roundLogsSubscription?.cancel();
@@ -1015,116 +1087,73 @@ class _FoCoMapWidgetState extends State<FoCoMapWidget>
 
   Future<void> _getCurrentLocation() async {
     try {
-      // Check location service enabled
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        debugPrint('⚠️ FoCoMap: Location services are disabled');
-        // Use cached location if available
-        if (_cachedLocation != null) {
-          setState(() {
-            currentLocation = _cachedLocation;
-            _currentZoom = 15.0;
-          });
-          debugPrint('✅ FoCoMap: Using cached location (services disabled)');
-          return;
-        }
-        // Try to request service
-        serviceEnabled = await Geolocator.openLocationSettings();
-        if (!serviceEnabled) {
-          throw Exception(
-              'Location services are disabled. Please enable location services in your device settings.');
-        }
-      }
+      debugPrint('🎯 FoCoMap: Getting current device location using LocationPermissionService...');
+      
+      final locationService = LocationPermissionService();
+      final result = await locationService.requestLocationPermission(
+        enableHighAccuracy: true,
+        maxRetries: 3,
+      );
 
-      // Check and request permissions
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        debugPrint('🎯 FoCoMap: Requesting location permission...');
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          // Use cached location if permission denied
+      // Handle different permission results
+      switch (result.result) {
+        case LocationPermissionResult.granted:
+          if (result.position != null) {
+            final deviceLocation = LatLng(
+              result.position!.latitude,
+              result.position!.longitude,
+            );
+
+            // Save to cache
+            await _saveLocationToCache(deviceLocation);
+            _cachedLocation = deviceLocation;
+
+            setState(() {
+              currentLocation = deviceLocation;
+              _currentZoom = 15.0; // Standard zoom for current location
+            });
+            debugPrint(
+                '✅ FoCoMap: Set location to device GPS: ${deviceLocation.latitude}, ${deviceLocation.longitude}');
+
+            // Update location service
+            await _locationService.initialize();
+            return;
+          }
+          break;
+
+        case LocationPermissionResult.denied:
+        case LocationPermissionResult.deniedForever:
+        case LocationPermissionResult.serviceDisabled:
+        case LocationPermissionResult.timeout:
+          // Show user-friendly message
+          final message = locationService.getPermissionStatusMessage(result.result);
+          debugPrint('⚠️ FoCoMap: $message');
+          
+          // Use cached location if available
           if (_cachedLocation != null) {
             setState(() {
               currentLocation = _cachedLocation;
               _currentZoom = 15.0;
             });
-            debugPrint('✅ FoCoMap: Using cached location (permission denied)');
+            debugPrint('✅ FoCoMap: Using cached location');
+            
+            // Show snackbar to user
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(message),
+                  backgroundColor: Colors.orange,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            }
             return;
           }
-          throw Exception(
-              'Location permissions are denied. Please grant location permission to use this feature.');
-        }
+          break;
       }
 
-      if (permission == LocationPermission.deniedForever) {
-        // Use cached location if permission permanently denied
-        if (_cachedLocation != null) {
-          setState(() {
-            currentLocation = _cachedLocation;
-            _currentZoom = 15.0;
-          });
-          debugPrint(
-              '✅ FoCoMap: Using cached location (permission permanently denied)');
-          return;
-        }
-        throw Exception(
-            'Location permissions are permanently denied. Please enable location permission in app settings.');
-      }
-
-      // Get current device location with reduced timeout and better error handling
-      debugPrint('🎯 FoCoMap: Getting current device location...');
-      Position? position;
-      try {
-        position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            timeLimit: Duration(seconds: 10), // Reduced timeout
-          ),
-        ).timeout(
-          const Duration(seconds: 10),
-        );
-      } catch (timeoutError) {
-        debugPrint('⚠️ FoCoMap: Location timeout: $timeoutError');
-        // Use cached location on timeout
-        if (_cachedLocation != null) {
-          setState(() {
-            currentLocation = _cachedLocation;
-            _currentZoom = 15.0;
-          });
-          debugPrint('✅ FoCoMap: Using cached location (timeout)');
-          return;
-        }
-        rethrow;
-      }
-
-      if (position == null) {
-        // Use cached location if position is null
-        if (_cachedLocation != null) {
-          setState(() {
-            currentLocation = _cachedLocation;
-            _currentZoom = 15.0;
-          });
-          debugPrint('✅ FoCoMap: Using cached location (position null)');
-          return;
-        }
-        throw Exception('Unable to get current location');
-      }
-
-      final deviceLocation = LatLng(position.latitude, position.longitude);
-
-      // Save to cache
-      await _saveLocationToCache(deviceLocation);
-      _cachedLocation = deviceLocation;
-
-      setState(() {
-        currentLocation = deviceLocation;
-        _currentZoom = 15.0; // Standard zoom for current location
-      });
-      debugPrint(
-          '✅ FoCoMap: Set location to device GPS: ${deviceLocation.latitude}, ${deviceLocation.longitude}');
-
-      // Update location service
-      await _locationService.initialize();
+      // If we get here, no location was obtained and no cache available
+      throw Exception('Unable to get current location');
     } catch (e) {
       debugPrint('❌ FoCoMap: Error getting device location: $e');
 
@@ -3928,13 +3957,18 @@ Remember: You're not just giving generic advice - you're coaching based on HOW T
             ),
 
             // Unified Floating Menu (Bottom Right) - All buttons in one expandable menu
-            Positioned(
-              bottom: 100,
-              right: 20,
-              child: SafeArea(
-                child: _buildUnifiedFloatingMenu(),
+            // Hide during voice session
+            if (!_isVoiceSessionActive)
+              Positioned(
+                bottom: 100,
+                right: 20,
+                child: SafeArea(
+                  child: _buildUnifiedFloatingMenu(),
+                ),
               ),
-            ),
+
+            // Voice Coach Overlay - Shows during active voice session
+            VoiceCoachOverlay(),
 
 
             // Enhanced Live Mode Indicator with Animation - Near Header (Top Right)
@@ -4053,31 +4087,34 @@ Remember: You're not just giving generic advice - you're coaching based on HOW T
     HapticFeedback.mediumImpact();
 
     try {
-      // Use Gemini Live for voice input
-      if (_geminiLiveService.isListening) {
-        // Stop listening
-        await _geminiLiveService.stopListening();
-        debugPrint('🎤 FoCoMap: Stopped Gemini Live listening');
-      } else {
-        // Connect if not connected
-        if (!_geminiLiveService.isConnected) {
-          debugPrint('🎤 FoCoMap: Connecting to Gemini Live...');
-          await _geminiLiveService.connect();
+      // Use Voice Coach Service for voice coaching sessions
+      if (_voiceCoachService.isSessionActive) {
+        // Stop voice coaching session
+        await _voiceCoachService.stopVoiceCoaching();
+        debugPrint('🛑 FoCoMap: Stopped voice coaching session');
+        
+        if (mounted) {
+          _showLiveUpdateNotification(
+            'Voice coaching session ended',
+            Colors.orange,
+          );
         }
-
-        // Start listening for audio input
-        await _geminiLiveService.startListening();
-        debugPrint('🎤 FoCoMap: Started Gemini Live listening');
-
-        // Show feedback
-        _showLiveUpdateNotification(
-          'Listening... Speak about your golf experience',
-          Colors.green,
-        );
+      } else {
+        // Start voice coaching session
+        await _startVoiceCoaching();
+        
+        if (mounted) {
+          _showLiveUpdateNotification(
+            'Voice coaching session started',
+            Colors.green,
+          );
+        }
       }
     } catch (e) {
-      debugPrint('❌ FoCoMap: Gemini Live error: $e');
-      _showLiveUpdateNotification('Voice error: $e', Colors.red);
+      debugPrint('❌ FoCoMap: Voice coaching error: $e');
+      if (mounted) {
+        _showLiveUpdateNotification('Voice error: $e', Colors.red);
+      }
     }
   }
 
@@ -4251,9 +4288,30 @@ Remember: You're not just giving generic advice - you're coaching based on HOW T
     
     return GestureDetector(
       key: key,
-      onTap: () {
+      onTap: () async {
+        // Map layer key to MapStyle enum
+        MapStyle? targetStyle;
+        switch (layerKey) {
+          case 'MindMap':
+            targetStyle = MapStyle.mindMap;
+            break;
+          case 'ShotMap':
+            targetStyle = MapStyle.shotMap;
+            break;
+          case 'SyncMap':
+            targetStyle = MapStyle.syncMap;
+            break;
+        }
+        
+        if (targetStyle != null) {
+          await _mapStyleController.setMapStyle(
+            targetStyle,
+            transitionDuration: const Duration(milliseconds: 300),
+          );
+        }
+        
         setState(() {
-        _model.selectLayer(layerKey);
+          _model.selectLayer(layerKey);
         });
         _updateMarkers();
         HapticFeedback.lightImpact();
@@ -4801,103 +4859,73 @@ Remember: You're not just giving generic advice - you're coaching based on HOW T
   Future<void> _refocusToCurrentLocation() async {
     debugPrint('🎯 FoCoMap: Location button tapped - refocusing to current device location');
     try {
-      // Check location service enabled
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        debugPrint('⚠️ FoCoMap: Location services disabled');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please enable location services in your device settings'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        return;
-      }
-
-      // Check and request permissions
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Location permission denied. Please grant permission in settings'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Location permission permanently denied. Please enable in app settings'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-
-      // Get fresh device location with timeout handling
-      debugPrint('🎯 FoCoMap: Getting fresh device location...');
-      Position? position;
-      try {
-        position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            timeLimit: Duration(seconds: 8),
-          ),
-        ).timeout(const Duration(seconds: 8));
-      } catch (timeoutError) {
-        debugPrint('⚠️ FoCoMap: Location timeout: $timeoutError');
-        position = null;
-      }
+      final locationService = LocationPermissionService();
+      final result = await locationService.requestLocationPermission(
+        enableHighAccuracy: true,
+        maxRetries: 2, // Fewer retries for refocus action
+      );
 
       LatLng? deviceLocation;
-      if (position != null) {
-        deviceLocation = LatLng(position.latitude, position.longitude);
+
+      if (result.result == LocationPermissionResult.granted && result.position != null) {
+        deviceLocation = LatLng(
+          result.position!.latitude,
+          result.position!.longitude,
+        );
         await _saveLocationToCache(deviceLocation);
         _cachedLocation = deviceLocation;
       } else {
+        // Use cached location or show error
         deviceLocation = _cachedLocation ?? currentLocation;
+        
         if (deviceLocation == null) {
+          final message = locationService.getPermissionStatusMessage(result.result);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Location unavailable. Using cached location or last known position.'),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 2),
+              SnackBar(
+                content: Text(message),
+                backgroundColor: result.result == LocationPermissionResult.timeout
+                    ? Colors.orange
+                    : Colors.red,
+                duration: const Duration(seconds: 3),
               ),
             );
           }
           return;
+        } else {
+          // Show info about using cached location
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Using cached location. ${locationService.getPermissionStatusMessage(result.result)}'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
         }
       }
 
+      // At this point, deviceLocation is guaranteed to be non-null
+      // (we returned early if it was null on line 4901)
+      final location = deviceLocation;
+
+      // Update state and animate map
       setState(() {
-        currentLocation = deviceLocation;
+        currentLocation = location;
         _currentZoom = 18.0; // Close zoom for focus mode
       });
 
       // Animate map to location
-      if (!_useAdvancedView && deviceLocation != null) {
+      if (!_useAdvancedView) {
         await PlatformMapWidget.animateToLocationFromKey(
           _platformMapKey,
-          deviceLocation,
+          location,
           zoom: 18.0,
         );
       }
 
-      if (deviceLocation != null) {
-        debugPrint('✅ FoCoMap: Map refocused to device location: ${deviceLocation.latitude}, ${deviceLocation.longitude}');
-      }
+      debugPrint('✅ FoCoMap: Map refocused to device location: ${location.latitude}, ${location.longitude}');
     } catch (e) {
       debugPrint('❌ FoCoMap: Error refocusing map: $e');
       if (mounted) {

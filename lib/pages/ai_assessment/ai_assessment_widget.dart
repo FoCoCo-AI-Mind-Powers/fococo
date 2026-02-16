@@ -74,8 +74,10 @@ class _AiAssessmentWidgetState extends State<AiAssessmentWidget>
     _fadeController.forward();
     _slideController.forward();
 
-    // Initialize AI client
-    _aiClient = GeminiAIClient(apiKey: ''); // API key handled by Firebase AI
+    // Initialize AI client with proper API key
+    // Note: GeminiAIClient uses Firebase AI internally, but we need to pass a non-empty key
+    // The actual API key is retrieved from GeminiLiveAPIConfig in the service layer
+    _aiClient = GeminiAIClient(apiKey: 'firebase_ai_logic');
 
     // Generate assessment on load
     _generateAssessment();
@@ -104,6 +106,11 @@ class _AiAssessmentWidgetState extends State<AiAssessmentWidget>
 
     try {
       final userId = currentUserUid;
+      
+      // Guard against empty userId
+      if (userId.isEmpty) {
+        throw Exception('User must be logged in to generate assessment');
+      }
 
       // Get user profile for personalization
       final userDoc = await UserRecord.collection.doc(userId).get();
@@ -133,7 +140,14 @@ class _AiAssessmentWidgetState extends State<AiAssessmentWidget>
       // Parse assessment data with validation
       final questionsList = assessmentJson['questions'] as List?;
       if (questionsList == null || questionsList.isEmpty) {
+        if (kDebugMode) {
+          print('❌ Assessment JSON structure: ${assessmentJson.keys}');
+        }
         throw Exception('Assessment generation failed: Empty questions list');
+      }
+
+      if (kDebugMode) {
+        print('✅ Received ${questionsList.length} questions from API');
       }
 
       final questions = <AssessmentQuestion>[];
@@ -147,24 +161,62 @@ class _AiAssessmentWidgetState extends State<AiAssessmentWidget>
             continue;
           }
 
-          // Validate question structure
-          if (questionMap['question'] == null ||
-              questionMap['answers'] == null) {
+          // Transform API response format to expected format
+          // API returns: questionText, options
+          // Code expects: question, answers
+          final transformedMap = <String, dynamic>{...questionMap};
+          
+          // Handle questionText -> question
+          if (transformedMap['questionText'] != null && transformedMap['question'] == null) {
+            transformedMap['question'] = transformedMap['questionText'];
+          }
+          
+          // Handle questionId -> id
+          if (transformedMap['questionId'] != null && transformedMap['id'] == null) {
+            transformedMap['id'] = transformedMap['questionId'];
+          }
+          
+          // Handle options -> answers
+          if (transformedMap['options'] != null && transformedMap['answers'] == null) {
+            final options = transformedMap['options'] as List?;
+            if (options != null) {
+              transformedMap['answers'] = options.map((opt) {
+                final optionMap = opt as Map<String, dynamic>;
+                return {
+                  'id': optionMap['optionId'] ?? optionMap['id'] ?? 'a',
+                  'text': optionMap['text'] ?? '',
+                  'varkType': optionMap['varkType'] ?? 'visual',
+                  'score': optionMap['score'] ?? 1,
+                };
+              }).toList();
+            }
+          }
+
+          // Validate question structure after transformation
+          if (transformedMap['question'] == null ||
+              transformedMap['answers'] == null) {
             if (kDebugMode) {
               print('⚠️ Skipping incomplete question at index $i');
+              print('   Available keys: ${transformedMap.keys}');
+              print('   Has question: ${transformedMap['question'] != null || transformedMap['questionText'] != null}');
+              print('   Has answers: ${transformedMap['answers'] != null || transformedMap['options'] != null}');
             }
             continue;
           }
 
-          final question = AssessmentQuestion.fromJson(questionMap);
+          final question = AssessmentQuestion.fromJson(transformedMap);
 
           // Validate answers
           if (question.answers.isEmpty || question.answers.length < 4) {
             if (kDebugMode) {
               print(
-                  '⚠️ Question ${question.id} has insufficient answers, skipping');
+                  '⚠️ Question ${question.id} has insufficient answers (${question.answers.length}), skipping');
             }
             continue;
+          }
+
+          if (kDebugMode) {
+            print('✅ Successfully parsed question ${i + 1}: ${question.question.substring(0, question.question.length > 50 ? 50 : question.question.length)}...');
           }
 
           questions.add(question);

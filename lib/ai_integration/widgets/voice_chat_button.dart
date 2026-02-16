@@ -4,7 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../flutter_flow/flutter_flow_theme.dart';
 import '../services/gemini_voice_service.dart';
-import 'voice_chat_modal.dart';
+// Voice chat modal removed
 
 /// Floating voice chat button that sits in the center of the bottom navigation
 class VoiceChatButton extends StatefulWidget {
@@ -113,7 +113,12 @@ class _VoiceChatButtonState extends State<VoiceChatButton>
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         barrierColor: Colors.black.withValues(alpha: 0.5),
-        builder: (context) => const FoCoCoVoiceChatModal(),
+        builder: (context) => Container(
+          padding: const EdgeInsets.all(20),
+          child: const Center(
+            child: Text('Voice chat modal has been removed'),
+          ),
+        ),
       );
     }
 
@@ -404,7 +409,12 @@ class _EnhancedVoiceChatButtonState extends State<EnhancedVoiceChatButton>
         barrierColor: Colors.black.withValues(alpha: 0.6),
         enableDrag: true,
         isDismissible: true,
-        builder: (context) => const FoCoCoVoiceChatModal(),
+        builder: (context) => Container(
+          padding: const EdgeInsets.all(20),
+          child: const Center(
+            child: Text('Voice chat modal has been removed'),
+          ),
+        ),
       );
     }
 

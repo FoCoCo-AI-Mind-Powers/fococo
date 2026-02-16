@@ -12,7 +12,7 @@
  * 3. Or trigger via Firebase Console
  */
 
-const functions = require('firebase-functions');
+const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 
 // Initialize Firebase Admin if not already initialized

@@ -52,8 +52,7 @@ export 'utils/ai_utils.dart';
 // AI Widgets
 export 'widgets/ai_insight_card_widget.dart';
 export 'widgets/ai_insight_widget_enhanced.dart';
-export 'widgets/voice_chat_modal.dart'
-    hide ChatMessage; // Hide to avoid conflict
+// voice_chat_modal.dart has been removed
 export 'widgets/navbar_widget.dart';
 
 // ============================================================================

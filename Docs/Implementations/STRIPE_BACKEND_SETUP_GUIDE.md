@@ -58,13 +58,9 @@ The functions are deployed but need proper IAM permissions. You need to:
      - `customer.subscription.deleted`
 
 2. **Get Webhook Secret**:
-   - Copy the webhook signing secret from Stripe
-   - Set it in Firebase:
-   ```bash
-   cd firebase
-   firebase functions:config:set stripe.webhook_secret="whsec_your_webhook_secret_here" --project fo-co-co-89gnf5
-   firebase deploy --only functions --project fo-co-co-89gnf5
-   ```
+   - Copy the webhook signing secret from Stripe.
+   - Current code path does not validate webhook signatures yet, so this value is not actively consumed.
+   - If/when signature validation is added, store it as a parameter value (not `functions:config:*`) and read it via `firebase-functions/params`.
 
 ### Step 3: Update to Production Stripe Keys
 
@@ -72,10 +68,18 @@ The functions are deployed but need proper IAM permissions. You need to:
    - Publishable Key: `pk_live_...`
    - Secret Key: `sk_live_...`
 
-2. **Update Firebase Functions**:
+2. **Update Firebase Functions parameter values**:
    ```bash
-   cd firebase
-   firebase functions:config:set stripe.secret_key="sk_live_your_secret_key_here" --project fo-co-co-89gnf5
+   cd firebase/functions
+   cat > .env.fo-co-co-89gnf5 <<'EOF'
+   STRIPE_SECRET_KEY=sk_live_your_secret_key_here
+   EOF
+   ```
+   - Keep this file out of git (already ignored by `.gitignore`).
+   - Deploy from the `firebase` directory after setting values:
+   ```bash
+   cd ..
+   firebase deploy --only functions --project fo-co-co-89gnf5
    ```
 
 3. **Update Flutter App**:
@@ -184,10 +188,12 @@ The app automatically handles fingerprint and face unlock permissions.
 # Check Firebase Functions logs
 firebase functions:log --project fo-co-co-89gnf5
 
-# Check Firebase Functions config
-firebase functions:config:get --project fo-co-co-89gnf5
+# Check local function parameter file (values redacted)
+cd firebase/functions
+sed -E 's/(=.*)$/=<redacted>/' .env.fo-co-co-89gnf5
 
 # Test function locally
+cd ..
 firebase emulators:start --only functions
 ```
 

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'models/gemini_models.dart';
 import 'config/gemini_config.dart';
 import 'services/gemini_cost_tracker.dart';
+import 'services/gemini_interactions_service.dart';
 
 /// Main client for Google Generative AI Gemini integration
 class GeminiAIClient {
@@ -471,6 +472,7 @@ class GeminiAIClient {
   // ============================================================================
 
   /// Generate a comprehensive VARK assessment with questions and images
+  /// Uses Gemini Interactions API with gemini-3-flash-preview
   Future<Map<String, dynamic>> generateVarkAssessment({
     required String userId,
     Map<String, dynamic>? userProfile,
@@ -479,43 +481,20 @@ class GeminiAIClient {
     final startTime = DateTime.now();
 
     try {
-      // Create model for assessment generation
-      final model = FirebaseAI.googleAI().generativeModel(
-        model: GeminiConfig.contentModel,
-        generationConfig: GenerationConfig(
-          temperature: 0.8,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 4096,
-          responseMimeType: 'application/json',
-        ),
-        safetySettings: GeminiConfig.defaultSafetySettings,
-        systemInstruction: Content.text(_getAssessmentSystemPrompt()),
-      );
-
-      // Build assessment prompt
-      final prompt = _buildAssessmentPrompt(
+      // Use Interactions API service
+      final interactionsService = GeminiInteractionsService();
+      
+      final jsonResponse = await interactionsService.generateVarkAssessment(
         userId: userId,
         userProfile: userProfile,
         questionCount: questionCount,
       );
 
-      // Generate response
-      final response = await model.generateContent([Content.text(prompt)]);
-      final responseText = response.text;
-
-      if (responseText == null || responseText.isEmpty) {
-        throw Exception('Empty response from Gemini API');
-      }
-
-      // Parse JSON response
-      final jsonResponse = _parseJsonResponse(responseText, userId: userId);
-
-      // Track usage
+      // Track usage (approximate)
       await _trackContentUsage(
         userId: userId,
-        inputTokens: _estimateTokens(prompt),
-        outputTokens: _estimateTokens(responseText),
+        inputTokens: _estimateTokens(jsonEncode(userProfile ?? {})),
+        outputTokens: _estimateTokens(jsonEncode(jsonResponse)),
         model: GeminiConfig.contentModel,
         duration: DateTime.now().difference(startTime),
       );

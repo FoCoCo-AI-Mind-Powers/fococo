@@ -2,6 +2,7 @@ import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/backend/schema/structs/notification_settings_struct.dart';
 import '/backend/schema/structs/app_preferences_struct.dart';
+import '/backend/schema/user_subscriptions_record.dart';
 import '/backend/push_notifications/push_notifications_util.dart';
 import '/backend/push_notifications/notification_settings_widget.dart';
 import 'package:flutter/services.dart';
@@ -14,7 +15,6 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_components.dart';
 import '/flutter_flow/glass_design_system.dart';
-import '/widgets/floating_voice_button.dart';
 import '/services/revenuecat_service.dart';
 import '/services/subscription_state_provider.dart';
 import '/main.dart';
@@ -53,20 +53,21 @@ class _SettingsWidgetState extends State<SettingsWidget>
   // App preferences
   AppPreferencesStruct? _appPreferences;
   bool _isLoadingPreferences = true;
-  
+
   // Additional app preferences (not in struct)
   bool _reduceMotion = false;
   bool _offlineMode = false;
   bool _isLoadingAdditionalPrefs = true;
-  
+
   // Permission states
   bool? _microphonePermission;
   bool? _gpsPermission;
   bool _isLoadingPermissions = true;
-  
+
   // Subscription states
   final RevenueCatService _revenueCatService = RevenueCatService();
-  final SubscriptionStateProvider _subscriptionProvider = SubscriptionStateProvider();
+  final SubscriptionStateProvider _subscriptionProvider =
+      SubscriptionStateProvider();
   Offerings? _offerings;
   bool _isLoadingOfferings = false;
 
@@ -104,7 +105,7 @@ class _SettingsWidgetState extends State<SettingsWidget>
     _checkPermissions();
     _loadOfferings();
   }
-  
+
   Future<void> _loadOfferings() async {
     setState(() => _isLoadingOfferings = true);
     try {
@@ -118,7 +119,7 @@ class _SettingsWidgetState extends State<SettingsWidget>
       setState(() => _isLoadingOfferings = false);
     }
   }
-  
+
   Future<void> _showPaywall() async {
     if (_offerings?.current == null) {
       // Fallback: navigate to subscription onboarding
@@ -147,7 +148,9 @@ class _SettingsWidgetState extends State<SettingsWidget>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlutterFlowTheme.of(context).secondaryText.withValues(alpha: 0.3),
+                  color: FlutterFlowTheme.of(context)
+                      .secondaryText
+                      .withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -569,7 +572,8 @@ class _SettingsWidgetState extends State<SettingsWidget>
     }
   }
 
-  Future<void> _updateAdditionalPreference(String preference, bool value) async {
+  Future<void> _updateAdditionalPreference(
+      String preference, bool value) async {
     try {
       await FirebaseFirestore.instance
           .collection('user')
@@ -692,7 +696,7 @@ class _SettingsWidgetState extends State<SettingsWidget>
   Future<void> _requestGPSPermission() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
-      
+
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
@@ -748,7 +752,7 @@ class _SettingsWidgetState extends State<SettingsWidget>
 
   Future<void> _showSignOutConfirmation() async {
     final theme = FlutterFlowTheme.of(context);
-    
+
     final confirmed = await GlassDesignSystem.showGlassModal<bool>(
       context: context,
       barrierDismissible: true,
@@ -934,7 +938,6 @@ class _SettingsWidgetState extends State<SettingsWidget>
     }
   }
 
-
   @override
   void dispose() {
     _fadeController.dispose();
@@ -1019,9 +1022,6 @@ class _SettingsWidgetState extends State<SettingsWidget>
                 ),
               ),
             ),
-
-            // Floating Voice Button
-            const FloatingVoiceButton(),
           ],
         ),
       ),
@@ -1111,115 +1111,148 @@ class _SettingsWidgetState extends State<SettingsWidget>
         Column(
           children: [
             const SizedBox(height: 16),
-            if (hasActiveSubscription)
-              _buildSettingsItem(
-                theme,
-                Icons.workspace_premium,
-                'Manage Subscription',
-                'View and manage your subscription details',
-                () => context.goNamed('subscription_management'),
-              )
-            else ...[
-              // Show Paywall UI by default
-              if (_isLoadingOfferings)
-                const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: CircularProgressIndicator(),
-                )
-              else if (_offerings?.current != null)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Column(
+            StreamBuilder<List<UserSubscriptionsRecord>>(
+              stream: UserSubscriptionsRecord.collection
+                  .where('userId', isEqualTo: currentUserUid)
+                  .where('status', whereIn: ['active', 'trialing'])
+                  .orderBy('currentPeriodEnd', descending: true)
+                  .limit(1)
+                  .snapshots()
+                  .map((snapshot) => snapshot.docs
+                      .map((doc) => UserSubscriptionsRecord.fromSnapshot(doc))
+                      .toList()),
+              builder: (context, subscriptionSnapshot) {
+                final hasPremiumSubscription = subscriptionSnapshot.hasData &&
+                    subscriptionSnapshot.data!.isNotEmpty;
+
+                bool isPremium = false;
+                if (hasPremiumSubscription) {
+                  final subscription = subscriptionSnapshot.data!.first;
+                  final membershipTier =
+                      subscription.membershipTier.toLowerCase();
+                  isPremium =
+                      membershipTier == 'premium' || membershipTier == 'prime';
+                }
+
+                if (hasActiveSubscription && isPremium) {
+                  return _buildSettingsItem(
+                    theme,
+                    Icons.workspace_premium,
+                    'Manage Subscription',
+                    'View and manage your subscription details',
+                    _showPaywall,
+                  );
+                } else {
+                  return Column(
                     children: [
-                      // Paywall Preview Card
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              theme.primary.withValues(alpha: 0.1),
-                              theme.secondary.withValues(alpha: 0.1),
+                      // Show Paywall UI by default
+                      if (_isLoadingOfferings)
+                        const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: CircularProgressIndicator(),
+                        )
+                      else if (_offerings?.current != null)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: Column(
+                            children: [
+                              // Paywall Preview Card
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      theme.primary.withValues(alpha: 0.1),
+                                      theme.secondary.withValues(alpha: 0.1),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: theme.primary.withValues(alpha: 0.3),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.workspace_premium,
+                                      color: theme.primary,
+                                      size: 48,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Upgrade to Premium',
+                                      style: theme.titleMedium.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: theme.primaryText,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      isWithinTrial
+                                          ? 'Your trial ends in $trialDaysRemaining days'
+                                          : 'Unlock all premium features',
+                                      style: theme.bodyMedium.copyWith(
+                                        color: theme.secondaryText,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton(
+                                      onPressed: _showPaywall,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: theme.primary,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 32,
+                                          vertical: 14,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: Text(
+                                        'View Plans',
+                                        style: theme.titleSmall.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              if (hasActiveSubscription && isPremium)
+                                _buildSettingsItem(
+                                  theme,
+                                  Icons.settings,
+                                  'Subscription Management',
+                                  'Manage your subscription settings',
+                                  _showPaywall,
+                                )
+                              else
+                                const SizedBox.shrink(),
                             ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: theme.primary.withValues(alpha: 0.3),
-                            width: 2,
-                          ),
+                        )
+                      else
+                        _buildSettingsItem(
+                          theme,
+                          Icons.workspace_premium,
+                          'Upgrade to Premium',
+                          'Unlock all premium features',
+                          _showPaywall,
                         ),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.workspace_premium,
-                              color: theme.primary,
-                              size: 48,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Upgrade to Premium',
-                              style: theme.titleMedium.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: theme.primaryText,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              isWithinTrial
-                                  ? 'Your trial ends in $trialDaysRemaining days'
-                                  : 'Unlock all premium features',
-                              style: theme.bodyMedium.copyWith(
-                                color: theme.secondaryText,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _showPaywall,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: theme.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 32,
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: Text(
-                                'View Plans',
-                                style: theme.titleSmall.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSettingsItem(
-                        theme,
-                        Icons.settings,
-                        'Subscription Management',
-                        'Manage your subscription settings',
-                        () => context.goNamed('subscription_management'),
-                      ),
                     ],
-                  ),
-                )
-              else
-                _buildSettingsItem(
-                  theme,
-                  Icons.workspace_premium,
-                  'Upgrade to Premium',
-                  'Unlock all premium features',
-                  () => context.pushNamed('subscription_onboarding'),
-                ),
-            ],
+                  );
+                }
+              },
+            ),
           ],
         )
       ],
@@ -1501,7 +1534,8 @@ class _SettingsWidgetState extends State<SettingsWidget>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Unable to open ${documentType.replaceAll('_', ' ')}'),
+            content:
+                Text('❌ Unable to open ${documentType.replaceAll('_', ' ')}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1517,7 +1551,9 @@ class _SettingsWidgetState extends State<SettingsWidget>
         Column(
           children: [
             const SizedBox(height: 16),
-            if (_isLoadingPreferences || _isLoadingPermissions || _isLoadingAdditionalPrefs)
+            if (_isLoadingPreferences ||
+                _isLoadingPermissions ||
+                _isLoadingAdditionalPrefs)
               const CircularProgressIndicator()
             else ...[
               // Microphone permission
@@ -1597,10 +1633,8 @@ class _SettingsWidgetState extends State<SettingsWidget>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildThemeOption(
-                'system', '📱 Auto', 'Follow device settings'),
-            _buildThemeOption(
-                'light', '☀️ Light', 'Always use light theme'),
+            _buildThemeOption('system', '📱 Auto', 'Follow device settings'),
+            _buildThemeOption('light', '☀️ Light', 'Always use light theme'),
             _buildThemeOption('dark', '🌙 Dark', 'Always use dark theme'),
           ],
         ),
@@ -1634,7 +1668,6 @@ class _SettingsWidgetState extends State<SettingsWidget>
       },
     );
   }
-
 
   Widget _buildSettingsItem(
     FlutterFlowTheme theme,
@@ -1687,7 +1720,6 @@ class _SettingsWidgetState extends State<SettingsWidget>
       ),
     );
   }
-
 
   Widget _buildSwitchItem(
     FlutterFlowTheme theme,

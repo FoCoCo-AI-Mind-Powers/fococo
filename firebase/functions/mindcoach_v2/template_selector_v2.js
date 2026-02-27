@@ -1,4 +1,5 @@
 const { FALLBACK_TEMPLATE_ID } = require('./contracts_v2');
+const logger = require('firebase-functions/logger');
 
 function normalizeTag(tag) {
   return String(tag || '').trim().toLowerCase();
@@ -13,6 +14,13 @@ function chooseTemplate({
   const availableSet = new Set(availableTemplateIds || []);
   const tags = new Set(scenarioTags.map(normalizeTag).filter(Boolean));
 
+  logger.info('[MCv2:templateSelector] choosing', {
+    contextMode,
+    scenarioTagCount: tags.size,
+    recentTemplateId,
+    availableCount: availableSet.size,
+  });
+
   const candidates = [];
 
   if (contextMode === 'before_round') {
@@ -22,7 +30,6 @@ function chooseTemplate({
   } else if (contextMode === 'off_day') {
     candidates.push('MC_T08_END_OF_ROUND_REFLECTION', 'MC_T01_PRE_ROUND_CLARITY');
   } else {
-    // during_round and fallback
     if (
       hasAnyTag(tags, [
         'after_bad_shot_release',
@@ -63,23 +70,29 @@ function chooseTemplate({
     }
 
     if (templateId === recentTemplateId) {
+      logger.info('[MCv2:templateSelector] skipping recent template', { templateId });
       continue;
     }
 
+    logger.info('[MCv2:templateSelector] SELECTED', { templateId, reason: 'candidate_match' });
     return templateId;
   }
 
   if (availableSet.has(recentTemplateId)) {
+    logger.info('[MCv2:templateSelector] SELECTED (reused recent)', { templateId: recentTemplateId });
     return recentTemplateId;
   }
 
   if (availableSet.has(FALLBACK_TEMPLATE_ID)) {
+    logger.warn('[MCv2:templateSelector] SELECTED fallback', { templateId: FALLBACK_TEMPLATE_ID });
     return FALLBACK_TEMPLATE_ID;
   }
 
-  return availableTemplateIds && availableTemplateIds.length
+  const result = availableTemplateIds && availableTemplateIds.length
     ? availableTemplateIds[0]
     : FALLBACK_TEMPLATE_ID;
+  logger.warn('[MCv2:templateSelector] SELECTED last-resort', { templateId: result });
+  return result;
 }
 
 function hasAnyTag(tagSet, probes) {

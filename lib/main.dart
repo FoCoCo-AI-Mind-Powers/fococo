@@ -1,3 +1,5 @@
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
@@ -242,16 +244,19 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<SubscriptionStateProvider>.value(
       value: SubscriptionStateProvider(),
-      child: MaterialApp.router(
-        debugShowCheckedModeBanner: false,
+      child: AdaptiveApp.router(
+        routerConfig: _router,
         title: 'FoCoCo',
-        localizationsDelegates: [
+        themeMode: _themeMode,
+        localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: const [Locale('en', '')],
-        theme: ThemeData(
+        material: (_, __) =>
+            const MaterialAppData(debugShowCheckedModeBanner: false),
+        materialLightTheme: ThemeData(
           brightness: Brightness.light,
           scaffoldBackgroundColor:
               const Color(0xFFFFFFFF), // White background for light mode
@@ -283,7 +288,7 @@ class _MyAppState extends State<MyApp> {
             }),
           ),
         ),
-        darkTheme: ThemeData(
+        materialDarkTheme: ThemeData(
           brightness: Brightness.dark,
           scaffoldBackgroundColor: const Color(0xFF111827), // Dark background
           colorScheme: const ColorScheme.dark(
@@ -332,8 +337,14 @@ class _MyAppState extends State<MyApp> {
             }),
           ),
         ),
-        themeMode: _themeMode,
-        routerConfig: _router,
+        cupertinoLightTheme: const CupertinoThemeData(
+          brightness: Brightness.light,
+          primaryColor: Color(0xFFFEA400),
+        ),
+        cupertinoDarkTheme: const CupertinoThemeData(
+          brightness: Brightness.dark,
+          primaryColor: Color(0xFFFEA400),
+        ),
       ),
     );
   }

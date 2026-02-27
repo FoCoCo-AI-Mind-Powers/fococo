@@ -1,8 +1,6 @@
 /// Configuration for Gemini Live API
 /// Based on: https://ai.google.dev/gemini-api/docs/live
 
-import 'package:flutter/foundation.dart';
-
 class GeminiLiveAPIConfig {
   GeminiLiveAPIConfig._();
 
@@ -10,24 +8,20 @@ class GeminiLiveAPIConfig {
   static const String websocketEndpoint =
       'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent';
 
-  /// Get API key from environment or secure storage
-  /// No hardcoded fallback is allowed for production safety.
+  /// Get API key: first from --dart-define=GEMINI_API_KEY, last fallback = Gemini key below.
   static String get apiKey {
-    // First, try to get from dart-define (for production builds)
     const keyFromEnv = String.fromEnvironment('GEMINI_API_KEY');
 
     if (keyFromEnv.isNotEmpty) {
       return keyFromEnv;
     }
 
-    if (kDebugMode && keyFromEnv.isEmpty) {
-      print('⚠️ GEMINI_API_KEY not set from environment.');
-      print(
-          '💡 For production, use --dart-define=GEMINI_API_KEY=your_key_here');
-    }
-
-    return '';
+    return _geminiApiKeyFallback;
   }
+
+  /// Last fallback Gemini API key (used when GEMINI_API_KEY is not set).
+  static const String _geminiApiKeyFallback =
+      'AIzaSyDBPLUOH59Y0bwslDhnFToFs424kDSQZno';
 
   /// Check if API key is configured
   static bool get isConfigured => apiKey.isNotEmpty;

@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 Future initFirebase() async {
@@ -47,7 +48,21 @@ Future initFirebase() async {
                 appId: "1:549026925121:ios:d5554c9723624fd02ad4c0"));
       }
     }
-    
+
+    // On web, set auth persistence to LOCAL so session survives tab close/refresh
+    if (kIsWeb) {
+      try {
+        await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+        if (kDebugMode) {
+          print('✅ Firebase Auth persistence set to LOCAL (web)');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ Could not set auth persistence: $e');
+        }
+      }
+    }
+
     if (kDebugMode) {
       print('✅ Firebase initialized successfully');
     }

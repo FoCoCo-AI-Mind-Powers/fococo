@@ -155,6 +155,20 @@ class MindCoachV2CompleteRequest {
   }
 }
 
+class MindCoachV2TimedLine {
+  const MindCoachV2TimedLine({
+    required this.text,
+    required this.startMs,
+    required this.durationMs,
+    this.endMs,
+  });
+
+  final String text;
+  final int startMs;
+  final int durationMs;
+  final int? endMs;
+}
+
 class MindCoachV2Session {
   MindCoachV2Session({
     required this.sessionId,
@@ -173,6 +187,10 @@ class MindCoachV2Session {
     this.contentId,
     this.scenarioTags = const <String>[],
     this.createdAt,
+    this.lines,
+    this.totalDurationSec,
+    this.varkModeSelected,
+    this.levelSelected,
   });
 
   final String sessionId;
@@ -191,6 +209,10 @@ class MindCoachV2Session {
   final String? contentId;
   final List<String> scenarioTags;
   final DateTime? createdAt;
+  final List<MindCoachV2TimedLine>? lines;
+  final int? totalDurationSec;
+  final String? varkModeSelected;
+  final String? levelSelected;
 
   factory MindCoachV2Session.fromApi(
     Map<String, dynamic> map, {
@@ -216,6 +238,10 @@ class MindCoachV2Session {
           (map['prompt_version'] ?? 'mindcoach_system_v1').toString(),
       contentId: map['content_id']?.toString(),
       scenarioTags: _stringList(map['scenario_tags']),
+      lines: _parseTimedLines(map['lines']),
+      totalDurationSec: _parseInt(map['total_duration_sec']),
+      varkModeSelected: map['vark_mode_selected']?.toString(),
+      levelSelected: map['level_selected']?.toString(),
     );
   }
 
@@ -256,6 +282,13 @@ class MindCoachV2Session {
       contentId: (map['content_id'] ?? map['contentId'])?.toString(),
       scenarioTags: _stringList(map['scenario_tags'] ?? map['scenarioTags']),
       createdAt: _timestampToDate(map['created_at'] ?? map['createdTime']),
+      lines: _parseTimedLines(map['lines']),
+      totalDurationSec:
+          _parseInt(map['total_duration_sec'] ?? map['totalDurationSec']),
+      varkModeSelected:
+          (map['vark_mode_selected'] ?? map['varkModeSelected'])?.toString(),
+      levelSelected:
+          (map['level_selected'] ?? map['levelSelected'])?.toString(),
     );
   }
 
@@ -274,6 +307,36 @@ class MindCoachV2Session {
           .toList();
     }
     return const <String>[];
+  }
+
+  static List<MindCoachV2TimedLine>? _parseTimedLines(dynamic raw) {
+    if (raw == null || raw is! List || raw.isEmpty) {
+      return null;
+    }
+    final out = <MindCoachV2TimedLine>[];
+    for (final item in raw) {
+      if (item is! Map) continue;
+      final text = (item['text'] ?? '').toString().trim();
+      if (text.isEmpty) continue;
+      final startMs = _parseInt(item['startMs']) ?? 0;
+      final durationMs = _parseInt(item['durationMs']) ?? 2500;
+      final endMs = _parseInt(item['endMs'] ?? item['end_ms']);
+      out.add(MindCoachV2TimedLine(
+        text: text,
+        startMs: startMs,
+        durationMs: durationMs,
+        endMs: endMs ?? (startMs + durationMs),
+      ));
+    }
+    return out.isEmpty ? null : out;
+  }
+
+  static int? _parseInt(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is int) return raw;
+    if (raw is double) return raw.toInt();
+    if (raw is String) return int.tryParse(raw);
+    return null;
   }
 
   static DateTime? _timestampToDate(dynamic raw) {

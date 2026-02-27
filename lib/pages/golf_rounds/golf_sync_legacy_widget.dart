@@ -272,7 +272,7 @@ class _GolfSyncLegacyWidgetState extends State<GolfSyncLegacyWidget>
       key: scaffoldKey,
       backgroundColor: theme.primaryBackground,
       drawer: user != null
-          ? EnhancedFoCoCoDrawer(
+          ? FoCoCoDrawer(
               currentUser: user,
               currentRoute: 'caddy_play',
               onNavigate: (route) => context.goNamed(route),

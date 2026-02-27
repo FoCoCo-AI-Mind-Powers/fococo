@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:firebase_ai/firebase_ai.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import 'models/gemini_models.dart';
 import 'config/gemini_config.dart';
@@ -403,7 +404,8 @@ class GeminiAIClient {
   // MULTI-TURN CONVERSATION
   // ============================================================================
 
-  /// Generate response in a multi-turn conversation
+  /// Generate response in a multi-turn conversation.
+  /// Tries REST with client API key first; on 403 (blocked key) falls back to Firebase AI.
   Future<GeminiConversationResponse> generateConversationResponse({
     required String userId,
     required String conversationId,
@@ -415,26 +417,63 @@ class GeminiAIClient {
     final startTime = DateTime.now();
 
     try {
-      // Create model for conversation
-      final model = FirebaseAI.googleAI().generativeModel(
-        model: GeminiConfig.defaultModel,
-        generationConfig: GeminiConfig.conversationGenerationConfig,
-        safetySettings: GeminiConfig.defaultSafetySettings,
-      );
+      String responseText = '';
 
-      // Build conversation context
-      final conversationContent = _buildConversationContent(
-        userMessage: userMessage,
-        conversationHistory: conversationHistory,
-        context: context,
-        userProfile: userProfile,
-      );
+      if (_apiKey.isNotEmpty) {
+        try {
+          responseText = await _generateConversationResponseViaRest(
+            userMessage: userMessage,
+            conversationHistory: conversationHistory,
+            context: context,
+            userProfile: userProfile,
+          );
+        } catch (restError) {
+          final msg = restError.toString();
+          if (msg.contains('403') ||
+              msg.contains('PERMISSION_DENIED') ||
+              msg.contains('API_KEY_SERVICE_BLOCKED')) {
+            if (kDebugMode) {
+              print('⚠️ Gemini REST blocked (403), falling back to Firebase AI.');
+            }
+            try {
+              responseText = await _generateConversationResponseViaFirebaseAI(
+                userMessage: userMessage,
+                conversationHistory: conversationHistory,
+                context: context,
+                userProfile: userProfile,
+              );
+            } catch (firebaseError) {
+              if (kDebugMode) {
+                print('⚠️ Firebase AI also failed: $firebaseError');
+              }
+              throw Exception(
+                'Gemini API is not available. Enable "Generative Language API" '
+                'in Google Cloud Console and ensure your API key is not restricted '
+                'for this app, or use Firebase AI with a valid key.',
+              );
+            }
+          } else {
+            rethrow;
+          }
+        }
+      }
 
-      // Generate response
-      final response = await model.generateContent(conversationContent);
+      if (responseText.isEmpty) {
+        try {
+          responseText = await _generateConversationResponseViaFirebaseAI(
+            userMessage: userMessage,
+            conversationHistory: conversationHistory,
+            context: context,
+            userProfile: userProfile,
+          );
+        } catch (e) {
+          if (kDebugMode) {
+            print('❌ Firebase AI fallback failed: $e');
+          }
+        }
+      }
 
-      final responseText = response.text;
-      if (responseText == null || responseText.isEmpty) {
+      if (responseText.isEmpty) {
         throw Exception('Empty response from Gemini API');
       }
 
@@ -449,7 +488,6 @@ class GeminiAIClient {
         tokensUsed: _estimateTokens(responseText),
       );
 
-      // Track usage
       await _trackConversationUsage(
         userId: userId,
         inputTokens: _estimateTokens(userMessage),
@@ -463,8 +501,116 @@ class GeminiAIClient {
       if (kDebugMode) {
         print('❌ Error generating conversation response: $e');
       }
+      final msg = e.toString();
+      if (msg.contains('Gemini API is not available') ||
+          msg.contains('PERMISSION_DENIED') ||
+          msg.contains('API_KEY_SERVICE_BLOCKED')) {
+        rethrow;
+      }
       throw Exception('Failed to generate conversation response: $e');
     }
+  }
+
+  /// Generate conversation response via Firebase AI (server-side key). Used when REST key is blocked or no key.
+  Future<String> _generateConversationResponseViaFirebaseAI({
+    required String userMessage,
+    required List<Map<String, dynamic>> conversationHistory,
+    String? context,
+    Map<String, dynamic>? userProfile,
+  }) async {
+    final model = FirebaseAI.googleAI().generativeModel(
+      model: GeminiConfig.defaultModel,
+      generationConfig: GeminiConfig.conversationGenerationConfig,
+      safetySettings: GeminiConfig.defaultSafetySettings,
+    );
+    final conversationContent = _buildConversationContent(
+      userMessage: userMessage,
+      conversationHistory: conversationHistory,
+      context: context,
+      userProfile: userProfile,
+    );
+    final response = await model.generateContent(conversationContent);
+    return response.text ?? '';
+  }
+
+  /// Call Gemini REST API for conversation (used when API key is provided to avoid Firebase AI leaked key).
+  Future<String> _generateConversationResponseViaRest({
+    required String userMessage,
+    required List<Map<String, dynamic>> conversationHistory,
+    String? context,
+    Map<String, dynamic>? userProfile,
+  }) async {
+    final contents = <Map<String, dynamic>>[];
+
+    if (context != null && context.isNotEmpty) {
+      contents.add({
+        'role': 'user',
+        'parts': [{'text': 'Context: $context'}],
+      });
+      contents.add({
+        'role': 'model',
+        'parts': [{'text': 'Understood.'}],
+      });
+    }
+    if (userProfile != null && userProfile.isNotEmpty) {
+      contents.add({
+        'role': 'user',
+        'parts': [{'text': 'User Profile: ${json.encode(userProfile)}'}],
+      });
+      contents.add({
+        'role': 'model',
+        'parts': [{'text': 'Understood.'}],
+      });
+    }
+    for (final message in conversationHistory) {
+      final role = message['role'] as String? ?? 'user';
+      final content = message['content'] as String? ?? '';
+      contents.add({
+        'role': role == 'assistant' ? 'model' : 'user',
+        'parts': [{'text': content}],
+      });
+    }
+    contents.add({
+      'role': 'user',
+      'parts': [{'text': userMessage}],
+    });
+
+    final uri = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$_apiKey',
+    );
+    final body = json.encode({
+      'contents': contents,
+      'generationConfig': {
+        'temperature': 0.8,
+        'topK': 40,
+        'topP': 0.95,
+        'maxOutputTokens': 1024,
+      },
+    });
+
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: body,
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Gemini API error: ${response.statusCode} ${response.body}',
+      );
+    }
+
+    final map = json.decode(response.body) as Map<String, dynamic>;
+    final candidates = map['candidates'] as List<dynamic>?;
+    if (candidates == null || candidates.isEmpty) {
+      throw Exception('No candidates in Gemini response');
+    }
+    final parts = (candidates.first as Map<String, dynamic>)['content']?['parts'] as List<dynamic>?;
+    if (parts == null || parts.isEmpty) {
+      throw Exception('No parts in Gemini response');
+    }
+    final text = (parts.first as Map<String, dynamic>)['text'] as String?;
+    return text ?? '';
   }
 
   // ============================================================================

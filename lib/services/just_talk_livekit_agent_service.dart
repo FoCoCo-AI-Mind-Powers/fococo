@@ -143,6 +143,13 @@ class JustTalkLiveKitAgentService {
       return;
     }
 
+    // Ensure the user is authenticated before attempting to start a session.
+    if (FirebaseAuth.instance.currentUser == null) {
+      throw StateError(
+        'Cannot start voice session: user is not authenticated.',
+      );
+    }
+
     await endSession();
 
     JustTalkLiveKitConfig.logConfig();
@@ -331,6 +338,17 @@ class JustTalkLiveKitAgentService {
     String? agentMetadata,
     Map<String, String>? participantAttributes,
   }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw StateError(
+        'Cannot fetch LiveKit token: user is not authenticated.',
+      );
+    }
+
+    // Force-refresh the Firebase ID token so the Functions call carries
+    // a valid credential even if the cached token has expired.
+    await user.getIdToken(true);
+
     final callable =
         FirebaseFunctions.instance.httpsCallable('generateLiveKitToken');
 

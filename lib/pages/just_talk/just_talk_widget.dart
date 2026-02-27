@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '/ai_integration/config/gemini_live_config.dart';
 import '/ai_integration/config/just_talk_livekit_config.dart';
 import '/ai_integration/gemini_ai_client.dart';
 import '/ai_integration/services/cartesia_api_service.dart';
@@ -120,7 +121,7 @@ class _JustTalkWidgetState extends State<JustTalkWidget>
   void initState() {
     super.initState();
     _model = createModel(context, () => JustTalkModel());
-    _aiClient = GeminiAIClient(apiKey: '');
+    _aiClient = GeminiAIClient(apiKey: GeminiLiveAPIConfig.apiKey);
     _livekitService = widget.liveKitService ?? JustTalkLiveKitAgentService();
     _databaseService = widget.databaseService ?? VoiceChatDatabaseService();
 
@@ -277,7 +278,7 @@ class _JustTalkWidgetState extends State<JustTalkWidget>
                           .copyWith(fontWeight: FontWeight.w800),
                     ),
                     Text(
-                      'LiveKit agent voice + fallback safety',
+                      'Voice conversation mode',
                       style:
                           theme.bodySmall.copyWith(color: theme.secondaryText),
                     ),
@@ -378,7 +379,7 @@ class _JustTalkWidgetState extends State<JustTalkWidget>
               ),
               const SizedBox(height: 14),
               Text(
-                'Tap the mic to speak.\nLive mode uses the LiveKit agent path.',
+                'Tap the mic to start a conversation.',
                 textAlign: TextAlign.center,
                 style: theme.bodyMedium.copyWith(color: theme.secondaryText),
               ),
@@ -601,7 +602,7 @@ class _JustTalkWidgetState extends State<JustTalkWidget>
       final connected = await _ensureConnected();
       if (!connected) {
         if (!_isUsingLiveKitFallback) {
-          _showSnack('LiveKit voice service is unavailable.');
+          _showSnack('Voice service is unavailable.');
         }
         return;
       }
@@ -625,7 +626,7 @@ class _JustTalkWidgetState extends State<JustTalkWidget>
           }
         }
       } catch (e) {
-        _showSnack('LiveKit microphone toggle failed: $e');
+        _showSnack('Microphone toggle failed. Please try again.');
       }
       return;
     }
@@ -837,7 +838,7 @@ JustTalk live conversation mode:
       }
 
       if (JustTalkLiveKitConfig.fallbackEnabled) {
-        await _activateLiveKitFallback('LiveKit unavailable: $e');
+        await _activateLiveKitFallback('Voice service unavailable');
       } else if (mounted) {
         setState(() {
           _connectionState = LiveKitConnectionState.disconnected;
@@ -904,7 +905,7 @@ JustTalk live conversation mode:
       });
     }
 
-    _showSnack('LiveKit unavailable, switched to fallback voice mode.');
+    _showSnack('Switched to local voice mode.');
   }
 
   Future<void> _togglePause() async {
@@ -1175,34 +1176,26 @@ JustTalk live conversation mode:
 
   String _statusText() {
     if (_isUsingLiveKitFallback) {
-      final reason = _lastLiveKitFallbackReason;
-      if (reason == null || reason.isEmpty) {
-        return 'Fallback voice mode active.';
-      }
-      return 'Fallback voice mode active: $reason';
+      return 'Voice mode active (local).';
     }
 
     if (_isLiveMode && _connectionState != LiveKitConnectionState.connected) {
-      return 'Connecting to LiveKit agent...';
+      return 'Connecting voice service...';
     }
 
     switch (_voiceState) {
       case GeminiLiveServiceState.listening:
-        return _isLiveMode
-            ? 'LiveKit is listening...'
-            : 'Listening for your voice...';
+        return 'Listening...';
       case GeminiLiveServiceState.thinking:
-        return _isLiveMode
-            ? 'Agent is thinking...'
-            : 'Thinking about your input...';
+        return 'Thinking...';
       case GeminiLiveServiceState.speaking:
-        return _isLiveMode ? 'Agent is speaking...' : 'Speaking response...';
+        return 'Speaking...';
       case GeminiLiveServiceState.error:
-        return 'Voice pipeline error. Try again.';
+        return 'Voice service error. Try again.';
       default:
         return _isLiveMode
-            ? 'Connected. Tap mic to talk with the agent.'
-            : 'Local mode active. Tap mic to continue.';
+            ? 'Ready. Tap mic to start talking.'
+            : 'Local mode. Tap mic to start.';
     }
   }
 

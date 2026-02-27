@@ -2,6 +2,7 @@ const {
   VALID_CONTEXT_MODES,
   VALID_UI_MODES,
 } = require('./contracts_v2');
+const logger = require('firebase-functions/logger');
 
 function deriveUiMode(contextMode) {
   if (contextMode === 'during_round') {
@@ -20,8 +21,11 @@ async function resolveContextMode({
     ? requestedMode
     : 'auto';
 
+  logger.info('[MCv2:contextResolver] resolving', { requestedMode, safeRequestedMode, userId });
+
   if (safeRequestedMode !== 'auto') {
     const uiMode = deriveUiMode(safeRequestedMode);
+    logger.info('[MCv2:contextResolver] using request override', { contextMode: safeRequestedMode, uiMode });
     return {
       contextMode: safeRequestedMode,
       uiMode: VALID_UI_MODES.has(uiMode) ? uiMode : 'guided_extended',
@@ -31,7 +35,6 @@ async function resolveContextMode({
     };
   }
 
-  // Best-effort inference from recent golf rounds.
   let latestRoundAt = null;
   try {
     const roundSnapshot = await db
@@ -47,8 +50,12 @@ async function resolveContextMode({
         latestRoundAt = raw.toDate();
       }
     }
-  } catch (_) {
-    // Keep inference resilient.
+    logger.info('[MCv2:contextResolver] golf_rounds query result', {
+      hasRound: !!latestRoundAt,
+      latestRoundAt: latestRoundAt ? latestRoundAt.toISOString() : null,
+    });
+  } catch (err) {
+    logger.warn('[MCv2:contextResolver] golf_rounds query failed', { error: err.message });
   }
 
   let contextMode = 'off_day';
@@ -59,14 +66,17 @@ async function resolveContextMode({
     } else if (deltaHours <= 24) {
       contextMode = 'after_round';
     }
+    logger.info('[MCv2:contextResolver] inferred from round delta', { deltaHours: deltaHours.toFixed(1), contextMode });
   } else {
     const hour = now.getHours();
     if (hour < 10) {
       contextMode = 'before_round';
     }
+    logger.info('[MCv2:contextResolver] inferred from time-of-day', { hour, contextMode });
   }
 
   const uiMode = deriveUiMode(contextMode);
+  logger.info('[MCv2:contextResolver] RESULT', { contextMode, uiMode });
 
   return {
     contextMode,

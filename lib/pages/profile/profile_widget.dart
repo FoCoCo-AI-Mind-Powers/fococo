@@ -7,8 +7,8 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_design_system.dart';
 import '/flutter_flow/glass_components.dart';
-import '/ai_integration/widgets/navbar_widget.dart';
 import '/services/revenuecat_service.dart';
+import '/widgets/fococo_drawer_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -241,7 +241,7 @@ class _ProfileWidgetState extends State<ProfileWidget>
                   FirebaseFirestore.instance.doc('user/${currentUserUid}')),
               builder: (context, snapshot) {
                 final userData = snapshot.data;
-                return EnhancedFoCoCoDrawer(
+                return FoCoCoDrawer(
                   currentUser: userData,
                   currentRoute: 'profile',
                   onNavigate: (route) => context.goNamed(route),
@@ -376,21 +376,13 @@ class _ProfileWidgetState extends State<ProfileWidget>
 
                     // Footer: Settings Link
                     _buildFooterSection(theme),
-                    const SizedBox(height: 100), // Bottom padding for navbar
+                    const SizedBox(height: 24),
                   ]),
                 ),
               ),
             ],
           ),
         ),
-      ),
-      bottomNavigationBar: EnhancedFoCoCoNavBar(
-        currentRoute: 'profile',
-        onTap: (route) {
-          print('🔄 Profile page: Navigation requested to route: $route');
-          context.goNamed(route);
-        },
-        currentUser: null, // Will be handled by the navbar internally
       ),
     );
   }

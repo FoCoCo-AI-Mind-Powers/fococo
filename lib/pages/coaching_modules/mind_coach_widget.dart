@@ -284,7 +284,7 @@ class _MindCoachWidgetState extends State<MindCoachWidget>
                 stream: _userRecordStream,
                 builder: (context, snapshot) {
                   final userData = snapshot.data;
-                  return EnhancedFoCoCoDrawer(
+                  return FoCoCoDrawer(
                     currentUser: userData,
                     currentRoute: 'mind_coach',
                     onNavigate: (route) => context.goNamed(route),

@@ -286,19 +286,21 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
         final decision =
             await AuthFlowService.instance.resolvePostAuthDecision();
         if (!mounted) return;
+        AppStateNotifier.instance.stopShowingSplashImage();
         context.goNamed(decision.routeName, extra: decision.extra);
       } else {
         if (kDebugMode) {
-          print('✅ Enhanced Splash: User not logged in, navigating to home');
+          print('✅ Enhanced Splash: User not logged in, navigating to login');
         }
+        AppStateNotifier.instance.stopShowingSplashImage();
         context.go('/login');
       }
     } catch (e) {
       if (kDebugMode) {
         print('❌ Enhanced Splash: Error during navigation: $e');
       }
-      // Fallback navigation
       if (mounted) {
+        AppStateNotifier.instance.stopShowingSplashImage();
         context.go('/login');
       }
     }

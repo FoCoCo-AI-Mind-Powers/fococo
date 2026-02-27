@@ -89,6 +89,12 @@ class AppStateNotifier extends ChangeNotifier {
     showSplashImage = false;
     notifyListeners();
   }
+
+  /// Sets splash hidden without notifying. Use only inside router redirect
+  /// to avoid a refresh loop (redirect -> notifyListeners -> refresh -> redirect).
+  void stopShowingSplashImageSilent() {
+    showSplashImage = false;
+  }
 }
 
 GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
@@ -96,6 +102,13 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       debugLogDiagnostics: true,
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
+      redirect: (context, state) {
+        if (state.matchedLocation == '/' && appStateNotifier.loggedIn) {
+          appStateNotifier.stopShowingSplashImageSilent();
+          return '/mind_coach';
+        }
+        return null;
+      },
       errorBuilder: (context, state) => appStateNotifier.loggedIn
           ? const MindCoachV2EntryWidget()
           : LoginWidget(),

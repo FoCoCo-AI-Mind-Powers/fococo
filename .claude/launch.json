@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flutter-app",
+      "runtimeExecutable": "flutter",
+      "runtimeArgs": ["run", "-d", "chrome", "--web-port", "3000"],
+      "port": 3000
+    },
+    {
+      "name": "firebase-emulators",
+      "runtimeExecutable": "firebase",
+      "runtimeArgs": ["emulators:start", "--project", "fo-co-co-89gnf5"],
+      "port": 4000
+    }
+  ]
+}

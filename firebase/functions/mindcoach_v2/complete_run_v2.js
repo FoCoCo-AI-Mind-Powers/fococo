@@ -1,4 +1,5 @@
 const functions = require('firebase-functions/v1');
+const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
 
 const db = admin.firestore();
@@ -59,6 +60,7 @@ async function findRun({ userId, sessionId, runId }) {
 
 async function completeMindCoachSessionRunV2(data, context) {
   if (!context.auth) {
+    logger.warn('[MCv2:completeRun] unauthenticated request rejected');
     throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
   }
 
@@ -71,6 +73,16 @@ async function completeMindCoachSessionRunV2(data, context) {
     ? null
     : Number(data.helpfulness_rating);
   const saveFavorite = data.save_favorite === true;
+
+  logger.info('[MCv2:completeRun] ENTRY', {
+    userId,
+    sessionId,
+    runId: runId || null,
+    completionStatus,
+    mindsetAfter,
+    helpfulnessRating,
+    saveFavorite,
+  });
 
   if (!sessionId) {
     throw new functions.https.HttpsError('invalid-argument', 'session_id is required');
@@ -100,6 +112,7 @@ async function completeMindCoachSessionRunV2(data, context) {
   }
 
   const runRef = await findRun({ userId, sessionId, runId: runId || null });
+  logger.info('[MCv2:completeRun] run resolved', { resolvedRunId: runRef.id });
 
   await runRef.set(
     {
@@ -132,7 +145,14 @@ async function completeMindCoachSessionRunV2(data, context) {
       { merge: true },
     );
     favoriteSaved = true;
+    logger.info('[MCv2:completeRun] favorite saved', { favoriteId: favoriteRef.id });
   }
+
+  logger.info('[MCv2:completeRun] RESPONSE', {
+    runId: runRef.id,
+    favoriteSaved,
+    completionStatus,
+  });
 
   return {
     run_id: runRef.id,

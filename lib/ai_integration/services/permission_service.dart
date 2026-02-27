@@ -4,8 +4,6 @@
 /// Based on pattern from coelle project and issue #574: https://github.com/Baseflow/flutter-permission-handler/issues/574
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart' as ph;
@@ -471,73 +469,15 @@ class PermissionService {
 
   /// Update microphone state and notify listeners
   void _updateMicrophoneState(PermissionServiceState newState) {
-    // #region agent log
-    final logEntry = {
-      'sessionId': 'debug-session',
-      'runId': 'run1',
-      'hypothesisId': 'C',
-      'location': 'permission_service.dart:_updateMicrophoneState',
-      'message': '_updateMicrophoneState ENTRY',
-      'data': {'oldState': _microphoneState.toString(), 'newState': newState.toString()},
-      'timestamp': DateTime.now().millisecondsSinceEpoch,
-    };
-    File('/Users/mac/Documents/Projects Code/fococo/.cursor/debug.log')
-        .writeAsStringSync('${jsonEncode(logEntry)}\n', mode: FileMode.append);
-    // #endregion
-    
     if (_microphoneState != newState) {
       _microphoneState = newState;
-      
-      // #region agent log
-      final logEntry2 = {
-        'sessionId': 'debug-session',
-        'runId': 'run1',
-        'hypothesisId': 'C',
-        'location': 'permission_service.dart:_updateMicrophoneState',
-        'message': 'BEFORE stream.add',
-        'data': {'state': newState.toString()},
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-      };
-      File('/Users/mac/Documents/Projects Code/fococo/.cursor/debug.log')
-          .writeAsStringSync('${jsonEncode(logEntry2)}\n', mode: FileMode.append);
-      // #endregion
-      
       _microphoneStateController.add(newState);
 
-      // #region agent log
-      final logEntry3 = {
-        'sessionId': 'debug-session',
-        'runId': 'run1',
-        'hypothesisId': 'C',
-        'location': 'permission_service.dart:_updateMicrophoneState',
-        'message': 'AFTER stream.add',
-        'data': {},
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-      };
-      File('/Users/mac/Documents/Projects Code/fococo/.cursor/debug.log')
-          .writeAsStringSync('${jsonEncode(logEntry3)}\n', mode: FileMode.append);
-      // #endregion
-
-      // Handle UI feedback
       handlePermissionStateChange(newState);
 
       if (kDebugMode) {
         print('🔄 Microphone permission state: $newState');
       }
-      
-      // #region agent log
-      final logEntry4 = {
-        'sessionId': 'debug-session',
-        'runId': 'run1',
-        'hypothesisId': 'C',
-        'location': 'permission_service.dart:_updateMicrophoneState',
-        'message': '_updateMicrophoneState EXIT',
-        'data': {},
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-      };
-      File('/Users/mac/Documents/Projects Code/fococo/.cursor/debug.log')
-          .writeAsStringSync('${jsonEncode(logEntry4)}\n', mode: FileMode.append);
-      // #endregion
     }
   }
 

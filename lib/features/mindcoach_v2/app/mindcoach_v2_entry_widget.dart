@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:tab_indicator_styler/tab_indicator_styler.dart';
 
+import '/auth/firebase_auth/auth_util.dart';
+import '/backend/backend.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
 import '/features/mindcoach_v2/config/mindcoach_v2_flags.dart';
 import '/features/mindcoach_v2/data/mindcoach_v2_repository.dart';
@@ -9,6 +12,8 @@ import '/features/mindcoach_v2/presentation/history/mindcoach_history_v2_widget.
 import '/features/mindcoach_v2/presentation/home/mindcoach_home_v2_widget.dart';
 import '/features/mindcoach_v2/presentation/player/mindcoach_session_player_v2_widget.dart';
 import '/features/mindcoach_v2/presentation/results/mindcoach_results_v2_widget.dart';
+import '/features/mindcoach_v2/services/mindcoach_v2_debug_logger.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/pages/coaching_modules/mind_coach_widget.dart';
 
@@ -24,24 +29,55 @@ class MindCoachV2EntryWidget extends StatefulWidget {
   State<MindCoachV2EntryWidget> createState() => _MindCoachV2EntryWidgetState();
 }
 
-class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
+class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget>
+    with SingleTickerProviderStateMixin {
+  static const String _tag = 'ENTRY';
   final MindCoachV2Repository _repository = MindCoachV2Repository.instance;
-  late int _tabIndex;
+  final MindCoachV2DebugLogger _logger = MindCoachV2DebugLogger.instance;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabIndex = widget.initialTabIndex.clamp(0, 2);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 2),
+    );
+    _tabController.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _runGenerationRequest(MindCoachV2GenerateRequest request) async {
+    _logger.log(_tag, '_runGenerationRequest', {
+      'contextMode': request.contextMode.wireValue,
+      'entrySource': request.entrySource,
+      'deliveryLength': request.preferredDeliveryLength,
+    });
     try {
       final response = await _repository.generateSession(request);
       if (!mounted) {
         return;
       }
+      _logger.log(_tag, 'generation succeeded, opening player', {
+        'sessionId': response.sessionId,
+        'uiMode': response.uiMode.wireValue,
+      });
       await _openPlayer(response);
-    } catch (e) {
+    } catch (e, s) {
+      _logger.error(_tag, '_runGenerationRequest failed', null, e, s);
       if (!mounted) {
         return;
       }
@@ -52,6 +88,12 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
   }
 
   Future<void> _resume(MindCoachV2ResumePayload payload) async {
+    _logger.log(_tag, '_resume', {
+      'sessionId': payload.session.sessionId,
+      'runId': payload.run.runId,
+      'contextMode': payload.session.contextMode.wireValue,
+    });
+
     final uiMode =
         payload.session.contextMode == MindCoachV2ContextMode.duringRound
             ? MindCoachV2UiMode.liveMinimal
@@ -69,6 +111,10 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
   }
 
   Future<void> _repeatSession(MindCoachV2Session session) {
+    _logger.log(_tag, '_repeatSession', {
+      'originalSessionId': session.sessionId,
+      'templateId': session.templateId,
+    });
     return _runGenerationRequest(
       MindCoachV2GenerateRequest(
         contextMode: session.contextMode,
@@ -79,6 +125,11 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
   }
 
   Future<void> _openPlayer(MindCoachV2GenerateResponse response) async {
+    _logger.log(_tag, '_openPlayer', {
+      'sessionId': response.sessionId,
+      'uiMode': response.uiMode.wireValue,
+      'templateId': response.session.templateId,
+    });
     final playerResult =
         await Navigator.of(context).push<MindCoachV2PlayerResult>(
       MaterialPageRoute(
@@ -89,8 +140,16 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
     );
 
     if (!mounted || playerResult == null) {
+      _logger.log(_tag, 'player returned null or widget unmounted');
       return;
     }
+
+    _logger.log(_tag, 'player result received', {
+      'completed': playerResult.completed.toString(),
+      'status': playerResult.completionStatus.wireValue,
+      'favoriteSaved': playerResult.favoriteSaved.toString(),
+      'runId': playerResult.runId ?? 'null',
+    });
 
     if (response.uiMode == MindCoachV2UiMode.guidedExtended &&
         playerResult.completed &&
@@ -107,9 +166,7 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
             },
             onOpenHistory: () {
               Navigator.of(context).pop();
-              setState(() {
-                _tabIndex = 2;
-              });
+              _setTabIndex(2);
             },
           ),
         ),
@@ -129,14 +186,10 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
         onGenerateRequested: _runGenerationRequest,
         onResumeRequested: _resume,
         onOpenBuilder: () {
-          setState(() {
-            _tabIndex = 1;
-          });
+          _setTabIndex(1);
         },
         onOpenHistory: () {
-          setState(() {
-            _tabIndex = 2;
-          });
+          _setTabIndex(2);
         },
       ),
       MindCoachBuilderV2Widget(
@@ -148,79 +201,99 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
       ),
     ];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('MindCoach'),
-        actions: [
-          if (MindCoachV2Flags.allowLegacyRoute)
-            IconButton(
-              tooltip: 'Legacy MindCoach',
-              icon: const Icon(Icons.history_toggle_off_outlined),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const MindCoachWidget(),
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          _buildTopTabSelector(),
-          Expanded(
-            child: IndexedStack(
-              index: _tabIndex,
-              children: pages,
-            ),
+    return StreamBuilder<UserRecord>(
+      stream: loggedIn
+          ? UserRecord.getDocument(
+              FirebaseFirestore.instance.doc('user/$currentUserUid'))
+          : null,
+      builder: (context, userSnapshot) {
+        final user = userSnapshot.data;
+        return FoCoCoAdaptiveScaffold(
+          title: 'MindCoach',
+          currentRoute: 'mind_coach',
+          onTap: (route) => context.goNamed(route),
+          drawer: user != null
+              ? FoCoCoDrawer(
+                  currentUser: user,
+                  currentRoute: 'mind_coach',
+                  onNavigate: (route) => context.goNamed(route),
+                )
+              : null,
+          body: Column(
+            children: [
+              _buildTopTabSelector(),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: pages,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-      bottomNavigationBar: EnhancedFoCoCoNavBar(
-        currentRoute: 'mind_coach',
-        onTap: (route) => context.goNamed(route),
-        currentUser: null,
-      ),
+        );
+      },
     );
   }
 
   Widget _buildTopTabSelector() {
-    final tabs = <({String label, IconData icon})>[
-      (label: 'Home', icon: Icons.home_outlined),
-      (label: 'Builder', icon: Icons.tune_outlined),
-      (label: 'History', icon: Icons.library_books_outlined),
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-      child: Row(
-        children: List.generate(tabs.length, (index) {
-          final tab = tabs[index];
-          final selected = _tabIndex == index;
-          return Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(right: index == tabs.length - 1 ? 0 : 8),
-              child: ChoiceChip(
-                selected: selected,
-                label: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(tab.icon, size: 16),
-                    const SizedBox(width: 6),
-                    Text(tab.label),
-                  ],
-                ),
-                onSelected: (_) {
-                  setState(() {
-                    _tabIndex = index;
-                  });
-                },
+    return Builder(
+      builder: (context) {
+        final theme = FlutterFlowTheme.of(context);
+        return SafeArea(
+          top: false,
+          bottom: false,
+          minimum: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.secondaryBackground.withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: theme.alternate.withValues(alpha: 0.22),
               ),
             ),
-          );
-        }),
-      ),
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: SizedBox(
+                height: 42,
+                child: TabBar(
+                  controller: _tabController,
+                  tabs: const [
+                    Tab(text: 'Home'),
+                    Tab(text: 'Builder'),
+                    Tab(text: 'History'),
+                  ],
+                  indicator: MaterialIndicator(
+                    height: 4,
+                    topLeftRadius: 8,
+                    topRightRadius: 8,
+                    bottomLeftRadius: 0,
+                    bottomRightRadius: 0,
+                    color: theme.primary,
+                    horizontalPadding: 16,
+                    tabPosition: TabPosition.bottom,
+                  ),
+                  labelColor: theme.primaryText,
+                  unselectedLabelColor: theme.secondaryText,
+                  labelStyle: theme.labelLarge.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  unselectedLabelStyle: theme.labelLarge.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                  indicatorSize: TabBarIndicatorSize.label,
+                  dividerColor: Colors.transparent,
+                  splashFactory: NoSplash.splashFactory,
+                  overlayColor: WidgetStateProperty.all(Colors.transparent),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
+  }
+
+  void _setTabIndex(int index) {
+    _tabController.animateTo(index);
   }
 }

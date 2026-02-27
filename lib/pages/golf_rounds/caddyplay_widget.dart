@@ -6,9 +6,11 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '/adaptive_ui/adaptive_ui.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/widgets/fococo_drawer_widget.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
 import '/services/profile_service.dart';
 
@@ -219,33 +221,29 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       builder: (context, snapshot) {
         final user = snapshot.data;
 
-        return Scaffold(
-          backgroundColor: _screen == _CaddyPlayScreen.active
-              ? const Color(0xFF0E1116)
-              : theme.primaryBackground,
+        return FoCoCoAdaptiveScaffold(
+          currentRoute: 'caddy_play',
+          onTap: _handleNavigation,
+          hideAppBar: true,
           drawer: user != null
-              ? EnhancedFoCoCoDrawer(
+              ? FoCoCoDrawer(
                   currentUser: user,
                   currentRoute: 'caddy_play',
                   onNavigate: (route) => context.goNamed(route),
                 )
               : null,
-          body: SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(theme),
-                if (_isBusy) const LinearProgressIndicator(minHeight: 2),
-                Expanded(child: _buildBody(theme)),
-              ],
+          enableVoiceButton: true,
+          body: Container(
+            color: theme.primaryBackground,
+            child: SafeArea(
+              child: Column(
+                children: [
+                  _buildHeader(theme),
+                  if (_isBusy) const LinearProgressIndicator(minHeight: 2),
+                  Expanded(child: _buildBody(theme)),
+                ],
+              ),
             ),
-          ),
-          bottomNavigationBar: EnhancedFoCoCoNavBar(
-            currentRoute: 'caddy_play',
-            currentUser: user,
-            onTap: _handleNavigation,
-            showLabels: true,
-            enableVoiceButton: true,
-            useGlassEffect: true,
           ),
         );
       },
@@ -286,13 +284,13 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           if (_screen != _CaddyPlayScreen.home)
             IconButton(
               onPressed: _goBack,
-              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+              icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.primaryText),
             )
           else
             Builder(
               builder: (context) => IconButton(
                 onPressed: () => Scaffold.of(context).openDrawer(),
-                icon: const Icon(Icons.menu_rounded),
+                icon: Icon(Icons.menu_rounded, color: theme.primaryText),
               ),
             ),
           Expanded(
@@ -318,8 +316,8 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           if (_screen == _CaddyPlayScreen.active && _mode == CaddyPlayMode.play)
             TextButton.icon(
               onPressed: _openScorecardSheet,
-              icon: const Icon(Icons.table_chart_rounded),
-              label: const Text('Scorecard'),
+              icon: Icon(Icons.table_chart_rounded, color: theme.primary),
+              label: Text('Scorecard', style: theme.labelLarge.copyWith(color: theme.primary)),
             ),
         ],
       ),
@@ -344,7 +342,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           icon: FontAwesomeIcons.flag,
           title: 'Play',
           subtitle: 'Capture your round with context and control',
-          color: const Color(0xFF0A3669),
+          color: theme.secondary,
           onTap: () {
             setState(() {
               _mode = CaddyPlayMode.play;
@@ -358,7 +356,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           icon: FontAwesomeIcons.dumbbell,
           title: 'Practice',
           subtitle: 'Capture learning moments without scoring',
-          color: const Color(0xFF017B3D),
+          color: theme.tertiary,
           onTap: () {
             setState(() {
               _mode = CaddyPlayMode.practice;
@@ -377,7 +375,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             subtitle: _activeSession!.mode == CaddyPlayMode.play
                 ? 'Continue round • Hole ${_activeSession!.currentHole}'
                 : 'Continue active practice capture',
-            color: const Color(0xFFFEA400),
+            color: theme.primary,
             onTap: () async {
               await _loadHoles(_activeSession!.id);
               if (!mounted) return;
@@ -430,9 +428,14 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
               ],
             ),
           ),
-          ElevatedButton(
-            onPressed: () => context.pushNamed('golf_chat'),
-            child: const Text('Open'),
+          Flexible(
+            fit: FlexFit.loose,
+            child: FoCoCoAdaptiveButton(
+              onPressed: () => context.pushNamed('golf_chat'),
+              label: 'Open',
+              color: theme.secondary,
+              textColor: theme.primaryText,
+            ),
           ),
         ],
       ),
@@ -461,12 +464,16 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             style: theme.bodyMedium.copyWith(color: theme.secondaryText),
           ),
         const SizedBox(height: 16),
-        TextField(
+        FoCoCoAdaptiveTextField(
           controller: _courseSearchController,
+          placeholder: 'Search course list',
+          onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             labelText: 'Course',
             hintText: 'Search course list',
-            prefixIcon: const Icon(Icons.search_rounded),
+            labelStyle: theme.bodyMedium.copyWith(color: theme.secondaryText),
+            hintStyle: theme.bodySmall.copyWith(color: theme.secondaryText),
+            prefixIcon: Icon(Icons.search_rounded, color: theme.secondaryText),
             suffixIcon: _selectedCourseName != null
                 ? IconButton(
                     onPressed: () {
@@ -475,11 +482,10 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
                         _selectedCourseId = null;
                       });
                     },
-                    icon: const Icon(Icons.close_rounded),
+                    icon: Icon(Icons.close_rounded, color: theme.secondaryText),
                   )
                 : null,
           ),
-          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 10),
         if (filteredCourses.isNotEmpty)
@@ -517,7 +523,12 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         const SizedBox(height: 14),
         DropdownButtonFormField<String>(
           initialValue: _selectedTeeName,
-          decoration: const InputDecoration(labelText: 'Tee'),
+          dropdownColor: theme.secondaryBackground,
+          style: theme.bodyMedium.copyWith(color: theme.primaryText),
+          decoration: InputDecoration(
+            labelText: 'Tee',
+            labelStyle: theme.bodyMedium.copyWith(color: theme.secondaryText),
+          ),
           items: _teeOptions
               .map((tee) => DropdownMenuItem<String>(
                     value: tee['name'] as String,
@@ -555,14 +566,16 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           ],
         ),
         const SizedBox(height: 10),
-        SwitchListTile(
+        ListTile(
           title: Text(
             'Advanced fields',
             style: theme.bodyMedium.copyWith(fontWeight: FontWeight.w600),
           ),
           subtitle: const Text('Optional Course Rating / Slope'),
-          value: _showAdvancedSetup,
-          onChanged: (v) => setState(() => _showAdvancedSetup = v),
+          trailing: FoCoCoAdaptiveSwitch(
+            value: _showAdvancedSetup,
+            onChanged: (v) => setState(() => _showAdvancedSetup = v),
+          ),
         ),
         if (_showAdvancedSetup) ...[
           const SizedBox(height: 8),
@@ -581,11 +594,11 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           ),
         ],
         const SizedBox(height: 18),
-        ElevatedButton.icon(
+        FoCoCoAdaptiveButtonIcon(
           onPressed: _isBusy ? null : _startSession,
-          icon: const Icon(Icons.play_arrow_rounded),
-          label: Text(
-              _mode == CaddyPlayMode.play ? 'Start Round' : 'Start Practice'),
+          icon: Icons.play_arrow_rounded,
+          label: _mode == CaddyPlayMode.play ? 'Start Round' : 'Start Practice',
+          enabled: !_isBusy,
         ),
       ],
     );
@@ -595,10 +608,10 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     final session = _activeSession;
     if (session == null) {
       return Center(
-        child: Text(
-          'No active session found.',
-          style: theme.bodyLarge.copyWith(color: Colors.white),
-        ),
+            child: Text(
+              'No active session found.',
+              style: theme.bodyLarge.copyWith(color: theme.primaryText),
+            ),
       );
     }
 
@@ -609,8 +622,8 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            color: Colors.white.withValues(alpha: 0.04),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+            color: theme.secondaryText.withValues(alpha: 0.08),
+            border: Border.all(color: theme.alternate.withValues(alpha: 0.2)),
           ),
           child: Row(
             children: [
@@ -618,20 +631,20 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
                 icon: Icons.flag_circle_rounded,
                 text: session.mode == CaddyPlayMode.play ? 'Play' : 'Practice',
                 color: session.mode == CaddyPlayMode.play
-                    ? const Color(0xFF0EA5E9)
-                    : const Color(0xFF22C55E),
+                    ? theme.info
+                    : theme.success,
               ),
               const SizedBox(width: 8),
               if (session.mode == CaddyPlayMode.play)
                 _statusPill(
                   icon: Icons.pin_drop_outlined,
                   text: 'Hole ${session.currentHole}',
-                  color: const Color(0xFFFEA400),
+                  color: theme.primary,
                 ),
               const Spacer(),
               Text(
                 '${session.holesPlayed}/${session.holesTotal}',
-                style: theme.labelLarge.copyWith(color: Colors.white70),
+                style: theme.labelLarge.copyWith(color: theme.secondaryText),
               ),
             ],
           ),
@@ -643,12 +656,12 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             color: _showCapturePulse
-                ? const Color(0xFF10B981).withValues(alpha: 0.25)
-                : Colors.white.withValues(alpha: 0.03),
+                ? theme.success.withValues(alpha: 0.25)
+                : theme.secondaryText.withValues(alpha: 0.06),
             border: Border.all(
               color: _showCapturePulse
-                  ? const Color(0xFF10B981)
-                  : Colors.white.withValues(alpha: 0.12),
+                  ? theme.success
+                  : theme.alternate.withValues(alpha: 0.2),
               width: _showCapturePulse ? 2 : 1,
             ),
           ),
@@ -688,22 +701,22 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              color: Colors.white.withValues(alpha: 0.03),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+              color: theme.secondaryText.withValues(alpha: 0.06),
+              border: Border.all(color: theme.alternate.withValues(alpha: 0.2)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Recent capture',
-                  style: theme.labelLarge.copyWith(color: Colors.white),
+                  style: theme.labelLarge.copyWith(color: theme.primaryText),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   _recentLogs.last.transcription.isNotEmpty
                       ? _recentLogs.last.transcription
                       : '${chipLabel(_recentLogs.last.result)} • ${chipLabel(_recentLogs.last.focus)}',
-                  style: theme.bodySmall.copyWith(color: Colors.white70),
+                  style: theme.bodySmall.copyWith(color: theme.secondaryText),
                 ),
               ],
             ),
@@ -746,7 +759,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             padding: const EdgeInsets.only(top: 8),
             child: Text(
               'Hard limits: no typing forms, no analytics, no coaching interruptions.',
-              style: theme.bodySmall.copyWith(color: Colors.white54),
+              style: theme.bodySmall.copyWith(color: theme.secondaryText),
             ),
           ),
       ],

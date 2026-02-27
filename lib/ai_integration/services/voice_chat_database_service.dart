@@ -340,13 +340,17 @@ class VoiceChatDatabaseService {
   }
 
   /// Get messages for a session
+  /// Query includes userId so Firestore security rules allow read.
   Future<List<VoiceChatMessage>> getSessionMessages({
     required String sessionId,
     int limit = 50,
     String? lastMessageId,
   }) async {
+    if (_currentUserId == null) return [];
+
     Query query = _firestore
         .collection(_messagesCollection)
+        .where('userId', isEqualTo: _currentUserId!)
         .where('sessionId', isEqualTo: sessionId)
         .orderBy('timestamp', descending: false)
         .limit(limit);

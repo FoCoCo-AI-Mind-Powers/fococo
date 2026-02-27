@@ -18,6 +18,7 @@ import '/flutter_flow/glass_design_system.dart';
 import '/services/revenuecat_service.dart';
 import '/services/subscription_state_provider.dart';
 import '/main.dart';
+import '/widgets/fococo_drawer_widget.dart';
 import 'settings_model.dart';
 export 'settings_model.dart';
 
@@ -955,13 +956,24 @@ class _SettingsWidgetState extends State<SettingsWidget>
         FocusScope.of(context).unfocus();
         FocusManager.instance.primaryFocus?.unfocus();
       },
-      child: Scaffold(
-        key: scaffoldKey,
-        backgroundColor: theme.primaryBackground,
-        body: Stack(
-          children: [
-            // Main content
-            Container(
+      child: StreamBuilder<UserRecord>(
+        stream: loggedIn
+            ? UserRecord.getDocument(
+                FirebaseFirestore.instance.doc('user/$currentUserUid'))
+            : null,
+        builder: (context, userSnapshot) {
+          final user = userSnapshot.data;
+          return Scaffold(
+            key: scaffoldKey,
+            backgroundColor: theme.primaryBackground,
+            drawer: user != null
+                ? FoCoCoDrawer(
+                    currentUser: user,
+                    currentRoute: 'settings',
+                    onNavigate: (route) => context.goNamed(route),
+                  )
+                : null,
+            body: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
@@ -976,120 +988,97 @@ class _SettingsWidgetState extends State<SettingsWidget>
                 opacity: _fadeAnimation,
                 child: SlideTransition(
                   position: _slideAnimation,
-                  child: SafeArea(
-                    child: Column(
-                      children: [
-                        // Custom App Bar
-                        _buildCustomAppBar(theme),
-
-                        // Main Content
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              children: [
-                                // Subscription Section (Paywall by default)
-                                _buildSubscriptionSection(theme),
-
-                                const SizedBox(height: 24),
-
-                                // Account Settings
-                                _buildAccountSection(theme),
-
-                                const SizedBox(height: 24),
-
-                                // Notifications
-                                _buildNotificationsSection(theme),
-
-                                const SizedBox(height: 24),
-
-                                // Legal & Policies
-                                _buildLegalSection(theme),
-
-                                const SizedBox(height: 24),
-
-                                // App Preferences
-                                _buildPreferencesSection(theme),
-
-                                const SizedBox(height: 24), // Bottom padding
-                              ],
+                  child: CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverAppBar(
+                        expandedHeight: 100.0,
+                        floating: false,
+                        pinned: true,
+                        backgroundColor: theme.primaryBackground,
+                        elevation: 0,
+                        surfaceTintColor: Colors.transparent,
+                        automaticallyImplyLeading: false,
+                        leading: Padding(
+                          padding: const EdgeInsets.only(left: 16),
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              scaffoldKey.currentState?.openDrawer();
+                            },
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: theme.glassBackground.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: theme.glassBorder.withValues(alpha: 0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.menu_rounded,
+                                color: theme.primaryText,
+                                size: 24,
+                              ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                        flexibleSpace: FlexibleSpaceBar(
+                          background: SafeArea(
+                            bottom: false,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(72, 20, 20, 20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    'Settings',
+                                    style: theme.headlineMedium.copyWith(
+                                      color: theme.primaryText,
+                                      fontWeight: FontWeight.w800,
+                                      fontFamily: 'Montserrat',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Manage your account and preferences',
+                                    style: theme.bodySmall.copyWith(
+                                      color: theme.secondaryText,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.all(20),
+                        sliver: SliverList(
+                          delegate: SliverChildListDelegate([
+                            _buildSubscriptionSection(theme),
+                            const SizedBox(height: 24),
+                            _buildAccountSection(theme),
+                            const SizedBox(height: 24),
+                            _buildNotificationsSection(theme),
+                            const SizedBox(height: 24),
+                            _buildLegalSection(theme),
+                            const SizedBox(height: 24),
+                            _buildPreferencesSection(theme),
+                            const SizedBox(height: 24),
+                          ]),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCustomAppBar(FlutterFlowTheme theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        children: [
-          // Back button
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: theme.glassBackground.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: theme.glassBorder.withValues(alpha: 0.2),
-                  width: 1,
-                ),
-              ),
-              child: Icon(
-                Icons.arrow_back_ios_new,
-                color: theme.primaryText,
-                size: 20,
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 16),
-
-          // Title
-          Expanded(
-            child: Text(
-              'Settings',
-              style: theme.headlineSmall.copyWith(
-                color: theme.primaryText,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-
-          // Profile button
-          GestureDetector(
-            onTap: () => context.goNamed('profile'),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: theme.glassBackground.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: theme.glassBorder.withValues(alpha: 0.2),
-                  width: 1,
-                ),
-              ),
-              child: Icon(
-                Icons.person_outline,
-                color: theme.primaryText,
-                size: 24,
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

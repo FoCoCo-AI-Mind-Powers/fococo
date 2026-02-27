@@ -5,8 +5,12 @@ import '/services/biometric_auth_service.dart';
 import '/services/auth_flow_service.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'login_model.dart';
 export 'login_model.dart';
+
+const String _kLoginRememberMe = 'login_remember_me';
+const String _kLoginEmail = 'login_email';
 
 class LoginWidget extends StatefulWidget {
   const LoginWidget({super.key});
@@ -30,6 +34,10 @@ class _LoginWidgetState extends State<LoginWidget>
   String _biometricName = 'Biometric';
   bool _isCheckingBiometric = false;
   bool _hasFaceBiometric = false;
+
+  // Sign-in loading state
+  bool _isGoogleSigningIn = false;
+  bool _isEmailSigningIn = false;
 
   // Logo rotation animation
   late AnimationController _logoRotationController;
@@ -62,6 +70,41 @@ class _LoginWidgetState extends State<LoginWidget>
 
     // Check biometric availability
     _checkBiometricAvailability();
+    // Load remember-me and email from storage
+    _loadRememberMe();
+  }
+
+  Future<void> _loadRememberMe() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rememberMe = prefs.getBool(_kLoginRememberMe) ?? false;
+      final email = prefs.getString(_kLoginEmail) ?? '';
+      if (!mounted) return;
+      setState(() {
+        _model.rememberMeValue = rememberMe;
+        if (email.isNotEmpty) {
+          _model.emailAddressTextController?.text = email;
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading remember me: $e');
+    }
+  }
+
+  Future<void> _saveRememberMe() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final remember = _model.rememberMeValue ?? false;
+      await prefs.setBool(_kLoginRememberMe, remember);
+      if (remember) {
+        final email = _model.emailAddressTextController?.text.trim() ?? '';
+        await prefs.setString(_kLoginEmail, email);
+      } else {
+        await prefs.remove(_kLoginEmail);
+      }
+    } catch (e) {
+      debugPrint('Error saving remember me: $e');
+    }
   }
 
   @override
@@ -519,6 +562,8 @@ class _LoginWidgetState extends State<LoginWidget>
                               // Google Sign In Button
                               _buildAuthButton(
                                 onTap: () async {
+                                  if (_isGoogleSigningIn) return;
+                                  setState(() => _isGoogleSigningIn = true);
                                   try {
                                     GoRouter.of(context).prepareAuthEvent();
                                     final user = await authManager
@@ -527,21 +572,39 @@ class _LoginWidgetState extends State<LoginWidget>
 
                                     await _navigateAfterAuth();
                                   } catch (e) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                            'Google Sign In failed. Please try again or use another method.'),
-                                        backgroundColor: Colors.red.shade400,
-                                      ),
-                                    );
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              'Google Sign In failed. Please try again or use another method.'),
+                                          backgroundColor: Colors.red.shade400,
+                                        ),
+                                      );
+                                    }
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() => _isGoogleSigningIn = false);
+                                    }
                                   }
                                 },
-                                icon: Image.asset(
-                                  'assets/images/google-logo.png',
-                                  width: 20,
-                                  height: 20,
-                                  fit: BoxFit.contain,
-                                ),
+                                icon: _isGoogleSigningIn
+                                    ? SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                  theme.primaryText),
+                                        ),
+                                      )
+                                    : Image.asset(
+                                        'assets/images/google-logo.png',
+                                        width: 20,
+                                        height: 20,
+                                        fit: BoxFit.contain,
+                                      ),
                                 text: 'Continue with Google',
                                 backgroundColor: theme.secondaryBackground,
                                 textColor: theme.primaryText,
@@ -840,34 +903,80 @@ class _LoginWidgetState extends State<LoginWidget>
                                 child: Material(
                                   color: Colors.transparent,
                                   child: InkWell(
-                                    onTap: () async {
-                                      GoRouter.of(context).prepareAuthEvent();
+                                    onTap: _isEmailSigningIn
+                                        ? null
+                                        : () async {
+                                            GoRouter.of(context)
+                                                .prepareAuthEvent();
+                                            setState(
+                                                () => _isEmailSigningIn = true);
+                                            try {
+                                              final user =
+                                                  await authManager
+                                                      .signInWithEmail(
+                                                context,
+                                                _model
+                                                    .emailAddressTextController
+                                                    .text,
+                                                _model
+                                                    .passwordTextController
+                                                    .text,
+                                              );
+                                              if (user == null) return;
 
-                                      final user =
-                                          await authManager.signInWithEmail(
-                                        context,
-                                        _model.emailAddressTextController.text,
-                                        _model.passwordTextController.text,
-                                      );
-                                      if (user == null) {
-                                        return;
-                                      }
-
-                                      await _navigateAfterAuth();
-                                    },
+                                              await _saveRememberMe();
+                                              await _navigateAfterAuth();
+                                            } finally {
+                                              if (mounted) {
+                                                setState(() =>
+                                                    _isEmailSigningIn = false);
+                                              }
+                                            }
+                                          },
                                     borderRadius: BorderRadius.circular(12),
                                     child: Container(
                                       alignment: Alignment.center,
-                                      child: Text(
-                                        'Sign In',
-                                        style: theme.titleMedium.override(
-                                          fontFamily: 'Montserrat',
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          height: 1.2,
-                                        ),
-                                      ),
+                                      child: _isEmailSigningIn
+                                          ? Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                SizedBox(
+                                                  width: 20,
+                                                  height: 20,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                            Color>(Colors.white),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Text(
+                                                  'Signing in...',
+                                                  style: theme.titleMedium
+                                                      .override(
+                                                    fontFamily: 'Montserrat',
+                                                    color: Colors.white,
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                    height: 1.2,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : Text(
+                                              'Sign In',
+                                              style: theme.titleMedium.override(
+                                                fontFamily: 'Montserrat',
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                height: 1.2,
+                                              ),
+                                            ),
                                     ),
                                   ),
                                 ),

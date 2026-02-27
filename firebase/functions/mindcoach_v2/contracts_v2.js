@@ -32,6 +32,8 @@ const VALID_MINDSET_VALUES = new Set([
 const VALID_DELIVERY_LENGTHS = new Set(['auto', 'micro', 'standard', 'deep']);
 const VALID_TONES = new Set(['auto', 'calm', 'directive', 'reassuring']);
 const VALID_VARK = new Set(['auto', 'Visual', 'Aural', 'ReadWrite', 'Kinesthetic']);
+const CONTENT_LIBRARY_EXPECTED_ROWS = 384;
+const SPEECH_TIMING_FIELDS = ['startMs', 'durationMs', 'endMs'];
 
 const TEMPLATE_IDS = [
   'MC_T01_PRE_ROUND_CLARITY',
@@ -93,6 +95,8 @@ module.exports = {
   VALID_DELIVERY_LENGTHS,
   VALID_TONES,
   VALID_VARK,
+  CONTENT_LIBRARY_EXPECTED_ROWS,
+  SPEECH_TIMING_FIELDS,
   TEMPLATE_IDS,
   FORBIDDEN_LANGUAGE_PATTERNS,
   MINDCOACH_DATA_PATH,

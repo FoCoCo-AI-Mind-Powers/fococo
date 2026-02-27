@@ -47,6 +47,13 @@ class CartesiaMCPConfig {
       'emotion': 'calm',
       'style': 'meditative',
     },
+    'coach_conversational': {
+      'voice_id': '7442d6b8-ff51-4477-bd30-0c0d16df84eb',
+      'model': 'sonic-2',
+      'speed': 'normal',
+      'emotion': 'conversational',
+      'style': 'dialogue',
+    },
   };
 
   // VARK-specific voice adaptations

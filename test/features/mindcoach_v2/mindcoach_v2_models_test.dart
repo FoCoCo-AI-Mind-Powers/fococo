@@ -22,6 +22,17 @@ void main() {
           'validator_status': 'PASS',
           'model_version': 'gemini-2.5-flash',
           'prompt_version': 'mindcoach_system_v1',
+          'vark_mode_selected': 'Visual',
+          'level_selected': 'Build',
+          'total_duration_sec': 10,
+          'lines': [
+            {
+              'text': 'Pause.',
+              'startMs': 0,
+              'durationMs': 2400,
+              'endMs': 2400,
+            },
+          ],
         },
       },
       userId: 'u1',
@@ -33,6 +44,10 @@ void main() {
     expect(response.uiMode, MindCoachV2UiMode.liveMinimal);
     expect(response.session.templateId, 'MC_T03_BETWEEN_SHOTS_RESET');
     expect(response.session.validatorStatus, 'PASS');
+    expect(response.session.varkModeSelected, 'Visual');
+    expect(response.session.levelSelected, 'Build');
+    expect(response.session.lines, isNotNull);
+    expect(response.session.lines!.first.endMs, 2400);
   });
 
   test('session model parses firestore compatibility fields', () {

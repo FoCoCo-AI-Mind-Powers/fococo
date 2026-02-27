@@ -8,6 +8,7 @@ import 'support_model.dart';
 export 'support_model.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -88,7 +89,7 @@ class _SupportWidgetState extends State<SupportWidget>
                     FirebaseFirestore.instance.doc('user/${currentUserUid}')),
                 builder: (context, snapshot) {
                   final userData = snapshot.data;
-                  return EnhancedFoCoCoDrawer(
+                  return FoCoCoDrawer(
                     currentUser: userData,
                     currentRoute: 'support',
                     onNavigate: (route) => context.goNamed(route),
@@ -96,66 +97,107 @@ class _SupportWidgetState extends State<SupportWidget>
                 },
               )
             : null,
-        body: Stack(
-          children: [
-            // Main content
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    theme.primaryBackground,
-                    theme.secondaryBackground.withValues(alpha: 0.8),
-                  ],
-                ),
-              ),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: SafeArea(
-                    child: Column(
-                      children: [
-                        // Custom App Bar
-                        _buildCustomAppBar(theme),
-
-                        // Main Content
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              children: [
-                                // Quick Help
-                                _buildQuickHelpSection(theme),
-
-                                const SizedBox(height: 24),
-
-                                // FAQ
-                                _buildFAQSection(theme),
-
-                                const SizedBox(height: 24),
-
-                                // Contact Support
-                                _buildContactSection(theme),
-
-                                const SizedBox(height: 24),
-
-                                // Resources
-                                _buildResourcesSection(theme),
-
-                                const SizedBox(height: 100), // Space for navbar
-                              ],
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                theme.primaryBackground,
+                theme.secondaryBackground.withValues(alpha: 0.8),
+              ],
+            ),
+          ),
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverAppBar(
+                    expandedHeight: 100.0,
+                    floating: false,
+                    pinned: true,
+                    backgroundColor: theme.primaryBackground,
+                    elevation: 0,
+                    surfaceTintColor: Colors.transparent,
+                    automaticallyImplyLeading: false,
+                    leading: Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          scaffoldKey.currentState?.openDrawer();
+                        },
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: theme.glassBackground.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: theme.glassBorder.withValues(alpha: 0.2),
+                              width: 1,
                             ),
                           ),
+                          child: Icon(
+                            Icons.menu_rounded,
+                            color: theme.primaryText,
+                            size: 24,
+                          ),
                         ),
-                      ],
+                      ),
+                    ),
+                    flexibleSpace: FlexibleSpaceBar(
+                      background: SafeArea(
+                        bottom: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(72, 20, 20, 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text(
+                                'Support',
+                                style: theme.headlineMedium.copyWith(
+                                  color: theme.primaryText,
+                                  fontWeight: FontWeight.w800,
+                                  fontFamily: 'Montserrat',
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Help & resources',
+                                style: theme.bodySmall.copyWith(
+                                  color: theme.secondaryText,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  SliverPadding(
+                    padding: const EdgeInsets.all(20),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _buildQuickHelpSection(theme),
+                        const SizedBox(height: 24),
+                        _buildFAQSection(theme),
+                        const SizedBox(height: 24),
+                        _buildContactSection(theme),
+                        const SizedBox(height: 24),
+                        _buildResourcesSection(theme),
+                        const SizedBox(height: 100),
+                      ]),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
         bottomNavigationBar: EnhancedFoCoCoNavBar(
           currentRoute: 'support',
@@ -165,69 +207,6 @@ class _SupportWidgetState extends State<SupportWidget>
           },
           currentUser: null,
         ),
-      ),
-    );
-  }
-
-  Widget _buildCustomAppBar(FlutterFlowTheme theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        children: [
-          // Menu button
-          GestureDetector(
-            onTap: () => scaffoldKey.currentState?.openDrawer(),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: theme.glassBackground.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: theme.glassBorder.withValues(alpha: 0.2),
-                  width: 1,
-                ),
-              ),
-              child: Icon(
-                Icons.menu_rounded,
-                color: theme.primaryText,
-                size: 24,
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 16),
-
-          // Title
-          Expanded(
-            child: Text(
-              'Help & Support',
-              style: theme.headlineSmall.copyWith(
-                color: theme.primaryText,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-
-          // Search button
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: theme.glassBackground.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: theme.glassBorder.withValues(alpha: 0.2),
-                width: 1,
-              ),
-            ),
-            child: Icon(
-              Icons.search,
-              color: theme.primaryText,
-              size: 24,
-            ),
-          ),
-        ],
       ),
     );
   }

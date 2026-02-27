@@ -2,49 +2,120 @@ import 'package:cloud_functions/cloud_functions.dart';
 
 import '/features/mindcoach_v2/data/mappers/mindcoach_v2_mappers.dart';
 import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart';
+import '/features/mindcoach_v2/services/mindcoach_v2_debug_logger.dart';
 
 class MindCoachV2FunctionsClient {
   MindCoachV2FunctionsClient({FirebaseFunctions? functions})
       : _functions = functions ?? FirebaseFunctions.instance;
 
+  static const String _tag = 'FUNCTIONS_CLIENT';
+  final MindCoachV2DebugLogger _logger = MindCoachV2DebugLogger.instance;
   final FirebaseFunctions _functions;
 
   Future<MindCoachV2GenerateResponse> generateSession({
     required String userId,
     required MindCoachV2GenerateRequest request,
   }) async {
+    final payload = request.toMap();
+    _logger.log(_tag, 'generateSession: calling Cloud Function', {
+      'userId': userId,
+      'contextMode': payload['context_mode'],
+      'entrySource': payload['entry_source'],
+      'deliveryLength': payload['preferred_delivery_length'],
+    });
+
     final callable = _functions.httpsCallable('generateMindCoachSessionV2');
     try {
-      final result = await callable.call(request.toMap());
+      final result = await callable.call(payload);
       final raw = result.data;
       if (raw is! Map) {
+        _logger.error(_tag, 'generateSession: invalid response type', {
+          'type': raw.runtimeType.toString(),
+        });
         throw Exception('Invalid generate response payload');
       }
 
-      return MindCoachV2Mappers.parseGenerateResponse(
+      _logger.log(_tag, 'generateSession: raw response received', {
+        'keys': raw.keys.toList().toString(),
+        'sessionId': raw['session_id']?.toString(),
+        'uiMode': raw['ui_mode']?.toString(),
+        'contextMode': raw['context_mode']?.toString(),
+      });
+
+      final response = MindCoachV2Mappers.parseGenerateResponse(
         Map<String, dynamic>.from(raw),
         userId: userId,
       );
-    } on FirebaseFunctionsException catch (e) {
+
+      _logger.log(_tag, 'generateSession: parsed successfully', {
+        'sessionId': response.sessionId,
+        'uiMode': response.uiMode.wireValue,
+        'templateId': response.session.templateId,
+        'validatorStatus': response.session.validatorStatus,
+        'hasTimedLines': (response.session.lines != null).toString(),
+      });
+
+      return response;
+    } on FirebaseFunctionsException catch (e, s) {
+      _logger.error(_tag, 'generateSession: FirebaseFunctionsException', {
+        'code': e.code,
+        'message': e.message,
+        'details': e.details?.toString(),
+      }, e, s);
       throw Exception(e.message ?? 'Failed to generate MindCoach v2 session');
+    } catch (e, s) {
+      _logger.error(
+          _tag, 'generateSession: unexpected error', null, e, s);
+      rethrow;
     }
   }
 
   Future<MindCoachV2CompleteResponse> completeRun(
     MindCoachV2CompleteRequest request,
   ) async {
+    final payload = request.toMap();
+    _logger.log(_tag, 'completeRun: calling Cloud Function', {
+      'sessionId': payload['session_id'],
+      'completionStatus': payload['completion_status'],
+      'saveFavorite': payload['save_favorite']?.toString(),
+    });
+
     final callable = _functions.httpsCallable('completeMindCoachSessionRunV2');
     try {
-      final result = await callable.call(request.toMap());
+      final result = await callable.call(payload);
       final raw = result.data;
       if (raw is! Map) {
+        _logger.error(_tag, 'completeRun: invalid response type', {
+          'type': raw.runtimeType.toString(),
+        });
         throw Exception('Invalid complete response payload');
       }
-      return MindCoachV2Mappers.parseCompleteResponse(
+
+      _logger.log(_tag, 'completeRun: raw response received', {
+        'runId': raw['run_id']?.toString(),
+        'favoriteSaved': raw['favorite_saved']?.toString(),
+      });
+
+      final response = MindCoachV2Mappers.parseCompleteResponse(
         Map<String, dynamic>.from(raw),
       );
-    } on FirebaseFunctionsException catch (e) {
+
+      _logger.log(_tag, 'completeRun: parsed successfully', {
+        'runId': response.runId,
+        'favoriteSaved': response.favoriteSaved.toString(),
+      });
+
+      return response;
+    } on FirebaseFunctionsException catch (e, s) {
+      _logger.error(_tag, 'completeRun: FirebaseFunctionsException', {
+        'code': e.code,
+        'message': e.message,
+        'details': e.details?.toString(),
+      }, e, s);
       throw Exception(e.message ?? 'Failed to complete MindCoach v2 run');
+    } catch (e, s) {
+      _logger.error(_tag, 'completeRun: unexpected error', null, e, s);
+      rethrow;
     }
   }
 }

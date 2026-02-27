@@ -12,6 +12,7 @@ import 'dashboard_model.dart';
 export 'dashboard_model.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'dart:math' as math;
@@ -154,7 +155,7 @@ class _DashboardWidgetState extends State<DashboardWidget>
                     FirebaseFirestore.instance.doc('user/${currentUserUid}')),
                 builder: (context, snapshot) {
                   final userData = snapshot.data;
-                  return EnhancedFoCoCoDrawer(
+                  return FoCoCoDrawer(
                     currentUser: userData,
                     currentRoute: 'dashboard',
                     onNavigate: (route) => context.goNamed(route),
@@ -163,216 +164,213 @@ class _DashboardWidgetState extends State<DashboardWidget>
               )
             : null,
         endDrawer: loggedIn ? _buildNotificationsDrawer(theme) : null,
-        body: Stack(
-          children: [
-            // Main content
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    theme.primaryBackground,
-                    theme.secondaryBackground.withValues(alpha: 0.8),
-                  ],
-                ),
-              ),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: SafeArea(
-                    child: Column(
-                      children: [
-                        // Custom App Bar
-                        _buildCustomAppBar(theme),
-
-                        // Main Content
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              children: [
-                                // TODAY Header with colored tab
-                                _buildTodayHeaderSection(theme),
-
-                                const SizedBox(height: 24),
-
-                                // Mental Performance Overview
-                                _buildMentalPerformanceSection(theme),
-
-                                const SizedBox(height: 24),
-
-                                // Golf Performance Metrics
-                                _buildGolfPerformanceSection(theme),
-
-                                const SizedBox(height: 24),
-
-                                // Weekly Progress Chart
-                                _buildWeeklyProgressSection(theme),
-
-                                const SizedBox(height: 24),
-
-                                // Recent Activities & Achievements
-                                _buildActivitiesSection(theme),
-
-                                const SizedBox(height: 24),
-
-                                // AI Insights & Goals
-                                _buildInsightsSection(theme),
-
-                                const SizedBox(height: 24),
-
-                                // Focus Areas
-                                _buildFocusAreasSection(theme),
-
-                                const SizedBox(height: 100), // Space for navbar
-                              ],
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                theme.primaryBackground,
+                theme.secondaryBackground.withValues(alpha: 0.8),
+              ],
+            ),
+          ),
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverAppBar(
+                    expandedHeight: 100.0,
+                    floating: false,
+                    pinned: true,
+                    backgroundColor: theme.primaryBackground,
+                    elevation: 0,
+                    surfaceTintColor: Colors.transparent,
+                    automaticallyImplyLeading: false,
+                    leading: Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          scaffoldKey.currentState?.openDrawer();
+                        },
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: theme.glassBackground.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: theme.glassBorder.withValues(alpha: 0.2),
+                              width: 1,
                             ),
                           ),
+                          child: Icon(
+                            Icons.menu_rounded,
+                            color: theme.primaryText,
+                            size: 24,
+                          ),
                         ),
-                      ],
+                      ),
+                    ),
+                    actions: [
+                      _buildAnimatedNotificationButton(theme),
+                      const SizedBox(width: 16),
+                    ],
+                    flexibleSpace: FlexibleSpaceBar(
+                      background: SafeArea(
+                        bottom: false,
+                        child: _buildAnimatedHeader(theme),
+                      ),
                     ),
                   ),
-                ),
+                  SliverPadding(
+                    padding: const EdgeInsets.all(20),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _buildTodayHeaderSection(theme),
+                        const SizedBox(height: 24),
+                        _buildMentalPerformanceSection(theme),
+                        const SizedBox(height: 24),
+                        _buildGolfPerformanceSection(theme),
+                        const SizedBox(height: 24),
+                        _buildWeeklyProgressSection(theme),
+                        const SizedBox(height: 24),
+                        _buildActivitiesSection(theme),
+                        const SizedBox(height: 24),
+                        _buildInsightsSection(theme),
+                        const SizedBox(height: 24),
+                        _buildFocusAreasSection(theme),
+                        const SizedBox(height: 100),
+                      ]),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
         bottomNavigationBar: EnhancedFoCoCoNavBar(
-          currentRoute: 'dashboard',
+          currentRoute: 'mind_coach',
           onTap: (route) {
-            print('🔄 Dashboard page: Navigation requested to route: $route');
+            debugPrint('Dashboard: Navigation requested to route: $route');
             context.goNamed(route);
           },
-          currentUser: null, // Will be handled by the navbar internally
+          currentUser: null,
         ),
       ),
     );
   }
 
-  Widget _buildCustomAppBar(FlutterFlowTheme theme) {
+  Widget _buildAnimatedHeader(FlutterFlowTheme theme) {
     return StreamBuilder<UserRecord>(
       stream: loggedIn
           ? UserRecord.getDocument(
-              FirebaseFirestore.instance.doc('user/${currentUserUid}'))
+              FirebaseFirestore.instance.doc('user/$currentUserUid'))
           : null,
       builder: (context, userSnapshot) {
         final user = userSnapshot.data;
         final displayName =
             user?.displayName.isNotEmpty == true ? user!.displayName : 'Golfer';
 
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Row(
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(72, 20, 72, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              // Menu button
-              GestureDetector(
-                onTap: () => scaffoldKey.currentState?.openDrawer(),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: theme.glassBackground.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: theme.glassBorder.withValues(alpha: 0.2),
-                      width: 1,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.menu_rounded,
-                    color: theme.primaryText,
-                    size: 24,
-                  ),
+              Text(
+                'Welcome back,',
+                style: theme.bodyMedium.copyWith(
+                  color: theme.secondaryText,
                 ),
               ),
-
-              const SizedBox(width: 16),
-
-              // Welcome message with full name
-              Expanded(
-                child: Text(
-                  'Welcome back, $displayName',
-                  style: theme.titleLarge.copyWith(
-                    color: theme.primaryText,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.clip,
+              Text(
+                displayName,
+                style: theme.headlineMedium.copyWith(
+                  color: theme.primaryText,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Montserrat',
                 ),
-              ),
-
-              const SizedBox(width: 16),
-
-              // Notification button
-              GestureDetector(
-                onTap: () {
-                  scaffoldKey.currentState?.openEndDrawer();
-                },
-                child: StreamBuilder<int>(
-                  stream: NotificationsRecord.collection
-                      .where('userId', isEqualTo: currentUserUid)
-                      .where('isRead', isEqualTo: false)
-                      .snapshots()
-                      .map((snapshot) => snapshot.docs.length),
-                  builder: (context, snapshot) {
-                    final unreadCount = snapshot.data ?? 0;
-                    return Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: theme.glassBackground.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: theme.glassBorder.withValues(alpha: 0.2),
-                          width: 1,
-                        ),
-                      ),
-                      child: Stack(
-                        children: [
-                          Center(
-                            child: Icon(
-                              Icons.notifications_outlined,
-                              color: theme.primaryText,
-                              size: 24,
-                            ),
-                          ),
-                          if (unreadCount > 0)
-                            Positioned(
-                              right: 6,
-                              top: 6,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: theme.error,
-                                  shape: BoxShape.circle,
-                                ),
-                                constraints: const BoxConstraints(
-                                  minWidth: 16,
-                                  minHeight: 16,
-                                ),
-                                child: Text(
-                                  unreadCount > 9 ? '9+' : '$unreadCount',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAnimatedNotificationButton(FlutterFlowTheme theme) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        scaffoldKey.currentState?.openEndDrawer();
+      },
+      child: StreamBuilder<int>(
+        stream: NotificationsRecord.collection
+            .where('userId', isEqualTo: currentUserUid)
+            .where('isRead', isEqualTo: false)
+            .snapshots()
+            .map((snapshot) => snapshot.docs.length),
+        builder: (context, snapshot) {
+          final unreadCount = snapshot.data ?? 0;
+          return Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: theme.glassBackground.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.glassBorder.withValues(alpha: 0.2),
+                width: 1,
+              ),
+            ),
+            child: Stack(
+              children: [
+                Center(
+                  child: Icon(
+                    Icons.notifications_outlined,
+                    color: theme.primaryText,
+                    size: 24,
+                  ),
+                ),
+                if (unreadCount > 0)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: theme.error,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: theme.primaryBackground,
+                          width: 2,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          unreadCount > 9 ? '9+' : '$unreadCount',
+                          style: theme.labelSmall.copyWith(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 

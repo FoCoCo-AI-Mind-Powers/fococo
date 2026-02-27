@@ -1,3 +1,5 @@
+const logger = require('firebase-functions/logger');
+
 function selectContent({
   entries,
   templateId,
@@ -5,8 +7,11 @@ function selectContent({
   level,
   length,
   scenarioTags = [],
+  recentContentIds = [],
+  rotationSeed = '',
 }) {
   if (!Array.isArray(entries) || entries.length === 0) {
+    logger.warn('[MCv2:contentSelector] no content entries available');
     return null;
   }
 
@@ -18,48 +23,66 @@ function selectContent({
   const desiredLevel = normalizeLevel(level);
   const desiredLength = normalizeLength(length);
 
+  logger.info('[MCv2:contentSelector] selecting', {
+    templateId,
+    desiredVark,
+    desiredLevel,
+    desiredLength,
+    scenarioTagCount: normalizedTags.length,
+    totalEntries: entries.length,
+    recentContentCount: recentContentIds.length,
+  });
+
   let candidates = entries.filter((entry) => entry.template_id === templateId);
   if (candidates.length === 0) {
+    logger.warn('[MCv2:contentSelector] no entries match templateId', { templateId });
     return null;
   }
 
-  // Step 2: scenario tag prioritization
+  logger.info('[MCv2:contentSelector] template-matched candidates', { count: candidates.length });
+
   const scenarioMatches = candidates.filter((entry) =>
     hasScenarioMatch(entry.scenario_tags, normalizedTags),
   );
   if (scenarioMatches.length > 0) {
     candidates = scenarioMatches;
+    logger.info('[MCv2:contentSelector] narrowed by scenario tags', { count: candidates.length });
   }
 
-  // Step 3: VARK
   const varkMatches = candidates.filter(
     (entry) => normalizeVark(entry.vark_mode) === desiredVark,
   );
   if (varkMatches.length > 0) {
     candidates = varkMatches;
+    logger.info('[MCv2:contentSelector] narrowed by VARK', { count: candidates.length });
   }
 
-  // Step 4: level
   const levelMatches = candidates.filter(
     (entry) => normalizeLevel(entry.level) === desiredLevel,
   );
   if (levelMatches.length > 0) {
     candidates = levelMatches;
+    logger.info('[MCv2:contentSelector] narrowed by level', { count: candidates.length });
   }
 
-  // Step 5: length
   const lengthMatches = candidates.filter(
     (entry) => normalizeLength(entry.length) === desiredLength,
   );
   if (lengthMatches.length > 0) {
     candidates = lengthMatches;
+    logger.info('[MCv2:contentSelector] narrowed by length', { count: candidates.length });
   }
 
   if (candidates.length > 0) {
-    return chooseStable(candidates);
+    const result = chooseStable(candidates, {
+      recentContentIds,
+      rotationSeed,
+    });
+    logger.info('[MCv2:contentSelector] SELECTED', { contentId: result ? result.content_id : null });
+    return result;
   }
 
-  // Relaxation order: scenario_tag -> level -> vark_mode -> length
+  logger.info('[MCv2:contentSelector] relaxing constraints for fallback');
   candidates = entries.filter((entry) => entry.template_id === templateId);
 
   const noScenario = candidates;
@@ -84,16 +107,66 @@ function selectContent({
     candidates = standardFallback;
   }
 
-  return chooseStable(candidates);
+  const result = chooseStable(candidates, {
+    recentContentIds,
+    rotationSeed,
+  });
+  logger.info('[MCv2:contentSelector] SELECTED (relaxed)', { contentId: result ? result.content_id : null });
+  return result;
 }
 
-function chooseStable(candidates) {
+function chooseStable(candidates, { recentContentIds = [], rotationSeed = '' } = {}) {
   if (!candidates || candidates.length === 0) {
     return null;
   }
-  return [...candidates].sort((a, b) => {
+  const sorted = [...candidates].sort((a, b) => {
     return String(a.content_id || '').localeCompare(String(b.content_id || ''));
-  })[0];
+  });
+
+  const recentRank = new Map();
+  recentContentIds
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .forEach((contentId, index) => {
+      if (!recentRank.has(contentId)) {
+        recentRank.set(contentId, index);
+      }
+    });
+
+  const unseen = sorted.filter(
+    (entry) => !recentRank.has(String(entry.content_id || '')),
+  );
+  if (unseen.length > 0) {
+    if (!rotationSeed) {
+      return unseen[0];
+    }
+    const index = stableHash(rotationSeed) % unseen.length;
+    return unseen[index];
+  }
+
+  // All candidates were recently used; choose the least-recently used.
+  const leastRecent = sorted
+    .map((entry) => {
+      const contentId = String(entry.content_id || '');
+      const rank = recentRank.get(contentId);
+      return {
+        entry,
+        // Larger index means older in recent list.
+        score: rank == null ? Number.MAX_SAFE_INTEGER : rank,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  return leastRecent[0]?.entry || sorted[0];
+}
+
+function stableHash(input) {
+  const raw = String(input || '');
+  let hash = 0;
+  for (let i = 0; i < raw.length; i += 1) {
+    hash = (hash * 31 + raw.charCodeAt(i)) >>> 0;
+  }
+  return hash;
 }
 
 function hasScenarioMatch(rawTags, probes) {

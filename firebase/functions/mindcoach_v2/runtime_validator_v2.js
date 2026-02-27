@@ -2,6 +2,7 @@ const {
   FALLBACK_TEMPLATE_ID,
   FORBIDDEN_LANGUAGE_PATTERNS,
 } = require('./contracts_v2');
+const logger = require('firebase-functions/logger');
 
 function validateAndCorrect({
   aiOutput,
@@ -11,6 +12,12 @@ function validateAndCorrect({
   promptVersion,
   requestedTemplateId,
 }) {
+  logger.info('[MCv2:validator] ENTRY', {
+    requestedTemplateId,
+    modelVersion,
+    hasAiOutput: !!aiOutput,
+  });
+
   const failedRules = [];
   const replacements = {};
   const contentFlags = [];
@@ -21,6 +28,7 @@ function validateAndCorrect({
   const output = sanitizeInput(aiOutput);
 
   if (!baseTemplate) {
+    logger.error('[MCv2:validator] no template available, using hard fallback');
     return {
       session: buildHardFallback({
         templateId: FALLBACK_TEMPLATE_ID,
@@ -47,6 +55,7 @@ function validateAndCorrect({
       from: output.template_id,
       to: selectedTemplateId,
     };
+    logger.warn('[MCv2:validator] template_id corrected', { from: output.template_id, to: selectedTemplateId });
     output.template_id = selectedTemplateId;
   }
 
@@ -60,6 +69,7 @@ function validateAndCorrect({
       from: output.routine_type,
       to: allowedRoutineTypes[0] || '',
     };
+    logger.warn('[MCv2:validator] routine_type corrected', { from: output.routine_type, to: allowedRoutineTypes[0] });
     output.routine_type = allowedRoutineTypes[0] || '';
   }
 
@@ -71,6 +81,7 @@ function validateAndCorrect({
       from: output.recommended_cue,
       to: replacementCue,
     };
+    logger.warn('[MCv2:validator] cue corrected', { from: output.recommended_cue, to: replacementCue });
     output.recommended_cue = replacementCue;
   }
 
@@ -84,6 +95,7 @@ function validateAndCorrect({
       from: output.delivery_length,
       to: replacementLength,
     };
+    logger.warn('[MCv2:validator] delivery_length corrected', { from: output.delivery_length, to: replacementLength });
     output.delivery_length = replacementLength;
   }
 
@@ -93,6 +105,7 @@ function validateAndCorrect({
       from: output.coaching_text,
       to: buildSafeFallbackText(baseTemplate),
     };
+    logger.warn('[MCv2:validator] coaching_text missing, using fallback');
     output.coaching_text = buildSafeFallbackText(baseTemplate);
   }
 
@@ -103,10 +116,10 @@ function validateAndCorrect({
       from: output.coaching_text,
       to: output.coaching_text.slice(0, maxLen).trim(),
     };
+    logger.warn('[MCv2:validator] coaching_text too long, truncated', { length: output.coaching_text.length, maxLen });
     output.coaching_text = output.coaching_text.slice(0, maxLen).trim();
   }
 
-  // Optional follow-up question constraints.
   if (output.follow_up_question != null) {
     const followUp = String(output.follow_up_question).trim();
     if (!followUp || followUp.length > 140 || countQuestions(followUp) > 1) {
@@ -115,6 +128,7 @@ function validateAndCorrect({
         from: output.follow_up_question,
         to: null,
       };
+      logger.warn('[MCv2:validator] follow_up_question invalid, removed');
       output.follow_up_question = null;
     } else {
       output.follow_up_question = followUp;
@@ -130,24 +144,42 @@ function validateAndCorrect({
       from: output.coaching_text,
       to: buildSafeFallbackText(baseTemplate),
     };
+    logger.error('[MCv2:validator] forbidden language detected', { hits: safetyHits });
     output.coaching_text = buildSafeFallbackText(baseTemplate);
     output.follow_up_question = null;
+    delete output.lines;
+    delete output.total_duration_sec;
   }
 
   const validatorStatus = buildStatus(failedRules, safetyHits.length > 0);
 
+  logger.info('[MCv2:validator] RESULT', {
+    validatorStatus,
+    failedRulesCount: failedRules.length,
+    failedRules,
+    contentFlagsCount: contentFlags.length,
+    templateIdReturned: output.template_id,
+  });
+
+  const session = {
+    template_id: output.template_id,
+    routine_type: output.routine_type,
+    recommended_cue: output.recommended_cue,
+    delivery_length: output.delivery_length,
+    coaching_text: output.coaching_text,
+    follow_up_question: output.follow_up_question ?? null,
+    validator_status: validatorStatus,
+    model_version: modelVersion,
+    prompt_version: promptVersion,
+  };
+  if (Array.isArray(output.lines) && output.lines.length > 0) {
+    session.lines = output.lines;
+  }
+  if (typeof output.total_duration_sec === 'number') {
+    session.total_duration_sec = output.total_duration_sec;
+  }
   return {
-    session: {
-      template_id: output.template_id,
-      routine_type: output.routine_type,
-      recommended_cue: output.recommended_cue,
-      delivery_length: output.delivery_length,
-      coaching_text: output.coaching_text,
-      follow_up_question: output.follow_up_question ?? null,
-      validator_status: validatorStatus,
-      model_version: modelVersion,
-      prompt_version: promptVersion,
-    },
+    session,
     log: {
       validator_status: validatorStatus,
       failed_rules: failedRules,
@@ -177,7 +209,7 @@ function buildHardFallback({ templateId }) {
 
 function sanitizeInput(raw) {
   const source = raw && typeof raw === 'object' ? raw : {};
-  return {
+  const out = {
     template_id: source.template_id ? String(source.template_id) : null,
     routine_type: source.routine_type ? String(source.routine_type) : null,
     recommended_cue: source.recommended_cue ? String(source.recommended_cue) : null,
@@ -188,6 +220,13 @@ function sanitizeInput(raw) {
         ? null
         : String(source.follow_up_question).trim(),
   };
+  if (Array.isArray(source.lines) && source.lines.length > 0) {
+    out.lines = source.lines;
+  }
+  if (typeof source.total_duration_sec === 'number') {
+    out.total_duration_sec = source.total_duration_sec;
+  }
+  return out;
 }
 
 function normalizeArray(value) {
@@ -204,9 +243,11 @@ function buildSafeFallbackText(template) {
 
 function maxCharsForLength(deliveryLength) {
   const raw = String(deliveryLength || '').toLowerCase();
-  if (raw.includes('micro')) return 400;
-  if (raw.includes('deep')) return 1600;
-  return 900;
+  if (raw.includes('micro')) return 500;
+  if (raw.includes('7m')) return 4000;
+  if (raw.includes('3m')) return 3200;
+  if (raw.includes('deep') || raw.includes('2m')) return 2400;
+  return 1400;
 }
 
 function countQuestions(text) {

@@ -1,5 +1,6 @@
 import 'package:fo_co_co/backend/backend.dart';
 
+import '/ai_integration/widgets/navbar_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -167,8 +168,10 @@ class _FoCoMapPlaceholderWidgetState extends State<FoCoMapPlaceholderWidget> {
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-        appBar: AppBar(
+        appBar: buildFoCoCoAppBar(
+          context,
           backgroundColor: FlutterFlowTheme.of(context).primary,
+          centerTitle: false,
           automaticallyImplyLeading: false,
           title: Text(
             'FoCoMap - Live Golf Experience',
@@ -196,8 +199,6 @@ class _FoCoMapPlaceholderWidgetState extends State<FoCoMapPlaceholderWidget> {
               ),
             ),
           ],
-          centerTitle: false,
-          elevation: 2.0,
         ),
         body: Column(
           children: [

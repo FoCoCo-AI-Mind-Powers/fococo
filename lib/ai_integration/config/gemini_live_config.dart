@@ -1,6 +1,8 @@
 /// Configuration for Gemini Live API
 /// Based on: https://ai.google.dev/gemini-api/docs/live
 
+import '/services/gemini_key_service.dart';
+
 class GeminiLiveAPIConfig {
   GeminiLiveAPIConfig._();
 
@@ -8,32 +10,30 @@ class GeminiLiveAPIConfig {
   static const String websocketEndpoint =
       'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent';
 
-  /// Get API key: first from --dart-define=GEMINI_API_KEY, last fallback = Gemini key below.
+  /// Synchronous accessor — returns the cached key or the compile-time key.
+  /// Call [GeminiKeyService.instance.preload()] after sign-in to populate.
   static String get apiKey {
     const keyFromEnv = String.fromEnvironment('GEMINI_API_KEY');
-
-    if (keyFromEnv.isNotEmpty) {
-      return keyFromEnv;
-    }
-
-    return _geminiApiKeyFallback;
+    return GeminiKeyService.instance.cachedKey ?? keyFromEnv;
   }
 
-  /// Last fallback Gemini API key (used when GEMINI_API_KEY is not set).
-  static const String _geminiApiKeyFallback =
-      'AIzaSyDBPLUOH59Y0bwslDhnFToFs424kDSQZno';
+  /// Async accessor — fetches from Secret Manager if not yet cached.
+  static Future<String> getApiKey() => GeminiKeyService.instance.getKey();
 
   /// Check if API key is configured
   static bool get isConfigured => apiKey.isNotEmpty;
 
   /// Native audio models (best quality, supports thinking)
   static const String nativeAudioModel =
-      'gemini-2.5-flash-preview-native-audio-dialog';
+      'gemini-2.5-flash-native-audio-preview-12-2025';
   static const String nativeAudioThinkingModel =
       'gemini-2.5-flash-exp-native-audio-thinking-dialog';
 
-  /// Half-cascade models (better performance)
+  /// @deprecated These models were shut down Dec 9, 2025.
+  /// Use [nativeAudioModel] instead.
+  @Deprecated('Shut down Dec 9 2025. Use nativeAudioModel.')
   static const String halfCascadeModel = 'gemini-live-2.5-flash-preview';
+  @Deprecated('Shut down Dec 9 2025. Use nativeAudioModel.')
   static const String halfCascadeFlashModel = 'gemini-2.0-flash-live-001';
 
   /// Default system instruction for FoCoCo

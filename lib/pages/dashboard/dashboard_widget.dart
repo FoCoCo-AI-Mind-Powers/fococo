@@ -255,6 +255,7 @@ class _DashboardWidgetState extends State<DashboardWidget>
         ),
         bottomNavigationBar: EnhancedFoCoCoNavBar(
           currentRoute: 'mind_coach',
+          barBackgroundColor: theme.primaryBackground,
           onTap: (route) {
             debugPrint('Dashboard: Navigation requested to route: $route');
             context.goNamed(route);

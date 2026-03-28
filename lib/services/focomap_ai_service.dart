@@ -20,8 +20,8 @@ class FoCoMapAIService {
   static const String _baseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models';
 
-  // Get API key from centralized config
-  String get _apiKey => GeminiLiveAPIConfig.apiKey;
+  // Get API key from Secret Manager / cache / dart-define
+  Future<String> get _apiKey => GeminiLiveAPIConfig.getApiKey();
 
   // Embedding cache for performance
   final Map<String, List<double>> _embeddingCache = {};
@@ -57,8 +57,9 @@ class FoCoMapAIService {
     String taskType = 'SEMANTIC_SIMILARITY',
     int outputDimensionality = 768,
   }) async {
+    final apiKey = await _apiKey;
     // Skip if API key is not set or is placeholder
-    if (_apiKey.isEmpty || _apiKey == 'YOUR_GEMINI_API_KEY_HERE') {
+    if (apiKey.isEmpty || apiKey == 'YOUR_GEMINI_API_KEY_HERE') {
       debugPrint(
           '⚠️ FoCoMapAIService: API key not set, skipping embedding generation');
       return [];
@@ -75,7 +76,7 @@ class FoCoMapAIService {
         Uri.parse('$_baseUrl/$_embeddingModel:embedContent'),
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': _apiKey,
+          'x-goog-api-key': apiKey,
         },
         body: jsonEncode({
           'model': 'models/$_embeddingModel',
@@ -120,8 +121,9 @@ class FoCoMapAIService {
     required List<LatLng> positions,
     required Map<String, dynamic> contextData,
   }) async {
+    final apiKey = await _apiKey;
     // Skip if API key is not set or is placeholder
-    if (_apiKey.isEmpty || _apiKey == 'YOUR_GEMINI_API_KEY_HERE') {
+    if (apiKey.isEmpty || apiKey == 'YOUR_GEMINI_API_KEY_HERE') {
       debugPrint(
           '⚠️ FoCoMapAIService: API key not set, skipping spatial analysis');
       return RoboticsAnalysis.empty();
@@ -135,7 +137,7 @@ class FoCoMapAIService {
         Uri.parse('$_baseUrl/$_roboticsModel:generateContent'),
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': _apiKey,
+          'x-goog-api-key': apiKey,
         },
         body: jsonEncode({
           'contents': [
@@ -616,9 +618,9 @@ class FoCoMapAIService {
     required LatLng? currentPosition,
     required Map<String, dynamic> mapContext,
   }) async {
-    if (_apiKey.isEmpty) {
+    final apiKey = await _apiKey;
+    if (apiKey.isEmpty) {
       // Silently skip guidance generation if API key is not configured
-      // This is expected behavior for users without API key setup
       return RealtimeGuidance.empty();
     }
 
@@ -643,7 +645,7 @@ class FoCoMapAIService {
         Uri.parse('$_baseUrl/$_roboticsModel:generateContent'),
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': _apiKey,
+          'x-goog-api-key': apiKey,
         },
         body: jsonEncode({
           'contents': [

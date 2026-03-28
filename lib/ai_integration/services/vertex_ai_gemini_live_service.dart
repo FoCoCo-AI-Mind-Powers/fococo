@@ -122,10 +122,8 @@ class VertexAIGeminiLiveService {
     // Try to get from environment or use API key as fallback
     // For Vertex AI, you typically use ADC or service account credentials
     // This is a simplified version - in production, use proper authentication
-    final apiKey = GeminiLiveAPIConfig.apiKey;
+    final apiKey = await GeminiLiveAPIConfig.getApiKey();
     if (apiKey.isNotEmpty) {
-      // For Vertex AI, you might need to exchange API key for access token
-      // For now, we'll use the API key directly in the WebSocket URL
       return null; // Will use API key in URL instead
     }
 
@@ -147,7 +145,6 @@ class VertexAIGeminiLiveService {
       }
 
       // Construct Vertex AI WebSocket URL
-      // Format: wss://{LOCATION}-aiplatform.googleapis.com/ws/google.cloud.aiplatform.v1.LlmBidiService/BidiGenerateContent
       final host = '$_location-aiplatform.googleapis.com';
       final path =
           '/ws/google.cloud.aiplatform.v1.LlmBidiService/BidiGenerateContent';
@@ -155,11 +152,10 @@ class VertexAIGeminiLiveService {
           'projects/$_projectId/locations/$_location/publishers/google/models/$_modelId';
 
       // Use API key if available, otherwise use access token
-      final apiKey = GeminiLiveAPIConfig.apiKey;
+      final apiKey = await GeminiLiveAPIConfig.getApiKey();
       Uri uri;
 
       if (apiKey.isNotEmpty) {
-        // Use API key in query parameter (for Google AI Studio API keys)
         uri = Uri.parse('wss://$host$path?key=$apiKey');
       } else {
         // Use access token in Authorization header (for Vertex AI)

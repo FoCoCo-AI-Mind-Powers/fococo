@@ -9,6 +9,8 @@ import '/backend/schema/structs/index.dart';
 import '/auth/base_auth_user_provider.dart';
 
 import '/flutter_flow/flutter_flow_util.dart';
+import '/services/gemini_key_service.dart';
+import '/ai_integration/widgets/navbar_widget.dart';
 
 import '/index.dart';
 
@@ -28,6 +30,9 @@ import '/pages/quick_mind_tools/reset_tool_widget.dart';
 import '/pages/quick_mind_tools/rebalance_tool_widget.dart';
 import '/pages/quick_mind_tools/virtual_training_experience_widget.dart';
 import '/pages/just_talk/just_talk_widget.dart';
+import '/pages/register/account_created_widget.dart';
+import '/pages/register/age_verification_widget.dart';
+import '/pages/fococo_tab/fococo_tab_widget.dart';
 import '/features/mindcoach_v2/app/mindcoach_v2_entry_widget.dart';
 import '/config/app_feature_flags.dart';
 
@@ -75,6 +80,10 @@ class AppStateNotifier extends ChangeNotifier {
         user?.uid == null || newUser.uid == null || user?.uid != newUser.uid;
     initialUser ??= newUser;
     user = newUser;
+    // Pre-warm the Gemini API key from Secret Manager on sign-in
+    if (newUser.loggedIn && shouldUpdate) {
+      GeminiKeyService.instance.preload();
+    }
     // Refresh the app on auth change unless explicitly marked otherwise.
     // No need to update unless the user has changed.
     if (notifyOnAuthChange && shouldUpdate) {
@@ -105,191 +114,231 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       redirect: (context, state) {
         if (state.matchedLocation == '/' && appStateNotifier.loggedIn) {
           appStateNotifier.stopShowingSplashImageSilent();
-          return '/mind_coach';
+          return '/fococo';
         }
         return null;
       },
-      errorBuilder: (context, state) => appStateNotifier.loggedIn
-          ? const MindCoachV2EntryWidget()
-          : LoginWidget(),
-      routes: [
-        FFRoute(
-          name: '_initialize',
-          path: '/',
-          builder: (context, _) => const EnhancedSplashWidget(),
-        ),
-        FFRoute(
-          name: LoginWidget.routeName,
-          path: LoginWidget.routePath,
-          builder: (context, params) => LoginWidget(),
-        ),
-        FFRoute(
-          name: ProfileWidget.routeName,
-          path: ProfileWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => ProfileWidget(),
-        ),
-        FFRoute(
-          name: 'face_id_settings',
-          path: '/face-id-settings',
-          requireAuth: true,
-          builder: (context, params) => FaceIdSettingsWidget(),
-        ),
-        FFRoute(
-          name: 'ai_insights',
-          path: '/ai_insights',
-          requireAuth: true,
-          builder: (context, params) => const AiInsightsWidget(),
-        ),
-        FFRoute(
-          name: CaddyPlayWidget.routeName,
-          path: CaddyPlayWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => const CaddyPlayWidget(),
-        ),
-        FFRoute(
-          name: MindCoachWidget.routeName,
-          path: MindCoachWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => MindCoachV2EntryWidget(
-            initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
-          ),
-        ),
-        FFRoute(
-          name: 'mind_coach_legacy',
-          path: '/mind_coach_legacy',
-          requireAuth: true,
-          builder: (context, params) => kDebugMode
-              ? MindCoachWidget(
-                  initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
-                )
-              : MindCoachV2EntryWidget(
+      errorBuilder: (context, state) =>
+          appStateNotifier.loggedIn ? const FoCoCoTabWidget() : LoginWidget(),
+      routes: <RouteBase>[
+        // ── Persistent tab shell: pages stay alive when switching tabs ──
+        StatefulShellRoute.indexedStack(
+          builder: (context, state, shell) => _FoCoCoTabShell(shell: shell),
+          branches: [
+            StatefulShellBranch(routes: [
+              FFRoute(
+                name: FoCoCoTabWidget.routeName,
+                path: FoCoCoTabWidget.routePath,
+                requireAuth: true,
+                builder: (context, params) => const FoCoCoTabWidget(),
+              ).toRoute(appStateNotifier),
+            ]),
+            StatefulShellBranch(routes: [
+              FFRoute(
+                name: CaddyPlayWidget.routeName,
+                path: CaddyPlayWidget.routePath,
+                requireAuth: true,
+                builder: (context, params) => const CaddyPlayWidget(),
+              ).toRoute(appStateNotifier),
+            ]),
+            StatefulShellBranch(routes: [
+              FFRoute(
+                name: MindCoachWidget.routeName,
+                path: MindCoachWidget.routePath,
+                requireAuth: true,
+                builder: (context, params) => MindCoachV2EntryWidget(
                   initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
                 ),
+              ).toRoute(appStateNotifier),
+            ]),
+            StatefulShellBranch(routes: [
+              FFRoute(
+                name: GolfChatWidget.routeName,
+                path: GolfChatWidget.routePath,
+                requireAuth: true,
+                builder: (context, params) => GolfChatWidget(
+                  initialRoundId: params.state.extraMap['roundId'] as String?,
+                  initialCaddyPlaySnapshot:
+                      params.state.extraMap['caddyplaySnapshot'] is Map
+                          ? Map<String, dynamic>.from(
+                              params.state.extraMap['caddyplaySnapshot'] as Map,
+                            )
+                          : null,
+                ),
+              ).toRoute(appStateNotifier),
+            ]),
+          ],
         ),
-        FFRoute(
-          name: ProgressWidget.routeName,
-          path: ProgressWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => ProgressWidget(),
-        ),
-        FFRoute(
-          name: AchievementsWidget.routeName,
-          path: AchievementsWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => AchievementsWidget(),
-        ),
-        FFRoute(
-          name: RegisterWidget.routeName,
-          path: RegisterWidget.routePath,
-          builder: (context, params) => RegisterWidget(),
-        ),
-        if (AppFeatureFlags.varkEnabled)
+        // ── Non-tab routes ──
+        ...(<FFRoute>[
           FFRoute(
-            name: VarkOnboardingWidget.routeName,
-            path: VarkOnboardingWidget.routePath,
-            builder: (context, params) => const VarkOnboardingWidget(),
+            name: '_initialize',
+            path: '/',
+            builder: (context, _) => const EnhancedSplashWidget(),
           ),
-        if (AppFeatureFlags.varkEnabled)
           FFRoute(
-            name: ComprehensiveOnboardingWidget.routeName,
-            path: ComprehensiveOnboardingWidget.routePath,
-            builder: (context, params) => const ComprehensiveOnboardingWidget(),
+            name: LoginWidget.routeName,
+            path: LoginWidget.routePath,
+            builder: (context, params) => LoginWidget(),
           ),
-        FFRoute(
-          name: 'subscription_onboarding',
-          path: '/subscription_onboarding',
-          requireAuth: true,
-          builder: (context, params) => SubscriptionOnboardingWidget(
-            isMandatory: params.state.extraMap['mandatory'] == true,
+          FFRoute(
+            name: ProfileWidget.routeName,
+            path: ProfileWidget.routePath,
+            requireAuth: true,
+            builder: (context, params) => ProfileWidget(),
           ),
-        ),
-        FFRoute(
-          name: 'subscription_management',
-          path: '/subscription_management',
-          requireAuth: true,
-          builder: (context, params) => const SubscriptionManagementWidget(),
-        ),
-        FFRoute(
-          name: 'foco_map',
-          path: '/foco_map',
-          requireAuth: true,
-          builder: (context, params) => const FoCoMapConditionalWidget(),
-        ),
-        FFRoute(
-          name: 'edit_profile',
-          path: '/edit-profile',
-          requireAuth: true,
-          builder: (context, params) => const EditProfileWidget(),
-        ),
-        FFRoute(
-          name: 'settings',
-          path: '/settings',
-          requireAuth: true,
-          builder: (context, params) => const SettingsWidget(),
-        ),
-        FFRoute(
-          name: 'support',
-          path: '/support',
-          requireAuth: true,
-          builder: (context, params) => const SupportWidget(),
-        ),
-        FFRoute(
-          name: AiAssessmentWidget.routeName,
-          path: AiAssessmentWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => const AiAssessmentWidget(),
-        ),
-        FFRoute(
-          name: BreathingToolWidget.routeName,
-          path: BreathingToolWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => const BreathingToolWidget(),
-        ),
-        FFRoute(
-          name: VisualizeToolWidget.routeName,
-          path: VisualizeToolWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => const VisualizeToolWidget(),
-        ),
-        FFRoute(
-          name: ResetToolWidget.routeName,
-          path: ResetToolWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => const ResetToolWidget(),
-        ),
-        FFRoute(
-          name: RebalanceToolWidget.routeName,
-          path: RebalanceToolWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => const RebalanceToolWidget(),
-        ),
-        FFRoute(
-          name: VirtualTrainingExperienceWidget.routeName,
-          path: VirtualTrainingExperienceWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => VirtualTrainingExperienceWidget(
-            moduleTitle: params.state.extraMap['moduleTitle'] as String?,
-            moduleId: params.state.extraMap['moduleId'] as String?,
-            description: params.state.extraMap['description'] as String?,
-            estimatedDuration:
-                params.state.extraMap['estimatedDuration'] as int?,
+          FFRoute(
+            name: 'face_id_settings',
+            path: '/face-id-settings',
+            requireAuth: true,
+            builder: (context, params) => FaceIdSettingsWidget(),
           ),
-        ),
-        FFRoute(
-          name: JustTalkWidget.routeName,
-          path: JustTalkWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => const JustTalkWidget(),
-        ),
-        FFRoute(
-          name: GolfChatWidget.routeName,
-          path: GolfChatWidget.routePath,
-          requireAuth: true,
-          builder: (context, params) => const GolfChatWidget(),
-        ),
-      ].map((r) => r.toRoute(appStateNotifier)).toList()
-        ..addAll([
+          FFRoute(
+            name: 'ai_insights',
+            path: '/ai_insights',
+            requireAuth: true,
+            builder: (context, params) => const AiInsightsWidget(),
+          ),
+          FFRoute(
+            name: 'mind_coach_legacy',
+            path: '/mind_coach_legacy',
+            requireAuth: true,
+            builder: (context, params) => kDebugMode
+                ? MindCoachWidget(
+                    initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
+                  )
+                : MindCoachV2EntryWidget(
+                    initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
+                  ),
+          ),
+          FFRoute(
+            name: ProgressWidget.routeName,
+            path: ProgressWidget.routePath,
+            requireAuth: true,
+            builder: (context, params) => ProgressWidget(),
+          ),
+          FFRoute(
+            name: AchievementsWidget.routeName,
+            path: AchievementsWidget.routePath,
+            requireAuth: true,
+            builder: (context, params) => AchievementsWidget(),
+          ),
+          FFRoute(
+            name: RegisterWidget.routeName,
+            path: RegisterWidget.routePath,
+            builder: (context, params) => RegisterWidget(),
+          ),
+          FFRoute(
+            name: AccountCreatedWidget.routeName,
+            path: AccountCreatedWidget.routePath,
+            builder: (context, params) => const AccountCreatedWidget(),
+          ),
+          FFRoute(
+            name: AgeVerificationWidget.routeName,
+            path: AgeVerificationWidget.routePath,
+            builder: (context, params) => const AgeVerificationWidget(),
+          ),
+          if (AppFeatureFlags.varkEnabled)
+            FFRoute(
+              name: VarkOnboardingWidget.routeName,
+              path: VarkOnboardingWidget.routePath,
+              builder: (context, params) => const VarkOnboardingWidget(),
+            ),
+          if (AppFeatureFlags.varkEnabled)
+            FFRoute(
+              name: ComprehensiveOnboardingWidget.routeName,
+              path: ComprehensiveOnboardingWidget.routePath,
+              builder: (context, params) =>
+                  const ComprehensiveOnboardingWidget(),
+            ),
+          FFRoute(
+            name: 'subscription_onboarding',
+            path: '/subscription_onboarding',
+            requireAuth: true,
+            builder: (context, params) => SubscriptionOnboardingWidget(
+              isMandatory: params.state.extraMap['mandatory'] == true,
+            ),
+          ),
+          FFRoute(
+            name: 'subscription_management',
+            path: '/subscription_management',
+            requireAuth: true,
+            builder: (context, params) => const SubscriptionManagementWidget(),
+          ),
+          FFRoute(
+            name: 'foco_map',
+            path: '/foco_map',
+            requireAuth: true,
+            builder: (context, params) => const FoCoMapConditionalWidget(),
+          ),
+          FFRoute(
+            name: 'edit_profile',
+            path: '/edit-profile',
+            requireAuth: true,
+            builder: (context, params) => const EditProfileWidget(),
+          ),
+          FFRoute(
+            name: 'settings',
+            path: '/settings',
+            requireAuth: true,
+            builder: (context, params) => const SettingsWidget(),
+          ),
+          FFRoute(
+            name: 'support',
+            path: '/support',
+            requireAuth: true,
+            builder: (context, params) => const SupportWidget(),
+          ),
+          FFRoute(
+            name: AiAssessmentWidget.routeName,
+            path: AiAssessmentWidget.routePath,
+            requireAuth: true,
+            builder: (context, params) => const AiAssessmentWidget(),
+          ),
+          FFRoute(
+            name: BreathingToolWidget.routeName,
+            path: BreathingToolWidget.routePath,
+            requireAuth: true,
+            builder: (context, params) => const BreathingToolWidget(),
+          ),
+          FFRoute(
+            name: VisualizeToolWidget.routeName,
+            path: VisualizeToolWidget.routePath,
+            requireAuth: true,
+            builder: (context, params) => const VisualizeToolWidget(),
+          ),
+          FFRoute(
+            name: ResetToolWidget.routeName,
+            path: ResetToolWidget.routePath,
+            requireAuth: true,
+            builder: (context, params) => const ResetToolWidget(),
+          ),
+          FFRoute(
+            name: RebalanceToolWidget.routeName,
+            path: RebalanceToolWidget.routePath,
+            requireAuth: true,
+            builder: (context, params) => const RebalanceToolWidget(),
+          ),
+          FFRoute(
+            name: VirtualTrainingExperienceWidget.routeName,
+            path: VirtualTrainingExperienceWidget.routePath,
+            requireAuth: true,
+            builder: (context, params) => VirtualTrainingExperienceWidget(
+              moduleTitle: params.state.extraMap['moduleTitle'] as String?,
+              moduleId: params.state.extraMap['moduleId'] as String?,
+              description: params.state.extraMap['description'] as String?,
+              estimatedDuration:
+                  params.state.extraMap['estimatedDuration'] as int?,
+            ),
+          ),
+          FFRoute(
+            name: JustTalkWidget.routeName,
+            path: JustTalkWidget.routePath,
+            requireAuth: true,
+            builder: (context, params) => const JustTalkWidget(),
+          ),
+        ].map((r) => r.toRoute(appStateNotifier))),
+      ]..addAll([
           _buildAliasRoute(
             appStateNotifier: appStateNotifier,
             name: DashboardWidget.routeName,
@@ -595,5 +644,42 @@ extension GoRouterLocationExtension on GoRouter {
         ? lastMatch.matches
         : routerDelegate.currentConfiguration;
     return matchList.uri.toString();
+  }
+}
+
+/// Shell widget for the 4 persistent tabs.
+/// Provides the single bottom nav bar; each tab page omits its own nav bar.
+class _FoCoCoTabShell extends StatelessWidget {
+  const _FoCoCoTabShell({required this.shell});
+
+  final StatefulNavigationShell shell;
+
+  static const List<String> _tabRoutes = [
+    'fococo',
+    'caddy_play',
+    'mind_coach',
+    'golf_chat',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final currentRoute = _tabRoutes[shell.currentIndex];
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      extendBody: true,
+      body: shell,
+      bottomNavigationBar: buildFoCoCoBottomNavBar(
+        context: context,
+        currentRoute: currentRoute,
+        onTap: (route) {
+          final index = foCoCoNavIndexFromRoute(route);
+          shell.goBranch(
+            index,
+            // Re-navigate to branch root if already on that tab
+            initialLocation: index == shell.currentIndex,
+          );
+        },
+      ),
+    );
   }
 }

@@ -2,74 +2,143 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fo_co_co/pages/golf_rounds/caddyplay_models.dart';
 
 void main() {
-  test('chip score mapping defaults match contract', () {
-    expect(focusScore(CaddyPlayFocusChip.clear), 90);
-    expect(focusScore(CaddyPlayFocusChip.neutral), 65);
-    expect(focusScore(CaddyPlayFocusChip.distracted), 35);
+  test('score helpers preserve spec weighting', () {
+    expect(focusScore(CaddyPlayFocusLevel.high), 90);
+    expect(focusScore(CaddyPlayFocusLevel.mid), 65);
+    expect(focusScore(CaddyPlayFocusLevel.low), 35);
 
-    expect(resultScore(CaddyPlayResultChip.good), 85);
-    expect(resultScore(CaddyPlayResultChip.ok), 60);
-    expect(resultScore(CaddyPlayResultChip.poor), 35);
+    expect(resultScore(CaddyPlayShotResult.good), 85);
+    expect(resultScore(CaddyPlayShotResult.ok), 60);
+    expect(resultScore(CaddyPlayShotResult.bad), 35);
 
-    expect(routineScore(CaddyPlayRoutineChip.yes), 85);
-    expect(routineScore(CaddyPlayRoutineChip.partial), 60);
-    expect(routineScore(CaddyPlayRoutineChip.no), 40);
-
-    expect(emotionScore(CaddyPlayEmotionChip.calm), 85);
-    expect(emotionScore(CaddyPlayEmotionChip.pressured), 55);
-    expect(emotionScore(CaddyPlayEmotionChip.frustrated), 35);
+    expect(routineScore(CaddyPlayRoutineStatus.yes), 85);
+    expect(routineScore(CaddyPlayRoutineStatus.partly), 60);
+    expect(routineScore(CaddyPlayRoutineStatus.no), 35);
   });
 
-  test('aggregate mindset computes deterministic pillar scores', () {
-    final logs = <CaddyPlayLog>[
-      CaddyPlayLog(
-        id: '1',
-        sessionId: 's',
-        userId: 'u',
-        mode: CaddyPlayMode.play,
-        holeNumber: 1,
-        inputMethod: 'tap',
-        transcription: '',
-        result: CaddyPlayResultChip.good,
-        focus: CaddyPlayFocusChip.clear,
-        routine: CaddyPlayRoutineChip.yes,
-        emotion: CaddyPlayEmotionChip.calm,
-        capturedAt: DateTime(2026, 2, 16),
-        editedAt: null,
-      ),
-      CaddyPlayLog(
-        id: '2',
-        sessionId: 's',
-        userId: 'u',
-        mode: CaddyPlayMode.play,
-        holeNumber: 2,
-        inputMethod: 'voice',
-        transcription: '',
-        result: CaddyPlayResultChip.poor,
-        focus: CaddyPlayFocusChip.distracted,
-        routine: CaddyPlayRoutineChip.no,
-        emotion: CaddyPlayEmotionChip.frustrated,
-        capturedAt: DateTime(2026, 2, 16),
-        editedAt: null,
-      ),
-    ];
-
-    final aggregate = aggregateMindset(logs);
-
-    expect(aggregate.mindsetFocus, 63);
-    expect(aggregate.mindsetConfidence, 60);
-    expect(aggregate.mindsetControl, 63);
-    expect(aggregate.overallEmoji, isNotEmpty);
-    expect(aggregate.mindsetColor, isNotEmpty);
-  });
-
-  test('voice inference triggers required fallback when partial data', () {
-    final inferred = inferChipSelectionFromTranscript(
-      'Felt rushed and distracted after that tee shot',
+  test('aggregate mindset and snapshot derive deterministic values', () {
+    final round = CaddyPlayActiveRound.newRound(
+      roundId: 'round_1',
+      userId: 'user_1',
+      courseName: 'San Lorenzo GC',
+      holesTotal: 18,
+      roundType: CaddyPlayRoundType.practice,
+      playingPartners: CaddyPlayPlayingPartners.friends,
+      preRoundMindset: CaddyPlayPreRoundMindset.positive,
+      weather: CaddyPlayWeather.good,
+    ).copyWith(
+      holes: [
+        CaddyPlayHole(
+          holeNumber: 1,
+          par: 4,
+          score: 5,
+          moments: [
+            CaddyPlayMoment(
+              id: 'tap_1',
+              holeNumber: 1,
+              type: CaddyPlayMomentType.tap,
+              timestamp: DateTime(2026, 3, 16, 9),
+              commitment: CaddyPlayCommitmentLevel.high,
+              focusLevel: CaddyPlayFocusLevel.high,
+              shotResult: CaddyPlayShotResult.good,
+              preShotRoutine: CaddyPlayRoutineStatus.yes,
+            ),
+          ],
+        ),
+        CaddyPlayHole(
+          holeNumber: 2,
+          par: 4,
+          score: 6,
+          moments: [
+            CaddyPlayMoment(
+              id: 'talk_1',
+              holeNumber: 2,
+              type: CaddyPlayMomentType.talk,
+              timestamp: DateTime(2026, 3, 16, 9, 8),
+              focusLevel: CaddyPlayFocusLevel.low,
+              shotResult: CaddyPlayShotResult.bad,
+              transcript: 'Focus dropped and I rushed the routine.',
+              pillarTags: const [CaddyPlayPillarTag.focus],
+            ),
+            CaddyPlayMoment(
+              id: 'mind_1',
+              holeNumber: 2,
+              type: CaddyPlayMomentType.mindsnap,
+              timestamp: DateTime(2026, 3, 16, 9, 12),
+              mindSnapSequence: CaddyPlayMindSnapSequence.recovery,
+            ),
+          ],
+        ),
+        for (var hole = 3; hole <= 18; hole++) CaddyPlayHole(holeNumber: hole),
+      ],
+      currentHole: 2,
+      lastUpdatedAt: DateTime(2026, 3, 16, 9, 15),
     );
 
-    expect(inferred.focus, CaddyPlayFocusChip.distracted);
-    expect(inferred.result, isNull);
-    expect(inferred.hasRequired, isFalse);
+    final aggregate = aggregateMindset(round);
+    final snapshot = buildRoundSnapshot(round);
+
+    expect(aggregate.focus, greaterThan(0));
+    expect(aggregate.confidence, greaterThan(0));
+    expect(aggregate.control, greaterThan(0));
+    expect(snapshot.courseName, 'San Lorenzo GC');
+    expect(snapshot.scoreToPar, -61);
+    expect(snapshot.holesPlayed, 2);
+    expect(snapshot.totalMoments, 3);
+    expect(snapshot.tapCount, 1);
+    expect(snapshot.talkCount, 1);
+    expect(snapshot.mindSnapCount, 1);
+    expect(snapshot.momentumShift, isNotEmpty);
+    expect(snapshot.completionInsight, isNotEmpty);
+  });
+
+  test('mind snap selection prefers recovery when recent hole slipped', () {
+    final round = CaddyPlayActiveRound.newRound(
+      roundId: 'round_2',
+      userId: 'user_2',
+      courseName: 'San Lorenzo GC',
+      holesTotal: 9,
+      roundType: CaddyPlayRoundType.casual,
+      playingPartners: CaddyPlayPlayingPartners.solo,
+      preRoundMindset: CaddyPlayPreRoundMindset.neutral,
+      weather: CaddyPlayWeather.ok,
+    ).copyWith(
+      holes: [
+        CaddyPlayHole(
+          holeNumber: 1,
+          moments: [
+            CaddyPlayMoment(
+              id: 'talk_recent',
+              holeNumber: 1,
+              type: CaddyPlayMomentType.talk,
+              timestamp: DateTime(2026, 3, 16, 10),
+              focusLevel: CaddyPlayFocusLevel.low,
+              shotResult: CaddyPlayShotResult.bad,
+              transcript: 'I felt tense and rushed over the ball.',
+            ),
+          ],
+        ),
+        for (var hole = 2; hole <= 9; hole++) CaddyPlayHole(holeNumber: hole),
+      ],
+      currentHole: 1,
+      lastUpdatedAt: DateTime(2026, 3, 16, 10, 1),
+    );
+
+    expect(
+      deriveMindSnapSequence(round),
+      CaddyPlayMindSnapSequence.composure,
+    );
+    expect(
+      buildTapMicroInsight(
+        CaddyPlayMoment(
+          id: 'tap_recent',
+          holeNumber: 1,
+          type: CaddyPlayMomentType.tap,
+          timestamp: DateTime(2026, 3, 16, 10, 2),
+          preShotRoutine: CaddyPlayRoutineStatus.no,
+        ),
+      ),
+      'Routine first.',
+    );
   });
 }

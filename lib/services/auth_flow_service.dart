@@ -26,6 +26,17 @@ class AuthFlowService {
   DocumentReference<Map<String, dynamic>> _userDoc(String userId) =>
       _firestore.collection('user').doc(userId);
 
+  bool _isFreshAccount(User user) {
+    final createdAt = user.metadata.creationTime;
+    final lastSignInAt = user.metadata.lastSignInTime;
+    if (createdAt == null || lastSignInAt == null) {
+      return false;
+    }
+
+    return lastSignInAt.difference(createdAt).abs() <
+        const Duration(minutes: 2);
+  }
+
   Future<AuthFlowDecision> resolvePostAuthDecision() async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -47,6 +58,10 @@ class AuthFlowService {
         'currentMembershipTier': 'junior',
         'mandatoryPaywallCompleted': false,
       }, SetOptions(merge: true));
+
+      if (_isFreshAccount(user)) {
+        return const AuthFlowDecision(routeName: 'account_created');
+      }
 
       return const AuthFlowDecision(
         routeName: 'subscription_onboarding',

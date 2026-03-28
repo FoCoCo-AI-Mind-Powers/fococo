@@ -33,7 +33,7 @@ class MindCoachHistoryV2Widget extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'No saved MindCoach v2 sessions yet.',
+                  'No saved sessions yet, try starting a new session in the Builder.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.outline,
                       ),

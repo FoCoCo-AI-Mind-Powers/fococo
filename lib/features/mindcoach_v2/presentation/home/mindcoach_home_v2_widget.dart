@@ -2,6 +2,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 
 import '/adaptive_ui/adaptive_ui.dart';
+import '/ai_integration/widgets/navbar_widget.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/features/mindcoach_v2/data/mindcoach_v2_repository.dart';
 import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart';
@@ -143,7 +144,14 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
         onRefresh: _loadContextAndResume,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            14,
+            16,
+            MediaQuery.viewPaddingOf(context).bottom +
+                kFoCoCoBottomNavStripAndTabsHeight +
+                16.0,
+          ),
           children: [
             _buildHeroCard(theme),
             const SizedBox(height: 14),

@@ -201,6 +201,7 @@ class _SupportWidgetState extends State<SupportWidget>
         ),
         bottomNavigationBar: EnhancedFoCoCoNavBar(
           currentRoute: 'support',
+          barBackgroundColor: theme.primaryBackground,
           onTap: (route) {
             print('🔄 Support page: Navigation requested to route: $route');
             context.goNamed(route);

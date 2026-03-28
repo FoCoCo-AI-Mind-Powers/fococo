@@ -23,16 +23,11 @@ class FoCoMapGeminiVoiceService {
   FoCoMapGeminiVoiceService._internal();
 
   // Gemini API Configuration
-  // Get API key from GeminiLiveAPIConfig for consistency
-  static String get _geminiApiKey {
-    final key = GeminiLiveAPIConfig.apiKey;
-    if (key.isEmpty) {
-      if (kDebugMode) {
-        print('⚠️ GEMINI_API_KEY not configured for FoCoMap voice service');
-        print('💡 Set GEMINI_API_KEY via --dart-define or environment variable');
-      }
-      // Return empty string - service will handle gracefully
-      return '';
+  // Get API key from Secret Manager / cache / dart-define
+  static Future<String> _getGeminiApiKey() async {
+    final key = await GeminiLiveAPIConfig.getApiKey();
+    if (key.isEmpty && kDebugMode) {
+      print('⚠️ GEMINI_API_KEY not configured for FoCoMap voice service');
     }
     return key;
   }
@@ -248,7 +243,7 @@ class FoCoMapGeminiVoiceService {
         Uri.parse('$_baseUrl/v1beta/models/$_audioModel:generateContent'),
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': _geminiApiKey,
+          'x-goog-api-key': await _getGeminiApiKey(),
         },
         body: jsonEncode({
           'contents': [
@@ -298,7 +293,7 @@ class FoCoMapGeminiVoiceService {
         Uri.parse('$_baseUrl/v1beta/models/$_instructionModel:generateContent'),
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': _geminiApiKey,
+          'x-goog-api-key': await _getGeminiApiKey(),
         },
         body: jsonEncode({
           'contents': [
@@ -381,7 +376,7 @@ Return a JSON object with:
         Uri.parse('$_baseUrl/v1beta/models/$_instructionModel:generateContent'),
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': _geminiApiKey,
+          'x-goog-api-key': await _getGeminiApiKey(),
         },
         body: jsonEncode({
           'contents': [
@@ -464,7 +459,7 @@ Generate a JSON response with:
         Uri.parse('$_baseUrl/v1beta/models/$_roboticsModel:generateContent'),
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': _geminiApiKey,
+          'x-goog-api-key': await _getGeminiApiKey(),
         },
         body: jsonEncode({
           'contents': [

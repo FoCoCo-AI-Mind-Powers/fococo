@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:firebase_ai/firebase_ai.dart';
@@ -16,10 +15,13 @@ import 'package:just_audio/just_audio.dart';
 import 'package:record/record.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:iconify_flutter/iconify_flutter.dart';
+import 'package:iconify_flutter/icons/carbon.dart';
 
 import '/adaptive_ui/adaptive_ui.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/firebase/firebase_config.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/ai_integration/gemini_ai_client.dart';
@@ -34,11 +36,21 @@ import 'golfchat_model.dart';
 
 export 'golfchat_model.dart';
 
+/// Space so the message list does not sit under the composer when it is pinned.
+const double _kGolfChatComposerClearance = 140;
+
 class GolfChatWidget extends StatefulWidget {
-  const GolfChatWidget({super.key});
+  const GolfChatWidget({
+    super.key,
+    this.initialRoundId,
+    this.initialCaddyPlaySnapshot,
+  });
 
   static const String routeName = 'golf_chat';
   static const String routePath = '/golf_chat';
+
+  final String? initialRoundId;
+  final Map<String, dynamic>? initialCaddyPlaySnapshot;
 
   @override
   State<GolfChatWidget> createState() => _GolfChatWidgetState();
@@ -80,7 +92,14 @@ class _GolfChatMessage {
       );
 }
 
-enum _VoiceModeState { idle, connecting, listening, processing, speaking, error }
+enum _VoiceModeState {
+  idle,
+  connecting,
+  listening,
+  processing,
+  speaking,
+  error
+}
 
 enum _AttachmentType { image, file }
 
@@ -118,6 +137,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   bool _ttsSpeaking = false;
   bool _ttsAvailable = false;
   String? _golfChatVoiceId;
+  String? _roundContextId;
+  Map<String, dynamic>? _roundContextSnapshot;
 
   String? _sessionId;
   final List<_GolfChatMessage> _messages = <_GolfChatMessage>[];
@@ -130,11 +151,20 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   bool _isVoiceMode = false;
   _VoiceModeState _voiceState = _VoiceModeState.idle;
   LiveSession? _liveSession;
-  StreamSubscription<LiveServerResponse>? _liveResponseSubscription;
   final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
+  StreamSubscription<PlayerState>? _audioPlayerStateSubscription;
   StreamSubscription<Uint8List>? _audioStreamSubscription;
+  Future<void>? _liveReceiveTask;
+  bool _keepReceivingLiveResponses = false;
+  bool _isLiveReceiveLoopRunning = false;
+  bool _isHandlingVoiceTransportError = false;
+  bool _liveAudioPlaylistLoaded = false;
+  int _liveAudioChunkCount = 0;
+  bool _awaitingPlaybackDrain = false;
   String _liveTranscription = '';
+  String _liveInputTranscript = '';
+  String _liveOutputTranscript = '';
   final List<double> _audioLevels = List.filled(64, 0.0);
 
   // Attachments
@@ -150,9 +180,31 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   void initState() {
     super.initState();
     _model = createModel(context, () => GolfChatModel());
+    _configureAudioPlayer();
     _initialize();
     _initTts();
     _initAnimations();
+  }
+
+  void _configureAudioPlayer() {
+    _audioPlayerStateSubscription = _audioPlayer.playerStateStream.listen(
+      (state) {
+        if (!_isVoiceMode) {
+          return;
+        }
+
+        if (state.processingState == ProcessingState.completed) {
+          unawaited(_resetLiveAudioPlayback());
+          if (mounted && _awaitingPlaybackDrain) {
+            setState(() {
+              _voiceState = _VoiceModeState.listening;
+              _audioLevels.fillRange(0, _audioLevels.length, 0.0);
+            });
+          }
+          _awaitingPlaybackDrain = false;
+        }
+      },
+    );
   }
 
   void _initAnimations() {
@@ -172,6 +224,27 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
       CurvedAnimation(
           parent: _gradientAnimationController, curve: Curves.easeInOut),
     );
+  }
+
+  @override
+  void didUpdateWidget(covariant GolfChatWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final roundChanged = oldWidget.initialRoundId != widget.initialRoundId;
+    final snapshotChanged = !mapEquals(
+      oldWidget.initialCaddyPlaySnapshot,
+      widget.initialCaddyPlaySnapshot,
+    );
+    if (!roundChanged && !snapshotChanged) {
+      return;
+    }
+
+    _hydrateRoundContextFromWidget();
+    if (!_isLoading) {
+      unawaited(_ensureSession());
+      if (mounted) {
+        setState(() {});
+      }
+    }
   }
 
   Future<void> _initTts() async {
@@ -207,6 +280,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   Future<void> _initialize() async {
     try {
       await _db.initialize();
+      _hydrateRoundContextFromWidget();
       await _loadBoundaryFlag();
       await _ensureSession();
     } catch (e) {
@@ -248,9 +322,15 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     if (currentUserUid.isEmpty) return;
 
     VoiceChatSession? session;
+    final requestedRoundId = _roundContextId?.trim();
     try {
       session = await _db.getActiveSession();
       if (session != null && session.sessionMetadata['surface'] != 'golfchat') {
+        session = null;
+      } else if (session != null &&
+          requestedRoundId != null &&
+          requestedRoundId.isNotEmpty &&
+          session.sessionMetadata['roundId']?.toString() != requestedRoundId) {
         session = null;
       }
     } catch (_) {
@@ -263,8 +343,14 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         metadata: <String, dynamic>{
           'surface': 'golfchat',
           'tone': 'calm_reflection',
+          if (requestedRoundId != null && requestedRoundId.isNotEmpty)
+            'roundId': requestedRoundId,
+          if (_roundContextSnapshot != null)
+            'caddyplaySnapshot': _roundContextSnapshot,
         },
       );
+    } else {
+      _hydrateRoundContextFromSession(session);
     }
 
     _sessionId = session.id;
@@ -288,10 +374,31 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     _scrollToBottom();
   }
 
+  void _hydrateRoundContextFromWidget() {
+    final roundId = widget.initialRoundId?.trim();
+    _roundContextId = (roundId == null || roundId.isEmpty) ? null : roundId;
+    final snapshot = widget.initialCaddyPlaySnapshot;
+    _roundContextSnapshot =
+        snapshot == null ? null : Map<String, dynamic>.from(snapshot);
+  }
+
+  void _hydrateRoundContextFromSession(VoiceChatSession session) {
+    final metadata = session.sessionMetadata;
+    final roundId = metadata['roundId']?.toString().trim();
+    if ((roundId ?? '').isNotEmpty) {
+      _roundContextId = roundId;
+    }
+    final snapshot = metadata['caddyplaySnapshot'];
+    if (snapshot is Map) {
+      _roundContextSnapshot = Map<String, dynamic>.from(snapshot);
+    }
+  }
+
   @override
   void dispose() {
-    _exitVoiceMode();
+    unawaited(_exitVoiceMode());
     _cartesiaTts.stopSpeaking();
+    _audioPlayerStateSubscription?.cancel();
     _textController.dispose();
     _scrollController.dispose();
     _waveAnimationController.dispose();
@@ -303,114 +410,185 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   }
 
   Future<void> _enterVoiceMode() async {
+    if (_isVoiceMode) {
+      return;
+    }
+
+    await _stopTtsPlayback();
+    await _resetLiveAudioPlayback();
+
     setState(() {
       _isVoiceMode = true;
       _voiceState = _VoiceModeState.connecting;
       _liveTranscription = '';
+      _liveInputTranscript = '';
+      _liveOutputTranscript = '';
+      _audioLevels.fillRange(0, _audioLevels.length, 0.0);
     });
 
     try {
-      final liveModel = FirebaseAI.googleAI().liveGenerativeModel(
+      final liveModel = FirebaseAI.googleAI(
+        app: await getGoogleAIFirebaseApp(),
+      ).liveGenerativeModel(
         model: GeminiVoiceConfig.nativeAudioDialogModel,
         liveGenerationConfig: LiveGenerationConfig(
           responseModalities: [ResponseModalities.audio],
-          speechConfig: SpeechConfig(voiceName: 'Puck'),
+          speechConfig: SpeechConfig(
+            voiceName: GeminiVoiceConfig.geminiLiveVoiceName,
+          ),
+          inputAudioTranscription: AudioTranscriptionConfig(),
+          outputAudioTranscription: AudioTranscriptionConfig(),
         ),
-        systemInstruction: Content.text(GeminiVoiceConfig.voiceCoachingSystemPrompt),
+        systemInstruction:
+            Content.system(GeminiVoiceConfig.voiceCoachingSystemPrompt),
       );
 
       _liveSession = await liveModel.connect();
-      _listenForResponses();
+      _keepReceivingLiveResponses = true;
+      _liveReceiveTask = _processLiveResponses();
 
+      await _startAudioCapture();
       if (mounted) {
         setState(() => _voiceState = _VoiceModeState.listening);
-        await _startAudioCapture();
       }
     } catch (e) {
       debugPrint('Voice mode connection failed: $e');
       if (mounted) {
         setState(() => _voiceState = _VoiceModeState.error);
-        _showSnack('Voice mode connection failed');
+        _showSnack(_describeVoiceError(e));
       }
     }
   }
 
-  void _listenForResponses() {
-    _liveResponseSubscription?.cancel();
-    _liveResponseSubscription = _liveSession?.receive().listen(
-      _handleLiveResponse,
-      onError: (error) {
-        debugPrint('Live session error: $error');
-        if (mounted) {
-          setState(() => _voiceState = _VoiceModeState.error);
-          _showSnack('Voice connection error');
-        }
-      },
-      onDone: () {
-        if (mounted && _isVoiceMode) _exitVoiceMode();
-      },
-    );
-  }
+  Future<void> _processLiveResponses() async {
+    final session = _liveSession;
+    if (session == null || _isLiveReceiveLoopRunning) {
+      return;
+    }
 
-  void _handleLiveResponse(LiveServerResponse response) {
-    final message = response.message;
-
-    if (message is LiveServerContent) {
-      if (message.modelTurn != null) {
-        for (final part in message.modelTurn!.parts) {
-          if (part is TextPart) {
-            if (mounted) setState(() => _liveTranscription = part.text);
-          } else if (part is InlineDataPart) {
-            if (part.mimeType.contains('audio')) {
-              if (mounted) setState(() => _voiceState = _VoiceModeState.speaking);
-              _updateAudioLevels(part.bytes);
-              _playPcmAudio(part.bytes);
-            }
+    _isLiveReceiveLoopRunning = true;
+    try {
+      while (_keepReceivingLiveResponses && identical(session, _liveSession)) {
+        await for (final response in session.receive()) {
+          await _handleLiveResponse(response);
+          if (!_keepReceivingLiveResponses ||
+              !identical(session, _liveSession)) {
+            break;
           }
         }
-      }
 
-      if (message.turnComplete == true) {
-        if (mounted) setState(() => _voiceState = _VoiceModeState.listening);
-      }
+        if (!_keepReceivingLiveResponses || !identical(session, _liveSession)) {
+          break;
+        }
 
-      if (message.interrupted == true) {
-        _audioPlayer.stop();
-        if (mounted) setState(() => _voiceState = _VoiceModeState.listening);
+        await Future<void>.delayed(const Duration(milliseconds: 32));
+      }
+    } catch (error) {
+      if (_keepReceivingLiveResponses) {
+        await _handleVoiceSessionError(error);
+      }
+    } finally {
+      _isLiveReceiveLoopRunning = false;
+    }
+  }
+
+  Future<void> _handleLiveResponse(LiveServerResponse response) async {
+    final message = response.message;
+
+    if (message is GoingAwayNotice) {
+      debugPrint(
+          'Voice session going away soon. Time left: ${message.timeLeft}');
+      return;
+    }
+
+    if (message is! LiveServerContent) {
+      return;
+    }
+
+    _handleTranscriptionChunk(
+      message.inputTranscription,
+      isUser: true,
+    );
+    _handleTranscriptionChunk(
+      message.outputTranscription,
+      isUser: false,
+    );
+
+    final modelTurn = message.modelTurn;
+    if (modelTurn != null) {
+      for (final part in modelTurn.parts) {
+        if (part is TextPart) {
+          _handleOutputTextChunk(part.text);
+        } else if (part is InlineDataPart && part.mimeType.contains('audio')) {
+          if (mounted) {
+            setState(() => _voiceState = _VoiceModeState.speaking);
+          }
+          _updateAudioLevels(part.bytes);
+          await _playPcmAudio(part.bytes);
+        }
+      }
+    }
+
+    if (message.interrupted == true) {
+      await _resetLiveAudioPlayback();
+      if (mounted) {
+        setState(() => _voiceState = _VoiceModeState.listening);
+      }
+      _awaitingPlaybackDrain = false;
+    }
+
+    if (message.turnComplete == true) {
+      await _commitLiveVoiceTurn();
+      final shouldWaitForPlayback = _liveAudioChunkCount > 0 &&
+          _audioPlayer.processingState != ProcessingState.completed;
+      _awaitingPlaybackDrain = shouldWaitForPlayback;
+      if (!shouldWaitForPlayback && mounted) {
+        setState(() => _voiceState = _VoiceModeState.listening);
       }
     }
   }
 
-  void _sendAudioChunk(Uint8List audioData) {
+  Future<void> _sendAudioChunk(Uint8List audioData) async {
     final session = _liveSession;
-    if (session == null) return;
+    if (session == null ||
+        !_keepReceivingLiveResponses ||
+        _voiceState == _VoiceModeState.error) {
+      return;
+    }
 
     try {
-      session.sendMediaChunks(
-        mediaChunks: [InlineDataPart('audio/pcm', audioData)],
-      );
+      await session.sendAudioRealtime(InlineDataPart('audio/pcm', audioData));
     } catch (e) {
-      debugPrint('Error sending audio: $e');
+      await _handleVoiceSessionError(e);
     }
   }
 
   Future<void> _exitVoiceMode() async {
+    _keepReceivingLiveResponses = false;
     _audioStreamSubscription?.cancel();
     _audioStreamSubscription = null;
 
-    _liveResponseSubscription?.cancel();
-    _liveResponseSubscription = null;
-
-    try { await _audioRecorder.stop(); } catch (_) {}
-    try { await _audioPlayer.stop(); } catch (_) {}
-    try { await _liveSession?.close(); } catch (_) {}
+    try {
+      await _audioRecorder.stop();
+    } catch (_) {}
+    await _resetLiveAudioPlayback();
+    try {
+      await _liveSession?.close();
+    } catch (_) {}
     _liveSession = null;
+    try {
+      await _liveReceiveTask;
+    } catch (_) {}
+    _liveReceiveTask = null;
+    _awaitingPlaybackDrain = false;
 
     if (mounted) {
       setState(() {
         _isVoiceMode = false;
         _voiceState = _VoiceModeState.idle;
         _liveTranscription = '';
+        _liveInputTranscript = '';
+        _liveOutputTranscript = '';
         _audioLevels.fillRange(0, _audioLevels.length, 0.0);
       });
     }
@@ -429,13 +607,62 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
         numChannels: 1,
+        autoGain: true,
+        echoCancel: true,
+        noiseSuppress: true,
       ),
     );
 
     _audioStreamSubscription = stream.listen((data) {
-      _sendAudioChunk(data);
+      unawaited(_sendAudioChunk(data));
       _updateAudioLevelsFromInput(data);
     });
+  }
+
+  Future<void> _handleVoiceSessionError(Object error) async {
+    if (_isHandlingVoiceTransportError) {
+      return;
+    }
+
+    _isHandlingVoiceTransportError = true;
+    _keepReceivingLiveResponses = false;
+    debugPrint('Voice session error: $error');
+
+    try {
+      await _audioStreamSubscription?.cancel();
+    } catch (_) {}
+    _audioStreamSubscription = null;
+
+    try {
+      await _audioRecorder.stop();
+    } catch (_) {}
+
+    await _resetLiveAudioPlayback();
+
+    try {
+      await _liveSession?.close();
+    } catch (_) {}
+    _liveSession = null;
+
+    if (mounted) {
+      setState(() => _voiceState = _VoiceModeState.error);
+      _showSnack(_describeVoiceError(error));
+    } else {
+      debugPrint('GolfChat voice error: ${_describeVoiceError(error)}');
+    }
+
+    _isHandlingVoiceTransportError = false;
+  }
+
+  String _describeVoiceError(Object error) {
+    final message = error.toString();
+    if (message.contains('reported as leaked')) {
+      return 'Voice API key was revoked as leaked. Rotate the Firebase/Google AI key or run with --dart-define=GEMINI_API_KEY=NEW_KEY.';
+    }
+    if (message.contains('WebSocket Closed')) {
+      return 'Voice connection closed unexpectedly.';
+    }
+    return 'Voice connection error';
   }
 
   void _updateAudioLevels(Uint8List audioData) {
@@ -463,14 +690,180 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   Future<void> _playPcmAudio(Uint8List pcmData) async {
     try {
       final wavData = _buildWavFile(pcmData, sampleRate: 24000);
-      final source = AudioSource.uri(
-        Uri.dataFromBytes(wavData, mimeType: 'audio/wav'),
-      );
-      await _audioPlayer.setAudioSource(source);
-      await _audioPlayer.play();
+      final audioChunk = _BytesAudioSource(wavData);
+
+      if (!_liveAudioPlaylistLoaded) {
+        await _audioPlayer.setAudioSources(
+          <AudioSource>[audioChunk],
+          preload: true,
+        );
+        _liveAudioPlaylistLoaded = true;
+        _liveAudioChunkCount = 1;
+      } else {
+        await _audioPlayer.addAudioSource(audioChunk);
+        _liveAudioChunkCount += 1;
+      }
+
+      if (!_audioPlayer.playing) {
+        await _audioPlayer.play();
+      }
     } catch (e) {
       debugPrint('Audio playback error: $e');
     }
+  }
+
+  void _handleTranscriptionChunk(
+    Transcription? transcription, {
+    required bool isUser,
+  }) {
+    final text = transcription?.text;
+    if (text == null || text.isEmpty) {
+      return;
+    }
+
+    final current = isUser ? _liveInputTranscript : _liveOutputTranscript;
+    final updated = '$current$text';
+
+    if (!mounted) {
+      if (isUser) {
+        _liveInputTranscript = updated;
+      } else {
+        _liveOutputTranscript = updated;
+      }
+      _liveTranscription = _normalizedTranscript(
+        _liveOutputTranscript.isNotEmpty
+            ? _liveOutputTranscript
+            : _liveInputTranscript,
+      );
+      return;
+    }
+
+    setState(() {
+      if (isUser) {
+        _liveInputTranscript = updated;
+      } else {
+        _liveOutputTranscript = updated;
+      }
+
+      _liveTranscription = _normalizedTranscript(
+        _liveOutputTranscript.isNotEmpty
+            ? _liveOutputTranscript
+            : _liveInputTranscript,
+      );
+
+      if (isUser &&
+          transcription?.finished == true &&
+          _liveOutputTranscript.isEmpty) {
+        _voiceState = _VoiceModeState.processing;
+      }
+    });
+  }
+
+  void _handleOutputTextChunk(String text) {
+    if (text.isEmpty) {
+      return;
+    }
+
+    final updated = '$_liveOutputTranscript$text';
+    if (mounted) {
+      setState(() {
+        _liveOutputTranscript = updated;
+        _liveTranscription = _normalizedTranscript(_liveOutputTranscript);
+      });
+    } else {
+      _liveOutputTranscript = updated;
+      _liveTranscription = _normalizedTranscript(_liveOutputTranscript);
+    }
+  }
+
+  String _normalizedTranscript(String value) {
+    return value.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  Future<void> _commitLiveVoiceTurn() async {
+    final userTranscript = _normalizedTranscript(_liveInputTranscript);
+    final modelTranscript = _normalizedTranscript(_liveOutputTranscript);
+
+    _liveInputTranscript = '';
+    _liveOutputTranscript = '';
+
+    if (mounted) {
+      setState(() {
+        _liveTranscription = modelTranscript;
+      });
+    } else {
+      _liveTranscription = modelTranscript;
+    }
+
+    if (userTranscript.isEmpty && modelTranscript.isEmpty) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final newMessages = <_GolfChatMessage>[];
+
+    if (userTranscript.isNotEmpty) {
+      newMessages.add(
+        _GolfChatMessage(
+          id: now.microsecondsSinceEpoch.toString(),
+          text: userTranscript,
+          isUser: true,
+          time: now,
+        ),
+      );
+    }
+
+    if (modelTranscript.isNotEmpty) {
+      newMessages.add(
+        _GolfChatMessage(
+          id: '${now.microsecondsSinceEpoch + 1}',
+          text: modelTranscript,
+          isUser: false,
+          time: now,
+        ),
+      );
+    }
+
+    if (newMessages.isEmpty) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _messages.addAll(newMessages);
+        _showBoundary = false;
+      });
+    } else {
+      _messages.addAll(newMessages);
+      _showBoundary = false;
+    }
+
+    _scrollToBottom();
+
+    for (final message in newMessages) {
+      await _persistMessage(
+        message,
+        messageType: message.isUser ? 'audio' : 'native_audio',
+      );
+    }
+  }
+
+  Future<void> _resetLiveAudioPlayback() async {
+    try {
+      await _audioPlayer.stop();
+    } catch (_) {}
+
+    try {
+      if (_liveAudioPlaylistLoaded) {
+        await _audioPlayer.setAudioSources(
+          const <AudioSource>[],
+          preload: false,
+        );
+      }
+    } catch (_) {}
+
+    _liveAudioPlaylistLoaded = false;
+    _liveAudioChunkCount = 0;
   }
 
   Uint8List _buildWavFile(Uint8List pcmData, {int sampleRate = 24000}) {
@@ -496,9 +889,12 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    final bottomSafeArea = MediaQuery.paddingOf(context).bottom;
+    final viewPadding = MediaQuery.viewPaddingOf(context);
     final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
     final hasKeyboard = keyboardHeight > 0;
+    final bottomNavReserve = hasKeyboard
+        ? 0.0
+        : (kFoCoCoBottomNavStripAndTabsHeight + viewPadding.bottom);
 
     return StreamBuilder<UserRecord>(
       stream: currentUserUid.isNotEmpty
@@ -508,9 +904,11 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
       builder: (context, snapshot) {
         final user = snapshot.data;
         return FoCoCoAdaptiveScaffold(
+          backgroundColor: theme.primaryBackground,
           title: 'GolfChat',
           currentRoute: GolfChatWidget.routeName,
           onTap: (route) => context.goNamed(route),
+          showBottomNav: false,
           drawer: user != null
               ? FoCoCoDrawer(
                   currentUser: user,
@@ -542,6 +940,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
               : null,
           enableVoiceButton: !_isVoiceMode,
           body: Stack(
+            clipBehavior: Clip.none,
             children: [
               Container(
                 color: theme.primaryBackground,
@@ -558,18 +957,33 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                         ),
                       ),
                     ),
-                    if (_isLoading)
-                      const LinearProgressIndicator(minHeight: 2),
+                    if (_isLoading) const LinearProgressIndicator(minHeight: 2),
                     if (_showBoundary) _buildBoundary(theme),
-                    Expanded(child: _buildConversation(theme)),
-                    _buildInput(theme),
-                    SizedBox(
-                      height: hasKeyboard ? 0 : bottomSafeArea,
+                    if (_hasRoundContext) _buildRoundContextBanner(theme),
+                    Expanded(
+                      child: _buildConversation(
+                        theme,
+                        extraBottomPadding:
+                            hasKeyboard ? 0 : _kGolfChatComposerClearance,
+                      ),
                     ),
                   ],
                 ),
               ),
-              if (_isVoiceMode) _buildVoiceModeOverlay(theme),
+              if (!_isVoiceMode)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: hasKeyboard ? 0.0 : bottomNavReserve,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: _buildInput(theme),
+                  ),
+                ),
+              if (_isVoiceMode)
+                Positioned.fill(
+                  child: _buildVoiceModeOverlay(theme, bottomNavReserve),
+                ),
             ],
           ),
         );
@@ -577,40 +991,59 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     );
   }
 
-  Widget _buildVoiceModeOverlay(FlutterFlowTheme theme) {
+  Widget _buildVoiceModeOverlay(
+    FlutterFlowTheme theme,
+    double bottomNavReserve,
+  ) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomPad = bottomNavReserve + keyboardInset;
+
     return AnimatedBuilder(
       animation: Listenable.merge([_waveAnimation, _gradientAnimation]),
       builder: (context, child) {
-        return Container(
-          color: Colors.black,
+        return Material(
+          color: Colors.transparent,
           child: Stack(
+            fit: StackFit.expand,
             children: [
-              CustomPaint(
-                painter: _AudioWaveBackgroundPainter(
-                  audioLevels: _audioLevels,
-                  wavePhase: _waveAnimation.value,
-                  gradientProgress: _gradientAnimation.value,
-                  primaryColor: theme.primary,
-                  secondaryColor: theme.secondary,
-                  tertiaryColor: theme.tertiary,
-                  isActive: _voiceState == _VoiceModeState.listening ||
-                      _voiceState == _VoiceModeState.speaking,
-                ),
+              const ColoredBox(color: Color(0xFF000000)),
+              const CustomPaint(
+                painter: _StarfieldPainter(),
                 size: Size.infinite,
               ),
-              SafeArea(
-                child: Column(
-                  children: [
-                    _buildVoiceModeHeader(theme),
-                    const Spacer(),
-                    _buildVoiceModeStatus(theme),
-                    const SizedBox(height: 24),
-                    if (_liveTranscription.isNotEmpty)
-                      _buildLiveTranscription(theme),
-                    const Spacer(),
-                    _buildVoiceModeControls(theme),
-                    const SizedBox(height: 40),
-                  ],
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 260,
+                child: CustomPaint(
+                  painter: _VoiceBottomWavePainter(
+                    audioLevels: _audioLevels,
+                    wavePhase: _waveAnimation.value,
+                    gradientProgress: _gradientAnimation.value,
+                    primaryColor: theme.primary,
+                    secondaryColor: theme.secondary,
+                    tertiaryColor: theme.tertiary,
+                    isActive: _voiceState == _VoiceModeState.listening ||
+                        _voiceState == _VoiceModeState.speaking ||
+                        _voiceState == _VoiceModeState.processing,
+                    voiceState: _voiceState,
+                  ),
+                ),
+              ),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 120),
+                  child: _buildVoiceModeCenterHint(theme),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: bottomPad),
+                  child: _buildInput(theme, voiceGlass: true),
                 ),
               ),
             ],
@@ -620,164 +1053,81 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     );
   }
 
-  Widget _buildVoiceModeHeader(FlutterFlowTheme theme) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: _exitVoiceMode,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.close_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Voice Mode',
-              style: theme.headlineSmall.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVoiceModeStatus(FlutterFlowTheme theme) {
-    String statusText;
-    IconData statusIcon;
-
+  Widget _buildVoiceModeCenterHint(FlutterFlowTheme theme) {
+    final String line1;
+    final String? line2;
     switch (_voiceState) {
       case _VoiceModeState.connecting:
-        statusText = 'Connecting...';
-        statusIcon = Icons.wifi_rounded;
+        line1 = 'Connecting';
+        line2 = 'Setting up voice…';
         break;
       case _VoiceModeState.listening:
-        statusText = 'Listening';
-        statusIcon = Icons.mic_rounded;
+        line1 = 'You may start speaking';
+        line2 = null;
         break;
       case _VoiceModeState.processing:
-        statusText = 'Processing';
-        statusIcon = Icons.psychology_rounded;
+        line1 = 'Processing';
+        line2 = null;
         break;
       case _VoiceModeState.speaking:
-        statusText = 'Speaking';
-        statusIcon = Icons.volume_up_rounded;
+        line1 = 'Coaching';
+        line2 = null;
         break;
       case _VoiceModeState.error:
-        statusText = 'Connection Error';
-        statusIcon = Icons.error_outline_rounded;
+        line1 = 'Connection issue';
+        line2 = 'Check network or try again';
         break;
       case _VoiceModeState.idle:
-        statusText = 'Ready';
-        statusIcon = Icons.mic_none_rounded;
+        line1 = '';
+        line2 = null;
+    }
+
+    if (line1.isEmpty) {
+      return const SizedBox.shrink();
     }
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: _voiceState == _VoiceModeState.listening
-                ? theme.primary.withValues(alpha: 0.3)
-                : _voiceState == _VoiceModeState.speaking
-                    ? theme.secondary.withValues(alpha: 0.3)
-                    : Colors.white.withValues(alpha: 0.15),
-            border: Border.all(
-              color: _voiceState == _VoiceModeState.listening
-                  ? theme.primary
-                  : _voiceState == _VoiceModeState.speaking
-                      ? theme.secondary
-                      : Colors.white.withValues(alpha: 0.4),
-              width: 3,
-            ),
-          ),
-          child: Icon(
-            statusIcon,
-            size: 48,
-            color: Colors.white,
-          ),
+        _VoiceMicGlyph(
+          theme: theme,
+          voiceState: _voiceState,
+          wavePhase: _waveAnimation.value,
+          gradientT: _gradientAnimation.value,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         Text(
-          statusText,
-          style: theme.titleMedium.copyWith(
-            color: Colors.white.withValues(alpha: 0.9),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLiveTranscription(FlutterFlowTheme theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.15),
-          ),
-        ),
-        child: Text(
-          _liveTranscription,
+          line1,
           textAlign: TextAlign.center,
-          style: theme.bodyMedium.copyWith(
-            color: Colors.white.withValues(alpha: 0.9),
-            height: 1.4,
+          style: theme.titleMedium.copyWith(
+            color: Colors.white.withValues(alpha: 0.92),
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.2,
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildVoiceModeControls(FlutterFlowTheme theme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        GestureDetector(
-          onTap: _exitVoiceMode,
-          child: Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: theme.error.withValues(alpha: 0.9),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.error.withValues(alpha: 0.4),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.call_end_rounded,
-              size: 32,
-              color: Colors.white,
+        if (line2 != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            line2,
+            textAlign: TextAlign.center,
+            style: theme.bodySmall.copyWith(
+              color: Colors.white.withValues(alpha: 0.55),
             ),
           ),
-        ),
+        ],
+        if (_liveTranscription.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          Text(
+            _liveTranscription,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.bodySmall.copyWith(
+              color: Colors.white.withValues(alpha: 0.5),
+              height: 1.35,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -817,14 +1167,87 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     );
   }
 
-  Widget _buildConversation(FlutterFlowTheme theme) {
+  bool get _hasRoundContext =>
+      (_roundContextId?.isNotEmpty ?? false) || _roundContextSnapshot != null;
+
+  Widget _buildRoundContextBanner(FlutterFlowTheme theme) {
+    final courseName = _roundContextSnapshot?['courseName']?.toString().trim();
+    final evaluation =
+        _roundContextSnapshot?['evaluationPhrase']?.toString().trim();
+    final moments = _roundContextSnapshot?['totalMoments'];
+    final roundLabel = switch (moments) {
+      int value => '$value moments captured',
+      num value => '${value.toInt()} moments captured',
+      _ => null,
+    };
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.tertiary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.tertiary.withValues(alpha: 0.24),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.flag_circle_outlined,
+            color: theme.tertiary,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  courseName?.isNotEmpty == true
+                      ? 'Round context loaded: $courseName'
+                      : 'Round context loaded',
+                  style: theme.bodySmall.copyWith(
+                    color: theme.primaryText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (roundLabel != null ||
+                    (evaluation?.isNotEmpty ?? false)) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    [
+                      if (roundLabel != null) roundLabel,
+                      if (evaluation?.isNotEmpty ?? false) evaluation!,
+                    ].join(' • '),
+                    style: theme.bodySmall.copyWith(
+                      color: theme.secondaryText.withValues(alpha: 0.9),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConversation(
+    FlutterFlowTheme theme, {
+    double extraBottomPadding = 0,
+  }) {
     if (_messages.isEmpty) {
-      return _buildEmptyState(theme);
+      return Padding(
+        padding: EdgeInsets.only(bottom: extraBottomPadding),
+        child: _buildEmptyState(theme),
+      );
     }
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + extraBottomPadding),
       itemCount: _messages.length,
       itemBuilder: (context, index) {
         final msg = _messages[index];
@@ -1061,8 +1484,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.chat_rounded,
+              Iconify(
+                Carbon.chat,
                 size: 44,
                 color: theme.secondaryText.withValues(alpha: 0.72),
               ),
@@ -1107,7 +1530,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
       children: [
         _buildQuickActionCard(
           theme: theme,
-          icon: Icons.golf_course_rounded,
+          carbonIconSvg: Carbon.flag_filled,
           title: 'Log a Round',
           subtitle: 'Capture your round data for better AI insights',
           onTap: () => context.pushNamed('caddy_play'),
@@ -1116,7 +1539,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         const SizedBox(height: 10),
         _buildQuickActionCard(
           theme: theme,
-          icon: Icons.psychology_rounded,
+          carbonIconSvg: Carbon.cognitive,
           title: 'Recommended Sessions',
           subtitle: 'MindCoach sessions based on your reflection',
           onTap: () => context.pushNamed('mind_coach'),
@@ -1125,7 +1548,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         const SizedBox(height: 10),
         _buildQuickActionCard(
           theme: theme,
-          icon: Icons.history_rounded,
+          carbonIconSvg: Carbon.recently_viewed,
           title: 'Chat History',
           subtitle: 'View past conversations and insights',
           onTap: _showChatHistory,
@@ -1137,7 +1560,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
 
   Widget _buildQuickActionCard({
     required FlutterFlowTheme theme,
-    required IconData icon,
+    required String carbonIconSvg,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
@@ -1167,8 +1590,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                     color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    icon,
+                  child: Iconify(
+                    carbonIconSvg,
                     color: color,
                     size: 24,
                   ),
@@ -1195,8 +1618,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
+                Iconify(
+                  Carbon.chevron_right,
                   color: theme.secondaryText.withValues(alpha: 0.6),
                   size: 16,
                 ),
@@ -1250,8 +1673,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                           color: theme.alternate.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(
-                          Icons.close_rounded,
+                        child: Iconify(
+                          Carbon.close,
                           color: theme.secondaryText,
                           size: 20,
                         ),
@@ -1280,7 +1703,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: msg.isUser
-                                  ? theme.conversationUser.withValues(alpha: 0.1)
+                                  ? theme.conversationUser
+                                      .withValues(alpha: 0.1)
                                   : theme.alternate.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -1357,93 +1781,182 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     _showSnack('New conversation started');
   }
 
-  Widget _buildInput(FlutterFlowTheme theme) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      decoration: BoxDecoration(
-        color: theme.primaryBackground,
-        border: Border(
-          top: BorderSide(
-            color: theme.alternate.withValues(alpha: 0.15),
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_replyPreview != null) ...[
-            _buildReplyPreviewBar(theme),
-            const SizedBox(height: 8),
-          ],
-          if (_pendingAttachments.isNotEmpty) ...[
-            _buildAttachmentPreview(theme),
-            const SizedBox(height: 8),
-          ],
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 48),
-                  decoration: BoxDecoration(
-                    color: theme.alternate.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      GestureDetector(
-                        onTap: () => _showAttachmentDialog(theme),
-                        behavior: HitTestBehavior.opaque,
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 14, bottom: 12),
-                          child: Icon(
-                            Icons.add_rounded,
-                            size: 24,
-                            color: theme.secondaryText,
-                          ),
+  Widget _buildInput(FlutterFlowTheme theme, {bool voiceGlass = false}) {
+    final fieldFill = voiceGlass
+        ? Colors.white.withValues(alpha: 0.06)
+        : theme.alternate.withValues(alpha: 0.12);
+    final hintColor = voiceGlass
+        ? Colors.white.withValues(alpha: 0.45)
+        : theme.secondaryText.withValues(alpha: 0.7);
+    final iconColor =
+        voiceGlass ? Colors.white.withValues(alpha: 0.65) : theme.secondaryText;
+    final textColor = voiceGlass ? Colors.white : theme.primaryText;
+
+    final inner = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_replyPreview != null) ...[
+          _buildReplyPreviewBar(theme),
+          const SizedBox(height: 8),
+        ],
+        if (_pendingAttachments.isNotEmpty) ...[
+          _buildAttachmentPreview(theme),
+          const SizedBox(height: 8),
+        ],
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 48),
+                decoration: BoxDecoration(
+                  color: fieldFill,
+                  borderRadius: BorderRadius.circular(voiceGlass ? 28 : 24),
+                  border: voiceGlass
+                      ? Border.all(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          width: 1,
+                        )
+                      : null,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _showAttachmentDialog(theme),
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 14, bottom: 12),
+                        child: Iconify(
+                          Carbon.add,
+                          size: 24,
+                          color: iconColor,
                         ),
                       ),
-                      Expanded(
-                        child: TextField(
-                          controller: _textController,
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: (_) => _sendMessage(),
-                          style: theme.bodyMedium.copyWith(color: theme.primaryText),
-                          decoration: InputDecoration(
-                            hintText: 'Reflect, ask, or share...',
-                            hintStyle: theme.bodyMedium.copyWith(
-                              color: theme.secondaryText.withValues(alpha: 0.7),
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 14,
-                            ),
-                            isDense: true,
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _textController,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _sendMessage(),
+                        style: theme.bodyMedium.copyWith(color: textColor),
+                        cursorColor: voiceGlass ? Colors.white : theme.primary,
+                        decoration: InputDecoration(
+                          hintText: voiceGlass
+                              ? 'How can FoCoCo help?'
+                              : 'Reflect, ask, or share...',
+                          hintStyle:
+                              theme.bodyMedium.copyWith(color: hintColor),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 14,
                           ),
-                          minLines: 1,
-                          maxLines: 4,
+                          isDense: true,
                         ),
+                        minLines: 1,
+                        maxLines: 4,
                       ),
+                    ),
+                    if (!voiceGlass)
                       GestureDetector(
                         onTap: _enterVoiceMode,
                         behavior: HitTestBehavior.opaque,
                         child: Padding(
-                          padding: const EdgeInsets.only(right: 14, bottom: 12, left: 4),
-                          child: Icon(
-                            Icons.mic_rounded,
+                          padding: const EdgeInsets.only(
+                              right: 14, bottom: 12, left: 4),
+                          child: Iconify(
+                            Carbon.microphone,
                             size: 24,
-                            color: theme.secondaryText,
+                            color: iconColor,
                           ),
                         ),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.only(
+                            right: 6, bottom: 10, left: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ...List<Widget>.generate(
+                              5,
+                              (i) => Padding(
+                                padding: const EdgeInsets.only(right: 3),
+                                child: Container(
+                                  width: 4,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: iconColor.withValues(alpha: 0.45),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Iconify(
+                              Carbon.microphone,
+                              size: 22,
+                              color: Colors.white.withValues(alpha: 0.85),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            if (voiceGlass) ...[
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: Material(
+                  color: theme.secondary.withValues(alpha: 0.92),
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: _isSending ? null : _sendMessage,
+                    child: Center(
+                      child: _isSending
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : Iconify(
+                              Carbon.send_filled,
+                              size: 22,
+                              color: Colors.white,
+                            ),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
+              Material(
+                color: Colors.white,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: _exitVoiceMode,
+                  child: const SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Icon(
+                      Icons.close_rounded,
+                      color: Colors.black87,
+                      size: 26,
+                    ),
+                  ),
+                ),
+              ),
+            ] else
               SizedBox(
                 width: 48,
                 height: 48,
@@ -1465,8 +1978,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                                 ),
                               ),
                             )
-                          : Icon(
-                              Icons.send_rounded,
+                          : Iconify(
+                              Carbon.send_filled,
                               size: 22,
                               color: theme.primaryText,
                             ),
@@ -1474,9 +1987,55 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                   ),
                 ),
               ),
-            ],
+          ],
+        ),
+      ],
+    );
+
+    if (!voiceGlass) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        decoration: BoxDecoration(
+          color: theme.primaryBackground,
+          border: Border(
+            top: BorderSide(
+              color: theme.alternate.withValues(alpha: 0.15),
+              width: 0.5,
+            ),
           ),
-        ],
+        ),
+        child: inner,
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.14),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 28,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
+              child: inner,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1733,6 +2292,31 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   }
 
   String _reflectionContext() {
+    final roundId = _roundContextId?.trim();
+    final snapshot = _roundContextSnapshot;
+    final roundContext = <String>[
+      if (roundId != null && roundId.isNotEmpty) '- Round ID: $roundId',
+      if ((snapshot?['courseName']?.toString().trim().isNotEmpty ?? false))
+        '- Course: ${snapshot!['courseName']}',
+      if ((snapshot?['date']?.toString().trim().isNotEmpty ?? false))
+        '- Round date: ${snapshot!['date']}',
+      if ((snapshot?['roundType']?.toString().trim().isNotEmpty ?? false))
+        '- Round type: ${snapshot!['roundType']}',
+      if (snapshot?['scoreToPar'] != null)
+        '- Score to par: ${snapshot!['scoreToPar']}',
+      if (snapshot?['holesPlayed'] != null)
+        '- Holes played: ${snapshot!['holesPlayed']}',
+      if (snapshot?['totalMoments'] != null)
+        '- Total moments: ${snapshot!['totalMoments']}',
+      if ((snapshot?['momentumShift']?.toString().trim().isNotEmpty ?? false))
+        '- Momentum shift: ${snapshot!['momentumShift']}',
+      if ((snapshot?['mindsetSummary']?.toString().trim().isNotEmpty ?? false))
+        '- Mindset summary: ${snapshot!['mindsetSummary']}',
+      if ((snapshot?['completionInsight']?.toString().trim().isNotEmpty ??
+          false))
+        '- Completion insight: ${snapshot!['completionInsight']}',
+    ].join('\n');
+
     return '''
 GolfChat: AI helps the user understand their game.
 
@@ -1757,10 +2341,15 @@ Constraints:
 - Calm, clear, non-judgmental tone. No in-round or shot-by-shot coaching.
 - No medical or therapeutic framing.
 - If deep analysis is needed, suggest exploring in the WebApp.
+
+${roundContext.isEmpty ? '' : '\nCaddyPlay round context:\n$roundContext'}
 ''';
   }
 
-  Future<void> _persistMessage(_GolfChatMessage message) async {
+  Future<void> _persistMessage(
+    _GolfChatMessage message, {
+    String messageType = 'text',
+  }) async {
     final sessionId = _sessionId;
     if (sessionId == null || currentUserUid.isEmpty) return;
 
@@ -1772,7 +2361,7 @@ Constraints:
         content: message.text,
         isUser: message.isUser,
         timestamp: message.time,
-        messageType: 'text',
+        messageType: messageType,
         isSystem: false,
       ),
     );
@@ -1798,6 +2387,26 @@ Constraints:
     } catch (_) {
       debugPrint('GolfChat snack: $message');
     }
+  }
+}
+
+class _BytesAudioSource extends StreamAudioSource {
+  _BytesAudioSource(this._bytes);
+
+  final Uint8List _bytes;
+
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    start ??= 0;
+    end ??= _bytes.length;
+
+    return StreamAudioResponse(
+      sourceLength: _bytes.length,
+      contentLength: end - start,
+      offset: start,
+      stream: Stream.value(_bytes.sublist(start, end)),
+      contentType: 'audio/wav',
+    );
   }
 }
 
@@ -2118,8 +2727,33 @@ class _ReplyQuote extends StatelessWidget {
   }
 }
 
-class _AudioWaveBackgroundPainter extends CustomPainter {
-  _AudioWaveBackgroundPainter({
+/// Sparse starfield for voice mode (deterministic layout).
+class _StarfieldPainter extends CustomPainter {
+  const _StarfieldPainter();
+
+  static const int _count = 96;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..isAntiAlias = true;
+    final rnd = math.Random(0x4f63436f);
+    for (var i = 0; i < _count; i++) {
+      final x = rnd.nextDouble() * size.width;
+      final y = rnd.nextDouble() * size.height * 0.72;
+      final base = 0.15 + rnd.nextDouble() * 0.55;
+      paint.color = Colors.white.withValues(alpha: base.clamp(0.08, 0.85));
+      final r = 0.6 + rnd.nextDouble() * 1.1;
+      canvas.drawCircle(Offset(x, y), r, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Bottom-edge gradient glow with waves driven by mic / model PCM levels.
+class _VoiceBottomWavePainter extends CustomPainter {
+  _VoiceBottomWavePainter({
     required this.audioLevels,
     required this.wavePhase,
     required this.gradientProgress,
@@ -2127,6 +2761,7 @@ class _AudioWaveBackgroundPainter extends CustomPainter {
     required this.secondaryColor,
     required this.tertiaryColor,
     required this.isActive,
+    required this.voiceState,
   });
 
   final List<double> audioLevels;
@@ -2136,85 +2771,188 @@ class _AudioWaveBackgroundPainter extends CustomPainter {
   final Color secondaryColor;
   final Color tertiaryColor;
   final bool isActive;
+  final _VoiceModeState voiceState;
+
+  double _levelAt(double normalizedX) {
+    if (audioLevels.isEmpty) return 0;
+    final i = (normalizedX * (audioLevels.length - 1))
+        .floor()
+        .clamp(0, audioLevels.length - 1);
+    return audioLevels[i];
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.fill
-      ..isAntiAlias = true;
+    final t = gradientProgress;
+    final c0 = Color.lerp(
+      primaryColor,
+      secondaryColor,
+      t,
+    )!
+        .withValues(alpha: 0.95);
+    final c1 = Color.lerp(
+      secondaryColor,
+      tertiaryColor,
+      t,
+    )!
+        .withValues(alpha: 0.85);
+    final c2 = Color.lerp(
+      tertiaryColor,
+      primaryColor,
+      t,
+    )!
+        .withValues(alpha: 0.65);
 
-    final gradientRect = Rect.fromLTWH(0, 0, size.width, size.height);
-    final gradient = LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [
-        Color.lerp(primaryColor.withValues(alpha: 0.2),
-            secondaryColor.withValues(alpha: 0.2), gradientProgress)!,
-        Color.lerp(secondaryColor.withValues(alpha: 0.15),
-            tertiaryColor.withValues(alpha: 0.15), gradientProgress)!,
-        Color.lerp(tertiaryColor.withValues(alpha: 0.1),
-            primaryColor.withValues(alpha: 0.1), gradientProgress)!,
-      ],
-    );
+    final baseAmp = switch (voiceState) {
+      _VoiceModeState.speaking => 38.0,
+      _VoiceModeState.listening => 34.0,
+      _VoiceModeState.processing => 22.0,
+      _ => 14.0,
+    };
+    final activeBoost = isActive ? 1.35 : 0.85;
 
-    paint.shader = gradient.createShader(gradientRect);
-    canvas.drawRect(gradientRect, paint);
+    for (var layer = 0; layer < 3; layer++) {
+      final phaseOff = layer * math.pi * 0.45;
+      final ampMul = 1.0 - layer * 0.22;
+      final path = Path();
+      const waves = 2.8;
+      var first = true;
+      var lastY = 0.0;
+      for (var x = 0.0; x <= size.width; x += 1.5) {
+        final nx = x / math.max(size.width, 1);
+        final lvl = _levelAt(nx);
+        final wobble = math.sin(
+          wavePhase + phaseOff + nx * waves * math.pi * 2,
+        );
+        final y = size.height * (0.12 + layer * 0.05) +
+            wobble * baseAmp * ampMul * activeBoost * (1.0 + lvl * 2.2) +
+            lvl * 28 * ampMul;
+        lastY = y;
+        if (first) {
+          path.moveTo(0, y);
+          first = false;
+        } else {
+          path.lineTo(x, y);
+        }
+      }
+      path
+        ..lineTo(size.width, lastY)
+        ..lineTo(size.width, size.height)
+        ..lineTo(0, size.height)
+        ..close();
 
-    _drawWaveLayer(canvas, size, primaryColor.withValues(alpha: 0.25), 0.0,
-        1.0, size.height * 0.65);
-    _drawWaveLayer(canvas, size, secondaryColor.withValues(alpha: 0.2),
-        math.pi / 3, 0.8, size.height * 0.55);
-    _drawWaveLayer(canvas, size, tertiaryColor.withValues(alpha: 0.15),
-        math.pi * 2 / 3, 0.6, size.height * 0.45);
-  }
+      final paint = Paint()
+        ..isAntiAlias = true
+        ..style = PaintingStyle.fill
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.transparent,
+            c2.withValues(alpha: 0.12 + layer * 0.06),
+            c1.withValues(alpha: 0.38 + layer * 0.08),
+            c0.withValues(alpha: 0.55 + layer * 0.06),
+          ],
+          stops: const [0.0, 0.35, 0.72, 1.0],
+        ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
-  void _drawWaveLayer(Canvas canvas, Size size, Color color, double phaseOffset,
-      double amplitudeMultiplier, double baseY) {
-    final wavePaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill
-      ..isAntiAlias = true;
-
-    final path = Path();
-    path.moveTo(0, size.height);
-
-    final baseAmplitude = isActive ? 40.0 : 15.0;
-    final waveCount = 3.0;
-
-    for (double x = 0; x <= size.width; x++) {
-      final normalizedX = x / size.width;
-      final levelIndex =
-          (normalizedX * (audioLevels.length - 1)).floor().clamp(0, audioLevels.length - 1);
-      final audioLevel = audioLevels[levelIndex];
-      final dynamicAmplitude =
-          baseAmplitude * amplitudeMultiplier * (1 + audioLevel * 2);
-
-      final y = baseY +
-          math.sin(wavePhase + phaseOffset + normalizedX * waveCount * math.pi * 2) *
-              dynamicAmplitude;
-      path.lineTo(x, y);
+      canvas.drawPath(path, paint);
     }
 
-    path.lineTo(size.width, size.height);
-    path.close();
-
-    canvas.drawPath(path, wavePaint);
+    final gloss = Paint()
+      ..blendMode = BlendMode.plus
+      ..isAntiAlias = true
+      ..shader = LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [
+          primaryColor.withValues(alpha: 0.0),
+          secondaryColor.withValues(alpha: 0.22),
+          tertiaryColor.withValues(alpha: 0.18),
+          primaryColor.withValues(alpha: 0.0),
+        ],
+        stops: const [0.0, 0.38, 0.62, 1.0],
+      ).createShader(
+          Rect.fromLTWH(0, size.height * 0.35, size.width, size.height * 0.65));
+    canvas.drawRect(
+      Rect.fromLTWH(0, size.height * 0.25, size.width, size.height * 0.75),
+      gloss,
+    );
   }
 
   @override
-  bool shouldRepaint(covariant _AudioWaveBackgroundPainter oldDelegate) {
+  bool shouldRepaint(covariant _VoiceBottomWavePainter oldDelegate) {
     return oldDelegate.wavePhase != wavePhase ||
         oldDelegate.gradientProgress != gradientProgress ||
         oldDelegate.isActive != isActive ||
-        !_listEquals(oldDelegate.audioLevels, audioLevels);
+        oldDelegate.voiceState != voiceState ||
+        !_levelsEqual(oldDelegate.audioLevels, audioLevels);
   }
 
-  bool _listEquals(List<double> a, List<double> b) {
+  bool _levelsEqual(List<double> a, List<double> b) {
     if (a.length != b.length) return false;
-    for (int i = 0; i < a.length; i++) {
-      if ((a[i] - b[i]).abs() > 0.01) return false;
+    for (var i = 0; i < a.length; i++) {
+      if ((a[i] - b[i]).abs() > 0.015) return false;
     }
     return true;
+  }
+}
+
+class _VoiceMicGlyph extends StatelessWidget {
+  const _VoiceMicGlyph({
+    required this.theme,
+    required this.voiceState,
+    required this.wavePhase,
+    required this.gradientT,
+  });
+
+  final FlutterFlowTheme theme;
+  final _VoiceModeState voiceState;
+  final double wavePhase;
+  final double gradientT;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = voiceState == _VoiceModeState.listening ||
+        voiceState == _VoiceModeState.speaking;
+    final h = 28.0;
+    return SizedBox(
+      height: h,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: List<Widget>.generate(5, (i) {
+          final base =
+              active ? 0.35 + 0.65 * math.sin(wavePhase + i * 0.9) : 0.2;
+          final bh = (h * (0.25 + base * 0.75)).clamp(4.0, h);
+          final c = Color.lerp(
+            theme.primary,
+            theme.secondary,
+            (i / 4 + gradientT) % 1.0,
+          )!;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: Container(
+              width: 4,
+              height: bh,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: active ? 0.85 : 0.35),
+                borderRadius: BorderRadius.circular(2),
+                boxShadow: active
+                    ? [
+                        BoxShadow(
+                          color: c.withValues(alpha: 0.45),
+                          blurRadius: 8,
+                          spreadRadius: 0.5,
+                        ),
+                      ]
+                    : null,
+              ),
+            ),
+          );
+        }),
+      ),
+    );
   }
 }
 

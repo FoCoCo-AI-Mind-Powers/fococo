@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '/ai_integration/widgets/navbar_widget.dart';
 import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
 import '/features/mindcoach_v2/presentation/player/mindcoach_session_player_v2_widget.dart';
 
 class MindCoachResultsV2Widget extends StatelessWidget {
@@ -20,10 +22,16 @@ class MindCoachResultsV2Widget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final ff = FlutterFlowTheme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('MindCoach Result'),
+      backgroundColor: ff.primaryBackground,
+      appBar: buildFoCoCoAppBar(
+        context,
+        title: Text(
+          'MindCoach Result',
+          style: ff.titleLarge.copyWith(color: ff.primaryText),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

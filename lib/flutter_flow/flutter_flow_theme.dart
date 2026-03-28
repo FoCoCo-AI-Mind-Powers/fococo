@@ -1336,11 +1336,14 @@ extension TextStyleHelper on TextStyle {
     FontStyle? fontStyle,
     bool useGoogleFonts = false,
     TextDecoration? decoration,
+    Color? decorationColor,
     double? lineHeight,
+    /// Same as [lineHeight] — sets [TextStyle.height] (line-height multiplier).
+    double? height,
     List<Shadow>? shadows,
     String? package,
-    required double height,
   }) {
+    final lineHeightValue = lineHeight ?? height;
     if (useGoogleFonts && fontFamily != null) {
       font = GoogleFonts.getFont(fontFamily,
           fontWeight: fontWeight ?? this.fontWeight,
@@ -1355,7 +1358,8 @@ extension TextStyleHelper on TextStyle {
             fontWeight: fontWeight ?? this.fontWeight,
             fontStyle: fontStyle ?? this.fontStyle,
             decoration: decoration,
-            height: lineHeight,
+            decorationColor: decorationColor,
+            height: lineHeightValue,
             shadows: shadows,
           )
         : copyWith(
@@ -1367,7 +1371,8 @@ extension TextStyleHelper on TextStyle {
             fontWeight: fontWeight,
             fontStyle: fontStyle,
             decoration: decoration,
-            height: lineHeight,
+            decorationColor: decorationColor,
+            height: lineHeightValue,
             shadows: shadows,
           );
   }

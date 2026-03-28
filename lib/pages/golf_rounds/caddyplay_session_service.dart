@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'caddyplay_models.dart';
 
@@ -16,6 +20,10 @@ class CaddyPlaySessionService {
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _auth = auth ?? FirebaseAuth.instance,
         _httpClient = httpClient ?? http.Client();
+
+  static const String activeRoundKey = 'caddyplay.active_round';
+  static const String advancedDefaultsKey = 'caddyplay.advanced_defaults';
+  static const String completedRoundsKey = 'caddyplay.completed_rounds';
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
@@ -33,320 +41,415 @@ class CaddyPlaySessionService {
   CollectionReference<Map<String, dynamic>> get _golfRounds =>
       _firestore.collection('golf_rounds');
 
-  String get _userId {
-    final userId = _auth.currentUser?.uid;
-    if (userId == null || userId.isEmpty) {
-      throw Exception('User must be authenticated');
+  String get currentUserId => _auth.currentUser?.uid ?? '';
+
+  Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
+
+  Future<CaddyPlayAdvancedDefaults> loadAdvancedDefaults() async {
+    final prefs = await _prefs;
+    final raw = prefs.getString(advancedDefaultsKey);
+    if (raw == null || raw.isEmpty) {
+      return const CaddyPlayAdvancedDefaults();
     }
-    return userId;
+
+    try {
+      return CaddyPlayAdvancedDefaults.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+    } catch (_) {
+      return const CaddyPlayAdvancedDefaults();
+    }
   }
 
-  Future<CaddyPlaySession> startSession({
-    required CaddyPlayMode mode,
-    required String? courseName,
-    required String? courseId,
-    required String? teeName,
-    required int? teeDistance,
-    required int holesTotal,
-    double? courseRating,
-    double? slopeRating,
-  }) async {
-    if (mode == CaddyPlayMode.play) {
-      if ((courseName ?? '').trim().isEmpty || (teeName ?? '').trim().isEmpty) {
-        throw Exception(
-            'Play mode requires course and tee setup before logging.');
+  Future<void> saveAdvancedDefaults(CaddyPlayAdvancedDefaults defaults) async {
+    final prefs = await _prefs;
+    await prefs.setString(
+      advancedDefaultsKey,
+      jsonEncode(defaults.toJson()),
+    );
+  }
+
+  Future<CaddyPlayActiveRound?> loadLocalActiveRound() async {
+    final prefs = await _prefs;
+    final raw = prefs.getString(activeRoundKey);
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+
+    try {
+      return CaddyPlayActiveRound.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+    } catch (error) {
+      debugPrint('CaddyPlay: failed to decode local round: $error');
+      await prefs.remove(activeRoundKey);
+      return null;
+    }
+  }
+
+  Future<void> clearLocalActiveRound() async {
+    final prefs = await _prefs;
+    await prefs.remove(activeRoundKey);
+  }
+
+  Future<List<CaddyPlayActiveRound>> loadCompletedRounds() async {
+    final prefs = await _prefs;
+    final rawList = prefs.getStringList(completedRoundsKey) ?? const <String>[];
+    final rounds = <CaddyPlayActiveRound>[];
+
+    for (final raw in rawList) {
+      try {
+        rounds.add(
+          CaddyPlayActiveRound.fromJson(
+            jsonDecode(raw) as Map<String, dynamic>,
+          ),
+        );
+      } catch (_) {
+        // Ignore malformed archive entries.
       }
     }
 
-    final sessionRef = _sessions.doc();
-    final now = DateTime.now();
-    final uid = _userId;
-    final gpsStart = await _captureGpsStart();
-    final weatherStart = await _captureWeatherStart(gpsStart);
+    return rounds;
+  }
 
-    final roundLogRef = _roundLogs.doc();
-
-    final sessionPayload = <String, dynamic>{
-      'userId': uid,
-      'mode': mode.name,
-      'status': CaddyPlaySessionStatus.active.name,
-      'courseName': courseName,
-      'courseId': courseId,
-      'teeName': teeName,
-      'teeDistance': teeDistance,
-      'holesTotal': holesTotal,
-      'startTime': Timestamp.fromDate(now),
-      'currentHole': 1,
-      'holesPlayed': 0,
-      'elapsedSeconds': 0,
-      'gpsStart': gpsStart,
-      'weatherStart': weatherStart,
-      'lockedContext': true,
-      'linkedRoundLogId': roundLogRef.id,
-      'linkedGolfRoundId': null,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      if (courseRating != null) 'courseRating': courseRating,
-      if (slopeRating != null) 'slopeRating': slopeRating,
-    };
-
-    final holeBatch = _firestore.batch();
-    for (var hole = 1; hole <= holesTotal; hole++) {
-      holeBatch.set(sessionRef.collection('holes').doc('$hole'), {
-        'holeNumber': hole,
-        'par': null,
-        'distance': null,
-        'score': null,
-        'isComplete': false,
-        'lastUpdated': FieldValue.serverTimestamp(),
-      });
+  Future<void> cleanupExpiredLocalArtifacts() async {
+    final rounds = await loadCompletedRounds();
+    if (rounds.isEmpty) {
+      return;
     }
 
-    await sessionRef.set(sessionPayload);
-    await holeBatch.commit();
+    final now = DateTime.now();
+    final retained = <CaddyPlayActiveRound>[];
 
-    await roundLogRef.set({
-      'userId': uid,
-      'roundId': sessionRef.id,
-      'date': Timestamp.fromDate(now),
-      'courseName':
-          courseName ?? (mode == CaddyPlayMode.practice ? 'Practice' : ''),
-      'courseType': mode == CaddyPlayMode.play ? 'play' : 'practice',
-      'coordinates': gpsStart != null
-          ? GeoPoint(
-              (gpsStart['lat'] as num).toDouble(),
-              (gpsStart['lng'] as num).toDouble(),
-            )
-          : null,
-      'mindsetFocus': 65,
-      'mindsetConfidence': 60,
-      'mindsetControl': 62,
-      'bestCue': 'Routine First',
-      'recoveryHoles': <String>[],
-      'overallMindsetEmoji': '😐',
-      'technicalSummary': 'Session started',
-      'aiRoundSummary': mode == CaddyPlayMode.play
-          ? 'Play round capture in progress.'
-          : 'Practice capture in progress.',
-      'voiceTranscription': '',
-      'nlpProcessed': true,
-      'isLive': true,
-      'mindsetColor': '#FFC107',
-      'linkedGolfRoundId': null,
-      'createdTime': FieldValue.serverTimestamp(),
-      'updatedTime': FieldValue.serverTimestamp(),
-    });
+    for (final round in rounds) {
+      final retainUntil = round.retainLocalUntil;
+      if (retainUntil != null && retainUntil.isBefore(now)) {
+        for (final path in round.allMoments
+            .map((moment) => moment.audioPath)
+            .whereType<String>()) {
+          await _deleteLocalFile(path);
+        }
+        continue;
+      }
+      retained.add(round);
+    }
 
-    final snap = await sessionRef.get();
-    return CaddyPlaySession.fromDoc(snap);
+    final prefs = await _prefs;
+    await prefs.setStringList(
+      completedRoundsKey,
+      retained
+          .map((round) => jsonEncode(round.toJson()))
+          .toList(growable: false),
+    );
   }
 
-  Future<CaddyPlaySession?> resumeActiveSession(String userId) async {
-    final query = await _sessions
-        .where('userId', isEqualTo: userId)
-        .where('status', isEqualTo: CaddyPlaySessionStatus.active.name)
-        .orderBy('updatedAt', descending: true)
-        .limit(1)
-        .get();
+  Future<CaddyPlayActiveRound?> restoreRemoteActiveRound() async {
+    final userId = currentUserId;
+    if (userId.isEmpty) {
+      return null;
+    }
 
-    if (query.docs.isEmpty) return null;
-    return CaddyPlaySession.fromDoc(query.docs.first);
+    try {
+      final query = await _sessions
+          .where('userId', isEqualTo: userId)
+          .where('status', isEqualTo: CaddyPlaySessionStatus.active.name)
+          .orderBy('updatedAt', descending: true)
+          .limit(1)
+          .get();
+
+      if (query.docs.isEmpty) {
+        return null;
+      }
+
+      final sessionDoc = query.docs.first;
+      final holesSnapshot = await _sessions
+          .doc(sessionDoc.id)
+          .collection('holes')
+          .orderBy('holeNumber', descending: false)
+          .get();
+      final logsSnapshot = await _logs
+          .where('sessionId', isEqualTo: sessionDoc.id)
+          .orderBy('capturedAt', descending: false)
+          .get();
+
+      final round = CaddyPlayActiveRound.fromRemote(
+        sessionDoc: sessionDoc,
+        holes: holesSnapshot.docs
+            .map((doc) => CaddyPlayHole.fromFirestore(doc.data()))
+            .toList(growable: false),
+        moments: logsSnapshot.docs
+            .map(CaddyPlayMoment.fromFirestore)
+            .toList(growable: false),
+      );
+
+      await _writeLocalActiveRound(round);
+      return round;
+    } catch (error) {
+      debugPrint('CaddyPlay: failed to restore remote round: $error');
+      return null;
+    }
   }
 
-  Future<void> saveLog(CaddyPlayLog log) async {
-    await _logs.doc(log.id).set({
-      ...log.toFirestore(),
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    await _sessions.doc(log.sessionId).update({
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    await syncRoundLogsCompatibility(log.sessionId);
-  }
-
-  Future<void> updateHole({
-    required String sessionId,
-    required int holeNumber,
-    int? par,
-    int? distance,
-    int? score,
-    bool? isComplete,
+  Future<CaddyPlayActiveRound> saveRound(
+    CaddyPlayActiveRound round, {
+    bool sync = true,
   }) async {
-    await _sessions.doc(sessionId).collection('holes').doc('$holeNumber').set({
-      'holeNumber': holeNumber,
-      'par': par,
-      'distance': distance,
-      'score': score,
-      'isComplete': isComplete ?? (score != null),
-      'lastUpdated': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await _writeLocalActiveRound(round);
+    if (!sync) {
+      return round;
+    }
 
-    await _sessions.doc(sessionId).update({
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    final synced = await syncRound(round);
+    await _writeLocalActiveRound(synced);
+    return synced;
   }
 
-  Future<bool> advanceHole(String sessionId) async {
-    final snap = await _sessions.doc(sessionId).get();
-    if (!snap.exists) return false;
+  Future<CaddyPlayActiveRound> syncRound(CaddyPlayActiveRound round) async {
+    if (round.userId.isEmpty || currentUserId.isEmpty) {
+      return round.copyWith(
+        syncState: CaddyPlaySyncState.localOnly,
+        lastSyncError: 'Not authenticated.',
+        snapshot: (round.snapshot ?? buildRoundSnapshot(round)).copyWith(
+          syncedToWebApp: false,
+          availableInWebApp: false,
+        ),
+      );
+    }
 
-    final map = snap.data() ?? <String, dynamic>{};
-    final currentHole = (map['currentHole'] as num?)?.toInt() ?? 1;
-    final holesTotal = (map['holesTotal'] as num?)?.toInt() ?? 9;
-    final nextHole = clampHole(currentHole + 1, holesTotal);
-    final holesPlayed = (map['holesPlayed'] as num?)?.toInt() ?? 0;
+    final snapshot = round.snapshot ?? buildRoundSnapshot(round);
+    final gpsStart = await _captureGpsStart();
+    final weatherStart =
+        gpsStart != null ? await _captureWeatherStart(gpsStart) : null;
 
-    await _sessions.doc(sessionId).update({
-      'currentHole': nextHole,
-      'holesPlayed': mathMin(holesTotal, holesPlayed + 1),
-      'elapsedSeconds': _elapsedSeconds(map['startTime']),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      final sessionRef = _sessions.doc(round.roundId);
+      final isFirstRemoteSync = round.lastRemoteSyncAt == null;
 
-    return currentHole >= holesTotal;
+      await sessionRef.set(
+        <String, dynamic>{
+          ...round.toFirestoreSession(),
+          if (isFirstRemoteSync) 'createdAt': FieldValue.serverTimestamp(),
+          if (gpsStart != null) 'gpsStart': gpsStart,
+          if (weatherStart != null) 'weatherStart': weatherStart,
+        },
+        SetOptions(merge: true),
+      );
+
+      final batch = _firestore.batch();
+      for (final hole in round.holes) {
+        batch.set(
+          sessionRef.collection('holes').doc('${hole.holeNumber}'),
+          hole.toFirestore(),
+          SetOptions(merge: true),
+        );
+      }
+
+      final syncedMoments = <CaddyPlayMoment>[];
+      for (final hole in round.holes) {
+        for (final moment in hole.moments) {
+          final syncedMoment = moment.copyWith(
+            syncState: CaddyPlaySyncState.synced,
+            pendingProcessing: false,
+          );
+          syncedMoments.add(syncedMoment);
+          batch.set(
+            _logs.doc(moment.id),
+            syncedMoment.toFirestore(
+              sessionId: round.roundId,
+              userId: round.userId,
+              mode: round.mode,
+            ),
+            SetOptions(merge: true),
+          );
+        }
+      }
+
+      await batch.commit();
+
+      final syncedRound = _replaceAllMoments(
+        round.copyWith(
+          syncState: CaddyPlaySyncState.synced,
+          lastSyncError: null,
+          lastRemoteSyncAt: DateTime.now(),
+          snapshot: snapshot.copyWith(
+            syncedToWebApp: true,
+            availableInWebApp: true,
+          ),
+        ),
+        syncedMoments,
+      );
+
+      await _roundLogs.doc(round.linkedRoundLogId ?? round.roundId).set(
+            _buildRoundLogPayload(syncedRound),
+            SetOptions(merge: true),
+          );
+
+      if (syncedRound.isCompleted) {
+        await _golfRounds.doc(round.linkedGolfRoundId ?? round.roundId).set(
+              _buildGolfRoundPayload(syncedRound),
+              SetOptions(merge: true),
+            );
+      }
+
+      return syncedRound;
+    } catch (error) {
+      debugPrint('CaddyPlay: sync failed: $error');
+      return round.copyWith(
+        syncState: CaddyPlaySyncState.localOnly,
+        lastSyncError: error.toString(),
+        snapshot: snapshot.copyWith(
+          syncedToWebApp: false,
+          availableInWebApp: false,
+        ),
+      );
+    }
   }
 
-  Future<void> completePlaySession(String sessionId) async {
-    final sessionDoc = await _sessions.doc(sessionId).get();
-    if (!sessionDoc.exists) return;
-
-    final session = CaddyPlaySession.fromDoc(sessionDoc);
-
-    await upsertGolfRoundSummary(sessionId);
-
-    await _sessions.doc(sessionId).update({
-      'status': CaddyPlaySessionStatus.completed.name,
-      'holesPlayed': session.holesTotal,
-      'elapsedSeconds': _elapsedSeconds(sessionDoc.data()?['startTime']),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'completedAt': FieldValue.serverTimestamp(),
-    });
-
-    await syncRoundLogsCompatibility(sessionId, markNotLive: true);
+  Future<CaddyPlayActiveRound> completeRound(CaddyPlayActiveRound round) async {
+    final snapshot = buildRoundSnapshot(round);
+    var completed = round.markCompleted(snapshot);
+    completed = await syncRound(completed);
+    await _archiveCompletedRound(completed);
+    await clearLocalActiveRound();
+    return completed;
   }
 
-  Future<void> completePracticeSession(String sessionId) async {
-    await _sessions.doc(sessionId).update({
-      'status': CaddyPlaySessionStatus.completed.name,
-      'elapsedSeconds': _elapsedSeconds(
-          (await _sessions.doc(sessionId).get()).data()?['startTime']),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'completedAt': FieldValue.serverTimestamp(),
-    });
+  Future<void> cancelRound(CaddyPlayActiveRound round) async {
+    await clearLocalActiveRound();
+    final userId = currentUserId;
+    if (userId.isEmpty) {
+      return;
+    }
 
-    await syncRoundLogsCompatibility(sessionId, markNotLive: true);
+    try {
+      await _sessions.doc(round.roundId).set(
+        <String, dynamic>{
+          'status': CaddyPlaySessionStatus.cancelled.name,
+          'updatedAt': FieldValue.serverTimestamp(),
+          'completedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+      await _roundLogs.doc(round.linkedRoundLogId ?? round.roundId).set(
+        <String, dynamic>{
+          'isLive': false,
+          'updatedTime': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    } catch (error) {
+      debugPrint('CaddyPlay: failed to cancel remote round: $error');
+    }
   }
 
-  Future<void> syncRoundLogsCompatibility(
-    String sessionId, {
-    bool markNotLive = false,
+  Future<CaddyPlayTalkAnalysis> analyzeTalkTranscript({
+    required String transcript,
+    required Duration recordingDuration,
+    String? audioPath,
   }) async {
-    final sessionDoc = await _sessions.doc(sessionId).get();
-    if (!sessionDoc.exists) return;
+    final normalized = transcript.trim();
+    await Future<void>.delayed(const Duration(milliseconds: 850));
 
-    final session = CaddyPlaySession.fromDoc(sessionDoc);
-    final logsQuery = await _logs
-        .where('sessionId', isEqualTo: sessionId)
-        .orderBy('capturedAt', descending: false)
-        .get();
+    if (normalized.isEmpty) {
+      return CaddyPlayTalkAnalysis(
+        transcript: normalized,
+        recordingDuration: recordingDuration,
+        audioPath: audioPath,
+      );
+    }
 
-    final logs = logsQuery.docs
-        .map((doc) => CaddyPlayLog.fromDoc(doc))
-        .toList(growable: false);
+    final text = normalized.toLowerCase();
+    final pillarTags = <CaddyPlayPillarTag>{};
 
-    final aggregate = aggregateMindset(logs);
-    final recoveryHoles = recoveryHolesFromLogs(logs);
-    final bestCue = bestCueFromLogs(logs);
-    final allTranscript = logs
-        .where((e) => e.transcription.trim().isNotEmpty)
-        .map((e) => e.transcription.trim())
-        .join(' | ');
+    if (text.contains('focus') ||
+        text.contains('routine') ||
+        text.contains('target') ||
+        text.contains('rush')) {
+      pillarTags.add(CaddyPlayPillarTag.focus);
+    }
+    if (text.contains('commit') ||
+        text.contains('trust') ||
+        text.contains('confident') ||
+        text.contains('solid')) {
+      pillarTags.add(CaddyPlayPillarTag.confidence);
+    }
+    if (text.contains('calm') ||
+        text.contains('breath') ||
+        text.contains('steady') ||
+        text.contains('control')) {
+      pillarTags.add(CaddyPlayPillarTag.control);
+    }
 
-    final targetId = session.linkedRoundLogId ?? session.id;
+    String? interpretation;
+    if (text.contains('rushed')) {
+      interpretation = 'Routine speed affected the shot.';
+    } else if (text.contains('push') || text.contains('block')) {
+      interpretation = 'Commitment was there, direction leaked right.';
+    } else if (text.contains('pull') || text.contains('left')) {
+      interpretation = 'The strike reacted quickly left of target.';
+    } else if (text.contains('calm') || text.contains('steady')) {
+      interpretation = 'The language suggests a calmer, steadier shot pattern.';
+    } else if (text.contains('good') || text.contains('solid')) {
+      interpretation = 'The reflection points to a useful, repeatable moment.';
+    } else if (normalized.isNotEmpty) {
+      interpretation = _shortInterpretationFromTranscript(normalized);
+    }
 
-    await _roundLogs.doc(targetId).set({
-      'userId': session.userId,
-      'roundId': session.id,
-      'date': Timestamp.fromDate(session.startTime),
-      'courseName':
-          session.courseName ?? (session.isPractice ? 'Practice' : ''),
-      'courseType': session.mode.name,
-      'mindsetFocus': aggregate.mindsetFocus,
-      'mindsetConfidence': aggregate.mindsetConfidence,
-      'mindsetControl': aggregate.mindsetControl,
-      'bestCue': bestCue,
-      'recoveryHoles': recoveryHoles,
-      'overallMindsetEmoji': aggregate.overallEmoji,
-      'technicalSummary':
-          'Captured ${logs.length} moments. Hole ${session.currentHole}/${session.holesTotal}.',
-      'aiRoundSummary': session.isPlay
-          ? 'Play round capture summary is ready for deeper review in the WebApp.'
-          : 'Practice capture summary is ready for deeper review in the WebApp.',
-      'voiceTranscription': allTranscript,
-      'nlpProcessed': true,
-      'isLive': !markNotLive && session.status == CaddyPlaySessionStatus.active,
-      'mindsetColor': aggregate.mindsetColor,
-      'linkedGolfRoundId': session.linkedGolfRoundId,
-      'updatedTime': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    return CaddyPlayTalkAnalysis(
+      transcript: normalized,
+      recordingDuration: recordingDuration,
+      aiInterpretation: interpretation,
+      pillarTags: pillarTags.toList(growable: false),
+      audioPath: audioPath,
+    );
   }
 
-  Future<void> upsertGolfRoundSummary(String sessionId) async {
-    final sessionDoc = await _sessions.doc(sessionId).get();
-    if (!sessionDoc.exists) return;
-    final session = CaddyPlaySession.fromDoc(sessionDoc);
-    if (!session.isPlay) return;
+  CaddyPlayMindSnapSequence nextMindSnapSequence(CaddyPlayActiveRound round) {
+    return deriveMindSnapSequence(round);
+  }
 
-    final holesSnapshot = await _sessions
-        .doc(sessionId)
-        .collection('holes')
-        .orderBy('holeNumber', descending: false)
-        .get();
+  CaddyPlayRoundSnapshot buildSnapshot(CaddyPlayActiveRound round) {
+    final snapshot = buildRoundSnapshot(
+      round,
+      syncedToWebApp: round.syncState == CaddyPlaySyncState.synced,
+      availableInWebApp: round.syncState == CaddyPlaySyncState.synced,
+    );
+    return snapshot;
+  }
 
-    final holes = holesSnapshot.docs
-        .map((doc) => CaddyPlayHole.fromMap(doc.data()))
-        .toList(growable: false);
+  Future<String> createTalkAudioPath(String roundId) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    return '${dir.path}/caddyplay_${roundId}_$stamp.m4a';
+  }
 
-    final validScores =
-        holes.where((e) => e.score != null).toList(growable: false);
-    final totalScore =
-        validScores.fold<int>(0, (sum, hole) => sum + (hole.score ?? 0));
-    final totalPar = holes.fold<int>(0, (sum, hole) => sum + (hole.par ?? 4));
+  Future<void> _writeLocalActiveRound(CaddyPlayActiveRound round) async {
+    final prefs = await _prefs;
+    await prefs.setString(
+      activeRoundKey,
+      jsonEncode(round.toJson()),
+    );
+  }
 
-    final golfRoundId = session.linkedGolfRoundId ?? _golfRounds.doc().id;
-
-    await _golfRounds.doc(golfRoundId).set({
-      'userId': session.userId,
-      'date': Timestamp.fromDate(session.startTime),
-      'courseName': session.courseName ?? '',
-      'courseId': session.courseId,
-      'teeBox': session.teeName ?? '',
-      'score': totalScore,
-      'parTotal': totalPar,
-      'scoreToPar': totalScore - totalPar,
-      'courseRating': (sessionDoc.data()?['courseRating'] as num?)?.toDouble(),
-      'slopeRating': (sessionDoc.data()?['slopeRating'] as num?)?.toDouble(),
-      'notes': 'Captured by CaddyPlay',
-      'createdTime': FieldValue.serverTimestamp(),
-      'updatedTime': FieldValue.serverTimestamp(),
-      'isValid': true,
-    }, SetOptions(merge: true));
-
-    await _sessions.doc(sessionId).update({
-      'linkedGolfRoundId': golfRoundId,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    await syncRoundLogsCompatibility(sessionId, markNotLive: true);
+  Future<void> _archiveCompletedRound(CaddyPlayActiveRound round) async {
+    final rounds = await loadCompletedRounds();
+    final next = <CaddyPlayActiveRound>[
+      round,
+      ...rounds.where((item) => item.roundId != round.roundId),
+    ];
+    final prefs = await _prefs;
+    await prefs.setStringList(
+      completedRoundsKey,
+      next.map((item) => jsonEncode(item.toJson())).toList(growable: false),
+    );
   }
 
   Future<Map<String, dynamic>?> _captureGpsStart() async {
     try {
       final enabled = await Geolocator.isLocationServiceEnabled();
-      if (!enabled) return null;
+      if (!enabled) {
+        return null;
+      }
 
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -363,23 +466,21 @@ class CaddyPlaySessionService {
         ),
       );
 
-      return {
+      return <String, dynamic>{
         'lat': position.latitude,
         'lng': position.longitude,
         'accuracy': position.accuracy,
         'capturedAt': Timestamp.now(),
       };
-    } catch (e) {
-      debugPrint('CaddyPlay: GPS capture failed: $e');
+    } catch (error) {
+      debugPrint('CaddyPlay: GPS capture failed: $error');
       return null;
     }
   }
 
   Future<Map<String, dynamic>?> _captureWeatherStart(
-    Map<String, dynamic>? gpsStart,
+    Map<String, dynamic> gpsStart,
   ) async {
-    if (gpsStart == null) return null;
-
     try {
       final lat = (gpsStart['lat'] as num).toDouble();
       final lng = (gpsStart['lng'] as num).toDouble();
@@ -389,27 +490,172 @@ class CaddyPlaySessionService {
 
       final response =
           await _httpClient.get(uri).timeout(const Duration(seconds: 4));
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200 || response.body.isEmpty) {
+        return null;
+      }
 
-      final body = response.body;
-      if (body.isEmpty) return null;
-
-      return {
+      return <String, dynamic>{
         'provider': 'open-meteo',
-        'raw': body,
+        'raw': response.body,
         'capturedAt': Timestamp.now(),
       };
-    } catch (e) {
-      debugPrint('CaddyPlay: Weather capture failed: $e');
+    } catch (error) {
+      debugPrint('CaddyPlay: Weather capture failed: $error');
       return null;
     }
   }
 
-  int _elapsedSeconds(dynamic timestamp) {
-    final startTime = timestampToDate(timestamp);
-    if (startTime == null) return 0;
-    return DateTime.now().difference(startTime).inSeconds;
+  Future<void> _deleteLocalFile(String path) async {
+    if (path.trim().isEmpty) {
+      return;
+    }
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // Ignore cleanup failures.
+    }
   }
 
-  int mathMin(int a, int b) => a < b ? a : b;
+  CaddyPlayActiveRound _replaceAllMoments(
+    CaddyPlayActiveRound round,
+    List<CaddyPlayMoment> syncedMoments,
+  ) {
+    final byHole = <int, List<CaddyPlayMoment>>{};
+    for (final moment in syncedMoments) {
+      byHole.putIfAbsent(moment.holeNumber, () => <CaddyPlayMoment>[]);
+      byHole[moment.holeNumber]!.add(moment);
+    }
+
+    return round.copyWith(
+      holes: round.holes
+          .map(
+            (hole) => hole.copyWith(
+              moments: byHole[hole.holeNumber] ?? hole.moments,
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  Map<String, dynamic> _buildRoundLogPayload(CaddyPlayActiveRound round) {
+    final snapshot = round.snapshot ?? buildRoundSnapshot(round);
+    final aggregate = aggregateMindset(round);
+    final voiceTranscription = round.allMoments
+        .where((moment) => moment.isTalk)
+        .map((moment) => moment.transcript?.trim() ?? '')
+        .where((value) => value.isNotEmpty)
+        .join(' | ');
+
+    return <String, dynamic>{
+      'userId': round.userId,
+      'roundId': round.roundId,
+      'date': Timestamp.fromDate(round.startedAt),
+      'courseName': round.courseName,
+      'courseType': round.mode.name,
+      'mindsetFocus': aggregate.focus,
+      'mindsetConfidence': aggregate.confidence,
+      'mindsetControl': aggregate.control,
+      'bestCue': _bestCue(round),
+      'recoveryHoles': _recoveryHoles(round),
+      'overallMindsetEmoji': _emojiForScore(aggregate.overall),
+      'technicalSummary':
+          'Captured ${round.totalMoments} moments. Hole ${round.currentHole}/${round.holesTotal}.',
+      'aiRoundSummary': snapshot.mindsetSummary,
+      'voiceTranscription': voiceTranscription,
+      'nlpProcessed': true,
+      'isLive': !round.isCompleted,
+      'mindsetColor': _colorForScore(aggregate.overall),
+      'linkedGolfRoundId': round.linkedGolfRoundId ?? round.roundId,
+      'updatedTime': FieldValue.serverTimestamp(),
+      if (round.lastRemoteSyncAt == null)
+        'createdTime': FieldValue.serverTimestamp(),
+    };
+  }
+
+  Map<String, dynamic> _buildGolfRoundPayload(CaddyPlayActiveRound round) {
+    final snapshot = round.snapshot ?? buildRoundSnapshot(round);
+    return <String, dynamic>{
+      'userId': round.userId,
+      'date': Timestamp.fromDate(round.startedAt),
+      'courseName': round.courseName,
+      'courseId': null,
+      'teeBox': round.teeName ?? '',
+      'score': round.totalScore,
+      'parTotal': round.totalPar,
+      'scoreToPar': round.scoreToPar,
+      'courseRating': round.courseRating,
+      'slopeRating': round.slopeRating,
+      'preRoundMood': enumLabel(round.preRoundMindset),
+      'notes': snapshot.evaluationPhrase,
+      'lessonsLearned': snapshot.completionInsight,
+      'keyMoments': snapshot.momentumShift,
+      'mentalFocus': aggregateMindset(round).focus,
+      'courseManagement': aggregateMindset(round).control,
+      'emotionalControl': aggregateMindset(round).confidence,
+      'createdTime': FieldValue.serverTimestamp(),
+      'updatedTime': FieldValue.serverTimestamp(),
+      'isValid': true,
+    };
+  }
+
+  String _bestCue(CaddyPlayActiveRound round) {
+    final counts = <String, int>{};
+    for (final moment in round.allMoments) {
+      for (final tag in moment.pillarTags) {
+        final label = enumLabel(tag);
+        counts[label] = (counts[label] ?? 0) + 1;
+      }
+    }
+    if (counts.isEmpty) {
+      return 'Routine First';
+    }
+
+    return counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+  }
+
+  List<String> _recoveryHoles(CaddyPlayActiveRound round) {
+    return round.holes
+        .where((hole) => hole.mindSnapCount > 0)
+        .map((hole) => 'H${hole.holeNumber}')
+        .toList(growable: false);
+  }
+
+  String _shortInterpretationFromTranscript(String transcript) {
+    final clean = transcript.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final words = clean.split(' ');
+    final excerpt = words.take(6).join(' ');
+    if (excerpt.isEmpty) {
+      return '';
+    }
+    return '$excerpt.';
+  }
+
+  String _emojiForScore(int score) {
+    if (score >= 80) {
+      return '😌';
+    }
+    if (score >= 60) {
+      return '🙂';
+    }
+    if (score >= 45) {
+      return '😐';
+    }
+    return '😟';
+  }
+
+  String _colorForScore(int score) {
+    if (score >= 80) {
+      return '#66BB6A';
+    }
+    if (score >= 60) {
+      return '#8BC34A';
+    }
+    if (score >= 45) {
+      return '#FFA726';
+    }
+    return '#EF5350';
+  }
 }

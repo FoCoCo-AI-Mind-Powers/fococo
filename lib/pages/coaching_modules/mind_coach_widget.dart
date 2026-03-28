@@ -348,6 +348,7 @@ class _MindCoachWidgetState extends State<MindCoachWidget>
         ),
         bottomNavigationBar: EnhancedFoCoCoNavBar(
           currentRoute: 'mind_coach',
+          barBackgroundColor: theme.primaryBackground,
           onTap: (route) => context.goNamed(route),
           currentUser: null, // Will be handled by the navbar internally
         ),

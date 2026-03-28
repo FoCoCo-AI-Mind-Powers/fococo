@@ -26,7 +26,7 @@ class GeminiConfig {
   
   /// Voice AI models
   static const String voiceFlashLiteModel = 'gemini-2.5-flash-lite';
-  static const String voiceLiveModel = 'models/gemini-live-2.5-flash-preview';
+  static const String voiceLiveModel = 'models/gemini-2.5-flash-native-audio-preview-12-2025';
   static const String voiceNativeAudioModel = 'models/gemini-2.5-flash-preview-native-audio-dialog';
   static const String voiceThinkingModel = 'models/gemini-2.5-flash-exp-native-audio-thinking-dialog';
   static const String voiceTTSFlashModel = 'models/gemini-2.5-flash-preview-tts';

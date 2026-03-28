@@ -2,13 +2,19 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import '/services/gemini_key_service.dart';
+
+const String _googleAIOverrideAppName = 'google_ai_override';
+
 Future initFirebase() async {
   try {
     // Check if Firebase is already initialized to prevent duplicate app error
     if (Firebase.apps.isNotEmpty) {
       if (kDebugMode) {
-        print('✅ Firebase already initialized with ${Firebase.apps.length} app(s)');
-        print('✅ Existing apps: ${Firebase.apps.map((app) => app.name).join(', ')}');
+        print(
+            '✅ Firebase already initialized with ${Firebase.apps.length} app(s)');
+        print(
+            '✅ Existing apps: ${Firebase.apps.map((app) => app.name).join(', ')}');
       }
       return;
     }
@@ -35,7 +41,8 @@ Future initFirebase() async {
         }
       } catch (e) {
         if (kDebugMode) {
-          print('⚠️ Default initialization failed, trying with explicit options: $e');
+          print(
+              '⚠️ Default initialization failed, trying with explicit options: $e');
         }
         // Fall back to explicit configuration
         await Firebase.initializeApp(
@@ -80,4 +87,34 @@ Future initFirebase() async {
       rethrow;
     }
   }
+}
+
+Future<FirebaseApp> getGoogleAIFirebaseApp() async {
+  // 1. Try fetching from Secret Manager via Cloud Function
+  final secretKey = await GeminiKeyService.instance.getKey();
+
+  // 2. Fall back to --dart-define
+  const dartDefineKey = String.fromEnvironment('GEMINI_API_KEY');
+  final overrideApiKey =
+      secretKey.isNotEmpty ? secretKey : dartDefineKey;
+
+  if (overrideApiKey.isEmpty) {
+    return Firebase.app();
+  }
+
+  // Re-use an existing override app if the key matches
+  for (final app in Firebase.apps) {
+    if (app.name == _googleAIOverrideAppName) {
+      if (app.options.apiKey == overrideApiKey) return app;
+      // Key changed — delete stale app and recreate
+      await app.delete();
+      break;
+    }
+  }
+
+  final baseApp = Firebase.app();
+  return Firebase.initializeApp(
+    name: _googleAIOverrideAppName,
+    options: baseApp.options.copyWith(apiKey: overrideApiKey),
+  );
 }

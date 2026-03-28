@@ -662,6 +662,7 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget>
         ),
         bottomNavigationBar: EnhancedFoCoCoNavBar(
           currentRoute: 'ai_insights',
+          barBackgroundColor: theme.primaryBackground,
           onTap: (route) => context.goNamed(route),
           currentUser: null, // Will be handled by the navbar internally
         ),

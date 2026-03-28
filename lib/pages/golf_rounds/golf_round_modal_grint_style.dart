@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'dart:ui';
 import '/auth/firebase_auth/auth_util.dart';
@@ -13,41 +12,42 @@ class GolfRoundModalGrintStyle extends StatefulWidget {
   const GolfRoundModalGrintStyle({required this.theme, super.key});
 
   @override
-  State<GolfRoundModalGrintStyle> createState() => _GolfRoundModalGrintStyleState();
+  State<GolfRoundModalGrintStyle> createState() =>
+      _GolfRoundModalGrintStyleState();
 }
 
 class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
   // Score and Putts
   int _score = 5;
   int _putts = 2;
-  
+
   // Tee Shot
   String _teeShotDirection = 'center';
   String _teeShotClub = 'Driver';
   bool _teeShotMisHit = false;
-  
+
   // Putt Distance
   int? _firstPuttDistance;
-  
+
   // Bunkers
   bool _fairwayBunker = false;
   bool _greenSideBunker = false;
-  
+
   // Penalties
   bool _hazardWater = false;
   bool _dropShot = false;
   bool _outOfBounds = false;
-  
+
   // Drinks
   bool _drinksOnHole = false;
-  
+
   // Mode
   bool _isAdvancedMode = true;
-  
+
   bool _isSubmitting = false;
-  
+
   String _selectedTeeBox = 'White';
-  
+
   // Get current user initials for avatar
   String get _userInitials {
     // You can get user name from UserRecord if needed
@@ -74,10 +74,10 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Header with Player Info
           _buildPlayerHeader(),
-          
+
           // Scrollable Content Area (everything between Enter button and Basic/Advanced)
           Expanded(
             child: SingleChildScrollView(
@@ -87,13 +87,13 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
                 children: [
                   // Score and Putts Section
                   _buildScorePuttsSection(),
-                  
+
                   // Tee Shot Section
                   _buildTeeShotSection(),
-                  
+
                   // 1st Putt Distance and Tee Shot Club
                   _buildPuttAndClubSection(),
-                  
+
                   // Bunkers, Penalties, Drinks Section
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -113,7 +113,7 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
               ),
             ),
           ),
-          
+
           // Mode Toggle and Enter Button
           _buildBottomControls(),
         ],
@@ -281,7 +281,8 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
                                   letterSpacing: 0.5,
                                   shadows: [
                                     Shadow(
-                                      color: Colors.black.withValues(alpha: 0.2),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.2),
                                       offset: const Offset(0, 1),
                                       blurRadius: 2,
                                     ),
@@ -309,7 +310,8 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
             child: _buildNumberControl(
               label: 'Score',
               value: _score,
-              onDecrement: () => setState(() => _score = (_score > 1) ? _score - 1 : 1),
+              onDecrement: () =>
+                  setState(() => _score = (_score > 1) ? _score - 1 : 1),
               onIncrement: () => setState(() => _score = _score + 1),
             ),
           ),
@@ -318,7 +320,8 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
             child: _buildNumberControl(
               label: 'Putts',
               value: _putts,
-              onDecrement: () => setState(() => _putts = (_putts > 1) ? _putts - 1 : 1),
+              onDecrement: () =>
+                  setState(() => _putts = (_putts > 1) ? _putts - 1 : 1),
               onIncrement: () => setState(() => _putts = _putts + 1),
             ),
           ),
@@ -422,7 +425,8 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
                 GestureDetector(
                   onTap: () => setState(() => _teeShotMisHit = false),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: widget.theme.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
@@ -471,8 +475,10 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
                               ? widget.theme.primaryBrandGradient
                               : LinearGradient(
                                   colors: [
-                                    widget.theme.glassTint.withValues(alpha: 0.2),
-                                    widget.theme.glassTint.withValues(alpha: 0.1),
+                                    widget.theme.glassTint
+                                        .withValues(alpha: 0.2),
+                                    widget.theme.glassTint
+                                        .withValues(alpha: 0.1),
                                   ],
                                 ),
                           border: Border.all(
@@ -495,14 +501,22 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
                     ),
                   ),
                   // Directional arrows (simplified - you can add more precise positioning)
-                  _buildDirectionButton('up', Icons.arrow_upward, Alignment.topCenter),
-                  _buildDirectionButton('down', Icons.arrow_downward, Alignment.bottomCenter),
-                  _buildDirectionButton('left', Icons.arrow_back, Alignment.centerLeft),
-                  _buildDirectionButton('right', Icons.arrow_forward, Alignment.centerRight),
-                  _buildDirectionButton('topLeft', Icons.arrow_upward, Alignment.topLeft),
-                  _buildDirectionButton('topRight', Icons.arrow_upward, Alignment.topRight),
-                  _buildDirectionButton('bottomLeft', Icons.arrow_downward, Alignment.bottomLeft),
-                  _buildDirectionButton('bottomRight', Icons.arrow_downward, Alignment.bottomRight),
+                  _buildDirectionButton(
+                      'up', Icons.arrow_upward, Alignment.topCenter),
+                  _buildDirectionButton(
+                      'down', Icons.arrow_downward, Alignment.bottomCenter),
+                  _buildDirectionButton(
+                      'left', Icons.arrow_back, Alignment.centerLeft),
+                  _buildDirectionButton(
+                      'right', Icons.arrow_forward, Alignment.centerRight),
+                  _buildDirectionButton(
+                      'topLeft', Icons.arrow_upward, Alignment.topLeft),
+                  _buildDirectionButton(
+                      'topRight', Icons.arrow_upward, Alignment.topRight),
+                  _buildDirectionButton(
+                      'bottomLeft', Icons.arrow_downward, Alignment.bottomLeft),
+                  _buildDirectionButton('bottomRight', Icons.arrow_downward,
+                      Alignment.bottomRight),
                 ],
               ),
             ),
@@ -513,7 +527,8 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
               child: GestureDetector(
                 onTap: () => setState(() => _teeShotMisHit = true),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: widget.theme.glassTint.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -536,7 +551,8 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
     );
   }
 
-  Widget _buildDirectionButton(String direction, IconData icon, Alignment alignment) {
+  Widget _buildDirectionButton(
+      String direction, IconData icon, Alignment alignment) {
     final isSelected = _teeShotDirection == direction;
     return Positioned.fill(
       child: Align(
@@ -674,7 +690,8 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
                 label: 'Green Side',
                 icon: FontAwesomeIcons.golfBallTee,
                 isSelected: _greenSideBunker,
-                onTap: () => setState(() => _greenSideBunker = !_greenSideBunker),
+                onTap: () =>
+                    setState(() => _greenSideBunker = !_greenSideBunker),
               ),
             ),
           ],
@@ -837,7 +854,8 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
                       color: !_isAdvancedMode
                           ? widget.theme.primary
                           : widget.theme.secondaryText,
-                      fontWeight: !_isAdvancedMode ? FontWeight.w600 : FontWeight.w400,
+                      fontWeight:
+                          !_isAdvancedMode ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                 ),
@@ -869,7 +887,8 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
                       color: _isAdvancedMode
                           ? widget.theme.success
                           : widget.theme.secondaryText,
-                      fontWeight: _isAdvancedMode ? FontWeight.w600 : FontWeight.w400,
+                      fontWeight:
+                          _isAdvancedMode ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                 ),
@@ -910,7 +929,23 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
   }
 
   Future<void> _showClubPicker() async {
-    final clubs = ['Driver', '3 Wood', '5 Wood', 'Hybrid', '3 Iron', '4 Iron', '5 Iron', '6 Iron', '7 Iron', '8 Iron', '9 Iron', 'PW', 'SW', 'LW', 'Putter'];
+    final clubs = [
+      'Driver',
+      '3 Wood',
+      '5 Wood',
+      'Hybrid',
+      '3 Iron',
+      '4 Iron',
+      '5 Iron',
+      '6 Iron',
+      '7 Iron',
+      '8 Iron',
+      '9 Iron',
+      'PW',
+      'SW',
+      'LW',
+      'Putter'
+    ];
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -939,7 +974,7 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
 
   Future<void> _submitRound() async {
     if (_isSubmitting) return;
-    
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -994,4 +1029,3 @@ class _GolfRoundModalGrintStyleState extends State<GolfRoundModalGrintStyle> {
     }
   }
 }
-

@@ -69,7 +69,7 @@ Keep responses concise and conversational for voice interactions.''',
       case AudioArchitecture.nativeAudio:
         return 'gemini-2.5-flash-preview-native-audio-dialog';
       case AudioArchitecture.halfCascade:
-        return 'gemini-live-2.5-flash-preview';
+        return 'gemini-2.5-flash-native-audio-preview-12-2025';
     }
   }
 
@@ -175,15 +175,16 @@ class GeminiLiveAPIService {
     try {
       _updateState(GeminiLiveState.connecting);
 
-      // Check API key configuration
-      if (!GeminiLiveAPIConfig.isConfigured) {
+      // Fetch API key from Secret Manager (or cache / dart-define fallback)
+      final apiKey = await GeminiLiveAPIConfig.getApiKey();
+      if (apiKey.isEmpty) {
         throw Exception(
-            'Gemini API key not configured. Please set GEMINI_API_KEY environment variable.');
+            'Gemini API key not configured. Add it to Secret Manager or set GEMINI_API_KEY.');
       }
 
       // Connect to Gemini Live API WebSocket
       final uri = Uri.parse(
-          '${GeminiLiveAPIConfig.websocketEndpoint}?key=${GeminiLiveAPIConfig.apiKey}');
+          '${GeminiLiveAPIConfig.websocketEndpoint}?key=$apiKey');
 
       _channel = WebSocketChannel.connect(uri);
 

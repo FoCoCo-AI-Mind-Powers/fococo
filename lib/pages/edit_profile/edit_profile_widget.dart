@@ -336,6 +336,7 @@ class _EditProfileWidgetState extends State<EditProfileWidget>
         ),
         bottomNavigationBar: EnhancedFoCoCoNavBar(
           currentRoute: 'profile',
+          barBackgroundColor: theme.primaryBackground,
           onTap: (route) {
             print(
                 '🔄 Edit Profile page: Navigation requested to route: $route');

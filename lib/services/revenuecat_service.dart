@@ -14,7 +14,7 @@ class RevenueCatService {
 
   bool _isInitialized = false;
   CustomerInfo? _customerInfo;
-  
+
   // RevenueCat API Keys
   // Note: RevenueCat SDK blocks test keys in release builds for security.
   // - Debug builds: Use test key (allows test purchases)
@@ -22,14 +22,14 @@ class RevenueCatService {
   static const String _testApiKey = 'test_YoethHbymgTmQuFGgiEjipuTQAS';
   static const String _appleApiKey = 'appl_AiEOIuToXpfzdJlKMIrYJGzNdGs';
   static const String _googleApiKey = 'goog_VRIyNIpAyuumxHnhLkClLEKbxuR';
-  
+
   // Get the appropriate API key based on platform and build mode
   static String _getApiKey() {
     // In debug mode, always use test key (RevenueCat allows this)
     if (kDebugMode) {
       return _testApiKey;
     }
-    
+
     // In release mode, RevenueCat requires platform-specific production keys
     // Using test keys in release will cause the SDK to show an error and close the app
     if (Platform.isIOS) {
@@ -37,20 +37,21 @@ class RevenueCatService {
     } else if (Platform.isAndroid) {
       return _googleApiKey;
     }
-    
+
     // Fallback to test key if platform not determined (shouldn't happen)
     return _testApiKey;
   }
-  
+
   // Entitlement identifier
   static const String _entitlementId = 'FoCoCo Pro';
-  
+  static const String defaultOfferingId = 'default';
+
   // Product identifiers
   static const String _productIdMonthly = 'fococo_monthly';
   static const String _productIdYearly = 'fococo_yearly';
   static const String _productIdYear = 'fococo-year';
   static const String _productIdMonthlyAlt = 'fococo-monthly';
-  
+
   /// Grace period in days (16 days)
   static const int gracePeriodDays = 16;
 
@@ -69,30 +70,32 @@ class RevenueCatService {
       // Configure RevenueCat with platform and build-mode appropriate API key
       final apiKey = _getApiKey();
       final isTestKey = apiKey.startsWith('test_');
-      
+
       if (kDebugMode) {
-        debugPrint('🔑 Using RevenueCat API Key: ${apiKey.substring(0, 15)}... (${Platform.isIOS ? 'iOS' : 'Android'} - Debug Mode)');
+        debugPrint(
+            '🔑 Using RevenueCat API Key: ${apiKey.substring(0, 15)}... (${Platform.isIOS ? 'iOS' : 'Android'} - Debug Mode)');
       } else {
-        debugPrint('🔑 Using RevenueCat API Key: ${apiKey.substring(0, 15)}... (${Platform.isIOS ? 'iOS' : 'Android'} - Release Mode)');
+        debugPrint(
+            '🔑 Using RevenueCat API Key: ${apiKey.substring(0, 15)}... (${Platform.isIOS ? 'iOS' : 'Android'} - Release Mode)');
         if (isTestKey) {
-          debugPrint('⚠️ WARNING: Test key detected in release build. RevenueCat SDK will block this and close the app.');
+          debugPrint(
+              '⚠️ WARNING: Test key detected in release build. RevenueCat SDK will block this and close the app.');
         }
       }
-      
+
       PurchasesConfiguration configuration;
-      
+
       if (Platform.isIOS) {
-        configuration = PurchasesConfiguration(apiKey)
-          ..appUserID = userId;
+        configuration = PurchasesConfiguration(apiKey)..appUserID = userId;
       } else if (Platform.isAndroid) {
-        configuration = PurchasesConfiguration(apiKey)
-          ..appUserID = userId;
+        configuration = PurchasesConfiguration(apiKey)..appUserID = userId;
       } else {
-        throw UnsupportedError('RevenueCat is only supported on iOS and Android');
+        throw UnsupportedError(
+            'RevenueCat is only supported on iOS and Android');
       }
 
       await Purchases.configure(configuration);
-      
+
       // Set user ID if available
       if (userId != null) {
         await Purchases.logIn(userId);
@@ -121,10 +124,10 @@ class RevenueCatService {
   void _handleCustomerInfoUpdate(CustomerInfo customerInfo) {
     _customerInfo = customerInfo;
     debugPrint('🔄 Customer info updated');
-    
+
     // Update subscription state provider
     SubscriptionStateProvider().updateAfterPurchase();
-    
+
     // Sync with Firestore
     _syncSubscriptionToFirestore(customerInfo);
   }
@@ -134,10 +137,10 @@ class RevenueCatService {
     try {
       _customerInfo = await Purchases.getCustomerInfo();
       debugPrint('✅ Customer info refreshed');
-      
+
       // Sync with Firestore
       await _syncSubscriptionToFirestore(_customerInfo!);
-      
+
       return _customerInfo!;
     } catch (e) {
       debugPrint('❌ Failed to refresh customer info: $e');
@@ -153,12 +156,12 @@ class RevenueCatService {
     try {
       final info = await refreshCustomerInfo();
       final entitlement = info.entitlements.active[_entitlementId];
-      
+
       if (entitlement != null) {
         debugPrint('✅ User has active entitlement: ${entitlement.identifier}');
         return true;
       }
-      
+
       debugPrint('❌ User does not have active entitlement');
       return false;
     } catch (e) {
@@ -168,36 +171,41 @@ class RevenueCatService {
   }
 
   /// Get available offerings (packages)
-  /// 
+  ///
   /// IMPORTANT: For this to work, you must configure in RevenueCat Dashboard:
   /// 1. Go to RevenueCat Dashboard > Products
-  /// 2. Add your test products (fococo_monthly_test, fococo_yearly_test) 
+  /// 2. Add your test products (fococo_monthly_test, fococo_yearly_test)
   /// 3. Go to Offerings section
   /// 4. Create an Offering (or use default)
   /// 5. Add the products to the Offering
   /// 6. Set the Offering as "Current"
-  /// 
+  ///
   /// The product IDs in code don't need to match exactly - RevenueCat maps them
   /// through the dashboard configuration.
   Future<Offerings> getOfferings() async {
     try {
       final offerings = await Purchases.getOfferings();
-      
-      if (offerings.current == null) {
-        debugPrint('⚠️ No current offering found');
+      final preferredOffering = getPreferredOffering(offerings);
+
+      if (preferredOffering == null) {
+        debugPrint('⚠️ No preferred offering found');
         debugPrint('💡 RevenueCat Configuration Checklist:');
-        debugPrint('   1. Products created in RevenueCat Dashboard (fococo_monthly_test, fococo_yearly_test)');
-        debugPrint('   2. Products added to an Offering in RevenueCat Dashboard');
-        debugPrint('   3. Offering set as "Current" in RevenueCat Dashboard');
-        debugPrint('   4. Products configured in App Store Connect (iOS) or Google Play Console (Android)');
-        debugPrint('   5. Products linked in RevenueCat Dashboard to store products');
+        debugPrint(
+            '   1. Offering "$defaultOfferingId" exists or one offering is set as Current');
+        debugPrint('   2. Products are attached to the offering package');
+        debugPrint(
+            '   3. Store products are configured in App Store Connect / Google Play Console');
+        debugPrint(
+            '   4. RevenueCat products are linked to the store products');
       } else {
-        debugPrint('✅ Found ${offerings.current!.availablePackages.length} packages in current offering');
-        for (final package in offerings.current!.availablePackages) {
-          debugPrint('   - Package: ${package.identifier}, Product: ${package.storeProduct.identifier}');
+        debugPrint(
+            '✅ Using offering "${preferredOffering.identifier}" with ${preferredOffering.availablePackages.length} package(s)');
+        for (final package in preferredOffering.availablePackages) {
+          debugPrint(
+              '   - Package: ${package.identifier}, Product: ${package.storeProduct.identifier}');
         }
       }
-      
+
       return offerings;
     } catch (e) {
       debugPrint('❌ Failed to get offerings: $e');
@@ -210,34 +218,39 @@ class RevenueCatService {
     }
   }
 
+  Offering? getPreferredOffering(Offerings offerings) {
+    return offerings.getOffering(defaultOfferingId) ?? offerings.current;
+  }
+
   /// Purchase a package
   Future<CustomerInfo> purchasePackage(Package package) async {
     try {
       debugPrint('🛒 Purchasing package: ${package.identifier}');
-      
-      final purchaseResult = await Purchases.purchase(PurchaseParams.package(package));
-      
+
+      final purchaseResult =
+          await Purchases.purchase(PurchaseParams.package(package));
+
       if (purchaseResult.customerInfo == null) {
         throw Exception('Purchase completed but customer info is null');
       }
-      
+
       final customerInfo = purchaseResult.customerInfo!;
-      
+
       debugPrint('✅ Purchase successful');
-      
+
       // Update local customer info
       _customerInfo = customerInfo;
-      
+
       // Sync with Firestore
       await _syncSubscriptionToFirestore(customerInfo);
-      
+
       // Update subscription state provider
       SubscriptionStateProvider().updateAfterPurchase();
-      
+
       return customerInfo;
     } on PurchasesError catch (e) {
       debugPrint('❌ Purchase error: ${e.message}');
-      
+
       // Handle specific error codes
       if (e.code == PurchasesErrorCode.purchaseCancelledError) {
         throw Exception('Purchase was cancelled');
@@ -258,20 +271,20 @@ class RevenueCatService {
   Future<CustomerInfo> restorePurchases() async {
     try {
       debugPrint('🔄 Restoring purchases...');
-      
+
       final customerInfo = await Purchases.restorePurchases();
-      
+
       debugPrint('✅ Purchases restored');
-      
+
       // Update local customer info
       _customerInfo = customerInfo;
-      
+
       // Sync with Firestore
       await _syncSubscriptionToFirestore(customerInfo);
-      
+
       // Update subscription state provider
       SubscriptionStateProvider().updateAfterPurchase();
-      
+
       return customerInfo;
     } catch (e) {
       debugPrint('❌ Failed to restore purchases: $e');
@@ -284,11 +297,11 @@ class RevenueCatService {
     try {
       final info = await refreshCustomerInfo();
       final entitlement = info.entitlements.active[_entitlementId];
-      
+
       if (entitlement == null) {
         return null;
       }
-      
+
       return RevenueCatSubscriptionInfo.fromEntitlementInfo(entitlement, info);
     } catch (e) {
       debugPrint('❌ Failed to get current subscription: $e');
@@ -300,18 +313,19 @@ class RevenueCatService {
   Future<bool> hasActiveSubscription() async {
     final subscription = await getCurrentSubscription();
     if (subscription == null) return false;
-    
-    return subscription.isActiveWithGracePeriod(gracePeriodDays: gracePeriodDays);
+
+    return subscription.isActiveWithGracePeriod(
+        gracePeriodDays: gracePeriodDays);
   }
 
   /// Get subscription tier for user
   Future<String> getUserTier() async {
     final hasEntitlement = await hasActiveEntitlement();
-    
+
     if (hasEntitlement) {
       return 'prime';
     }
-    
+
     // Fallback: check user document
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -320,7 +334,7 @@ class RevenueCatService {
             .collection('user')
             .doc(user.uid)
             .get();
-        
+
         if (userDoc.exists) {
           final userData = userDoc.data();
           final tier = userData?['currentMembershipTier'] as String?;
@@ -332,7 +346,7 @@ class RevenueCatService {
         debugPrint('❌ Error getting user tier: $e');
       }
     }
-    
+
     return 'junior';
   }
 
@@ -346,44 +360,45 @@ class RevenueCatService {
       }
 
       final entitlement = customerInfo.entitlements.active[_entitlementId];
-      
+
       if (entitlement == null) {
         debugPrint('ℹ️ No active entitlement to sync');
         return;
       }
 
       final productIdentifier = entitlement.productIdentifier;
-      final isMonthly = productIdentifier.contains('monthly') || 
-                       productIdentifier == _productIdMonthly ||
-                       productIdentifier == _productIdMonthlyAlt;
-      
+      final isMonthly = productIdentifier.contains('monthly') ||
+          productIdentifier == _productIdMonthly ||
+          productIdentifier == _productIdMonthlyAlt;
+
       final platform = Platform.isIOS ? 'app_store' : 'google_play';
-      
+
       // Get expiration date
-      final expirationDate = (entitlement.expirationDate as DateTime?) ?? 
-                             DateTime.now().add(const Duration(days: 30));
+      final expirationDate = (entitlement.expirationDate as DateTime?) ??
+          DateTime.now().add(const Duration(days: 30));
       final now = DateTime.now();
-      
+
       // Calculate period start (assume 30 days for monthly, 365 for yearly)
-      final periodStart = isMonthly 
+      final periodStart = isMonthly
           ? expirationDate.subtract(const Duration(days: 30))
           : expirationDate.subtract(const Duration(days: 365));
-      
+
       // Get original transaction ID from latest transaction or customer ID
       final latestPurchase = entitlement.latestPurchaseDate;
       String originalTransactionId = customerInfo.originalAppUserId;
-      
+
       if (latestPurchase != null) {
         try {
           // Try to cast to DateTime
           final purchaseDate = latestPurchase as DateTime;
-          originalTransactionId = purchaseDate.millisecondsSinceEpoch.toString();
+          originalTransactionId =
+              purchaseDate.millisecondsSinceEpoch.toString();
         } catch (e) {
           // If not DateTime, use string representation
           originalTransactionId = latestPurchase.toString();
         }
       }
-      
+
       // Create subscription record
       final subscriptionData = {
         'userId': user.uid,
@@ -502,18 +517,18 @@ class RevenueCatSubscriptionInfo {
   /// Check if subscription is active (including grace period)
   bool isActiveWithGracePeriod({int gracePeriodDays = 0}) {
     if (!isActive) return false;
-    
+
     final now = DateTime.now();
     final gracePeriodEnd = expirationDate.add(Duration(days: gracePeriodDays));
-    
+
     if (now.isBefore(expirationDate)) {
       return true;
     }
-    
+
     if (gracePeriodDays > 0 && now.isBefore(gracePeriodEnd) && willRenew) {
       return true;
     }
-    
+
     return false;
   }
 
@@ -521,21 +536,21 @@ class RevenueCatSubscriptionInfo {
   int getDaysRemaining({int gracePeriodDays = 0}) {
     final now = DateTime.now();
     final gracePeriodEnd = expirationDate.add(Duration(days: gracePeriodDays));
-    
+
     if (now.isBefore(expirationDate)) {
       return expirationDate.difference(now).inDays;
     } else if (now.isBefore(gracePeriodEnd)) {
       return gracePeriodEnd.difference(now).inDays;
     }
-    
+
     return 0;
   }
 
   /// Check if subscription is monthly
   bool get isMonthly {
-    return productIdentifier.contains('monthly') || 
-           productIdentifier == 'fococo_monthly' ||
-           productIdentifier == 'fococo-monthly';
+    return productIdentifier.contains('monthly') ||
+        productIdentifier == 'fococo_monthly' ||
+        productIdentifier == 'fococo-monthly';
   }
 
   factory RevenueCatSubscriptionInfo.fromEntitlementInfo(
@@ -545,7 +560,7 @@ class RevenueCatSubscriptionInfo {
     // Get original transaction ID from latest purchase date or customer ID
     final latestPurchase = entitlement.latestPurchaseDate;
     String originalTransactionId = customerInfo.originalAppUserId;
-    
+
     if (latestPurchase != null) {
       try {
         // Try to cast to DateTime
@@ -556,11 +571,11 @@ class RevenueCatSubscriptionInfo {
         originalTransactionId = latestPurchase.toString();
       }
     }
-    
+
     // Get expiration date
-    final expirationDate = (entitlement.expirationDate as DateTime?) ?? 
-                           DateTime.now().add(const Duration(days: 30));
-    
+    final expirationDate = (entitlement.expirationDate as DateTime?) ??
+        DateTime.now().add(const Duration(days: 30));
+
     return RevenueCatSubscriptionInfo(
       productIdentifier: entitlement.productIdentifier,
       originalTransactionId: originalTransactionId,

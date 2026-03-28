@@ -91,13 +91,15 @@ class GeminiCartesiaBridgeService {
     try {
       _updateState(BridgeState.connecting);
 
-      if (!GeminiLiveAPIConfig.isConfigured) {
+      // Fetch API key from Secret Manager (or cache / dart-define fallback)
+      final apiKey = await GeminiLiveAPIConfig.getApiKey();
+      if (apiKey.isEmpty) {
         throw Exception('Gemini API key not configured');
       }
 
       // Build WebSocket URL with API key
       final uri = Uri.parse(
-        '${GeminiLiveAPIConfig.websocketEndpoint}?key=${GeminiLiveAPIConfig.apiKey}',
+        '${GeminiLiveAPIConfig.websocketEndpoint}?key=$apiKey',
       );
 
       _channel = WebSocketChannel.connect(uri);

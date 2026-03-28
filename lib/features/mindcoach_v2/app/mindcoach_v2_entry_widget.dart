@@ -208,10 +208,13 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget>
           : null,
       builder: (context, userSnapshot) {
         final user = userSnapshot.data;
+        final theme = FlutterFlowTheme.of(context);
         return FoCoCoAdaptiveScaffold(
+          backgroundColor: theme.primaryBackground,
           title: 'MindCoach',
           currentRoute: 'mind_coach',
           onTap: (route) => context.goNamed(route),
+          showBottomNav: false,
           drawer: user != null
               ? FoCoCoDrawer(
                   currentUser: user,

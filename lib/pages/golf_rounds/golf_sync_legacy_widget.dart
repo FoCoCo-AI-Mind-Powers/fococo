@@ -326,6 +326,7 @@ class _GolfSyncLegacyWidgetState extends State<GolfSyncLegacyWidget>
       ),
       bottomNavigationBar: EnhancedFoCoCoNavBar(
         currentRoute: 'caddy_play',
+        barBackgroundColor: theme.primaryBackground,
         currentUser: user,
         onTap: (route) => _handleNavigation(route),
         showLabels: true,
@@ -570,6 +571,7 @@ class _GolfSyncLegacyWidgetState extends State<GolfSyncLegacyWidget>
       ),
       bottomNavigationBar: EnhancedFoCoCoNavBar(
         currentRoute: 'caddy_play',
+        barBackgroundColor: theme.primaryBackground,
         currentUser: user,
         onTap: (route) => _handleNavigation(route),
         showLabels: true,
@@ -630,6 +632,7 @@ class _GolfSyncLegacyWidgetState extends State<GolfSyncLegacyWidget>
       ),
       bottomNavigationBar: EnhancedFoCoCoNavBar(
         currentRoute: 'caddy_play',
+        barBackgroundColor: theme.primaryBackground,
         currentUser: user,
         onTap: (route) => _handleNavigation(route),
         showLabels: true,

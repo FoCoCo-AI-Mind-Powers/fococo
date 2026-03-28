@@ -1,5 +1,6 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/ai_integration/widgets/navbar_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/ai_integration/gemini_ai_client.dart';
@@ -551,9 +552,9 @@ class _AiAssessmentWidgetState extends State<AiAssessmentWidget>
     return Scaffold(
       key: scaffoldKey,
       backgroundColor: theme.primaryBackground,
-      appBar: AppBar(
+      appBar: buildFoCoCoAppBar(
+        context,
         backgroundColor: Colors.transparent,
-        elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: theme.primaryText),
           onPressed: () {
@@ -592,7 +593,6 @@ class _AiAssessmentWidgetState extends State<AiAssessmentWidget>
             fontWeight: FontWeight.w700,
           ),
         ),
-        centerTitle: true,
       ),
       body: SafeArea(
         child: FadeTransition(

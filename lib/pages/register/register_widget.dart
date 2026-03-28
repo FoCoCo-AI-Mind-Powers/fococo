@@ -1,11 +1,72 @@
+import '/ai_integration/widgets/navbar_widget.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/services/auth_flow_service.dart';
+import 'age_verification_widget.dart';
+import 'account_created_widget.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'register_model.dart';
 export 'register_model.dart';
+
+// ─── Age-threshold helper ───────────────────────────────────────────────────
+
+int _getAgeThreshold(String? countryCode) {
+  switch (countryCode?.toUpperCase()) {
+    case 'US':
+    case 'GB':
+    case 'DK':
+    case 'AU':
+    case 'JP':
+      return 13;
+    case 'ES':
+    case 'KR':
+      return 14;
+    case 'FR':
+      return 15;
+    case 'NL':
+    case 'DE':
+    case 'IE':
+    case 'PT':
+      return 16;
+    default:
+      return 16;
+  }
+}
+
+// ─── Locale-based pricing string ─────────────────────────────────────────────
+
+String _getPricingString(String? countryCode) {
+  switch (countryCode?.toUpperCase()) {
+    case 'GB':
+      return '14-day free trial. Then £8.75 a month, billed annually at £105.';
+    case 'DE':
+    case 'FR':
+    case 'NL':
+    case 'IE':
+    case 'PT':
+    case 'ES':
+    case 'IT':
+    case 'BE':
+    case 'AT':
+    case 'FI':
+    case 'GR':
+    case 'LU':
+    case 'SK':
+    case 'SI':
+    case 'EE':
+    case 'LV':
+    case 'LT':
+    case 'CY':
+    case 'MT':
+      return '14-day free trial. Then €10 a month, billed annually at €120.';
+    default:
+      return '14-day free trial. Then \$10 a month, billed annually at \$120.';
+  }
+}
+
+// ─── Widget ──────────────────────────────────────────────────────────────────
 
 class RegisterWidget extends StatefulWidget {
   const RegisterWidget({super.key});
@@ -21,921 +82,711 @@ class _RegisterWidgetState extends State<RegisterWidget> {
   late RegisterModel _model;
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
+  // DOB state
+  int _selectedMonthIndex = 0;
+  int _selectedDayIndex = 0;
+  int _selectedYearIndex = 0;
+  bool _monthTouched = false;
+  bool _dayTouched = false;
+  bool _yearTouched = false;
+
+  late final FixedExtentScrollController _monthController;
+  late final FixedExtentScrollController _dayController;
+  late final FixedExtentScrollController _yearController;
+
+  late final List<int> _years;
+
+  // Terms
+  bool _termsAccepted = false;
+
+  // Email validation state (shown below field)
+  String? _emailError;
+  String? _passwordError;
+
+  // Loading
+  bool _isLoading = false;
+
+  // Month names
+  static const _months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  bool get _isValidEmail {
+    final email = _model.emailTextController?.text.trim() ?? '';
+    return RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email);
+  }
+
+  bool get _isValidPassword {
+    final pw = _model.passwordTextController?.text ?? '';
+    return pw.length >= 8;
+  }
+
+  bool get _canContinue =>
+      _isValidEmail &&
+      _isValidPassword &&
+      _monthTouched &&
+      _dayTouched &&
+      _yearTouched &&
+      _termsAccepted;
+
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => RegisterModel());
 
-    _model.nameTextController ??= TextEditingController();
-    _model.nameFocusNode ??= FocusNode();
-
     _model.emailTextController ??= TextEditingController();
     _model.emailFocusNode ??= FocusNode();
-
     _model.passwordTextController ??= TextEditingController();
     _model.passwordFocusNode ??= FocusNode();
 
-    _model.confirmPasswordTextController ??= TextEditingController();
-    _model.confirmPasswordFocusNode ??= FocusNode();
+    // Add listeners to rebuild when text changes (for button enable state)
+    _model.emailTextController?.addListener(() => setState(() {}));
+    _model.passwordTextController?.addListener(() => setState(() {}));
+
+    // Build year list: oldest (1920) → current year
+    final currentYear = DateTime.now().year;
+    _years = List.generate(currentYear - 1920 + 1, (i) => 1920 + i);
+
+    // Start year wheel near 1990 for practical usability
+    final startYearIndex = _years.indexOf(1990).clamp(0, _years.length - 1);
+
+    _monthController = FixedExtentScrollController();
+    _dayController = FixedExtentScrollController();
+    _yearController = FixedExtentScrollController(initialItem: startYearIndex);
+    _selectedYearIndex = startYearIndex;
+
+    // ListWheelScrollView only calls onSelectedItemChanged after user scrolls.
+    // Without this, the visible defaults (Jan 1 / year wheel position) never
+    // set the *_touched flags and Continue stays permanently disabled.
+    _monthTouched = true;
+    _dayTouched = true;
+    _yearTouched = true;
   }
 
   @override
   void dispose() {
-    // Let the model handle disposal to avoid double-disposal
+    _monthController.dispose();
+    _dayController.dispose();
+    _yearController.dispose();
     _model.dispose();
     super.dispose();
   }
 
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red.shade400,
-        behavior: SnackBarBehavior.floating,
-      ),
+  DateTime get _selectedDate {
+    return DateTime(
+      _years[_selectedYearIndex],
+      _selectedMonthIndex + 1,
+      _selectedDayIndex + 1,
     );
   }
 
-  Future<void> _navigateAfterAuth() async {
-    final decision = await AuthFlowService.instance.resolvePostAuthDecision();
-    if (!mounted) return;
-    GoRouter.of(context).clearRedirectLocation();
-    context.goNamed(
-      decision.routeName,
-      extra: decision.extra,
-    );
+  int _calculateAge(DateTime dob) {
+    final now = DateTime.now();
+    int age = now.year - dob.year;
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  Future<void> _onContinue() async {
+    // Validate fields and show inline errors
+    setState(() {
+      _emailError = _isValidEmail ? null : 'Enter a valid email address';
+      _passwordError =
+          _isValidPassword ? null : 'Password must be at least 8 characters';
+    });
+
+    if (!_canContinue) return;
+
+    final countryCode =
+        Localizations.localeOf(context).countryCode;
+
+    // Age check — BEFORE any Firebase call
+    final age = _calculateAge(_selectedDate);
+    final threshold = _getAgeThreshold(countryCode);
+
+    if (age < threshold) {
+      // Navigate to age block — zero data stored
+      context.goNamed(AgeVerificationWidget.routeName);
+      return;
+    }
+
+    // Create account
+    setState(() => _isLoading = true);
+    try {
+      GoRouter.of(context).prepareAuthEvent();
+
+      final user = await authManager.createAccountWithEmail(
+        context,
+        _model.emailTextController!.text.trim(),
+        _model.passwordTextController!.text,
+      );
+
+      if (user == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Store user document in Firestore (DOB, terms, and initial fields)
+      final uid = user.uid;
+      await FirebaseFirestore.instance.collection('user').doc(uid).set({
+        'email': user.email ?? '',
+        'displayName': 'Golfer',
+        'profileImageUrl': '',
+        'createdTime': FieldValue.serverTimestamp(),
+        'lastActive': FieldValue.serverTimestamp(),
+        'currentMembershipTier': 'junior',
+        'mandatoryPaywallCompleted': false,
+        'dateOfBirth': Timestamp.fromDate(_selectedDate),
+        'termsAcceptedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      context.goNamed(AccountCreatedWidget.routeName);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red.shade400,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.inAppWebView);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final safeAreaTop = MediaQuery.of(context).padding.top;
-    final safeAreaBottom = MediaQuery.of(context).padding.bottom;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final countryCode = Localizations.localeOf(context).countryCode;
 
     return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-        FocusManager.instance.primaryFocus?.unfocus();
-      },
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: theme.primaryBackground,
-        body: Container(
-          width: screenWidth,
-          height: screenHeight,
-          color: theme.primaryBackground,
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: screenHeight,
-              ),
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: 20,
-                  right: 20,
-                  top: safeAreaTop + 80,
-                  bottom: safeAreaBottom + 20,
+        appBar: buildFoCoCoAppBar(
+          context,
+          backgroundColor: Colors.transparent,
+          leading: IconButton(
+            icon:
+                const Icon(Icons.chevron_left, color: Colors.white, size: 28),
+            onPressed: () => context.pop(),
+          ),
+          title: Text(
+            'Create Account',
+            style: theme.headlineSmall.override(
+              fontFamily: 'Inter',
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w300,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                    24, 24, 24, bottomPadding + 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Email field
+                    _buildTextField(
+                      controller: _model.emailTextController!,
+                      focusNode: _model.emailFocusNode!,
+                      hintText: 'Email',
+                      keyboardType: TextInputType.emailAddress,
+                      obscure: false,
+                      suffixIcon: null,
+                      theme: theme,
+                    ),
+                    if (_emailError != null) _buildFieldError(_emailError!),
+
+                    _buildGlowDivider(),
+
+                    const SizedBox(height: 16),
+
+                    // Password field
+                    _buildTextField(
+                      controller: _model.passwordTextController!,
+                      focusNode: _model.passwordFocusNode!,
+                      hintText: 'Password',
+                      keyboardType: TextInputType.visiblePassword,
+                      obscure: !_model.passwordVisibility,
+                      suffixIcon: InkWell(
+                        onTap: () => setState(
+                          () => _model.passwordVisibility =
+                              !_model.passwordVisibility,
+                        ),
+                        child: Icon(
+                          _model.passwordVisibility
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          color: Colors.white.withValues(alpha: 0.5),
+                          size: 20,
+                        ),
+                      ),
+                      theme: theme,
+                    ),
+                    if (_passwordError != null)
+                      _buildFieldError(_passwordError!),
+
+                    _buildGlowDivider(),
+
+                    const SizedBox(height: 24),
+
+                    // DOB picker section
+                    Text(
+                      'Date of birth:',
+                      style: theme.bodyMedium.override(
+                        fontFamily: 'Inter',
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    _buildDobPicker(theme),
+
+                    const SizedBox(height: 24),
+
+                    // Terms checkbox
+                    _buildTermsRow(theme),
+
+                    const SizedBox(height: 28),
+
+                    // Continue button
+                    _buildContinueButton(theme),
+
+                    const SizedBox(height: 20),
+
+                    // Pricing text
+                    Text(
+                      _getPricingString(countryCode),
+                      textAlign: TextAlign.center,
+                      style: theme.bodySmall.override(
+                        fontFamily: 'Inter',
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontSize: 13,
+                        height: 1.6,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    Text(
+                      'No credit card required',
+                      textAlign: TextAlign.center,
+                      style: theme.bodySmall.override(
+                        fontFamily: 'Inter',
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontSize: 13,
+                        height: 1.5,
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+                  ],
                 ),
-                child: TweenAnimationBuilder<double>(
-                  duration: const Duration(milliseconds: 1200),
-                  tween: Tween(begin: 0.0, end: 1.0),
-                  builder: (context, value, child) {
-                    return Transform.translate(
-                      offset: Offset(0, 50 * (1 - value)),
-                      child: Opacity(
-                        opacity: value,
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            children: [
-                              // Logo Section - FoCoCo Logo Image
-                              Container(
-                                width: 120,
-                                height: 120,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(16),
-                                  gradient: RadialGradient(
-                                    colors: [
-                                      theme.secondaryBackground
-                                          .withValues(alpha: 0.1),
-                                      Colors.transparent,
-                                    ],
-                                    stops: const [0.0, 1.0],
-                                  ),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.asset(
-                                    'assets/images/logo/Logo.png',
-                                    width: 96,
-                                    height: 96,
-                                    fit: BoxFit.contain,
-                                  ),
-                                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── DOB picker ─────────────────────────────────────────────────────────────
+
+  Widget _buildDobPicker(FlutterFlowTheme theme) {
+    return Container(
+      height: 160,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.12),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Month column
+          Expanded(
+            flex: 3,
+            child: _buildWheelColumn(
+              items: _months,
+              selectedIndex: _monthTouched ? _selectedMonthIndex : null,
+              controller: _monthController,
+              label: 'Month',
+              onChanged: (i) => setState(() {
+                _selectedMonthIndex = i;
+                _monthTouched = true;
+              }),
+            ),
+          ),
+          _buildColumnDivider(),
+          // Day column
+          Expanded(
+            flex: 2,
+            child: _buildWheelColumn(
+              items: List.generate(31, (i) => (i + 1).toString()),
+              selectedIndex: _dayTouched ? _selectedDayIndex : null,
+              controller: _dayController,
+              label: 'Day',
+              onChanged: (i) => setState(() {
+                _selectedDayIndex = i;
+                _dayTouched = true;
+              }),
+            ),
+          ),
+          _buildColumnDivider(),
+          // Year column
+          Expanded(
+            flex: 2,
+            child: _buildWheelColumn(
+              items: _years.map((y) => y.toString()).toList(),
+              selectedIndex: _yearTouched ? _selectedYearIndex : null,
+              controller: _yearController,
+              label: 'Year',
+              onChanged: (i) => setState(() {
+                _selectedYearIndex = i;
+                _yearTouched = true;
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildColumnDivider() {
+    return Container(
+      width: 1,
+      height: double.infinity,
+      color: Colors.white.withValues(alpha: 0.1),
+    );
+  }
+
+  Widget _buildWheelColumn({
+    required List<String> items,
+    required int? selectedIndex,
+    required FixedExtentScrollController controller,
+    required String label,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Column(
+      children: [
+        // Column header
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.45),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+        Container(
+          height: 1,
+          color: Colors.white.withValues(alpha: 0.06),
+        ),
+        // Wheel
+        Expanded(
+          child: Stack(
+            children: [
+              // Center highlight band
+              Positioned(
+                top: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: selectedIndex != null
+                          ? const Color(0xFF4CAF50).withValues(alpha: 0.08)
+                          : Colors.transparent,
+                      border: selectedIndex != null
+                          ? Border.symmetric(
+                              horizontal: BorderSide(
+                                color: const Color(0xFF4CAF50)
+                                    .withValues(alpha: 0.25),
+                                width: 1,
                               ),
-
-                              const SizedBox(height: 16),
-
-                              // Tagline - Enhanced Typography
-                              Column(
-                                children: [
-                                  Text(
-                                    'FoCoCo',
-                                    textAlign: TextAlign.center,
-                                    style: theme.titleMedium.override(
-                                      fontFamily: 'Inter',
-                                      color: const Color(0xFFFFD54F),
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.8,
-                                      height: 1.3,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Join the Mental Performance Journey',
-                                    textAlign: TextAlign.center,
-                                    style: theme.bodyMedium.override(
-                                      fontFamily: 'Inter',
-                                      color: theme.primaryText,
-                                      fontSize: 13,
-                                      letterSpacing: 0.5,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 24),
-
-                              // Header with Enhanced Golf Icon
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          const Color(0xFF1B5E20)
-                                              .withValues(alpha: 0.15),
-                                          const Color(0xFF2E7D32)
-                                              .withValues(alpha: 0.1),
-                                        ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: const Color(0xFF1B5E20)
-                                            .withValues(alpha: 0.2),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      Icons.person_add,
-                                      color: const Color(0xFF1B5E20),
-                                      size: 18,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Flexible(
-                                    child: Text(
-                                      'Create Your Account',
-                                      style: theme.headlineSmall.override(
-                                        fontFamily: 'Inter',
-                                        color: const Color(0xFF1B5E20),
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w700,
-                                        height: 1.2,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 8),
-
-                              Text(
-                                'Start your mental performance journey today',
-                                textAlign: TextAlign.center,
-                                style: theme.bodyMedium.override(
-                                  fontFamily: 'Inter',
-                                  color: const Color(0xFF2E7D32),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  height: 1.4,
-                                ),
-                              ),
-
-                              const SizedBox(height: 20),
-
-                              // Google Sign In Button
-                              _buildAuthButton(
-                                onTap: () async {
-                                  try {
-                                    GoRouter.of(context).prepareAuthEvent();
-                                    final user = await authManager
-                                        .signInWithGoogle(context);
-                                    if (user == null) return;
-
-                                    await _navigateAfterAuth();
-                                  } catch (e) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                            'Google Sign In failed. Please try again or use another method.'),
-                                        backgroundColor: Colors.red.shade400,
-                                      ),
-                                    );
-                                  }
-                                },
-                                icon: Image.asset(
-                                  'assets/images/google-logo.png',
-                                  width: 20,
-                                  height: 20,
-                                  fit: BoxFit.contain,
-                                ),
-                                text: 'Continue with Google',
-                                backgroundColor: theme.secondaryBackground,
-                                textColor: theme.primaryText,
-                                theme: theme,
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // Apple Sign In (iOS only)
-                              if (Theme.of(context).platform ==
-                                  TargetPlatform.iOS) ...[
-                                _buildAuthButton(
-                                  onTap: () async {
-                                    try {
-                                      GoRouter.of(context).prepareAuthEvent();
-                                      final user = await authManager
-                                          .signInWithApple(context);
-                                      if (user == null) return;
-
-                                      await _navigateAfterAuth();
-                                    } catch (e) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                              'Apple Sign In failed. Please try again or use another method.'),
-                                          backgroundColor: Colors.red.shade400,
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  icon: Icon(
-                                    FontAwesomeIcons.apple,
-                                    color: Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? Colors.black
-                                        : Colors.white,
-                                    size: 18,
-                                  ),
-                                  text: 'Continue with Apple',
-                                  backgroundColor:
-                                      Theme.of(context).brightness ==
-                                              Brightness.dark
-                                          ? Colors.white
-                                          : Colors.black,
-                                  textColor: Theme.of(context).brightness ==
-                                          Brightness.dark
-                                      ? Colors.black
-                                      : Colors.white,
-                                  theme: theme,
-                                ),
-                                const SizedBox(height: 12),
-                              ],
-
-                              // Enhanced Divider
-                              _buildDivider(),
-
-                              const SizedBox(height: 20),
-
-                              // Name Input Field
-                              TextFormField(
-                                controller: _model.nameTextController,
-                                focusNode: _model.nameFocusNode,
-                                autofocus: false,
-                                obscureText: false,
-                                decoration: InputDecoration(
-                                  labelText: 'Full Name',
-                                  labelStyle: theme.bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    color: const Color(0xFF1B5E20),
-                                    fontSize: 14,
-                                    height: 1.4,
-                                  ),
-                                  hintText: 'Enter your full name',
-                                  hintStyle: theme.bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    color: Colors.grey[400],
-                                    fontSize: 14,
-                                    height: 1.4,
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                      color: const Color(0xFF1B5E20)
-                                          .withValues(alpha: 0.3),
-                                      width: 1.5,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFF1B5E20),
-                                      width: 2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  errorBorder: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                      color: theme.error,
-                                      width: 1.5,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  focusedErrorBorder: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                      color: theme.error,
-                                      width: 2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  filled: true,
-                                  fillColor: theme.secondaryBackground,
-                                  contentPadding:
-                                      const EdgeInsetsDirectional.fromSTEB(
-                                          16, 16, 16, 16),
-                                  prefixIcon: const Icon(
-                                    Icons.person_outline,
-                                    color: Color(0xFF1B5E20),
-                                    size: 20,
-                                  ),
-                                ),
-                                style: theme.bodyMedium.override(
-                                  fontFamily: 'Inter',
-                                  color: theme.primaryText,
-                                  fontSize: 14,
-                                  height: 1.4,
-                                ),
-                                validator: _model.nameTextControllerValidator
-                                    .asValidator(context),
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              // Email Input Field
-                              TextFormField(
-                                controller: _model.emailTextController,
-                                focusNode: _model.emailFocusNode,
-                                autofocus: false,
-                                obscureText: false,
-                                decoration: InputDecoration(
-                                  labelText: 'Email',
-                                  labelStyle: theme.bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    color: const Color(0xFF1B5E20),
-                                    fontSize: 14,
-                                    height: 1.4,
-                                  ),
-                                  hintText: 'Enter your email',
-                                  hintStyle: theme.bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    color: Colors.grey[400],
-                                    fontSize: 14,
-                                    height: 1.4,
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                      color: const Color(0xFF1B5E20)
-                                          .withValues(alpha: 0.3),
-                                      width: 1.5,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFF1B5E20),
-                                      width: 2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  errorBorder: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                      color: theme.error,
-                                      width: 1.5,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  focusedErrorBorder: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                      color: theme.error,
-                                      width: 2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  filled: true,
-                                  fillColor: theme.secondaryBackground,
-                                  contentPadding:
-                                      const EdgeInsetsDirectional.fromSTEB(
-                                          16, 16, 16, 16),
-                                  prefixIcon: const Icon(
-                                    Icons.email_outlined,
-                                    color: Color(0xFF1B5E20),
-                                    size: 20,
-                                  ),
-                                ),
-                                style: theme.bodyMedium.override(
-                                  fontFamily: 'Inter',
-                                  color: theme.primaryText,
-                                  fontSize: 14,
-                                  height: 1.4,
-                                ),
-                                keyboardType: TextInputType.emailAddress,
-                                validator: _model.emailTextControllerValidator
-                                    .asValidator(context),
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              // Password Input Field
-                              TextFormField(
-                                controller: _model.passwordTextController,
-                                focusNode: _model.passwordFocusNode,
-                                autofocus: false,
-                                obscureText: !_model.passwordVisibility,
-                                decoration: InputDecoration(
-                                  labelText: 'Password',
-                                  labelStyle: theme.bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    color: const Color(0xFF1B5E20),
-                                    fontSize: 14,
-                                    height: 1.4,
-                                  ),
-                                  hintText: 'Create a strong password',
-                                  hintStyle: theme.bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    color: Colors.grey[400],
-                                    fontSize: 14,
-                                    height: 1.4,
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                      color: const Color(0xFF1B5E20)
-                                          .withValues(alpha: 0.3),
-                                      width: 1.5,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFF1B5E20),
-                                      width: 2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  errorBorder: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                      color: theme.error,
-                                      width: 1.5,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  focusedErrorBorder: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                      color: theme.error,
-                                      width: 2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  filled: true,
-                                  fillColor: theme.secondaryBackground,
-                                  contentPadding:
-                                      const EdgeInsetsDirectional.fromSTEB(
-                                          16, 16, 16, 16),
-                                  prefixIcon: const Icon(
-                                    Icons.lock_outline,
-                                    color: Color(0xFF1B5E20),
-                                    size: 20,
-                                  ),
-                                  suffixIcon: InkWell(
-                                    onTap: () => setState(
-                                      () => _model.passwordVisibility =
-                                          !_model.passwordVisibility,
-                                    ),
-                                    focusNode: FocusNode(skipTraversal: true),
-                                    child: Icon(
-                                      _model.passwordVisibility
-                                          ? Icons.visibility_outlined
-                                          : Icons.visibility_off_outlined,
-                                      color: const Color(0xFF1B5E20),
-                                      size: 20,
-                                    ),
-                                  ),
-                                ),
-                                style: theme.bodyMedium.override(
-                                  fontFamily: 'Inter',
-                                  color: theme.primaryText,
-                                  fontSize: 14,
-                                  height: 1.4,
-                                ),
-                                validator: _model
-                                    .passwordTextControllerValidator
-                                    .asValidator(context),
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              // Confirm Password Input Field
-                              TextFormField(
-                                controller:
-                                    _model.confirmPasswordTextController,
-                                focusNode: _model.confirmPasswordFocusNode,
-                                autofocus: false,
-                                obscureText: !_model.confirmPasswordVisibility,
-                                decoration: InputDecoration(
-                                  labelText: 'Confirm Password',
-                                  labelStyle: theme.bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    color: const Color(0xFF1B5E20),
-                                    fontSize: 14,
-                                    height: 1.4,
-                                  ),
-                                  hintText: 'Confirm your password',
-                                  hintStyle: theme.bodyMedium.override(
-                                    fontFamily: 'Inter',
-                                    color: Colors.grey[400],
-                                    fontSize: 14,
-                                    height: 1.4,
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                      color: const Color(0xFF1B5E20)
-                                          .withValues(alpha: 0.3),
-                                      width: 1.5,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFF1B5E20),
-                                      width: 2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  errorBorder: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                      color: theme.error,
-                                      width: 1.5,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  focusedErrorBorder: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                      color: theme.error,
-                                      width: 2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  filled: true,
-                                  fillColor: theme.secondaryBackground,
-                                  contentPadding:
-                                      const EdgeInsetsDirectional.fromSTEB(
-                                          16, 16, 16, 16),
-                                  prefixIcon: const Icon(
-                                    Icons.lock_outline,
-                                    color: Color(0xFF1B5E20),
-                                    size: 20,
-                                  ),
-                                  suffixIcon: InkWell(
-                                    onTap: () => setState(
-                                      () => _model.confirmPasswordVisibility =
-                                          !_model.confirmPasswordVisibility,
-                                    ),
-                                    focusNode: FocusNode(skipTraversal: true),
-                                    child: Icon(
-                                      _model.confirmPasswordVisibility
-                                          ? Icons.visibility_outlined
-                                          : Icons.visibility_off_outlined,
-                                      color: const Color(0xFF1B5E20),
-                                      size: 20,
-                                    ),
-                                  ),
-                                ),
-                                style: theme.bodyMedium.override(
-                                  fontFamily: 'Inter',
-                                  color: theme.primaryText,
-                                  fontSize: 14,
-                                  height: 1.4,
-                                ),
-                                validator: _model
-                                    .confirmPasswordTextControllerValidator
-                                    .asValidator(context),
-                              ),
-
-                              const SizedBox(height: 20),
-
-                              // Sign Up Button
-                              Container(
-                                width: double.infinity,
-                                height: 52,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      const Color(0xFF1B5E20),
-                                      const Color(0xFF2E7D32),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF1B5E20)
-                                          .withValues(alpha: 0.3),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () async {
-                                      GoRouter.of(context).prepareAuthEvent();
-                                      if (_model.passwordTextController.text !=
-                                          _model.confirmPasswordTextController
-                                              .text) {
-                                        _showErrorSnackBar(
-                                            'Passwords don\'t match!');
-                                        return;
-                                      }
-
-                                      final user = await authManager
-                                          .createAccountWithEmail(
-                                        context,
-                                        _model.emailTextController.text,
-                                        _model.passwordTextController.text,
-                                      );
-                                      if (user == null) {
-                                        return;
-                                      }
-
-                                      // Send email verification
-                                      try {
-                                        await currentUser
-                                            ?.sendEmailVerification();
-
-                                        // Show success message
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Account created! Please check your email to verify your account.',
-                                              style: TextStyle(
-                                                  color: Colors.white),
-                                            ),
-                                            backgroundColor:
-                                                Colors.green.shade600,
-                                            behavior: SnackBarBehavior.floating,
-                                            duration: Duration(seconds: 5),
-                                          ),
-                                        );
-                                      } catch (e) {
-                                        // Show warning if email verification fails
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Account created, but failed to send verification email. You can resend it from your profile.',
-                                              style: TextStyle(
-                                                  color: Colors.white),
-                                            ),
-                                            backgroundColor:
-                                                Colors.orange.shade600,
-                                            behavior: SnackBarBehavior.floating,
-                                            duration: Duration(seconds: 5),
-                                          ),
-                                        );
-                                      }
-
-                                      await _navigateAfterAuth();
-                                    },
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Container(
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        'Sign Up',
-                                        style: theme.titleMedium.override(
-                                          fontFamily: 'Montserrat',
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          height: 1.2,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              // Sign In Link
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    'Already have an account? ',
-                                    style: theme.bodyMedium.override(
-                                      fontFamily: 'Inter',
-                                      color: const Color(0xFF1B5E20),
-                                      fontSize: 14,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: () => context.goNamed('login'),
-                                    child: Text(
-                                      'Sign In',
-                                      style: theme.bodyMedium.override(
-                                        fontFamily: 'Inter',
-                                        color: const Color(0xFF1B5E20),
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        decoration: TextDecoration.underline,
-                                        height: 1.4,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              // Enhanced Terms and Privacy
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFD54F)
-                                          .withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Icon(
-                                      Icons.flag,
-                                      color: const Color(0xFFFFD54F),
-                                      size: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Flexible(
-                                    child: Text(
-                                      'By continuing, you agree to play by our Terms of Service and Privacy Policy',
-                                      textAlign: TextAlign.center,
-                                      style: theme.bodySmall.override(
-                                        fontFamily: 'Inter',
-                                        color: theme.secondaryText,
-                                        fontSize: 10,
-                                        height: 1.4,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+              ),
+              ListWheelScrollView.useDelegate(
+                controller: controller,
+                itemExtent: 36,
+                physics: const FixedExtentScrollPhysics(),
+                perspective: 0.003,
+                diameterRatio: 2.5,
+                onSelectedItemChanged: onChanged,
+                childDelegate: ListWheelChildBuilderDelegate(
+                  childCount: items.length,
+                  builder: (context, index) {
+                    final isSelected =
+                        selectedIndex != null && selectedIndex == index;
+                    return Center(
+                      child: Text(
+                        items[index],
+                        style: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.35),
+                          fontSize: isSelected ? 15 : 13,
+                          fontWeight: isSelected
+                              ? FontWeight.w500
+                              : FontWeight.w400,
                         ),
                       ),
                     );
                   },
                 ),
               ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Normal Auth Button Builder
-  Widget _buildAuthButton({
-    required VoidCallback onTap,
-    required Widget icon,
-    required String text,
-    required Color backgroundColor,
-    required Color textColor,
-    required FlutterFlowTheme theme,
-  }) {
-    return Container(
-      width: double.infinity,
-      height: 52,
-      margin: const EdgeInsets.symmetric(vertical: 0),
-      child: Material(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-        elevation: 2,
-        shadowColor: backgroundColor.withValues(alpha: 0.3),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: backgroundColor.computeLuminance() > 0.5
-                    ? Colors.grey.withValues(alpha: 0.3)
-                    : Colors.transparent,
-                width: 1,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                icon,
-                const SizedBox(width: 12),
-                Text(
-                  text,
-                  style: theme.titleMedium.override(
-                    fontFamily: 'Inter',
-                    color: textColor,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    height: 1.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Enhanced Divider
-  Widget _buildDivider() {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 1,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.transparent,
-                  const Color(0xFF2E7D32).withValues(alpha: 0.4),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                colors: [
-                  const Color(0xFF2E7D32).withValues(alpha: 0.2),
-                  const Color(0xFF2E7D32).withValues(alpha: 0.1),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFF2E7D32).withValues(alpha: 0.3),
-                width: 1,
-              ),
-            ),
-            child: Icon(
-              Icons.sports_golf,
-              color: const Color(0xFF2E7D32),
-              size: 10,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Container(
-            height: 1,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.transparent,
-                  const Color(0xFF2E7D32).withValues(alpha: 0.4),
-                  Colors.transparent,
-                ],
-              ),
-            ),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  // ─── Terms row ───────────────────────────────────────────────────────────────
+
+  Widget _buildTermsRow(FlutterFlowTheme theme) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 24,
+          height: 24,
+          child: Checkbox(
+            value: _termsAccepted,
+            onChanged: (val) => setState(() => _termsAccepted = val ?? false),
+            activeColor: const Color(0xFF4CAF50),
+            checkColor: Colors.white,
+            side: BorderSide(
+              color: Colors.white.withValues(alpha: 0.45),
+              width: 1.5,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Wrap(
+            children: [
+              Text(
+                'I agree to ',
+                style: theme.bodyMedium.override(
+                  fontFamily: 'Inter',
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 14,
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _openUrl(
+                    'https://fococo.app/terms'),
+                child: Text(
+                  'Terms & Privacy Policy',
+                  style: theme.bodyMedium.override(
+                    fontFamily: 'Inter',
+                    color: Colors.white,
+                    fontSize: 14,
+                    decoration: TextDecoration.underline,
+                    decorationColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Continue button ─────────────────────────────────────────────────────────
+
+  Widget _buildContinueButton(FlutterFlowTheme theme) {
+    final enabled = _canContinue && !_isLoading;
+
+    return GestureDetector(
+      onTap: enabled ? _onContinue : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: double.infinity,
+        height: 52,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: enabled
+                ? const Color(0xFF4CAF50)
+                : Colors.white.withValues(alpha: 0.2),
+            width: 1.5,
+          ),
+          boxShadow: enabled
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF4CAF50).withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
+          color: enabled
+              ? const Color(0xFF1A3320).withValues(alpha: 0.5)
+              : Colors.white.withValues(alpha: 0.03),
+        ),
+        child: Center(
+          child: _isLoading
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Text(
+                  'Continue',
+                  style: TextStyle(
+                    color:
+                        enabled ? Colors.white : Colors.white.withValues(alpha: 0.35),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Shared helpers ──────────────────────────────────────────────────────────
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required FocusNode focusNode,
+    required String hintText,
+    required TextInputType keyboardType,
+    required bool obscure,
+    required Widget? suffixIcon,
+    required FlutterFlowTheme theme,
+  }) {
+    return TextField(
+      controller: controller,
+      focusNode: focusNode,
+      obscureText: obscure,
+      keyboardType: keyboardType,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 15,
+      ),
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: TextStyle(
+          color: Colors.white.withValues(alpha: 0.4),
+          fontSize: 15,
+        ),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.05),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(
+            color: Colors.white.withValues(alpha: 0.15),
+            width: 1,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(
+            color: Colors.white.withValues(alpha: 0.15),
+            width: 1,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(
+            color: Color(0xFF4CAF50),
+            width: 1.5,
+          ),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        suffixIcon: suffixIcon != null
+            ? Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: suffixIcon,
+              )
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildFieldError(String message) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, left: 4, bottom: 4),
+      child: Text(
+        message,
+        style: const TextStyle(
+          color: Color(0xFFFF8A65),
+          fontSize: 12,
+          height: 1.4,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlowDivider() {
+    return Container(
+      height: 2,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.transparent,
+            const Color(0xFF4CAF50),
+            Colors.transparent,
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4CAF50).withValues(alpha: 0.5),
+            blurRadius: 8,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
     );
   }
 }

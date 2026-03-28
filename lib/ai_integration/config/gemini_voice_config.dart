@@ -8,19 +8,24 @@ class GeminiVoiceConfig {
   // ============================================================================
   // VOICE AI MODELS
   // ============================================================================
-  
+
   /// Most cost-efficient model supporting high throughput (for real-time voice)
   static const String flashLiteModel = 'gemini-2.5-flash-lite';
-  
+
   /// Live API model for bidirectional voice interactions
-  static const String liveModel = 'models/gemini-live-2.5-flash-preview';
-  
+  static const String liveModel = 'gemini-2.5-flash-native-audio-preview-12-2025';
+
   /// Native audio dialog model
-  static const String nativeAudioDialogModel = 'models/gemini-2.5-flash-preview-native-audio-dialog';
-  
+  static const String nativeAudioDialogModel =
+      'gemini-2.5-flash-native-audio-preview-12-2025';
+
   /// Native audio with thinking model
-  static const String nativeAudioThinkingModel = 'models/gemini-2.5-flash-exp-native-audio-thinking-dialog';
-  
+  static const String nativeAudioThinkingModel =
+      'gemini-2.5-flash-exp-native-audio-thinking-dialog';
+
+  /// Prebuilt Gemini live voice name. Cartesia voice IDs are not accepted here.
+  static const String geminiLiveVoiceName = 'Puck';
+
   /// Text-to-speech models
   static const String flashTTSModel = 'models/gemini-2.5-flash-preview-tts';
   static const String proTTSModel = 'models/gemini-2.5-pro-preview-tts';
@@ -31,39 +36,39 @@ class GeminiVoiceConfig {
 
   /// Configuration for real-time voice chat (flash-lite)
   static GenerationConfig get voiceChatConfig => GenerationConfig(
-    temperature: 0.8,
-    topK: 40,
-    topP: 0.95,
-    maxOutputTokens: 1024,
-    responseMimeType: 'text/plain',
-  );
+        temperature: 0.8,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 1024,
+        responseMimeType: 'text/plain',
+      );
 
   /// Configuration for live voice interactions
   static GenerationConfig get liveVoiceConfig => GenerationConfig(
-    temperature: 0.7,
-    topK: 30,
-    topP: 0.9,
-    maxOutputTokens: 512,
-    responseMimeType: 'text/plain',
-  );
+        temperature: 0.7,
+        topK: 30,
+        topP: 0.9,
+        maxOutputTokens: 512,
+        responseMimeType: 'text/plain',
+      );
 
   /// Configuration for native audio with thinking
   static GenerationConfig get thinkingVoiceConfig => GenerationConfig(
-    temperature: 0.6,
-    topK: 25,
-    topP: 0.85,
-    maxOutputTokens: 2048,
-    responseMimeType: 'text/plain',
-  );
+        temperature: 0.6,
+        topK: 25,
+        topP: 0.85,
+        maxOutputTokens: 2048,
+        responseMimeType: 'text/plain',
+      );
 
   /// Configuration for TTS generation
   static GenerationConfig get ttsConfig => GenerationConfig(
-    temperature: 0.3,
-    topK: 10,
-    topP: 0.7,
-    maxOutputTokens: 512,
-    responseMimeType: 'audio/wav',
-  );
+        temperature: 0.3,
+        topK: 10,
+        topP: 0.7,
+        maxOutputTokens: 512,
+        responseMimeType: 'audio/wav',
+      );
 
   // ============================================================================
   // VOICE SYSTEM PROMPTS
@@ -153,9 +158,9 @@ Provide thoughtful, strategic advice while maintaining a conversational voice to
       model: flashLiteModel,
       generationConfig: voiceChatConfig,
       safetySettings: _voiceSafetySettings,
-      systemInstruction: systemInstruction != null 
-        ? Content.text(systemInstruction) 
-        : Content.text(voiceCoachingSystemPrompt),
+      systemInstruction: systemInstruction != null
+          ? Content.text(systemInstruction)
+          : Content.text(voiceCoachingSystemPrompt),
     );
   }
 
@@ -167,9 +172,9 @@ Provide thoughtful, strategic advice while maintaining a conversational voice to
       model: nativeAudioThinkingModel,
       generationConfig: thinkingVoiceConfig,
       safetySettings: _voiceSafetySettings,
-      systemInstruction: systemInstruction != null 
-        ? Content.text(systemInstruction) 
-        : Content.text(voiceThinkingSystemPrompt),
+      systemInstruction: systemInstruction != null
+          ? Content.text(systemInstruction)
+          : Content.text(voiceThinkingSystemPrompt),
     );
   }
 
@@ -187,24 +192,24 @@ Provide thoughtful, strategic advice while maintaining a conversational voice to
   // ============================================================================
 
   static List<SafetySetting> get _voiceSafetySettings => [
-    // TODO: Fix SafetySetting constructor once we understand the firebase_ai API
-    // SafetySetting(
-    //   category: HarmCategory.harassment,
-    //   threshold: HarmBlockThreshold.medium,
-    // ),
-    // SafetySetting(
-    //   category: HarmCategory.hateSpeech,
-    //   threshold: HarmBlockThreshold.medium,
-    // ),
-    // SafetySetting(
-    //   category: HarmCategory.sexuallyExplicit,
-    //   threshold: HarmBlockThreshold.high,
-    // ),
-    // SafetySetting(
-    //   category: HarmCategory.dangerousContent,
-    //   threshold: HarmBlockThreshold.medium,
-    // ),
-  ];
+        // TODO: Fix SafetySetting constructor once we understand the firebase_ai API
+        // SafetySetting(
+        //   category: HarmCategory.harassment,
+        //   threshold: HarmBlockThreshold.medium,
+        // ),
+        // SafetySetting(
+        //   category: HarmCategory.hateSpeech,
+        //   threshold: HarmBlockThreshold.medium,
+        // ),
+        // SafetySetting(
+        //   category: HarmCategory.sexuallyExplicit,
+        //   threshold: HarmBlockThreshold.high,
+        // ),
+        // SafetySetting(
+        //   category: HarmCategory.dangerousContent,
+        //   threshold: HarmBlockThreshold.medium,
+        // ),
+      ];
 
   // ============================================================================
   // COST ESTIMATION
@@ -219,18 +224,17 @@ Provide thoughtful, strategic advice while maintaining a conversational voice to
     // Pricing per 1M tokens (approximate)
     final Map<String, Map<String, double>> pricing = {
       flashLiteModel: {'input': 0.075, 'output': 0.30}, // Most cost-efficient
-      liveModel: {'input': 0.30, 'output': 1.20}, // Live API premium
-      nativeAudioDialogModel: {'input': 0.30, 'output': 1.20},
+      nativeAudioDialogModel: {'input': 0.30, 'output': 1.20}, // Live / native audio
       nativeAudioThinkingModel: {'input': 0.30, 'output': 1.20},
       flashTTSModel: {'input': 0.30, 'output': 1.20},
       proTTSModel: {'input': 7.00, 'output': 21.00}, // Premium TTS
     };
 
     final modelPricing = pricing[model] ?? pricing[flashLiteModel]!;
-    
+
     final inputCost = (inputTokens / 1000000) * modelPricing['input']!;
     final outputCost = (outputTokens / 1000000) * modelPricing['output']!;
-    
+
     return inputCost + outputCost;
   }
 
@@ -272,9 +276,9 @@ enum VoiceInteractionType {
 
 /// Voice response quality levels
 enum VoiceResponseQuality {
-  fast,    // flash-lite for speed
+  fast, // flash-lite for speed
   balanced, // flash for balance
-  premium,  // pro for best quality
+  premium, // pro for best quality
 }
 
 /// Audio format types

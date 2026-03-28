@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '/adaptive_ui/adaptive_ui.dart';
+import '/ai_integration/widgets/navbar_widget.dart';
 import '/features/mindcoach_v2/data/mindcoach_v2_repository.dart';
 import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart';
 import '/features/mindcoach_v2/services/mindcoach_v2_debug_logger.dart';
@@ -504,10 +505,9 @@ class _MindCoachSessionPlayerV2WidgetState
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(
+        appBar: buildFoCoCoAppBar(
+          context,
           backgroundColor: Colors.black,
-          elevation: 0,
-          foregroundColor: Colors.white,
           title: Text(
             '${widget.generateResponse.session.routineType} • ~${(_totalDurationMs / 1000).round()}s',
             style: theme.textTheme.titleSmall?.copyWith(color: Colors.white70),

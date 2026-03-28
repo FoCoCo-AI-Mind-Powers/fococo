@@ -37,7 +37,7 @@ class _SubscriptionOnboardingWidgetState
   final RevenueCatService _revenueCatService = RevenueCatService();
 
   bool _isLoading = false;
-  Offerings? _offerings;
+  Offering? _selectedOffering;
 
   @override
   void initState() {
@@ -83,20 +83,22 @@ class _SubscriptionOnboardingWidgetState
     setState(() => _isLoading = true);
     try {
       final offerings = await _revenueCatService.getOfferings();
+      final selectedOffering =
+          _revenueCatService.getPreferredOffering(offerings);
       setState(() {
-        _offerings = offerings;
+        _selectedOffering = selectedOffering;
         _isLoading = false;
       });
 
-      if (offerings.current == null) {
+      if (selectedOffering == null) {
         debugPrint(
-            '⚠️ No current offering found. Check RevenueCat dashboard configuration.');
+            '⚠️ No default/current offering found. Check RevenueCat dashboard configuration.');
         debugPrint('   Make sure you have:');
-        debugPrint('   1. Created an Offering in RevenueCat dashboard');
         debugPrint(
-            '   2. Added products (fococo_monthly_test, fococo_yearly_test) to the offering');
+            '   1. Created an offering with lookup key "default" or marked one as Current');
+        debugPrint('   2. Added the yearly products to the offering package');
         debugPrint(
-            '   3. Set the offering as "Current" in RevenueCat dashboard');
+            '   3. Linked those RevenueCat products to App Store / Play store products');
       }
     } catch (e) {
       debugPrint('❌ Failed to load offerings: $e');
@@ -140,7 +142,7 @@ class _SubscriptionOnboardingWidgetState
               child: SafeArea(
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : _offerings?.current != null
+                    : _selectedOffering != null
                         ? _buildPaywallDirect(theme)
                         : _buildErrorState(theme),
               ),
@@ -157,7 +159,8 @@ class _SubscriptionOnboardingWidgetState
       children: [
         Expanded(
           child: PaywallView(
-            offering: _offerings!.current!,
+            offering: _selectedOffering!,
+            displayCloseButton: !widget.isMandatory,
             onPurchaseCompleted: (customerInfo, storeTransaction) async {
               await _handlePaywallUnlock();
             },
@@ -224,10 +227,10 @@ class _SubscriptionOnboardingWidgetState
                 const SizedBox(height: 8),
                 Text(
                   'Please check your RevenueCat dashboard configuration:\n\n'
-                  '1. Products created (fococo_monthly_test, fococo_yearly_test)\n'
-                  '2. Products added to an Offering\n'
-                  '3. Offering set as "Current"\n'
-                  '4. Products linked to App Store/Google Play',
+                  '1. Offering lookup key "default" exists, or one offering is current\n'
+                  '2. The annual package is attached to your yearly products\n'
+                  '3. RevenueCat products are linked to App Store / Google Play products\n'
+                  '4. The products are approved and available in the store',
                   style: theme.bodyMedium.copyWith(
                     color: theme.secondaryText,
                   ),

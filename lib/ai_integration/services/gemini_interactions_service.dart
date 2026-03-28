@@ -16,8 +16,8 @@ class GeminiInteractionsService {
       'https://generativelanguage.googleapis.com/v1beta/interactions';
   static const String _model = 'gemini-3-flash-preview';
 
-  /// Get API key from configuration
-  String get _apiKey => GeminiLiveAPIConfig.apiKey;
+  /// Get API key from Secret Manager / cache / dart-define
+  Future<String> get _apiKey => GeminiLiveAPIConfig.getApiKey();
 
   /// Create a new interaction
   /// Returns the interaction ID and outputs
@@ -30,12 +30,13 @@ class GeminiInteractionsService {
     bool stream = false,
   }) async {
     try {
-      if (_apiKey.isEmpty) {
+      final apiKey = await _apiKey;
+      if (apiKey.isEmpty) {
         throw Exception('Gemini API key not configured');
       }
 
-      final url = Uri.parse('$_baseUrl?key=$_apiKey');
-      
+      final url = Uri.parse('$_baseUrl?key=$apiKey');
+
       final body = <String, dynamic>{
         'model': _model,
         'input': input,
@@ -83,11 +84,12 @@ class GeminiInteractionsService {
   /// Get interaction by ID
   Future<Map<String, dynamic>> getInteraction(String interactionId) async {
     try {
-      if (_apiKey.isEmpty) {
+      final apiKey = await _apiKey;
+      if (apiKey.isEmpty) {
         throw Exception('Gemini API key not configured');
       }
 
-      final url = Uri.parse('$_baseUrl/$interactionId?key=$_apiKey');
+      final url = Uri.parse('$_baseUrl/$interactionId?key=$apiKey');
 
       final response = await http.get(url);
 

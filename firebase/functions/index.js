@@ -34,6 +34,9 @@ const livekitToken = require('./livekit_token');
 
 // Import MindCoach data seeding
 const seedMindCoachData = require('./seed_mindcoach_data');
+
+// Import Gemini key function
+const geminiKeyModule = require('./gemini_key');
 const mindCoachGenerateV2 = require('./mindcoach_v2/generate_session_v2');
 const mindCoachCompleteRunV2 = require('./mindcoach_v2/complete_run_v2');
 
@@ -338,6 +341,12 @@ exports.generateMindCoachSessionV2 =
     mindCoachGenerateV2.generateMindCoachSessionV2;
 exports.completeMindCoachSessionRunV2 =
     mindCoachCompleteRunV2.completeMindCoachSessionRunV2;
+
+// ============================================================================
+// GEMINI API KEY (from Secret Manager)
+// ============================================================================
+
+exports.getGeminiKey = geminiKeyModule.getGeminiKey;
 
 // ============================================================================
 // STRIPE WEBHOOK EVENT HANDLERS

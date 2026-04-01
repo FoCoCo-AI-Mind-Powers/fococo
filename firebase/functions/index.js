@@ -37,6 +37,7 @@ const seedMindCoachData = require('./seed_mindcoach_data');
 
 // Import Gemini key function
 const geminiKeyModule = require('./gemini_key');
+const fococoDailyInsights = require('./fococo_daily_insights');
 const mindCoachGenerateV2 = require('./mindcoach_v2/generate_session_v2');
 const mindCoachCompleteRunV2 = require('./mindcoach_v2/complete_run_v2');
 
@@ -347,6 +348,10 @@ exports.completeMindCoachSessionRunV2 =
 // ============================================================================
 
 exports.getGeminiKey = geminiKeyModule.getGeminiKey;
+exports.getOrCreateFoCoCoDailyInsight =
+    fococoDailyInsights.getOrCreateFoCoCoDailyInsight;
+exports.exportFoCoCoDailyInsightsReview =
+    fococoDailyInsights.exportFoCoCoDailyInsightsReview;
 
 // ============================================================================
 // STRIPE WEBHOOK EVENT HANDLERS

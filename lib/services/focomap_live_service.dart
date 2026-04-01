@@ -327,6 +327,9 @@ class FoCoMapLiveService {
         try {
           for (final change in snapshot.docChanges) {
             if (change.type == DocumentChangeType.added) {
+              if (change.doc.data()?['insightType'] == 'fococo_daily') {
+                continue;
+              }
               _liveUpdateController.add({
                 'type': 'ai_insight_added',
                 'data': change.doc.data(),

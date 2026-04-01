@@ -22,6 +22,7 @@ const {
   CONTENT_LIBRARY_CSV_PATH,
   SCENARIO_TAGS_CSV_PATH,
 } = require('./contracts_v2');
+const { getMindCoachSessionDefinition } = require('./catalog_v2');
 const { resolveContextMode } = require('./context_resolver_v2');
 const { chooseTemplate } = require('./template_selector_v2');
 const { selectContent, normalizeLength } = require('./content_selector_v2');
@@ -111,6 +112,18 @@ const FALLBACK_TEMPLATES = [
     delivery_lengths: ['micro_60s', 'standard_3m', 'deep_7m'],
     primary_pillar: 'ALL',
   },
+  {
+    id: 'MC_T09_POST_ROUND_INSIGHT',
+    name: 'Post-Round Insight',
+    allowed_routine_types: ['🧘 Post-Shot'],
+    allowed_cues: [
+      '💬 Self-Talk',
+      '🎯 Visualization',
+      '✋ Letting Go',
+    ],
+    delivery_lengths: ['micro_60s', 'standard_75s', 'deep_90s'],
+    primary_pillar: 'ALL',
+  },
 ];
 
 function safeString(value, fallback = '') {
@@ -152,7 +165,15 @@ async function loadTemplates() {
     const snapshot = await db.collection('mindcoach_templates').get();
     if (!snapshot.empty) {
       const mapped = snapshot.docs.map((doc) => mapTemplateDoc(doc.data(), doc.id));
-      templatesCache = mapped.filter((template) => template.id);
+      const templateMap = new Map(
+        mapped.filter((template) => template.id).map((template) => [template.id, template]),
+      );
+      for (const fallback of FALLBACK_TEMPLATES) {
+        if (!templateMap.has(fallback.id)) {
+          templateMap.set(fallback.id, fallback);
+        }
+      }
+      templatesCache = Array.from(templateMap.values());
       if (templatesCache.length) {
         logger.info('[MCv2:loadTemplates] loaded from Firestore', { count: templatesCache.length });
         return templatesCache;
@@ -168,9 +189,15 @@ async function loadTemplates() {
     const templates = (json.templates || []).map((template) =>
       mapTemplateDoc(template, template.id),
     );
-    templatesCache = templates;
+    const templateMap = new Map(templates.map((template) => [template.id, template]));
+    for (const fallback of FALLBACK_TEMPLATES) {
+      if (!templateMap.has(fallback.id)) {
+        templateMap.set(fallback.id, fallback);
+      }
+    }
+    templatesCache = Array.from(templateMap.values());
     logger.info('[MCv2:loadTemplates] loaded from JSON file', { count: templates.length, path: TEMPLATES_JSON_PATH });
-    return templates;
+    return templatesCache;
   } catch (err) {
     logger.warn('[MCv2:loadTemplates] JSON file read failed, using hardcoded fallback', { error: err.message });
     templatesCache = FALLBACK_TEMPLATES;
@@ -193,8 +220,11 @@ function mapContentRow(row) {
 }
 
 function assertContentLibraryIntegrity(entries, source) {
+  const contentBackedTemplateIds = TEMPLATE_IDS.filter(
+    (templateId) => templateId !== 'MC_T09_POST_ROUND_INSIGHT',
+  );
   const report = validateContentLibraryIntegrity(entries, {
-    templateIds: TEMPLATE_IDS,
+    templateIds: contentBackedTemplateIds,
     expectedRows: CONTENT_LIBRARY_EXPECTED_ROWS,
   });
 
@@ -403,12 +433,33 @@ function pickDeliveryLength({ preferred, template, contextMode }) {
   return standard || allowed[0];
 }
 
+function pickNearestDeliveryLength({ template, targetSec, preferred = 'auto', contextMode }) {
+  if (!targetSec || targetSec <= 0) {
+    return pickDeliveryLength({ preferred, template, contextMode });
+  }
+
+  const allowed = Array.isArray(template.delivery_lengths)
+    ? template.delivery_lengths
+    : [];
+  if (!allowed.length) {
+    return targetSec <= 15 ? 'micro_10s' : 'standard_45s';
+  }
+
+  return allowed.reduce((best, candidate) => {
+    const bestDiff = Math.abs(parseTargetSeconds(best) - targetSec);
+    const candidateDiff = Math.abs(parseTargetSeconds(candidate) - targetSec);
+    return candidateDiff < bestDiff ? candidate : best;
+  });
+}
+
 function buildPromptText({
   template,
   content,
   selectedDeliveryLength,
+  fixedTargetSec,
   selectedLevel,
   contextMode,
+  lockedSession,
   userMessage,
   customization,
   scenarioTags,
@@ -424,12 +475,16 @@ function buildPromptText({
   }
 
   const baseScript = safeString(content?.script_text);
-  const targetSec = parseTargetSeconds(selectedDeliveryLength);
+  const targetSec = fixedTargetSec || parseTargetSeconds(selectedDeliveryLength);
   const lineRange = lineRangeForDuration(targetSec);
 
   return `${promptCache}
 
 Context mode: ${contextMode}
+Locked pillar: ${safeString(lockedSession?.pillar, 'none')}
+Locked session key: ${safeString(lockedSession?.key, 'none')}
+Locked session name: ${safeString(lockedSession?.name, 'none')}
+Locked session descriptor: ${safeString(lockedSession?.descriptor, 'none')}
 Template ID: ${template.id}
 Template name: ${template.name}
 Allowed routine types: ${template.allowed_routine_types.join(', ')}
@@ -446,8 +501,9 @@ Customization vark_mode: ${safeString(customization.vark_mode, 'auto')}
 Reference script: ${baseScript || 'none'}
 
 Return JSON only with keys:
-template_id, routine_type, recommended_cue, delivery_length, coaching_text, follow_up_question.
+template_id, routine_type, recommended_cue, delivery_length, coaching_text, follow_up_question, session_key, session_name, session_descriptor, duration_sec.
 REQUIRED: include "lines" (array of {text: string, startMs: number, durationMs: number}) and "total_duration_sec" (number).
+If a locked session is supplied, you MUST preserve its session_name, session_descriptor, duration_sec, and fixed purpose.
 
 TIMING RULES - CRITICAL:
 - total_duration_sec MUST be approximately ${targetSec} seconds (±10%).
@@ -477,7 +533,7 @@ const MAX_LINE_CHARS = 60;
 const MIN_LINES = 3;
 const MAX_LINES = 32;
 const MAX_DURATION_DURING = 60;
-const MAX_DURATION_OTHER = 480;
+const MAX_DURATION_OTHER = 90;
 
 function validateAndNormalizeTimedLines(aiOutput, contextMode) {
   const lines = aiOutput?.lines;
@@ -616,9 +672,11 @@ function buildDeterministicOutput({
   template,
   content,
   selectedDeliveryLength,
+  fixedTargetSec,
   contextMode,
   uiMode,
   userId,
+  lockedSession,
   recentCoachingTexts = [],
   fallbackSeed = '',
 }) {
@@ -639,11 +697,19 @@ function buildDeterministicOutput({
   const timed = buildTimedFallbackLines({
     coachingText,
     selectedDeliveryLength,
+    fixedTargetSec,
     uiMode,
   });
 
   return {
     template_id: template.id,
+    session_key: safeString(lockedSession?.key, template.id),
+    session_name: safeString(lockedSession?.name, template.name),
+    session_descriptor: safeString(
+      lockedSession?.descriptor,
+      safeString(content?.cta_question),
+    ),
+    duration_sec: fixedTargetSec || timed.totalDurationSec,
     routine_type: routineType,
     recommended_cue: cue,
     delivery_length: selectedDeliveryLength,
@@ -846,8 +912,13 @@ function stableHash(value) {
   return hash;
 }
 
-function buildTimedFallbackLines({ coachingText, selectedDeliveryLength, uiMode }) {
-  const targetSec = parseTargetSeconds(selectedDeliveryLength);
+function buildTimedFallbackLines({
+  coachingText,
+  selectedDeliveryLength,
+  fixedTargetSec,
+  uiMode,
+}) {
+  const targetSec = fixedTargetSec || parseTargetSeconds(selectedDeliveryLength);
   const targetMs = targetSec * 1000;
 
   const fragments = safeString(coachingText)
@@ -913,7 +984,7 @@ async function applyRateLimit(userId) {
 
   logger.info('[MCv2:rateLimit] current counts', { dailyCount, hourlyCount, dayKey, hourKey });
 
-  if (dailyCount >= 50) {
+  if (dailyCount >= 25) {
     logger.warn('[MCv2:rateLimit] daily limit reached', { dailyCount });
     throw new functions.https.HttpsError(
       'resource-exhausted',
@@ -1019,6 +1090,11 @@ async function _generateMindCoachSessionV2Impl(data, context) {
   const userId = context.auth.uid;
   const requestedContextMode = safeString(data.context_mode, 'auto');
   const entrySource = safeString(data.entry_source, 'home_primary');
+  const requestedPillar = safeString(data.pillar).toLowerCase();
+  const sessionKey = safeString(data.session_key);
+  const requestedSessionName = safeString(data.session_name);
+  const requestedSessionDescriptor = safeString(data.session_descriptor);
+  const targetDurationSec = Number(data.target_duration_sec || 0) || 0;
   const userMessage = safeString(data.user_message);
   const mindsetBefore = safeString(data.mindset_before);
   const preferredDeliveryLength = safeString(data.preferred_delivery_length, 'auto');
@@ -1031,6 +1107,8 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     userId,
     requestedContextMode,
     entrySource,
+    requestedPillar: requestedPillar || null,
+    sessionKey: sessionKey || null,
     preferredDeliveryLength,
     mindsetBefore: mindsetBefore || null,
     hasUserMessage: !!userMessage,
@@ -1065,20 +1143,53 @@ async function _generateMindCoachSessionV2Impl(data, context) {
   await applyRateLimit(userId);
   logger.info('[MCv2:generate] rate limit OK');
 
-  const resolvedBase = await resolveContextMode({
-    requestedMode: requestedContextMode,
-    userId,
-    db,
-  });
-  const resolved = { ...resolvedBase };
-  if (entrySource === 'builder' && resolved.contextMode === 'during_round') {
-    resolved.contextMode = 'off_day';
-    resolved.uiMode = 'guided_extended';
-    resolved.signals = {
-      ...resolved.signals,
-      builder_mode_adjusted: true,
+  const lockedSession = sessionKey ? getMindCoachSessionDefinition(sessionKey) : null;
+  if (sessionKey && !lockedSession) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Unknown session_key for MindCoach generation.',
+    );
+  }
+  if (
+    lockedSession &&
+    requestedPillar &&
+    requestedPillar !== String(lockedSession.pillar).toLowerCase()
+  ) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'pillar does not match the requested session_key.',
+    );
+  }
+
+  let resolved;
+  if (lockedSession) {
+    resolved = {
+      contextMode: safeString(lockedSession.context_mode),
+      uiMode:
+        safeString(lockedSession.context_mode) === 'during_round'
+          ? 'live_minimal'
+          : 'guided_extended',
+      signals: {
+        locked_catalog_session: true,
+        locked_pillar: lockedSession.pillar,
+      },
     };
-    logger.info('[MCv2:generate] builder during-round adjusted to off_day');
+  } else {
+    const resolvedBase = await resolveContextMode({
+      requestedMode: requestedContextMode,
+      userId,
+      db,
+    });
+    resolved = { ...resolvedBase };
+    if (entrySource === 'builder' && resolved.contextMode === 'during_round') {
+      resolved.contextMode = 'off_day';
+      resolved.uiMode = 'guided_extended';
+      resolved.signals = {
+        ...resolved.signals,
+        builder_mode_adjusted: true,
+      };
+      logger.info('[MCv2:generate] builder during-round adjusted to off_day');
+    }
   }
   logger.info('[MCv2:generate] context resolved', {
     contextMode: resolved.contextMode,
@@ -1137,14 +1248,16 @@ async function _generateMindCoachSessionV2Impl(data, context) {
   });
   logger.info('[MCv2:generate] scenario tags detected', { scenarioTags });
 
-  const templateId = chooseTemplate({
-    contextMode: resolved.contextMode,
-    scenarioTags,
-    recentTemplateId,
-    availableTemplateIds: templates
-      .map((template) => template.id)
-      .filter((id) => TEMPLATE_IDS.includes(id)),
-  });
+  const templateId = lockedSession
+    ? safeString(lockedSession.template_id)
+    : chooseTemplate({
+        contextMode: resolved.contextMode,
+        scenarioTags,
+        recentTemplateId,
+        availableTemplateIds: templates
+          .map((template) => template.id)
+          .filter((id) => TEMPLATE_IDS.includes(id)),
+      });
 
   const template = templatesById.get(templateId) || templatesById.get(FALLBACK_TEMPLATE_ID);
   const fallbackTemplate = templatesById.get(FALLBACK_TEMPLATE_ID) || templates[0];
@@ -1153,9 +1266,15 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     templateName: template ? template.name : 'MISSING',
   });
 
-  const selectedDeliveryLength = pickDeliveryLength({
+  const fixedTargetSec = lockedSession
+    ? Number(lockedSession.duration_sec || 0)
+    : targetDurationSec > 0
+    ? targetDurationSec
+    : 0;
+  const selectedDeliveryLength = pickNearestDeliveryLength({
     preferred: preferredDeliveryLength,
     template,
+    targetSec: fixedTargetSec,
     contextMode: resolved.contextMode,
   });
   const effectiveVarkMode =
@@ -1198,8 +1317,18 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     template,
     content: selectedContent,
     selectedDeliveryLength,
+    fixedTargetSec,
     selectedLevel: effectiveLevel,
     contextMode: resolved.contextMode,
+    lockedSession: lockedSession
+      ? {
+          key: sessionKey,
+          name: requestedSessionName || lockedSession.name,
+          descriptor:
+            requestedSessionDescriptor || lockedSession.descriptor,
+          pillar: requestedPillar || lockedSession.pillar,
+        }
+      : null,
     userMessage,
     customization: {
       ...customization,
@@ -1231,9 +1360,18 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     template,
     content: selectedContent,
     selectedDeliveryLength,
+    fixedTargetSec,
     contextMode: resolved.contextMode,
     uiMode: resolved.uiMode,
     userId,
+    lockedSession: lockedSession
+      ? {
+          key: sessionKey,
+          name: requestedSessionName || lockedSession.name,
+          descriptor:
+            requestedSessionDescriptor || lockedSession.descriptor,
+        }
+      : null,
     recentCoachingTexts,
     fallbackSeed: rotationSeed,
   });
@@ -1274,6 +1412,24 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     validatedSession.total_duration_sec = deterministicOutput.total_duration_sec;
   }
 
+  validatedSession.session_key = safeString(
+    validatedSession.session_key,
+    sessionKey || template.id,
+  );
+  validatedSession.session_name = safeString(
+    validatedSession.session_name,
+    requestedSessionName || safeString(lockedSession?.name, template.name),
+  );
+  validatedSession.session_descriptor = safeString(
+    validatedSession.session_descriptor,
+    requestedSessionDescriptor ||
+      safeString(lockedSession?.descriptor, safeString(selectedContent?.cta_question)),
+  );
+  validatedSession.duration_sec =
+    Number(validatedSession.duration_sec || 0) ||
+    fixedTargetSec ||
+    Number(validatedSession.total_duration_sec || 0);
+
   const sessionRef = db.collection('mindcoach_sessions').doc();
   const runRef = db.collection('mindcoach_session_runs').doc();
   const validatorLogRef = db.collection('ai_validator_logs').doc();
@@ -1284,9 +1440,14 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     user_id: userId,
     created_at: now,
     updated_at: now,
+    pillar: safeString(requestedPillar, safeString(lockedSession?.pillar, 'focus')),
     context_mode: resolved.contextMode,
     entry_source: entrySource,
     template_id: validatedSession.template_id,
+    session_key: validatedSession.session_key,
+    session_name: validatedSession.session_name,
+    session_descriptor: validatedSession.session_descriptor,
+    duration_sec: validatedSession.duration_sec,
     routine_type: validatedSession.routine_type,
     recommended_cue: validatedSession.recommended_cue,
     delivery_length: validatedSession.delivery_length,
@@ -1304,7 +1465,12 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     // Compatibility mirror fields for current app models.
     userId: userId,
     timestamp: now,
+    pillarKey: safeString(requestedPillar, safeString(lockedSession?.pillar, 'focus')),
     templateId: validatedSession.template_id,
+    sessionKey: validatedSession.session_key,
+    sessionName: validatedSession.session_name,
+    sessionDescriptor: validatedSession.session_descriptor,
+    durationSec: validatedSession.duration_sec,
     routineType: validatedSession.routine_type,
     cueUsed: validatedSession.recommended_cue,
     deliveryLength: validatedSession.delivery_length,
@@ -1383,7 +1549,12 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     ui_mode: resolved.uiMode,
     session: {
       schema_version: SCHEMA_VERSION,
+      pillar: safeString(requestedPillar, safeString(lockedSession?.pillar, 'focus')),
       template_id: validatedSession.template_id,
+      session_key: validatedSession.session_key,
+      session_name: validatedSession.session_name,
+      session_descriptor: validatedSession.session_descriptor,
+      duration_sec: validatedSession.duration_sec,
       routine_type: validatedSession.routine_type,
       recommended_cue: validatedSession.recommended_cue,
       delivery_length: validatedSession.delivery_length,

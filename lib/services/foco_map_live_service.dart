@@ -487,12 +487,16 @@ class FoCoMapLiveService {
         try {
           _cachedAIInsights = snapshot.docs
               .map((doc) => doc.data())
+              .where((data) => data['insightType'] != 'fococo_daily')
               .toList();
 
           _aiInsightsController.add(_cachedAIInsights);
 
           for (final change in snapshot.docChanges) {
             if (change.type == DocumentChangeType.added) {
+              if (change.doc.data()?['insightType'] == 'fococo_daily') {
+                continue;
+              }
               _liveUpdateController.add({
                 'type': 'ai_insight_added',
                 'data': change.doc.data(),
@@ -524,6 +528,7 @@ class FoCoMapLiveService {
       final snapshot = await query.get();
       _cachedAIInsights = snapshot.docs
           .map((doc) => doc.data())
+          .where((data) => data['insightType'] != 'fococo_daily')
           .toList();
 
       _aiInsightsController.add(_cachedAIInsights);

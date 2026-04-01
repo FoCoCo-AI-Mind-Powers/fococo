@@ -144,7 +144,7 @@ class StripeService {
           customerEphemeralKeySecret: subscriptionData['ephemeralKey'],
           customerId: subscriptionData['customerId'],
           merchantDisplayName: 'FoCoCo',
-          style: ThemeMode.system,
+          style: ThemeMode.dark,
           billingDetails: BillingDetails(
             email: user.email,
             name: user.displayName,

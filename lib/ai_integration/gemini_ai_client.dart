@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:firebase_ai/firebase_ai.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -405,7 +406,8 @@ class GeminiAIClient {
   // ============================================================================
 
   /// Generate response in a multi-turn conversation.
-  /// Tries REST with client API key first; on 403 (blocked key) falls back to Firebase AI.
+  /// Prefers Firebase AI Logic (project auth, no raw key in REST). If that returns
+  /// nothing or fails, falls back to Generative Language REST when [_apiKey] is set.
   Future<GeminiConversationResponse> generateConversationResponse({
     required String userId,
     required String conversationId,
@@ -418,8 +420,23 @@ class GeminiAIClient {
 
     try {
       String responseText = '';
+      Object? firebaseError;
 
-      if (_apiKey.isNotEmpty) {
+      try {
+        responseText = await _generateConversationResponseViaFirebaseAI(
+          userMessage: userMessage,
+          conversationHistory: conversationHistory,
+          context: context,
+          userProfile: userProfile,
+        );
+      } catch (e) {
+        firebaseError = e;
+        if (kDebugMode) {
+          print('⚠️ Firebase AI conversation failed: $e');
+        }
+      }
+
+      if (responseText.isEmpty && _apiKey.isNotEmpty) {
         try {
           responseText = await _generateConversationResponseViaRest(
             userMessage: userMessage,
@@ -427,53 +444,30 @@ class GeminiAIClient {
             context: context,
             userProfile: userProfile,
           );
+          if (kDebugMode && responseText.isNotEmpty) {
+            print('✅ GolfChat: used Gemini REST fallback');
+          }
         } catch (restError) {
           final msg = restError.toString();
+          if (kDebugMode) {
+            print('⚠️ Gemini REST failed: $restError');
+          }
           if (msg.contains('403') ||
               msg.contains('PERMISSION_DENIED') ||
-              msg.contains('API_KEY_SERVICE_BLOCKED')) {
-            if (kDebugMode) {
-              print('⚠️ Gemini REST blocked (403), falling back to Firebase AI.');
-            }
-            try {
-              responseText = await _generateConversationResponseViaFirebaseAI(
-                userMessage: userMessage,
-                conversationHistory: conversationHistory,
-                context: context,
-                userProfile: userProfile,
-              );
-            } catch (firebaseError) {
-              if (kDebugMode) {
-                print('⚠️ Firebase AI also failed: $firebaseError');
-              }
-              throw Exception(
-                'Gemini API is not available. Enable "Generative Language API" '
-                'in Google Cloud Console and ensure your API key is not restricted '
-                'for this app, or use Firebase AI with a valid key.',
-              );
-            }
-          } else {
-            rethrow;
+              msg.contains('API_KEY_SERVICE_BLOCKED') ||
+              msg.contains('leaked')) {
+            throw Exception(
+              _geminiUnavailableMessage(firebaseError, restError),
+            );
           }
+          rethrow;
         }
       }
 
       if (responseText.isEmpty) {
-        try {
-          responseText = await _generateConversationResponseViaFirebaseAI(
-            userMessage: userMessage,
-            conversationHistory: conversationHistory,
-            context: context,
-            userProfile: userProfile,
-          );
-        } catch (e) {
-          if (kDebugMode) {
-            print('❌ Firebase AI fallback failed: $e');
-          }
+        if (firebaseError != null) {
+          throw Exception(_geminiUnavailableMessage(firebaseError, null));
         }
-      }
-
-      if (responseText.isEmpty) {
         throw Exception('Empty response from Gemini API');
       }
 
@@ -502,7 +496,8 @@ class GeminiAIClient {
         print('❌ Error generating conversation response: $e');
       }
       final msg = e.toString();
-      if (msg.contains('Gemini API is not available') ||
+      if (msg.contains('Gemini is not available') ||
+          msg.contains('Gemini API is not available') ||
           msg.contains('PERMISSION_DENIED') ||
           msg.contains('API_KEY_SERVICE_BLOCKED')) {
         rethrow;
@@ -511,14 +506,22 @@ class GeminiAIClient {
     }
   }
 
-  /// Generate conversation response via Firebase AI (server-side key). Used when REST key is blocked or no key.
+  String _geminiUnavailableMessage(Object? firebaseErr, Object? restErr) {
+    return 'Gemini is not available. Enable Firebase AI Logic / Gemini for this '
+        'Firebase project and use a valid model (${GeminiConfig.defaultModel}). '
+        'If you see "leaked" or 403, create a new API key in Google AI Studio and '
+        'update Secret Manager / Cloud Functions. '
+        'Firebase AI error: $firebaseErr. REST error: $restErr';
+  }
+
+  /// Generate conversation response via Firebase AI Logic (default [Firebase.app]).
   Future<String> _generateConversationResponseViaFirebaseAI({
     required String userMessage,
     required List<Map<String, dynamic>> conversationHistory,
     String? context,
     Map<String, dynamic>? userProfile,
   }) async {
-    final model = FirebaseAI.googleAI().generativeModel(
+    final model = FirebaseAI.googleAI(app: Firebase.app()).generativeModel(
       model: GeminiConfig.defaultModel,
       generationConfig: GeminiConfig.conversationGenerationConfig,
       safetySettings: GeminiConfig.defaultSafetySettings,
@@ -533,7 +536,7 @@ class GeminiAIClient {
     return response.text ?? '';
   }
 
-  /// Call Gemini REST API for conversation (used when API key is provided to avoid Firebase AI leaked key).
+  /// Call Gemini REST API for conversation (fallback when Firebase AI returns empty).
   Future<String> _generateConversationResponseViaRest({
     required String userMessage,
     required List<Map<String, dynamic>> conversationHistory,

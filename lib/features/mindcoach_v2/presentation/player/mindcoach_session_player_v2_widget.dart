@@ -3,18 +3,26 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '/adaptive_ui/adaptive_ui.dart';
-import '/ai_integration/widgets/navbar_widget.dart';
 import '/features/mindcoach_v2/data/mindcoach_v2_repository.dart';
 import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart';
+import '/features/mindcoach_v2/presentation/shared/mindcoach_v2_visuals.dart';
 import '/features/mindcoach_v2/services/mindcoach_v2_debug_logger.dart';
 import '/features/mindcoach_v2/services/mindcoach_v2_tts_service.dart';
+
+const int kMindCoachFavoriteLimitPerPillar = 5;
+
+enum MindCoachV2PlayerNextAction {
+  none,
+  playAgain,
+  backToSessions,
+}
 
 class MindCoachV2PlayerResult {
   MindCoachV2PlayerResult({
     required this.completed,
     required this.completionStatus,
     required this.favoriteSaved,
+    required this.nextAction,
     this.helpfulnessRating,
     this.runId,
   });
@@ -22,6 +30,7 @@ class MindCoachV2PlayerResult {
   final bool completed;
   final MindCoachV2CompletionStatus completionStatus;
   final bool favoriteSaved;
+  final MindCoachV2PlayerNextAction nextAction;
   final int? helpfulnessRating;
   final String? runId;
 }
@@ -50,6 +59,7 @@ class _MindCoachSessionPlayerV2WidgetState
   late final List<String> _lines;
   late final List<MindCoachV2SpeechLine> _speechLines;
   late final List<int> _revealStartMs;
+  final Stopwatch _playbackClock = Stopwatch();
   List<MindCoachV2TimedLine>? _timedLines;
 
   late final int _totalDurationMs;
@@ -61,6 +71,7 @@ class _MindCoachSessionPlayerV2WidgetState
 
   DateTime? _activeLineStartAt;
   int? _activeLineIndex;
+  int _lastCompletedIndex = -1;
   DateTime? _fallbackStartedAt;
   int _fallbackBaseElapsedMs = 0;
 
@@ -71,28 +82,31 @@ class _MindCoachSessionPlayerV2WidgetState
   bool _playbackFinished = false;
   bool _submitting = false;
   bool _degradedMode = false;
-  int _rating = 4;
   bool _saveFavorite = false;
+  bool _favoriteSaved = false;
   String? _runId;
   bool _ttsMuted = false;
 
   bool get _isLiveMinimal =>
       widget.generateResponse.uiMode == MindCoachV2UiMode.liveMinimal;
 
+  MindCoachV2Session get _session => widget.generateResponse.session;
+  MindCoachV2Pillar get _pillar => _session.pillar;
+  Color get _accent => MindCoachV2Visuals.accentForPillar(_pillar);
+
   @override
   void initState() {
     super.initState();
     _runId = widget.generateResponse.runId;
 
-    final session = widget.generateResponse.session;
-    _timedLines = (session.lines != null && session.lines!.isNotEmpty)
-        ? session.lines
+    _timedLines = (_session.lines != null && _session.lines!.isNotEmpty)
+        ? _session.lines
         : null;
 
     if (_timedLines != null) {
       _lines = _timedLines!.map((line) => line.text).toList(growable: false);
     } else {
-      _lines = _tokenizeLines(session.coachingText);
+      _lines = _tokenizeLines(_session.coachingText);
     }
 
     _speechLines = List<MindCoachV2SpeechLine>.generate(
@@ -100,7 +114,7 @@ class _MindCoachSessionPlayerV2WidgetState
       (index) => MindCoachV2SpeechLine(
         lineIndex: index,
         text: _lines[index],
-        durationHintMs: _durationHintFor(index, session.deliveryLength),
+        durationHintMs: _durationHintFor(index, _session.deliveryLength),
       ),
       growable: false,
     );
@@ -111,31 +125,32 @@ class _MindCoachSessionPlayerV2WidgetState
       (sum, line) => sum + (line.durationHintMs ?? 2500),
     );
 
-    if ((session.totalDurationSec ?? 0) > 0) {
+    if ((_session.totalDurationSec ?? 0) > 0) {
       _totalDurationMs =
-          math.max(session.totalDurationSec! * 1000, hintedTotal);
+          math.max(_session.totalDurationSec! * 1000, hintedTotal);
     } else {
       _totalDurationMs = math.max(hintedTotal, 1);
     }
 
-    _logger.log(_tag, 'initState', {
-      'sessionId': widget.generateResponse.sessionId,
-      'uiMode': widget.generateResponse.uiMode.wireValue,
-      'templateId': session.templateId,
-      'routineType': session.routineType,
-      'deliveryLength': session.deliveryLength,
-      'lineCount': _lines.length,
-      'hasTimedLines': (_timedLines != null).toString(),
-      'totalDurationMs': _totalDurationMs,
-    });
-
     _ttsService = MindCoachV2TTSService();
     _lineEventsSub = _ttsService.lineEvents.listen(_onLineEvent);
     _ttsStateSub = _ttsService.stateStream.listen((state) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       if (state == MindCoachV2TTSState.degraded && !_degradedMode) {
         setState(() => _degradedMode = true);
       }
+    });
+
+    _logger.log(_tag, 'initState', {
+      'sessionId': widget.generateResponse.sessionId,
+      'sessionKey': _session.sessionKey,
+      'uiMode': widget.generateResponse.uiMode.wireValue,
+      'templateId': _session.templateId,
+      'lineCount': _lines.length,
+      'hasTimedLines': (_timedLines != null).toString(),
+      'totalDurationMs': _totalDurationMs,
     });
 
     _startProgressTicker();
@@ -158,9 +173,9 @@ class _MindCoachSessionPlayerV2WidgetState
         .split(RegExp(r'(?<=[.!?])\s+'))
         .map((line) => line.trim())
         .where((line) => line.isNotEmpty)
-        .toList();
+        .toList(growable: false);
     if (split.isEmpty) {
-      return <String>['Take one breath.', 'Focus on the next target.'];
+      return const <String>['Take one breath.', 'Focus on the next target.'];
     }
     return split;
   }
@@ -173,24 +188,24 @@ class _MindCoachSessionPlayerV2WidgetState
     final text = _lines[index];
     final chars = text.length;
     final words = text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
-    final base = 1000 + math.max(chars * 17, words * 210);
+    final base = 1200 + math.max(chars * 18, words * 240);
     final normalized = deliveryLength.toLowerCase();
 
     if (normalized.contains('micro')) {
-      return base.clamp(1200, 2600).toInt();
+      return base.clamp(1600, 3200).toInt();
     }
     if (normalized.contains('deep')) {
-      return (base + 900).clamp(2200, 6200).toInt();
+      return (base + 1200).clamp(3200, 7600).toInt();
     }
-    return (base + 350).clamp(1600, 3800).toInt();
+    return (base + 700).clamp(2200, 5200).toInt();
   }
 
   List<int> _buildRevealStartMs() {
     final revealStarts = <int>[];
     var cursor = 0;
-    for (int i = 0; i < _speechLines.length; i += 1) {
+    for (final line in _speechLines) {
       revealStarts.add(cursor);
-      cursor += _speechLines[i].durationHintMs ?? 2500;
+      cursor += line.durationHintMs ?? 2500;
     }
     return revealStarts;
   }
@@ -203,7 +218,7 @@ class _MindCoachSessionPlayerV2WidgetState
 
     try {
       await _ttsService.init(
-        deliveryLength: widget.generateResponse.session.deliveryLength,
+        deliveryLength: _session.deliveryLength,
         voiceProfileKey: 'mentor_calm',
       );
 
@@ -212,10 +227,9 @@ class _MindCoachSessionPlayerV2WidgetState
         return;
       }
 
-      _logger.log(_tag, 'starting Cartesia line queue', {
-        'lineCount': _speechLines.length,
-      });
-
+      _playbackClock
+        ..reset()
+        ..start();
       await _ttsService.playLines(_speechLines);
     } catch (error, stackTrace) {
       _logger.error(
@@ -232,25 +246,18 @@ class _MindCoachSessionPlayerV2WidgetState
   void _startProgressTicker() {
     _progressTicker?.cancel();
     _progressTicker = Timer.periodic(const Duration(milliseconds: 120), (_) {
-      if (!mounted || _playbackFinished) {
+      if (!mounted || _playbackFinished || _fallbackTimer != null) {
         return;
       }
 
-      if (_fallbackTimer != null) {
-        return;
-      }
-
-      final activeElapsed = (_activeLineStartAt == null)
+      final activeElapsed = _activeLineStartAt == null
           ? 0
           : DateTime.now().difference(_activeLineStartAt!).inMilliseconds;
       final nextElapsed = (_spokenDurationMs + activeElapsed)
           .clamp(0, _totalDurationMs)
           .toInt();
-
       if (nextElapsed != _elapsedMs) {
-        setState(() {
-          _elapsedMs = nextElapsed;
-        });
+        setState(() => _elapsedMs = nextElapsed);
       }
     });
   }
@@ -284,6 +291,7 @@ class _MindCoachSessionPlayerV2WidgetState
             (_spokenDurationMs + durationMs).clamp(0, _totalDurationMs).toInt();
         _activeLineIndex = null;
         _activeLineStartAt = null;
+        _lastCompletedIndex = math.max(_lastCompletedIndex, lineIndex);
 
         if (event.type == MindCoachV2TTSLineEventType.lineTimeout ||
             event.type == MindCoachV2TTSLineEventType.lineError) {
@@ -297,9 +305,7 @@ class _MindCoachSessionPlayerV2WidgetState
 
         setState(() {
           _elapsedMs = _spokenDurationMs.clamp(0, _totalDurationMs).toInt();
-          if (lineIndex + 1 > _visibleLineCount) {
-            _visibleLineCount = lineIndex + 1;
-          }
+          _visibleLineCount = math.max(_visibleLineCount, lineIndex + 1);
           if (event.type != MindCoachV2TTSLineEventType.lineCompleted) {
             _degradedMode = true;
           }
@@ -309,7 +315,6 @@ class _MindCoachSessionPlayerV2WidgetState
         _finishPlayback();
         break;
       case MindCoachV2TTSLineEventType.queueCancelled:
-        // Expected when user exits, mutes, or we switch to fallback mode.
         break;
     }
   }
@@ -325,21 +330,19 @@ class _MindCoachSessionPlayerV2WidgetState
     _fallbackTimer?.cancel();
     _fallbackStartedAt = DateTime.now();
     _fallbackBaseElapsedMs = continueFromCurrent ? _elapsedMs : 0;
-
+    _degradedMode = true;
     _logger.warn(_tag, 'starting timed fallback playback', {
       'reason': reason,
-      'continueFromCurrent': continueFromCurrent,
-      'baseElapsedMs': _fallbackBaseElapsedMs,
+      'continueFromCurrent': continueFromCurrent.toString(),
     });
-
     unawaited(_ttsService.stop(clearQueue: true));
-
-    _degradedMode = true;
 
     if (!continueFromCurrent) {
       _visibleLineCount = _lines.isEmpty ? 0 : 1;
       _elapsedMs = 0;
       _spokenDurationMs = 0;
+      _lastCompletedIndex = -1;
+      _activeLineIndex = 0;
     }
 
     _fallbackTimer = Timer.periodic(const Duration(milliseconds: 120), (timer) {
@@ -361,10 +364,13 @@ class _MindCoachSessionPlayerV2WidgetState
         }
       }
       visible = visible.clamp(0, _lines.length);
+      final activeIndex =
+          visible <= 0 ? 0 : math.min(visible - 1, _lines.length - 1);
 
       setState(() {
         _elapsedMs = totalElapsed;
         _visibleLineCount = math.max(_visibleLineCount, visible);
+        _activeLineIndex = activeIndex;
       });
 
       if (totalElapsed >= _totalDurationMs) {
@@ -380,81 +386,139 @@ class _MindCoachSessionPlayerV2WidgetState
     }
 
     _playbackFinished = true;
+    _playbackClock.stop();
     _fallbackTimer?.cancel();
 
     _logger.log(_tag, 'playback complete', {
+      'elapsedMs': _playbackClock.elapsedMilliseconds,
       'degradedMode': _degradedMode.toString(),
-      'visibleLines': _visibleLineCount,
     });
 
     setState(() {
       _visibleLineCount = _lines.length;
       _elapsedMs = _totalDurationMs;
       _showCompletion = true;
+      _activeLineIndex = null;
     });
 
     if (_isLiveMinimal) {
-      Future.delayed(const Duration(seconds: 2), () {
+      Future<void>.delayed(const Duration(seconds: 2), () {
         if (!mounted) {
           return;
         }
         _completeAndExit(
           status: MindCoachV2CompletionStatus.autoDismissed,
-          saveFavorite: false,
-          rating: null,
+          nextAction: MindCoachV2PlayerNextAction.backToSessions,
         );
       });
     }
+  }
+
+  List<int> _windowIndices() {
+    if (_lines.isEmpty) {
+      return const <int>[];
+    }
+    final center =
+        (_activeLineIndex ?? _lastCompletedIndex).clamp(0, _lines.length - 1);
+    final indices = <int>[];
+    for (var index = center - 1; index <= center + 1; index += 1) {
+      if (index >= 0 && index < _lines.length) {
+        indices.add(index);
+      }
+    }
+    if (indices.isEmpty) {
+      indices.add(0);
+    }
+    return indices;
   }
 
   Future<void> _handleBack() async {
     if (_submitting) {
       return;
     }
-
-    _logger.log(_tag, 'user abandoned playback');
     await _ttsService.stop();
     await _completeAndExit(
       status: MindCoachV2CompletionStatus.abandoned,
-      saveFavorite: false,
-      rating: null,
+      nextAction: MindCoachV2PlayerNextAction.backToSessions,
     );
+  }
+
+  Future<bool> _maybeSaveFavorite() async {
+    if (!_saveFavorite || _favoriteSaved) {
+      return _favoriteSaved;
+    }
+
+    final initialResult = await _repository.saveFavorite(session: _session);
+    if (initialResult.saved) {
+      return true;
+    }
+    if (!initialResult.needsReplacement || !mounted) {
+      return false;
+    }
+
+    final replacement = await showDialog<MindCoachV2Favorite>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) {
+        return _FavoriteReplaceDialog(
+          color: _accent,
+          favorites: initialResult.currentFavorites,
+        );
+      },
+    );
+
+    if (replacement == null) {
+      return false;
+    }
+
+    final replaced = await _repository.saveFavorite(
+      session: _session,
+      replaceFavoriteId: replacement.favoriteId,
+    );
+    return replaced.saved;
   }
 
   Future<void> _completeAndExit({
     required MindCoachV2CompletionStatus status,
-    required bool saveFavorite,
-    required int? rating,
+    required MindCoachV2PlayerNextAction nextAction,
   }) async {
     if (_submitting) {
       return;
     }
 
-    setState(() {
-      _submitting = true;
-    });
-
+    setState(() => _submitting = true);
     _fallbackTimer?.cancel();
     await _ttsService.stop();
 
     String? completedRunId = _runId;
-    bool favoriteSaved = false;
+    var favoriteSaved = _favoriteSaved;
 
     try {
+      if (status == MindCoachV2CompletionStatus.completed && _saveFavorite) {
+        favoriteSaved = await _maybeSaveFavorite();
+        if (_saveFavorite && !favoriteSaved && mounted) {
+          setState(() => _submitting = false);
+          return;
+        }
+        _favoriteSaved = favoriteSaved;
+      }
+
       final response = await _repository.completeRun(
         MindCoachV2CompleteRequest(
           sessionId: widget.generateResponse.sessionId,
           runId: _runId,
           completionStatus: status,
-          helpfulnessRating: rating,
-          saveFavorite: saveFavorite,
         ),
       );
       completedRunId = response.runId;
-      favoriteSaved = response.favoriteSaved;
     } catch (error, stackTrace) {
-      _logger.error(_tag, 'completeRun failed (continuing exit)', null, error,
-          stackTrace);
+      _logger.error(
+        _tag,
+        'completeRun failed (continuing exit)',
+        null,
+        error,
+        stackTrace,
+      );
     }
 
     if (!mounted) {
@@ -467,17 +531,15 @@ class _MindCoachSessionPlayerV2WidgetState
             status == MindCoachV2CompletionStatus.autoDismissed,
         completionStatus: status,
         favoriteSaved: favoriteSaved,
-        helpfulnessRating: rating,
+        nextAction: nextAction,
+        helpfulnessRating: null,
         runId: completedRunId,
       ),
     );
   }
 
   void _toggleMute() {
-    setState(() {
-      _ttsMuted = !_ttsMuted;
-    });
-
+    setState(() => _ttsMuted = !_ttsMuted);
     _ttsService.setMuted(_ttsMuted);
 
     if (_ttsMuted && !_playbackFinished) {
@@ -488,196 +550,408 @@ class _MindCoachSessionPlayerV2WidgetState
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final progress = _totalDurationMs > 0
-        ? (_elapsedMs / _totalDurationMs).clamp(0.0, 1.0)
-        : (_lines.isEmpty ? 1.0 : (_visibleLineCount / _lines.length));
+  Widget _buildPlaybackBody(BuildContext context) {
+    final lineWindow = _windowIndices();
+    final centerIndex =
+        _activeLineIndex ?? _lastCompletedIndex.clamp(0, _lines.length - 1);
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) {
-          return;
-        }
-        _handleBack();
-      },
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        appBar: buildFoCoCoAppBar(
-          context,
-          backgroundColor: Colors.black,
-          title: Text(
-            '${widget.generateResponse.session.routineType} • ~${(_totalDurationMs / 1000).round()}s',
-            style: theme.textTheme.titleSmall?.copyWith(color: Colors.white70),
-          ),
-          actions: [
-            if (!_isLiveMinimal)
-              IconButton(
-                icon: Icon(
-                  _ttsMuted
-                      ? Icons.volume_off_rounded
-                      : Icons.volume_up_rounded,
-                  color: Colors.white70,
-                ),
-                onPressed: _toggleMute,
-                tooltip: _ttsMuted ? 'Unmute' : 'Mute',
+    return Column(
+      children: [
+        Row(
+          children: [
+            IconButton(
+              onPressed: _handleBack,
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
               ),
-          ],
-        ),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Column(
-              children: [
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (int i = 0;
-                          i < _visibleLineCount && i < _lines.length;
-                          i++)
-                        Padding(
-                          key: ValueKey('line_$i'),
-                          padding: const EdgeInsets.only(bottom: 18),
-                          child: TweenAnimationBuilder<double>(
-                            key: ValueKey('fade_$i'),
-                            tween: Tween<double>(begin: 0, end: 1),
-                            duration: const Duration(milliseconds: 350),
-                            curve: Curves.easeOut,
-                            builder: (context, value, child) {
-                              return Opacity(opacity: value, child: child);
-                            },
-                            child: Text(
-                              _lines[i],
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: Colors.white,
-                                height: 1.35,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (!_ttsMuted && !_showCompletion)
-                      const Padding(
-                        padding: EdgeInsets.only(right: 8),
-                        child: Icon(
-                          Icons.graphic_eq_rounded,
-                          color: Colors.lightBlueAccent,
-                          size: 18,
-                        ),
-                      ),
-                    Expanded(
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 5,
-                        backgroundColor: Colors.white24,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          Colors.lightBlueAccent,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (_degradedMode) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Playback recovered with timing fallback.',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.white54,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                if (_showCompletion)
-                  Text(
-                    'Session complete.',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: Colors.white70,
+            ),
+            Expanded(
+              child: Text(
+                _session.topBarTitle,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.82),
                       fontWeight: FontWeight.w500,
                     ),
-                  ),
-                const SizedBox(height: 12),
-                if (_showCompletion && !_isLiveMinimal)
-                  Column(
-                    children: [
-                      Row(
-                        children: [
-                          const Text(
-                            'Helpfulness',
-                            style: TextStyle(color: Colors.white70),
+              ),
+            ),
+            IconButton(
+              onPressed: _toggleMute,
+              icon: Icon(
+                _ttsMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        Text(
+          _pillar.label,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: _accent,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.6,
+              ),
+        ),
+        const SizedBox(height: 10),
+        MindCoachGlowLine(color: _accent, width: 158),
+        const SizedBox(height: 34),
+        MindCoachOrb(
+          color: _accent,
+          active: !_ttsMuted && !_playbackFinished,
+        ),
+        const SizedBox(height: 42),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 280),
+          child: Column(
+            key: ValueKey<String>('line_${centerIndex}_$_visibleLineCount'),
+            children: [
+              for (final index in lineWindow)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Text(
+                    _lines[index],
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          color: Colors.white.withValues(
+                            alpha: index == centerIndex
+                                ? 0.98
+                                : index < centerIndex
+                                    ? 0.36
+                                    : 0.3,
                           ),
-                          const Spacer(),
-                          DropdownButton<int>(
-                            dropdownColor: Colors.black87,
-                            value: _rating,
-                            style: const TextStyle(color: Colors.white),
-                            items: const [1, 2, 3, 4, 5]
-                                .map(
-                                  (v) => DropdownMenuItem<int>(
-                                    value: v,
-                                    child: Text('$v'),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              if (value == null) return;
-                              setState(() {
-                                _rating = value;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'Save to favorites',
-                          style: TextStyle(color: Colors.white70),
+                          fontWeight: index == centerIndex
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          height: 1.35,
                         ),
-                        trailing: FoCoCoAdaptiveSwitch(
-                          value: _saveFavorite,
-                          onChanged: (value) {
-                            setState(() {
-                              _saveFavorite = value;
-                            });
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FoCoCoAdaptiveButton(
-                          onPressed: _submitting
-                              ? null
-                              : () {
-                                  _completeAndExit(
-                                    status:
-                                        MindCoachV2CompletionStatus.completed,
-                                    saveFavorite: _saveFavorite,
-                                    rating: _rating,
-                                  );
-                                },
-                          label: _submitting ? 'Saving...' : 'Done',
-                          enabled: !_submitting,
-                        ),
-                      ),
-                    ],
                   ),
+                ),
+            ],
+          ),
+        ),
+        const Spacer(),
+        Row(
+          children: [
+            if (!_ttsMuted)
+              Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: Icon(
+                  Icons.graphic_eq_rounded,
+                  color: _accent,
+                  size: 20,
+                ),
+              ),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: (_elapsedMs / _totalDurationMs).clamp(0.0, 1.0),
+                  minHeight: 6,
+                  backgroundColor: Colors.white.withValues(alpha: 0.16),
+                  valueColor: AlwaysStoppedAnimation<Color>(_accent),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_degradedMode) ...[
+          const SizedBox(height: 10),
+          Text(
+            'Playback recovered with timing fallback.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.56),
+                ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCompletionBody(BuildContext context) {
+    return Column(
+      children: [
+        const SizedBox(height: 28),
+        Text(
+          _pillar.label,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: _accent,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.6,
+              ),
+        ),
+        const SizedBox(height: 8),
+        MindCoachGlowLine(color: _accent, width: 172),
+        const Spacer(),
+        Text(
+          'You are ready.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _accent,
+            boxShadow: [
+              BoxShadow(
+                color: _accent.withValues(alpha: 0.8),
+                blurRadius: 16,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 26),
+        MindCoachGlowLine(color: _accent, width: 172),
+        const Spacer(),
+        _ActionButton(
+          label: 'Play Again',
+          accent: _accent,
+          primary: true,
+          onTap: _submitting
+              ? null
+              : () => _completeAndExit(
+                    status: MindCoachV2CompletionStatus.completed,
+                    nextAction: MindCoachV2PlayerNextAction.playAgain,
+                  ),
+        ),
+        const SizedBox(height: 14),
+        _ActionButton(
+          label: 'Back to Sessions',
+          accent: Colors.white.withValues(alpha: 0.42),
+          primary: false,
+          onTap: _submitting
+              ? null
+              : () => _completeAndExit(
+                    status: MindCoachV2CompletionStatus.completed,
+                    nextAction: MindCoachV2PlayerNextAction.backToSessions,
+                  ),
+        ),
+        const SizedBox(height: 18),
+        InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: _submitting
+              ? null
+              : () => setState(() => _saveFavorite = !_saveFavorite),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _saveFavorite
+                      ? Icons.star_rounded
+                      : Icons.star_border_rounded,
+                  color: _saveFavorite
+                      ? _accent
+                      : Colors.white.withValues(alpha: 0.7),
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _favoriteSaved ? 'Saved to Favorites' : 'Add to Favorites',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.82),
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
               ],
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _handleBack();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: MindCoachV2Visuals.baseBackground,
+        body: MindCoachV2Backdrop(
+          pillar: _pillar,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 8, 22, 24),
+              child: _showCompletion && !_isLiveMinimal
+                  ? _buildCompletionBody(context)
+                  : _buildPlaybackBody(context),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.label,
+    required this.accent,
+    required this.primary,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color accent;
+  final bool primary;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: primary
+              ? accent.withValues(alpha: 0.08)
+              : Colors.white.withValues(alpha: 0.02),
+          border: Border.all(
+            color: accent.withValues(alpha: primary ? 0.9 : 0.35),
+          ),
+          boxShadow: primary
+              ? [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.2),
+                    blurRadius: 20,
+                    spreadRadius: -6,
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color:
+                    Colors.white.withValues(alpha: onTap == null ? 0.45 : 0.96),
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FavoriteReplaceDialog extends StatelessWidget {
+  const _FavoriteReplaceDialog({
+    required this.color,
+    required this.favorites,
+  });
+
+  final Color color;
+  final List<MindCoachV2Favorite> favorites;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          color: const Color(0xFF131523),
+          border: Border.all(color: color.withValues(alpha: 0.72)),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.24),
+              blurRadius: 28,
+              spreadRadius: -6,
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 22, 22, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'You\'ve saved $kMindCoachFavoriteLimitPerPillar favorites.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Choose one to replace.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.72),
+                  ),
+            ),
+            const SizedBox(height: 18),
+            for (final favorite in favorites) ...[
+              InkWell(
+                onTap: () => Navigator.of(context).pop(favorite),
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              favorite.sessionName,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ),
+                          Text(
+                            favorite.contextMode.displayLabel,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.56),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      MindCoachGlowLine(color: color, width: double.infinity),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.72)),
+              ),
+            ),
+          ],
         ),
       ),
     );

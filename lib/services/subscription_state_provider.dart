@@ -40,9 +40,13 @@ class SubscriptionStateProvider extends ChangeNotifier {
     await refreshSubscriptionState();
   }
 
+  bool _refreshInProgress = false;
+
   /// Refresh subscription state from service
   /// Prioritizes RevenueCat, falls back to StoreSubscriptionService
   Future<void> refreshSubscriptionState() async {
+    if (_refreshInProgress) return;
+    _refreshInProgress = true;
     _isLoading = true;
     notifyListeners();
 
@@ -87,6 +91,7 @@ class SubscriptionStateProvider extends ChangeNotifier {
       debugPrint('❌ Error refreshing subscription state: $e');
     } finally {
       _isLoading = false;
+      _refreshInProgress = false;
       notifyListeners();
     }
   }

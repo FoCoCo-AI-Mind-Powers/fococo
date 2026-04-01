@@ -413,38 +413,13 @@ class _SettingsWidgetState extends State<SettingsWidget>
   }
 
   void _updateTheme(String themeMode) {
-    ThemeMode mode;
-    switch (themeMode) {
-      case 'light':
-        mode = ThemeMode.light;
-        break;
-      case 'dark':
-        mode = ThemeMode.dark;
-        break;
-      case 'system':
-      default:
-        mode = ThemeMode.system;
-        break;
-    }
-
-    FlutterFlowTheme.saveThemeMode(mode);
-
-    // Update the app theme immediately
+    FlutterFlowTheme.saveThemeMode(ThemeMode.dark);
     try {
-      MyApp.of(context).setThemeMode(mode);
+      MyApp.of(context).setThemeMode(ThemeMode.dark);
     } catch (e) {
       debugPrint('Error updating theme: $e');
     }
-
-    if (mounted) {
-      setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('🎨 Theme updated!'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _exportUserData() async {
@@ -1563,13 +1538,13 @@ class _SettingsWidgetState extends State<SettingsWidget>
                 _gpsPermission ?? false,
                 _requestGPSPermission,
               ),
-              // Theme selection with three options
               _buildSettingsItem(
                 theme,
                 Icons.palette_outlined,
                 'App Theme',
-                _getThemeDisplayName(_appPreferences?.themeMode ?? 'system'),
-                () => _showThemeSelectionDialog(),
+                'Dark (FoCoCo default)',
+                null,
+                showTrailing: false,
               ),
               _buildSwitchItem(
                 theme,
@@ -1602,69 +1577,14 @@ class _SettingsWidgetState extends State<SettingsWidget>
     );
   }
 
-  String _getThemeDisplayName(String themeMode) {
-    switch (themeMode) {
-      case 'light':
-        return '☀️ Light';
-      case 'dark':
-        return '🌙 Dark';
-      case 'system':
-      default:
-        return '📱 Auto';
-    }
-  }
-
-  void _showThemeSelectionDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('🎨 Choose Theme'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildThemeOption('system', '📱 Auto', 'Follow device settings'),
-            _buildThemeOption('light', '☀️ Light', 'Always use light theme'),
-            _buildThemeOption('dark', '🌙 Dark', 'Always use dark theme'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildThemeOption(String value, String title, String subtitle) {
-    return ListTile(
-      leading: Radio<String>(
-        value: value,
-        groupValue: _appPreferences?.themeMode ?? 'system',
-        onChanged: (newValue) {
-          if (newValue != null) {
-            _updateAppPreference('themeMode', newValue);
-            Navigator.of(context).pop();
-          }
-        },
-      ),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      onTap: () {
-        _updateAppPreference('themeMode', value);
-        Navigator.of(context).pop();
-      },
-    );
-  }
-
   Widget _buildSettingsItem(
     FlutterFlowTheme theme,
     IconData icon,
     String title,
     String subtitle,
-    VoidCallback onTap, {
+    VoidCallback? onTap, {
     bool isDestructive = false,
+    bool showTrailing = true,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1697,11 +1617,13 @@ class _SettingsWidgetState extends State<SettingsWidget>
             color: theme.secondaryText,
           ),
         ),
-        trailing: Icon(
-          Icons.arrow_forward_ios,
-          color: theme.secondaryText,
-          size: 16,
-        ),
+        trailing: showTrailing
+            ? Icon(
+                Icons.arrow_forward_ios,
+                color: theme.secondaryText,
+                size: 16,
+              )
+            : null,
         onTap: onTap,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),

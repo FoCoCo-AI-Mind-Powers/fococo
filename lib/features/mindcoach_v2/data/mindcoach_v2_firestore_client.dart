@@ -73,4 +73,93 @@ class MindCoachV2FirestoreClient {
       return ids;
     });
   }
+
+  Stream<List<MindCoachV2Favorite>> streamFavorites({
+    required String userId,
+    MindCoachV2Pillar? pillar,
+  }) {
+    return _firestore
+        .collection('mindcoach_favorites')
+        .where('user_id', isEqualTo: userId)
+        .orderBy('saved_at', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      final favorites = snapshot.docs
+          .map((doc) => MindCoachV2Favorite.fromFirestore(doc.id, doc.data()))
+          .where((favorite) => pillar == null || favorite.pillar == pillar)
+          .toList(growable: false);
+      return favorites;
+    });
+  }
+
+  Future<List<MindCoachV2Favorite>> fetchFavorites({
+    required String userId,
+    MindCoachV2Pillar? pillar,
+  }) async {
+    final snapshot = await _firestore
+        .collection('mindcoach_favorites')
+        .where('user_id', isEqualTo: userId)
+        .orderBy('saved_at', descending: true)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => MindCoachV2Favorite.fromFirestore(doc.id, doc.data()))
+        .where((favorite) => pillar == null || favorite.pillar == pillar)
+        .toList(growable: false);
+  }
+
+  Future<String> upsertFavorite({
+    required String userId,
+    required MindCoachV2Session session,
+    String? replaceFavoriteId,
+    int maxPerPillar = 5,
+  }) async {
+    final favoritesRef = _firestore.collection('mindcoach_favorites');
+    final existing = await fetchFavorites(
+      userId: userId,
+      pillar: session.pillar,
+    );
+
+    final matchingSession = existing
+        .where((favorite) => favorite.sessionKey == session.sessionKey)
+        .toList(growable: false);
+    final targetId = matchingSession.isNotEmpty
+        ? matchingSession.first.favoriteId
+        : replaceFavoriteId;
+
+    if (matchingSession.isEmpty &&
+        replaceFavoriteId == null &&
+        existing.length >= maxPerPillar) {
+      throw StateError('favorite_replacement_required');
+    }
+
+    final targetRef =
+        targetId == null ? favoritesRef.doc() : favoritesRef.doc(targetId);
+    final payload = <String, dynamic>{
+      'user_id': userId,
+      'pillar': session.pillar.wireValue,
+      'context_mode': session.contextMode.wireValue,
+      'session_id': session.sessionId,
+      'session_key': session.sessionKey,
+      'session_name': session.sessionName,
+      'session_descriptor': session.sessionDescriptor,
+      'duration_sec': session.durationSec,
+      'template_id': session.templateId,
+      'session_payload': <String, dynamic>{
+        ...session.toMap(),
+        'session_id': session.sessionId,
+      },
+      'saved_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    };
+
+    await targetRef.set(
+      {
+        ...payload,
+        'created_at': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+    return targetRef.id;
+  }
 }

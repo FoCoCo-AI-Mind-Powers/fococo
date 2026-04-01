@@ -285,7 +285,10 @@ class AICoachingService {
           .where('createdTime', isGreaterThanOrEqualTo: startOfDay)
           .get();
 
-      final count = todayRequests.docs.length;
+      final count = todayRequests.docs
+          .map((doc) => AiInsightsRecord.fromSnapshot(doc))
+          .where((insight) => !insight.isFoCoCoDaily)
+          .length;
       const maxDailyRequests = 50; // Default daily limit for Gemini
       final canGenerate = count < maxDailyRequests;
 
@@ -543,7 +546,8 @@ class AICoachingService {
     } catch (e) {
       if (kDebugMode) {
         final errorMessage = e.toString();
-        if (errorMessage.contains('leaked') || errorMessage.contains('API key')) {
+        if (errorMessage.contains('leaked') ||
+            errorMessage.contains('API key')) {
           print('❌ Error generating Gemini coaching recommendations: $e');
           print('⚠️ API key issue detected. Please:');
           print('   1. Get a new API key from https://aistudio.google.com/');
@@ -810,7 +814,7 @@ class AICoachingService {
 
       // Parse JSON - handle both List and Map responses
       final decoded = jsonDecode(cleanedText);
-      
+
       // If response is a List, take the first element or wrap it
       if (decoded is List) {
         if (decoded.isEmpty) {
@@ -822,30 +826,32 @@ class AICoachingService {
             'rawResponse': responseText,
           };
         }
-        
+
         // If list contains a single map, return it
         if (decoded.length == 1 && decoded[0] is Map<String, dynamic>) {
           if (kDebugMode) {
-            print('ℹ️ JSON response is a list with single map, extracting first element');
+            print(
+                'ℹ️ JSON response is a list with single map, extracting first element');
           }
           return decoded[0] as Map<String, dynamic>;
         }
-        
+
         // If list contains multiple items, wrap in a response object
         if (kDebugMode) {
-          print('ℹ️ JSON response is a list with ${decoded.length} items, wrapping in response object');
+          print(
+              'ℹ️ JSON response is a list with ${decoded.length} items, wrapping in response object');
         }
         return {
           'items': decoded,
           'count': decoded.length,
         };
       }
-      
+
       // If response is already a Map, return it
       if (decoded is Map<String, dynamic>) {
         return decoded;
       }
-      
+
       // Fallback for unexpected types
       if (kDebugMode) {
         print('⚠️ JSON response is unexpected type: ${decoded.runtimeType}');
@@ -864,7 +870,7 @@ class AICoachingService {
             print('⚠️ Retrying JSON parse after additional repair...');
           }
           final decoded = jsonDecode(fallback);
-          
+
           // Handle List response in retry
           if (decoded is List) {
             if (decoded.isNotEmpty && decoded[0] is Map<String, dynamic>) {
@@ -875,7 +881,7 @@ class AICoachingService {
               'count': decoded.length,
             };
           }
-          
+
           return decoded as Map<String, dynamic>;
         } catch (_) {
           // Continue to fallback below

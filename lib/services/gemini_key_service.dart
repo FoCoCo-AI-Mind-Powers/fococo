@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
@@ -7,23 +8,22 @@ class GeminiKeyService {
   static final GeminiKeyService instance = GeminiKeyService._();
 
   String? cachedKey;
-  bool _fetching = false;
+  Completer<String>? _inflight;
 
   /// Returns the cached key, or fetches it from the Cloud Function.
   /// Falls back to --dart-define GEMINI_API_KEY if the function call fails.
   Future<String> getKey() async {
     if (cachedKey != null && cachedKey!.isNotEmpty) return cachedKey!;
 
-    // Fall back to compile-time key if set
+    // If another call is already in flight, wait for the same result instead
+    // of returning a potentially empty fallback after an arbitrary delay.
+    if (_inflight != null) return _inflight!.future;
+
     const dartDefineKey = String.fromEnvironment('GEMINI_API_KEY');
 
-    if (_fetching) {
-      // Another call is in progress — wait briefly then return what we have
-      await Future.delayed(const Duration(milliseconds: 500));
-      return cachedKey ?? dartDefineKey;
-    }
+    final completer = Completer<String>();
+    _inflight = completer;
 
-    _fetching = true;
     try {
       final callable =
           FirebaseFunctions.instance.httpsCallable('getGeminiKey');
@@ -34,6 +34,7 @@ class GeminiKeyService {
         if (kDebugMode) {
           print('✅ Gemini key fetched from Secret Manager');
         }
+        completer.complete(key);
         return key;
       }
     } catch (e) {
@@ -41,16 +42,18 @@ class GeminiKeyService {
         print('⚠️ Failed to fetch Gemini key from Secret Manager: $e');
       }
     } finally {
-      _fetching = false;
+      _inflight = null;
     }
 
-    // Fall back
     if (dartDefineKey.isNotEmpty) {
       cachedKey = dartDefineKey;
+      if (!completer.isCompleted) completer.complete(dartDefineKey);
       return dartDefineKey;
     }
 
-    return '';
+    const empty = '';
+    if (!completer.isCompleted) completer.complete(empty);
+    return empty;
   }
 
   /// Pre-warm the key cache. Call after Firebase Auth sign-in.

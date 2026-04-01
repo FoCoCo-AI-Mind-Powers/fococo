@@ -12,28 +12,7 @@ export 'register_model.dart';
 
 // ─── Age-threshold helper ───────────────────────────────────────────────────
 
-int _getAgeThreshold(String? countryCode) {
-  switch (countryCode?.toUpperCase()) {
-    case 'US':
-    case 'GB':
-    case 'DK':
-    case 'AU':
-    case 'JP':
-      return 13;
-    case 'ES':
-    case 'KR':
-      return 14;
-    case 'FR':
-      return 15;
-    case 'NL':
-    case 'DE':
-    case 'IE':
-    case 'PT':
-      return 16;
-    default:
-      return 16;
-  }
-}
+int _getAgeThreshold() => 16;
 
 // ─── Locale-based pricing string ─────────────────────────────────────────────
 
@@ -201,12 +180,9 @@ class _RegisterWidgetState extends State<RegisterWidget> {
 
     if (!_canContinue) return;
 
-    final countryCode =
-        Localizations.localeOf(context).countryCode;
-
     // Age check — BEFORE any Firebase call
     final age = _calculateAge(_selectedDate);
-    final threshold = _getAgeThreshold(countryCode);
+    final threshold = _getAgeThreshold();
 
     if (age < threshold) {
       // Navigate to age block — zero data stored

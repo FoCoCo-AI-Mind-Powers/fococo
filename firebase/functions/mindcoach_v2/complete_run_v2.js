@@ -58,6 +58,49 @@ async function findRun({ userId, sessionId, runId }) {
   return newRunRef;
 }
 
+function stableHash(value) {
+  const raw = String(value || '');
+  let hash = 0;
+  for (let i = 0; i < raw.length; i += 1) {
+    hash = (hash * 31 + raw.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function buildReflection(sessionData, sessionId) {
+  const pillar = String(sessionData.pillar || 'focus').toLowerCase();
+  const contextMode = String(sessionData.context_mode || '').toLowerCase();
+  if (contextMode === 'during_round') {
+    return null;
+  }
+
+  const significanceGate = stableHash(`${sessionId}|${pillar}|${contextMode}`) % 100;
+  if (significanceGate > 69) {
+    return null;
+  }
+
+  const pools = {
+    focus: [
+      'Clarity held when the round narrowed to one thing at a time.',
+      'The routine drew your attention back to what mattered most in the moment.',
+      'You gave the round less noise and more clear intention.',
+    ],
+    confidence: [
+      'Trust looked steadier once the decision mattered more than the result.',
+      'The session kept belief attached to your choice, not the outcome.',
+      'Confidence showed up in the way you stayed with the decision.',
+    ],
+    control: [
+      'Composure grew the moment you stopped asking the round to feel perfect.',
+      'Control looked quieter and steadier than pressure first suggested.',
+      'The reset mattered because you let the round settle before judging it.',
+    ],
+  };
+
+  const options = pools[pillar] || pools.focus;
+  return options[stableHash(`${sessionId}|reflection`) % options.length];
+}
+
 async function completeMindCoachSessionRunV2(data, context) {
   if (!context.auth) {
     logger.warn('[MCv2:completeRun] unauthenticated request rejected');
@@ -69,10 +112,6 @@ async function completeMindCoachSessionRunV2(data, context) {
   const runId = String(data.run_id || '').trim();
   const completionStatus = String(data.completion_status || '').trim();
   const mindsetAfter = data.mindset_after == null ? null : String(data.mindset_after).trim();
-  const helpfulnessRating = data.helpfulness_rating == null
-    ? null
-    : Number(data.helpfulness_rating);
-  const saveFavorite = data.save_favorite === true;
 
   logger.info('[MCv2:completeRun] ENTRY', {
     userId,
@@ -80,8 +119,6 @@ async function completeMindCoachSessionRunV2(data, context) {
     runId: runId || null,
     completionStatus,
     mindsetAfter,
-    helpfulnessRating,
-    saveFavorite,
   });
 
   if (!sessionId) {
@@ -93,13 +130,6 @@ async function completeMindCoachSessionRunV2(data, context) {
   if (mindsetAfter && !VALID_MINDSET_AFTER.has(mindsetAfter)) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid mindset_after');
   }
-  if (
-    helpfulnessRating != null &&
-    (!Number.isFinite(helpfulnessRating) || helpfulnessRating < 1 || helpfulnessRating > 5)
-  ) {
-    throw new functions.https.HttpsError('invalid-argument', 'helpfulness_rating must be between 1 and 5');
-  }
-
   const sessionRef = db.collection('mindcoach_sessions').doc(sessionId);
   const sessionSnap = await sessionRef.get();
   if (!sessionSnap.exists) {
@@ -111,6 +141,9 @@ async function completeMindCoachSessionRunV2(data, context) {
     throw new functions.https.HttpsError('permission-denied', 'Session does not belong to user');
   }
 
+  const reflection =
+    completionStatus === 'completed' ? buildReflection(sessionData, sessionId) : null;
+
   const runRef = await findRun({ userId, sessionId, runId: runId || null });
   logger.info('[MCv2:completeRun] run resolved', { resolvedRunId: runRef.id });
 
@@ -119,44 +152,21 @@ async function completeMindCoachSessionRunV2(data, context) {
       status: completionStatus,
       completed_at: admin.firestore.FieldValue.serverTimestamp(),
       mindset_after: mindsetAfter || null,
-      helpfulness_rating: helpfulnessRating == null ? null : helpfulnessRating,
+      reflection_text: reflection,
       updated_at: admin.firestore.FieldValue.serverTimestamp(),
     },
     { merge: true },
   );
 
-  let favoriteSaved = false;
-  if (saveFavorite) {
-    const favoriteRef = db
-      .collection('mindcoach_favorites')
-      .doc(`${userId}_${sessionId}`);
-
-    await favoriteRef.set(
-      {
-        favorite_id: favoriteRef.id,
-        user_id: userId,
-        session_id: sessionId,
-        template_id: sessionData.template_id || sessionData.templateId || null,
-        routine_type: sessionData.routine_type || sessionData.routineType || null,
-        coaching_text: sessionData.coaching_text || sessionData.coachingText || null,
-        saved_at: admin.firestore.FieldValue.serverTimestamp(),
-        updated_at: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
-    favoriteSaved = true;
-    logger.info('[MCv2:completeRun] favorite saved', { favoriteId: favoriteRef.id });
-  }
-
   logger.info('[MCv2:completeRun] RESPONSE', {
     runId: runRef.id,
-    favoriteSaved,
     completionStatus,
+    hasReflection: !!reflection,
   });
 
   return {
     run_id: runRef.id,
-    favorite_saved: favoriteSaved,
+    reflection,
   };
 }
 

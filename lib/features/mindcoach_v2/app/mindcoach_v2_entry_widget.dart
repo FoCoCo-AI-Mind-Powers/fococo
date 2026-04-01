@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:tab_indicator_styler/tab_indicator_styler.dart';
 
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
@@ -7,13 +6,10 @@ import '/ai_integration/widgets/navbar_widget.dart';
 import '/features/mindcoach_v2/config/mindcoach_v2_flags.dart';
 import '/features/mindcoach_v2/data/mindcoach_v2_repository.dart';
 import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart';
-import '/features/mindcoach_v2/presentation/builder/mindcoach_builder_v2_widget.dart';
-import '/features/mindcoach_v2/presentation/history/mindcoach_history_v2_widget.dart';
 import '/features/mindcoach_v2/presentation/home/mindcoach_home_v2_widget.dart';
 import '/features/mindcoach_v2/presentation/player/mindcoach_session_player_v2_widget.dart';
-import '/features/mindcoach_v2/presentation/results/mindcoach_results_v2_widget.dart';
+import '/features/mindcoach_v2/presentation/shared/mindcoach_v2_visuals.dart';
 import '/features/mindcoach_v2/services/mindcoach_v2_debug_logger.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/pages/coaching_modules/mind_coach_widget.dart';
 
@@ -29,36 +25,10 @@ class MindCoachV2EntryWidget extends StatefulWidget {
   State<MindCoachV2EntryWidget> createState() => _MindCoachV2EntryWidgetState();
 }
 
-class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget>
-    with SingleTickerProviderStateMixin {
+class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
   static const String _tag = 'ENTRY';
   final MindCoachV2Repository _repository = MindCoachV2Repository.instance;
   final MindCoachV2DebugLogger _logger = MindCoachV2DebugLogger.instance;
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(
-      length: 3,
-      vsync: this,
-      initialIndex: widget.initialTabIndex.clamp(0, 2),
-    );
-    _tabController.addListener(_onTabChanged);
-  }
-
-  void _onTabChanged() {
-    if (!_tabController.indexIsChanging) {
-      setState(() {});
-    }
-  }
-
-  @override
-  void dispose() {
-    _tabController.removeListener(_onTabChanged);
-    _tabController.dispose();
-    super.dispose();
-  }
 
   Future<void> _runGenerationRequest(MindCoachV2GenerateRequest request) async {
     _logger.log(_tag, '_runGenerationRequest', {
@@ -110,20 +80,6 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget>
     await _openPlayer(response);
   }
 
-  Future<void> _repeatSession(MindCoachV2Session session) {
-    _logger.log(_tag, '_repeatSession', {
-      'originalSessionId': session.sessionId,
-      'templateId': session.templateId,
-    });
-    return _runGenerationRequest(
-      MindCoachV2GenerateRequest(
-        contextMode: session.contextMode,
-        entrySource: 'history_repeat',
-        preferredDeliveryLength: session.deliveryLength,
-      ),
-    );
-  }
-
   Future<void> _openPlayer(MindCoachV2GenerateResponse response) async {
     _logger.log(_tag, '_openPlayer', {
       'sessionId': response.sessionId,
@@ -149,26 +105,20 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget>
       'status': playerResult.completionStatus.wireValue,
       'favoriteSaved': playerResult.favoriteSaved.toString(),
       'runId': playerResult.runId ?? 'null',
+      'nextAction': playerResult.nextAction.name,
     });
 
-    if (response.uiMode == MindCoachV2UiMode.guidedExtended &&
-        playerResult.completed &&
-        playerResult.completionStatus ==
-            MindCoachV2CompletionStatus.completed) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => MindCoachResultsV2Widget(
-            session: response.session,
-            playerResult: playerResult,
-            onRepeat: () {
-              Navigator.of(context).pop();
-              _repeatSession(response.session);
-            },
-            onOpenHistory: () {
-              Navigator.of(context).pop();
-              _setTabIndex(2);
-            },
-          ),
+    if (playerResult.nextAction == MindCoachV2PlayerNextAction.playAgain) {
+      await _runGenerationRequest(
+        MindCoachV2GenerateRequest(
+          contextMode: response.session.contextMode,
+          entrySource: 'play_again',
+          pillar: response.session.pillar,
+          sessionKey: response.session.sessionKey,
+          sessionName: response.session.sessionName,
+          sessionDescriptor: response.session.sessionDescriptor,
+          targetDurationSec: response.session.durationSec,
+          preferredDeliveryLength: response.session.deliveryLength,
         ),
       );
     }
@@ -179,42 +129,23 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget>
     if (!MindCoachV2Flags.mindCoachV2Enabled) {
       return const MindCoachWidget();
     }
-
-    final pages = <Widget>[
-      MindCoachHomeV2Widget(
-        repository: _repository,
-        onGenerateRequested: _runGenerationRequest,
-        onResumeRequested: _resume,
-        onOpenBuilder: () {
-          _setTabIndex(1);
-        },
-        onOpenHistory: () {
-          _setTabIndex(2);
-        },
-      ),
-      MindCoachBuilderV2Widget(
-        onGenerateRequested: _runGenerationRequest,
-      ),
-      MindCoachHistoryV2Widget(
-        repository: _repository,
-        onRepeat: _repeatSession,
-      ),
-    ];
+    final isVisible =
+        GoRouterState.of(context).uri.toString().contains(MindCoachWidget.routePath);
 
     return StreamBuilder<UserRecord>(
-      stream: loggedIn
+      stream: isVisible && loggedIn
           ? UserRecord.getDocument(
               FirebaseFirestore.instance.doc('user/$currentUserUid'))
           : null,
       builder: (context, userSnapshot) {
         final user = userSnapshot.data;
-        final theme = FlutterFlowTheme.of(context);
         return FoCoCoAdaptiveScaffold(
-          backgroundColor: theme.primaryBackground,
-          title: 'MindCoach',
+          backgroundColor: MindCoachV2Visuals.shellBackgroundForPillar(null),
           currentRoute: 'mind_coach',
           onTap: (route) => context.goNamed(route),
           showBottomNav: false,
+          appBarForegroundColor: Colors.white,
+          showAppBarGlowDivider: false,
           drawer: user != null
               ? FoCoCoDrawer(
                   currentUser: user,
@@ -222,81 +153,15 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget>
                   onNavigate: (route) => context.goNamed(route),
                 )
               : null,
-          body: Column(
-            children: [
-              _buildTopTabSelector(),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: pages,
-                ),
-              ),
-            ],
-          ),
+          body: isVisible
+              ? MindCoachHomeV2Widget(
+                  repository: _repository,
+                  onGenerateRequested: _runGenerationRequest,
+                  onResumeRequested: _resume,
+                )
+              : const SizedBox.shrink(),
         );
       },
     );
-  }
-
-  Widget _buildTopTabSelector() {
-    return Builder(
-      builder: (context) {
-        final theme = FlutterFlowTheme.of(context);
-        return SafeArea(
-          top: false,
-          bottom: false,
-          minimum: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: theme.secondaryBackground.withValues(alpha: 0.65),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: theme.alternate.withValues(alpha: 0.22),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: SizedBox(
-                height: 42,
-                child: TabBar(
-                  controller: _tabController,
-                  tabs: const [
-                    Tab(text: 'Home'),
-                    Tab(text: 'Builder'),
-                    Tab(text: 'History'),
-                  ],
-                  indicator: MaterialIndicator(
-                    height: 4,
-                    topLeftRadius: 8,
-                    topRightRadius: 8,
-                    bottomLeftRadius: 0,
-                    bottomRightRadius: 0,
-                    color: theme.primary,
-                    horizontalPadding: 16,
-                    tabPosition: TabPosition.bottom,
-                  ),
-                  labelColor: theme.primaryText,
-                  unselectedLabelColor: theme.secondaryText,
-                  labelStyle: theme.labelLarge.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  unselectedLabelStyle: theme.labelLarge.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                  indicatorSize: TabBarIndicatorSize.label,
-                  dividerColor: Colors.transparent,
-                  splashFactory: NoSplash.splashFactory,
-                  overlayColor: WidgetStateProperty.all(Colors.transparent),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _setTabIndex(int index) {
-    _tabController.animateTo(index);
   }
 }

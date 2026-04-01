@@ -108,18 +108,20 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   String? _bannerMessage;
   Color _bannerColor = _kCaddyGreen;
   Timer? _bannerTimer;
+  bool _hasInitialized = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initialize();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    setFoCoCoNavBarBackgroundOverride(_kBackgroundStart);
+    if (_isRouteVisible(context)) {
+      setFoCoCoNavBarBackgroundOverride(_kBackgroundStart);
+    }
   }
 
   Future<void> _initialize() async {
@@ -171,6 +173,8 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
+    _bootstrapIfVisible();
+    final isVisible = _isRouteVisible(context);
     if (currentUserUid.isEmpty) {
       return Scaffold(
         backgroundColor: _kBackgroundStart,
@@ -184,9 +188,11 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     }
 
     return StreamBuilder<UserRecord>(
-      stream: UserRecord.getDocument(
-        FirebaseFirestore.instance.doc('user/$currentUserUid'),
-      ),
+      stream: isVisible
+          ? UserRecord.getDocument(
+              FirebaseFirestore.instance.doc('user/$currentUserUid'),
+            )
+          : null,
       builder: (context, snapshot) {
         final user = snapshot.data;
         return FoCoCoAdaptiveScaffold(
@@ -220,6 +226,21 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
 
   bool get _canUseDrawer =>
       _overlay == _CaddyPlayOverlay.none && _screen == _CaddyPlayScreen.home;
+
+  bool _isRouteVisible(BuildContext context) {
+    return GoRouterState.of(context).uri.toString().contains(
+          CaddyPlayWidget.routePath,
+        );
+  }
+
+  void _bootstrapIfVisible() {
+    if (_hasInitialized || !_isRouteVisible(context)) {
+      return;
+    }
+
+    _hasInitialized = true;
+    unawaited(_initialize());
+  }
 
   String get _appBarTitle {
     switch (_overlay) {

@@ -38,7 +38,7 @@ class MindCoachV2Mappers {
   ) {
     return MindCoachV2CompleteResponse(
       runId: (map['run_id'] ?? '').toString(),
-      favoriteSaved: map['favorite_saved'] == true,
+      reflection: map['reflection']?.toString(),
     );
   }
 }

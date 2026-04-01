@@ -12,11 +12,14 @@ class GeminiVoiceConfig {
   /// Most cost-efficient model supporting high throughput (for real-time voice)
   static const String flashLiteModel = 'gemini-2.5-flash-lite';
 
-  /// Live API model for bidirectional voice interactions
-  static const String liveModel = 'gemini-2.5-flash-native-audio-preview-12-2025';
+  /// Live API model for bidirectional voice interactions (latest stable)
+  static const String liveModel = 'gemini-3.1-flash-live-preview';
 
-  /// Native audio dialog model
-  static const String nativeAudioDialogModel =
+  /// Native audio dialog model — uses the latest Gemini 3.1 Flash Live
+  static const String nativeAudioDialogModel = 'gemini-3.1-flash-live-preview';
+
+  /// Fallback live model if 3.1 is unavailable
+  static const String nativeAudioDialogModelFallback =
       'gemini-2.5-flash-native-audio-preview-12-2025';
 
   /// Native audio with thinking model

@@ -921,6 +921,7 @@ class _DashboardWidgetState extends State<DashboardWidget>
           .snapshots()
           .map((snapshot) => snapshot.docs
               .map((doc) => AiInsightsRecord.fromSnapshot(doc))
+              .where((insight) => !insight.isFoCoCoDaily)
               .toList()),
       builder: (context, snapshot) {
         final allInsights = snapshot.data ?? [];

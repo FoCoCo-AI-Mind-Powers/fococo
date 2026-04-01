@@ -1,12 +1,12 @@
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
-import '/adaptive_ui/adaptive_ui.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
-import '/auth/firebase_auth/auth_util.dart';
 import '/features/mindcoach_v2/data/mindcoach_v2_repository.dart';
 import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart';
-import '/features/mindcoach_v2/services/mindcoach_v2_context_resolver.dart';
+import '/features/mindcoach_v2/presentation/shared/mindcoach_v2_visuals.dart';
+import '/features/mindcoach_v2/services/mindcoach_v2_catalog_service.dart';
 
 class MindCoachHomeV2Widget extends StatefulWidget {
   const MindCoachHomeV2Widget({
@@ -14,8 +14,6 @@ class MindCoachHomeV2Widget extends StatefulWidget {
     required this.repository,
     required this.onGenerateRequested,
     required this.onResumeRequested,
-    required this.onOpenBuilder,
-    required this.onOpenHistory,
   });
 
   final MindCoachV2Repository repository;
@@ -23,573 +21,882 @@ class MindCoachHomeV2Widget extends StatefulWidget {
       onGenerateRequested;
   final Future<void> Function(MindCoachV2ResumePayload payload)
       onResumeRequested;
-  final VoidCallback onOpenBuilder;
-  final VoidCallback onOpenHistory;
 
   @override
   State<MindCoachHomeV2Widget> createState() => _MindCoachHomeV2WidgetState();
 }
 
 class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
-  final MindCoachV2ContextResolver _contextResolver =
-      MindCoachV2ContextResolver();
-
-  MindCoachV2ContextMode _contextMode = MindCoachV2ContextMode.offDay;
-  bool _loadingContext = true;
-  bool _starting = false;
+  MindCoachV2Catalog? _catalog;
   MindCoachV2ResumePayload? _resumePayload;
+  MindCoachV2Pillar? _selectedPillar;
+  MindCoachV2ContextMode? _selectedContext;
+  bool _loading = true;
+  bool _starting = false;
+  bool _resumeDismissed = false;
+  bool _favoritesExpanded = false;
+  String? _loadError;
 
   @override
   void initState() {
     super.initState();
-    _loadContextAndResume();
+    unawaited(_loadInitialState());
   }
 
-  Future<void> _loadContextAndResume() async {
+  @override
+  void dispose() {
+    setFoCoCoNavBarBackgroundOverride(null);
+    setFoCoCoNavSelectedColorOverride('mind_coach', null);
+    super.dispose();
+  }
+
+  Future<void> _loadInitialState() async {
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _loadError = null;
+      });
+    }
+
+    try {
+      final results = await Future.wait<dynamic>([
+        MindCoachV2CatalogService.instance.load(),
+        widget.repository.getResumePayload(),
+      ]);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _catalog = results[0] as MindCoachV2Catalog;
+        _resumePayload = results[1] as MindCoachV2ResumePayload?;
+        _loading = false;
+      });
+      _syncShellChrome();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _loadError =
+            'MindCoach could not finish loading. Pull to retry or reopen the app.';
+      });
+    }
+  }
+
+  void _syncShellChrome() {
+    final selectedPillar = _selectedPillar;
+    setFoCoCoNavBarBackgroundOverride(
+      MindCoachV2Visuals.shellBackgroundForPillar(selectedPillar),
+    );
+    setFoCoCoNavSelectedColorOverride(
+      'mind_coach',
+      selectedPillar == null
+          ? MindCoachV2Visuals.homeNavAccent
+          : MindCoachV2Visuals.accentForPillar(selectedPillar),
+    );
+  }
+
+  Future<void> _handleRefresh() async {
+    await _loadInitialState();
+  }
+
+  Widget _buildLoadError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _loadError ?? 'MindCoach could not finish loading.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.84),
+                    height: 1.5,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: _handleRefresh,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _selectPillar(MindCoachV2Pillar pillar) {
     setState(() {
-      _loadingContext = true;
+      _selectedPillar = pillar;
+      _selectedContext = null;
+      _favoritesExpanded = false;
     });
+    _syncShellChrome();
+  }
 
-    final inferred =
-        await _contextResolver.inferContextMode(currentUserUidOrEmpty());
-    final resume = await widget.repository.getResumePayload();
+  void _openContext(MindCoachV2ContextMode contextMode) {
+    if (_selectedPillar == null) {
+      return;
+    }
+    setState(() {
+      _selectedContext = contextMode;
+      _favoritesExpanded = false;
+    });
+  }
 
-    if (!mounted) {
+  void _goBackOneLevel() {
+    if (_selectedContext != null) {
+      setState(() {
+        _selectedContext = null;
+      });
+      return;
+    }
+    if (_selectedPillar != null) {
+      setState(() {
+        _selectedPillar = null;
+        _favoritesExpanded = false;
+      });
+      _syncShellChrome();
+    }
+  }
+
+  Future<void> _handleResume() async {
+    final payload = _resumePayload;
+    if (payload == null || _starting) {
       return;
     }
 
-    setState(() {
-      _contextMode = inferred;
-      _resumePayload = resume;
-      _loadingContext = false;
-    });
-  }
-
-  String currentUserUidOrEmpty() {
+    setState(() => _starting = true);
     try {
-      return currentUserUid;
-    } catch (_) {
-      return '';
+      await widget.onResumeRequested(payload);
+      if (mounted) {
+        await _loadInitialState();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _starting = false);
+      }
     }
   }
 
-  String _primaryActionTitle() {
-    switch (_contextMode) {
-      case MindCoachV2ContextMode.beforeRound:
-        return 'Calm First Tee';
-      case MindCoachV2ContextMode.duringRound:
-        return 'Quick Reset (30s)';
-      case MindCoachV2ContextMode.afterRound:
-        return 'Round Reflection';
-      case MindCoachV2ContextMode.offDay:
-      case MindCoachV2ContextMode.auto:
-        return 'Build Today\'s MindCoach';
+  String _deliveryLengthForSession(MindCoachV2CatalogSession session) {
+    if (session.contextMode == MindCoachV2ContextMode.duringRound ||
+        session.durationSec <= 20) {
+      return 'micro';
     }
+    if (session.durationSec >= 75 ||
+        session.contextMode == MindCoachV2ContextMode.afterRound) {
+      return 'deep';
+    }
+    return 'standard';
   }
 
-  String _heroDescription() {
-    switch (_contextMode) {
-      case MindCoachV2ContextMode.beforeRound:
-        return 'Prime your attention and settle into one clear plan before the opening shot.';
-      case MindCoachV2ContextMode.duringRound:
-        return 'Short in-round coaching to reset breathing, focus, and next-shot commitment.';
-      case MindCoachV2ContextMode.afterRound:
-        return 'Capture one win and one adjustment so tomorrow starts sharper.';
-      case MindCoachV2ContextMode.offDay:
-      case MindCoachV2ContextMode.auto:
-        return 'Train your mental routines with guided sessions tailored to your moment.';
-    }
-  }
-
-  Future<void> _start({
-    required MindCoachV2ContextMode contextMode,
+  Future<void> _startCatalogSession(
+    MindCoachV2CatalogSession session, {
     required String entrySource,
   }) async {
     if (_starting) {
       return;
     }
 
-    setState(() {
-      _starting = true;
-    });
-
+    setState(() => _starting = true);
     try {
       await widget.onGenerateRequested(
         MindCoachV2GenerateRequest(
-          contextMode: contextMode,
+          contextMode: session.contextMode,
           entrySource: entrySource,
-          preferredDeliveryLength:
-              contextMode == MindCoachV2ContextMode.duringRound
-                  ? 'micro'
-                  : 'standard',
+          pillar: session.pillar,
+          sessionKey: session.key,
+          sessionName: session.name,
+          sessionDescriptor: session.descriptor,
+          targetDurationSec: session.durationSec,
+          preferredDeliveryLength: _deliveryLengthForSession(session),
         ),
       );
+      if (mounted) {
+        await _loadInitialState();
+      }
     } finally {
       if (mounted) {
-        setState(() {
-          _starting = false;
-        });
+        setState(() => _starting = false);
       }
-      _loadContextAndResume();
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  Future<void> _startFavorite(MindCoachV2Favorite favorite) {
+    return _startCatalogSession(
+      MindCoachV2CatalogSession(
+        key: favorite.sessionKey,
+        name: favorite.sessionName,
+        descriptor: favorite.sessionDescriptor,
+        durationSec: favorite.durationSec,
+        templateId: favorite.templateId,
+        pillar: favorite.pillar,
+        contextMode: favorite.contextMode,
+      ),
+      entrySource: 'favorite_replay',
+    );
+  }
 
-    return Material(
-      type: MaterialType.transparency,
-      child: RefreshIndicator(
-        onRefresh: _loadContextAndResume,
-        child: ListView(
+  Widget _buildHomeScreen(MindCoachV2Catalog catalog) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(
+        22,
+        16,
+        22,
+        MediaQuery.viewPaddingOf(context).bottom +
+            kFoCoCoBottomNavStripAndTabsHeight +
+            24,
+      ),
+      children: [
+        const SizedBox(height: 4),
+        Text(
+          'MindCoach',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
+              ),
+        ),
+        const SizedBox(height: 28),
+        Text(
+          catalog.homeSubtitle,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: MindCoachV2Visuals.dimTextColor,
+                fontWeight: FontWeight.w400,
+              ),
+        ),
+        if (_resumePayload != null && !_resumeDismissed) ...[
+          const SizedBox(height: 28),
+          _ResumePill(
+            onResume: _starting ? null : _handleResume,
+            onDismiss: () {
+              setState(() => _resumeDismissed = true);
+            },
+          ),
+        ],
+        const SizedBox(height: 34),
+        for (final pillar in catalog.pillars) ...[
+          MindCoachGlowCard(
+            color: MindCoachV2Visuals.accentForPillar(pillar.key),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
+            onTap: () => _selectPillar(pillar.key),
+            child: Column(
+              children: [
+                Text(
+                  pillar.label,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        color: MindCoachV2Visuals.accentForPillar(pillar.key),
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.4,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  pillar.descriptor,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.92),
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPillarScreen(MindCoachV2CatalogPillar pillar) {
+    final accent = MindCoachV2Visuals.accentForPillar(pillar.key);
+    return StreamBuilder<List<MindCoachV2Favorite>>(
+      stream: widget.repository.streamFavorites(pillar: pillar.key),
+      builder: (context, snapshot) {
+        final favorites = snapshot.data ?? const <MindCoachV2Favorite>[];
+        return ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.fromLTRB(
-            16,
-            14,
-            16,
+            22,
+            12,
+            22,
             MediaQuery.viewPaddingOf(context).bottom +
                 kFoCoCoBottomNavStripAndTabsHeight +
-                16.0,
+                24,
           ),
           children: [
-            _buildHeroCard(theme),
-            const SizedBox(height: 14),
-            _buildQuickModeCards(theme),
-            if (_resumePayload != null) ...[
-              const SizedBox(height: 14),
-              _buildResumeCard(theme),
-            ],
-            const SizedBox(height: 14),
-            _buildStudioActions(theme),
-            const SizedBox(height: 18),
-            Text('Recent Sessions', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            _buildRecentSessions(theme),
+            _PillarHeader(
+              title: pillar.label,
+              subtitle: pillar.descriptor,
+              color: accent,
+              onBack: _goBackOneLevel,
+            ),
+            const SizedBox(height: 26),
+            _ContextCard(
+              title: 'During Round',
+              subtitle:
+                  pillar.rowDescriptors[MindCoachV2ContextMode.duringRound] ??
+                      '',
+              color: accent,
+              onTap: () => _openContext(MindCoachV2ContextMode.duringRound),
+            ),
+            const SizedBox(height: 16),
+            _ContextCard(
+              title: 'Before Round',
+              subtitle:
+                  pillar.rowDescriptors[MindCoachV2ContextMode.beforeRound] ??
+                      '',
+              durationHint: pillar
+                  .context(MindCoachV2ContextMode.beforeRound)
+                  .durationHint,
+              color: accent,
+              onTap: () => _openContext(MindCoachV2ContextMode.beforeRound),
+            ),
+            const SizedBox(height: 16),
+            _ContextCard(
+              title: 'After Round',
+              subtitle:
+                  pillar.rowDescriptors[MindCoachV2ContextMode.afterRound] ??
+                      '',
+              durationHint: pillar
+                  .context(MindCoachV2ContextMode.afterRound)
+                  .durationHint,
+              color: accent,
+              onTap: () => _openContext(MindCoachV2ContextMode.afterRound),
+            ),
+            const SizedBox(height: 16),
+            _FavoritesAccordion(
+              color: accent,
+              expanded: _favoritesExpanded,
+              favorites: favorites,
+              onTap: () {
+                setState(() => _favoritesExpanded = !_favoritesExpanded);
+              },
+              onFavoriteTap: _startFavorite,
+            ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeroCard(ThemeData theme) {
-    final colorScheme = theme.colorScheme;
-    final baseColor = _contextMode == MindCoachV2ContextMode.duringRound
-        ? const Color(0xFF0A6BB8)
-        : _contextMode == MindCoachV2ContextMode.afterRound
-            ? const Color(0xFF166B4A)
-            : const Color(0xFF1A2F55);
-
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            baseColor,
-            Color.alphaBlend(baseColor.withValues(alpha: 0.35), Colors.black),
-          ],
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'MindCoach Studio',
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: Colors.white70,
-              letterSpacing: 0.4,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _primaryActionTitle(),
-            style: theme.textTheme.headlineSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _heroDescription(),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withValues(alpha: 0.9),
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (_loadingContext)
-            const LinearProgressIndicator(minHeight: 2)
-          else
-            SizedBox(
-              width: double.infinity,
-              child: FoCoCoAdaptiveButton(
-                onPressed: _starting
-                    ? null
-                    : () => _start(
-                          contextMode: _contextMode,
-                          entrySource: 'home_primary',
-                        ),
-                label: _starting ? 'Starting...' : 'Start Session',
-                enabled: !_starting,
-                color: colorScheme.secondary,
-                textColor: colorScheme.onSecondary,
-              ),
-            ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              _buildHeroChip(
-                  label:
-                      'Mode: ${_contextMode.wireValue.replaceAll('_', ' ')}'),
-              _buildHeroChip(label: 'Runtime Validator Active'),
-              _buildHeroChip(label: 'Cartesia Voice Ready'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeroChip({required String label}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickModeCards(ThemeData theme) {
-    final items = <({
-      String title,
-      IconData icon,
-      MindCoachV2ContextMode mode,
-      String subtitle,
-    })>[
-      (
-        title: 'Before Round',
-        icon: FluentIcons.flag_24_regular,
-        mode: MindCoachV2ContextMode.beforeRound,
-        subtitle: 'Settle and commit',
-      ),
-      (
-        title: 'During Round',
-        icon: FluentIcons.target_24_regular,
-        mode: MindCoachV2ContextMode.duringRound,
-        subtitle: 'Fast pressure reset',
-      ),
-      (
-        title: 'After Round',
-        icon: FluentIcons.checkmark_circle_24_regular,
-        mode: MindCoachV2ContextMode.afterRound,
-        subtitle: 'Review and adapt',
-      ),
-    ];
-
-    return Row(
-      children: items
-          .map(
-            (item) => Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  right: item.title == 'After Round' ? 0 : 8,
-                ),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: _starting
-                      ? null
-                      : () => _start(
-                            contextMode: item.mode,
-                            entrySource: 'home_chip',
-                          ),
-                  child: Ink(
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color:
-                            theme.colorScheme.outline.withValues(alpha: 0.18),
-                      ),
-                    ),
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(item.icon,
-                            size: 20, color: theme.colorScheme.primary),
-                        const SizedBox(height: 10),
-                        Text(
-                          item.title,
-                          style: theme.textTheme.labelLarge,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          item.subtitle,
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          )
-          .toList(growable: false),
-    );
-  }
-
-  Widget _buildResumeCard(ThemeData theme) {
-    final payload = _resumePayload!;
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.32),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.tertiary.withValues(alpha: 0.3),
-        ),
-      ),
-      child: ListTile(
-        title: const Text('Resume Last Session'),
-        subtitle: Text(payload.session.routineType),
-        trailing: const Icon(FluentIcons.play_circle_24_filled),
-        onTap: () => widget.onResumeRequested(payload),
-      ),
-    );
-  }
-
-  Widget _buildStudioActions(ThemeData theme) {
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.surface,
-            colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outline.withValues(alpha: 0.1),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                FluentIcons.toolbox_20_regular,
-                size: 20,
-                color: colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Build & Review',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _StudioActionCard(
-                  icon: FluentIcons.wand_24_regular,
-                  title: 'Custom Builder',
-                  subtitle: 'Create your session',
-                  gradientColors: const [
-                    Color(0xFF6366F1),
-                    Color(0xFF8B5CF6),
-                  ],
-                  onTap: widget.onOpenBuilder,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StudioActionCard(
-                  icon: FluentIcons.history_24_regular,
-                  title: 'History',
-                  subtitle: 'Past sessions',
-                  gradientColors: const [
-                    Color(0xFF0EA5E9),
-                    Color(0xFF06B6D4),
-                  ],
-                  onTap: widget.onOpenHistory,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecentSessions(ThemeData theme) {
-    return StreamBuilder<List<MindCoachV2Session>>(
-      stream: widget.repository.streamHistory(limit: 5),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Text(
-              'Could not load history: ${snapshot.error}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
-              ),
-            ),
-          );
-        }
-
-        final sessions = snapshot.data ?? const <MindCoachV2Session>[];
-        if (sessions.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('No MindCoach v2 sessions yet.'),
-          );
-        }
-
-        return Column(
-          children: sessions
-              .map(
-                (session) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.12),
-                    ),
-                  ),
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(
-                      FluentIcons.play_circle_24_regular,
-                      color: theme.colorScheme.primary,
-                    ),
-                    title: Text(session.routineType),
-                    subtitle: Text(
-                      '${session.deliveryLength} • ${session.validatorStatus}',
-                    ),
-                  ),
-                ),
-              )
-              .toList(growable: false),
         );
       },
     );
   }
+
+  Widget _buildSessionListScreen(
+    MindCoachV2CatalogPillar pillar,
+    MindCoachV2CatalogContext contextModel,
+  ) {
+    final accent = MindCoachV2Visuals.accentForPillar(pillar.key);
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(
+        22,
+        12,
+        22,
+        MediaQuery.viewPaddingOf(context).bottom +
+            kFoCoCoBottomNavStripAndTabsHeight +
+            24,
+      ),
+      children: [
+        _PillarHeader(
+          title: pillar.label,
+          subtitle: pillar.descriptor,
+          color: accent,
+          onBack: _goBackOneLevel,
+        ),
+        const SizedBox(height: 18),
+        Text(
+          contextModel.label,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: 8),
+        MindCoachGlowLine(color: accent, width: 188),
+        const SizedBox(height: 18),
+        for (final session in contextModel.sessions) ...[
+          _SessionListRow(
+            color: accent,
+            session: session,
+            onTap: _starting
+                ? null
+                : () => _startCatalogSession(
+                      session,
+                      entrySource: contextModel.mode ==
+                              MindCoachV2ContextMode.duringRound
+                          ? 'during_round_overlay'
+                          : 'session_list',
+                    ),
+          ),
+          const SizedBox(height: 18),
+        ],
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final catalog = _catalog;
+    final pillar = _selectedPillar == null || catalog == null
+        ? null
+        : catalog.pillar(_selectedPillar!);
+    final backgroundPillar = _selectedPillar;
+
+    return PopScope(
+      canPop: _selectedPillar == null && _selectedContext == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && (_selectedPillar != null || _selectedContext != null)) {
+          _goBackOneLevel();
+        }
+      },
+      child: MindCoachV2Backdrop(
+        pillar: backgroundPillar,
+        child: _loading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: Colors.white70,
+                ),
+              )
+            : catalog == null
+                ? _buildLoadError()
+                : RefreshIndicator(
+                    color: Colors.white,
+                    backgroundColor: Colors.black,
+                    onRefresh: _handleRefresh,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 280),
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeIn,
+                      child: _selectedPillar == null
+                          ? _buildHomeScreen(catalog)
+                          : _selectedContext == null
+                              ? _buildPillarScreen(pillar!)
+                              : _buildSessionListScreen(
+                                  pillar!,
+                                  pillar.context(_selectedContext!),
+                                ),
+                    ),
+                  ),
+      ),
+    );
+  }
 }
 
-class _StudioActionCard extends StatelessWidget {
-  const _StudioActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.gradientColors,
-    required this.onTap,
+class _ResumePill extends StatelessWidget {
+  const _ResumePill({
+    required this.onResume,
+    required this.onDismiss,
   });
 
-  final IconData icon;
+  final VoidCallback? onResume;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        color: Colors.white.withValues(alpha: 0.035),
+        border: Border.all(
+          color: const Color(0xFF398EFF).withValues(alpha: 0.44),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Resume session?',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ),
+          TextButton(
+            onPressed: onResume,
+            child: const Text('Resume'),
+          ),
+          Text(
+            '·',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.48),
+              fontSize: 18,
+            ),
+          ),
+          TextButton(
+            onPressed: onDismiss,
+            child: Text(
+              'Dismiss',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.74),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PillarHeader extends StatelessWidget {
+  const _PillarHeader({
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onBack,
+  });
+
   final String title;
   final String subtitle;
-  final List<Color> gradientColors;
+  final Color color;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton(
+              onPressed: onBack,
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                color: Colors.white,
+              ),
+            ),
+            Flexible(
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
+              ),
+            ),
+            const SizedBox(width: 48),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.78),
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w400,
+              ),
+        ),
+        const SizedBox(height: 10),
+        MindCoachGlowLine(color: color, width: 168),
+      ],
+    );
+  }
+}
+
+class _ContextCard extends StatelessWidget {
+  const _ContextCard({
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+    this.durationHint,
+  });
+
+  final String title;
+  final String subtitle;
+  final String? durationHint;
+  final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Material(
-      type: MaterialType.transparency,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                gradientColors[0].withValues(alpha: 0.15),
-                gradientColors[1].withValues(alpha: 0.08),
+    return MindCoachGlowCard(
+      color: color,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      onTap: onTap,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.74),
+                      ),
+                ),
               ],
             ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: gradientColors[0].withValues(alpha: 0.25),
+          ),
+          if (durationHint != null) ...[
+            const SizedBox(width: 12),
+            Text(
+              durationHint!,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.48),
+                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ],
+          const SizedBox(width: 10),
+          Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: Colors.white.withValues(alpha: 0.8),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FavoritesAccordion extends StatelessWidget {
+  const _FavoritesAccordion({
+    required this.color,
+    required this.expanded,
+    required this.favorites,
+    required this.onTap,
+    required this.onFavoriteTap,
+  });
+
+  final Color color;
+  final bool expanded;
+  final List<MindCoachV2Favorite> favorites;
+  final VoidCallback onTap;
+  final Future<void> Function(MindCoachV2Favorite favorite) onFavoriteTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return MindCoachGlowCard(
+      color: color,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Favorites',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Saved for instant access.',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.74),
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: Colors.white.withValues(alpha: 0.8),
+                  ),
+                ],
+              ),
             ),
           ),
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: gradientColors,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: gradientColors[0].withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+          if (expanded) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              height: 1,
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+            const SizedBox(height: 14),
+            if (favorites.isEmpty)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Column(
+                  children: [
+                    Text(
+                      'No favorites yet. Complete a session and save it\nfor quick access.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.52),
+                            fontStyle: FontStyle.italic,
+                          ),
                     ),
+                    const SizedBox(height: 18),
+                    MindCoachGlowLine(color: color, width: double.infinity),
                   ],
                 ),
-                child: Icon(
-                  icon,
-                  size: 22,
-                  color: Colors.white,
+              )
+            else ...[
+              for (final favorite in favorites) ...[
+                _FavoriteRow(
+                  favorite: favorite,
+                  color: color,
+                  onTap: () => onFavoriteTap(favorite),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.outline,
+                const SizedBox(height: 14),
+              ],
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '${favorites.length} of 5 slots used',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
               ),
             ],
-          ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FavoriteRow extends StatelessWidget {
+  const _FavoriteRow({
+    required this.favorite,
+    required this.color,
+    required this.onTap,
+  });
+
+  final MindCoachV2Favorite favorite;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    favorite.sessionName,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+                Text(
+                  '${favorite.contextMode.displayLabel} · ${favorite.durationSec} sec',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.56),
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            MindCoachGlowLine(color: color, width: double.infinity),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SessionListRow extends StatelessWidget {
+  const _SessionListRow({
+    required this.color,
+    required this.session,
+    required this.onTap,
+  });
+
+  final Color color;
+  final MindCoachV2CatalogSession session;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        session.name,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        session.descriptor,
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.78),
+                                  fontStyle: FontStyle.italic,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '${session.durationSec} sec',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.62),
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            MindCoachGlowLine(color: color, width: double.infinity),
+          ],
         ),
       ),
     );

@@ -13,6 +13,11 @@ const VALID_CONTEXT_MODES = new Set([
 ]);
 
 const VALID_ENTRY_SOURCES = new Set([
+  'session_list',
+  'during_round_overlay',
+  'resume_restart',
+  'play_again',
+  'favorite_replay',
   'home_primary',
   'home_chip',
   'builder',
@@ -44,7 +49,10 @@ const TEMPLATE_IDS = [
   'MC_T06_PRESSURE_MOMENTS',
   'MC_T07_MOMENTUM_PROTECTION',
   'MC_T08_END_OF_ROUND_REFLECTION',
+  'MC_T09_POST_ROUND_INSIGHT',
 ];
+
+const PILLAR_KEYS = ['focus', 'confidence', 'control'];
 
 const FORBIDDEN_LANGUAGE_PATTERNS = [
   /\bdiagnos(e|is|tic)\b/i,
@@ -98,6 +106,7 @@ module.exports = {
   CONTENT_LIBRARY_EXPECTED_ROWS,
   SPEECH_TIMING_FIELDS,
   TEMPLATE_IDS,
+  PILLAR_KEYS,
   FORBIDDEN_LANGUAGE_PATTERNS,
   MINDCOACH_DATA_PATH,
   TEMPLATES_JSON_PATH,

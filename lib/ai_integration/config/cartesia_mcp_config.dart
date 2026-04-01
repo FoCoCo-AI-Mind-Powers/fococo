@@ -28,6 +28,7 @@ class CartesiaMCPConfig {
           '7442d6b8-ff51-4477-bd30-0c0d16df84eb', // Your specified voice ID
       'model': 'sonic-2',
       'speed': 'normal',
+      'speed_multiplier': 1.0,
       'emotion': 'confident',
       'style': 'coaching',
     },
@@ -36,6 +37,7 @@ class CartesiaMCPConfig {
           '7442d6b8-ff51-4477-bd30-0c0d16df84eb', // Using same voice with different settings
       'model': 'sonic-2',
       'speed': 'slow',
+      'speed_multiplier': 0.84,
       'emotion': 'encouraging',
       'style': 'supportive',
     },
@@ -44,6 +46,7 @@ class CartesiaMCPConfig {
           '7442d6b8-ff51-4477-bd30-0c0d16df84eb', // Using same voice with calm settings
       'model': 'sonic-2',
       'speed': 'slow',
+      'speed_multiplier': 0.76,
       'emotion': 'calm',
       'style': 'meditative',
     },
@@ -51,6 +54,7 @@ class CartesiaMCPConfig {
       'voice_id': '7442d6b8-ff51-4477-bd30-0c0d16df84eb',
       'model': 'sonic-2',
       'speed': 'normal',
+      'speed_multiplier': 0.95,
       'emotion': 'conversational',
       'style': 'dialogue',
     },

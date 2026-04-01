@@ -2,6 +2,7 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
@@ -27,12 +28,18 @@ void main() async {
   GoRouter.optionURLReflectsImperativeAPIs = true;
   usePathUrlStrategy();
 
-  await initFirebase();
+  // Firebase init can rethrow for non-duplicate-app errors; catch here so the
+  // app still launches (degraded) instead of a silent process abort.
+  try {
+    await initFirebase();
+  } catch (e) {
+    if (kDebugMode) {
+      print('❌ Firebase init failed – app will launch degraded: $e');
+    }
+  }
 
-  // Initialize timezone data for scheduled notifications
   tz.initializeTimeZones();
 
-  // Set up background message handler for FCM with error handling
   try {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   } catch (e) {
@@ -43,56 +50,12 @@ void main() async {
 
   await FlutterFlowTheme.initialize();
 
-  // Initialize Stripe
-  try {
-    await StripeService().initialize();
-    if (kDebugMode) {
-      print('✅ Stripe initialized successfully');
-    }
-  } catch (e) {
-    if (kDebugMode) {
-      print('❌ Failed to initialize Stripe: $e');
-    }
-  }
-
-  // Initialize RevenueCat (primary subscription handler)
-  try {
-    await RevenueCatService().initialize();
-    if (kDebugMode) {
-      print('✅ RevenueCat initialized successfully');
-    }
-  } catch (e) {
-    if (kDebugMode) {
-      print('❌ Failed to initialize RevenueCat: $e');
-    }
-  }
-
-  // Initialize Store Subscription Service (fallback/legacy)
-  try {
-    await StoreSubscriptionService().initialize();
-    if (kDebugMode) {
-      print('✅ Store Subscription Service initialized');
-    }
-  } catch (e) {
-    if (kDebugMode) {
-      print('❌ Failed to initialize Store Subscription Service: $e');
-    }
-  }
-
-  // Initialize Subscription State Provider
-  try {
-    await SubscriptionStateProvider().initialize();
-    if (kDebugMode) {
-      print('✅ Subscription State Provider initialized');
-    }
-  } catch (e) {
-    if (kDebugMode) {
-      print('❌ Failed to initialize Subscription State Provider: $e');
-    }
-  }
-
   if (!kIsWeb) {
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
   }
 
   runApp(MyApp());
@@ -135,14 +98,24 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
 
-    // Initialize theme mode after SharedPreferences is loaded
-    _themeMode = FlutterFlowTheme.themeMode;
+    _themeMode = ThemeMode.dark;
+    FlutterFlowTheme.saveThemeMode(ThemeMode.dark);
 
     _appStateNotifier = AppStateNotifier.instance;
     _router = createRouter(_appStateNotifier);
 
-    // Initialize the user stream and handle authentication state
+    // Initialize the user stream and handle authentication state.
     _initializeUserStream();
+
+    // Keep payment/subscription SDK warmup out of the launch window entirely.
+    // The app can function without them during first paint, and delaying them
+    // reduces the odds of iOS launch-time crashes inside native SDK threads.
+    Future.delayed(const Duration(seconds: 8), () {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_warmStartupServices());
+    });
 
     // Enhanced splash screen will handle its own timing and navigation
     // Reduced timeout as backup safety measure
@@ -158,6 +131,48 @@ class _MyAppState extends State<MyApp> {
         }
       },
     );
+  }
+
+  Future<void> _warmStartupServices() async {
+    await _initializeDeferredService(
+      name: 'Stripe',
+      initialize: () => StripeService().initialize(),
+    );
+    await _initializeDeferredService(
+      name: 'RevenueCat',
+      initialize: () => RevenueCatService().initialize(),
+    );
+    await _initializeDeferredService(
+      name: 'Store Subscription Service',
+      initialize: () => StoreSubscriptionService().initialize(),
+    );
+    await _initializeDeferredService(
+      name: 'Subscription State Provider',
+      initialize: () => SubscriptionStateProvider().initialize(),
+    );
+  }
+
+  Future<void> _initializeDeferredService({
+    required String name,
+    required Future<void> Function() initialize,
+  }) async {
+    try {
+      await initialize();
+      if (kDebugMode) {
+        print('✅ $name initialized successfully');
+      }
+    } catch (error, stackTrace) {
+      if (!kIsWeb) {
+        await FirebaseCrashlytics.instance.recordError(
+          error,
+          stackTrace,
+          reason: '$name startup initialization failed',
+        );
+      }
+      if (kDebugMode) {
+        print('❌ Failed to initialize $name: $error');
+      }
+    }
   }
 
   void _initializeUserStream() {
@@ -229,8 +244,8 @@ class _MyAppState extends State<MyApp> {
   }
 
   void setThemeMode(ThemeMode mode) => safeSetState(() {
-        _themeMode = mode;
-        FlutterFlowTheme.saveThemeMode(mode);
+        _themeMode = ThemeMode.dark;
+        FlutterFlowTheme.saveThemeMode(ThemeMode.dark);
       });
 
   @override

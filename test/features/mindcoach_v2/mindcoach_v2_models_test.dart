@@ -74,4 +74,54 @@ void main() {
     expect(session.validatorStatus, 'FAIL_CORRECTED');
     expect(session.scenarioTags, ['post_round_learn']);
   });
+
+  test('generate request keeps locked session metadata for catalog launches',
+      () {
+    final request = MindCoachV2GenerateRequest(
+      contextMode: MindCoachV2ContextMode.beforeRound,
+      entrySource: 'session_list',
+      pillar: MindCoachV2Pillar.focus,
+      sessionKey: 'focus_clear_start',
+      sessionName: 'Clear Start',
+      sessionDescriptor: 'Settle before the first tee.',
+      targetDurationSec: 30,
+      preferredDeliveryLength: 'standard',
+    );
+
+    expect(request.toMap(), {
+      'context_mode': 'before_round',
+      'entry_source': 'session_list',
+      'pillar': 'focus',
+      'session_key': 'focus_clear_start',
+      'session_name': 'Clear Start',
+      'session_descriptor': 'Settle before the first tee.',
+      'target_duration_sec': 30,
+      'preferred_delivery_length': 'standard',
+      'customization': {
+        'tone': 'auto',
+        'vark_mode': 'auto',
+      },
+    });
+  });
+
+  test('session top bar title uses context label and duration', () {
+    final session = MindCoachV2Session.fromApi(
+      {
+        'template_id': 'MC_T01_PRE_ROUND_CLARITY',
+        'routine_type': 'Clear Start',
+        'recommended_cue': 'Breathe',
+        'delivery_length': 'standard_30s',
+        'coaching_text': 'Settle into the round.',
+        'duration_sec': 45,
+        'validator_status': 'PASS',
+        'model_version': 'gemini',
+        'prompt_version': 'mindcoach_system_v1',
+      },
+      sessionId: 'session_1',
+      userId: 'user_1',
+      contextMode: MindCoachV2ContextMode.beforeRound,
+    );
+
+    expect(session.topBarTitle, 'Before Round · 45 sec');
+  });
 }

@@ -125,8 +125,10 @@ class CartesiaAPIService {
   Future<List<int>> generateSpeech({
     required String text,
     String? voiceId,
+    String? voiceProfileKey,
     String? contentType,
     VarkPreferencesStruct? varkPreferences,
+    double? speedMultiplier,
   }) async {
     if (!_isInitialized) {
       await initialize();
@@ -142,19 +144,11 @@ class CartesiaAPIService {
       final voiceSettings = _getVoiceSettings(contentType, varkPreferences);
 
       // Convert speed setting to numeric value
-      double speedValue = 1.0; // Default normal speed
-      switch (voiceSettings['speed']) {
-        case 'slow':
-          speedValue = 0.8;
-          break;
-        case 'fast':
-          speedValue = 1.2;
-          break;
-        case 'normal':
-        default:
-          speedValue = 1.0;
-          break;
-      }
+      final speedValue = _resolveSpeedValue(
+        voiceSettings: voiceSettings,
+        voiceProfileKey: voiceProfileKey,
+        explicitSpeedMultiplier: speedMultiplier,
+      );
 
       // Prepare request payload matching your curl command format
       final payload = {
@@ -210,8 +204,10 @@ class CartesiaAPIService {
   Future<void> speakText({
     required String text,
     String? voiceId,
+    String? voiceProfileKey,
     String? contentType,
     VarkPreferencesStruct? varkPreferences,
+    double? speedMultiplier,
     VoidCallback? onComplete,
   }) async {
     if (_isSpeaking) {
@@ -226,8 +222,10 @@ class CartesiaAPIService {
       final audioData = await generateSpeech(
         text: text,
         voiceId: voiceId,
+        voiceProfileKey: voiceProfileKey,
         contentType: contentType,
         varkPreferences: varkPreferences,
+        speedMultiplier: speedMultiplier,
       );
 
       // Play the generated audio
@@ -271,6 +269,78 @@ class CartesiaAPIService {
     }
   }
 
+  Future<void> speakTextAndWait({
+    required String text,
+    String? voiceId,
+    String? voiceProfileKey,
+    String? contentType,
+    VarkPreferencesStruct? varkPreferences,
+    double? speedMultiplier,
+    VoidCallback? onComplete,
+  }) async {
+    if (_isSpeaking) {
+      await stopSpeaking();
+    }
+
+    try {
+      _isSpeaking = true;
+      _speakingController.add(true);
+
+      final audioData = await generateSpeech(
+        text: text,
+        voiceId: voiceId,
+        voiceProfileKey: voiceProfileKey,
+        contentType: contentType,
+        varkPreferences: varkPreferences,
+        speedMultiplier: speedMultiplier,
+      );
+
+      await playAudioDataAndWait(audioData, onComplete: onComplete);
+    } catch (e) {
+      _isSpeaking = false;
+      _speakingController.add(false);
+      _errorController.add('Failed to speak text: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> playAudioDataAndWait(
+    List<int> audioData, {
+    VoidCallback? onComplete,
+  }) async {
+    try {
+      final audioSource = _BytesAudioSource(audioData);
+      await _audioPlayer.setAudioSource(audioSource);
+
+      final completion = Completer<void>();
+      late final StreamSubscription<PlayerState> stateSub;
+      stateSub = _audioPlayer.playerStateStream.listen(
+        (state) {
+          if (state.processingState == ProcessingState.completed &&
+              !completion.isCompleted) {
+            completion.complete();
+          }
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!completion.isCompleted) {
+            completion.completeError(error, stackTrace);
+          }
+        },
+      );
+
+      await _audioPlayer.play();
+      if (!completion.isCompleted) {
+        await completion.future;
+      }
+      await stateSub.cancel();
+      onComplete?.call();
+    } catch (e) {
+      _isSpeaking = false;
+      _speakingController.add(false);
+      throw Exception('Failed to play audio: $e');
+    }
+  }
+
   /// Stop current speech
   Future<void> stopSpeaking() async {
     if (_isSpeaking) {
@@ -302,6 +372,34 @@ class CartesiaAPIService {
     _currentVoiceId = voiceId;
     if (kDebugMode) {
       print('🎭 Voice ID set to: $voiceId');
+    }
+  }
+
+  double _resolveSpeedValue({
+    required Map<String, dynamic> voiceSettings,
+    String? voiceProfileKey,
+    double? explicitSpeedMultiplier,
+  }) {
+    if (explicitSpeedMultiplier != null && explicitSpeedMultiplier > 0) {
+      return explicitSpeedMultiplier;
+    }
+
+    final profile = voiceProfileKey == null
+        ? null
+        : CartesiaMCPConfig.getVoiceProfile(voiceProfileKey);
+    final profileSpeed = profile?['speed_multiplier'];
+    if (profileSpeed is num && profileSpeed > 0) {
+      return profileSpeed.toDouble();
+    }
+
+    switch (voiceSettings['speed']) {
+      case 'slow':
+        return 0.8;
+      case 'fast':
+        return 1.2;
+      case 'normal':
+      default:
+        return 1.0;
     }
   }
 

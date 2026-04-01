@@ -1032,9 +1032,9 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
                           if (_model.dateOfBirth != null &&
                               _model.termsAccepted) ...[
                             const SizedBox(height: 20),
-                            if (age != null && age < 13)
-                              _buildUnder13Message(theme),
-                            if (age != null && age >= 13 && age < 18)
+                            if (age != null && age < 16)
+                              _buildUnderMinimumAgeMessage(theme),
+                            if (age != null && age >= 16 && age < 18)
                               _buildTeenageConsent(theme),
                             // Removed continue button - navigation arrows handle this
                           ],
@@ -1267,14 +1267,14 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
     IconData ageIcon;
     Color backgroundColor;
 
-    if (age < 13) {
+    if (age < 16) {
       ageColor = theme.error;
-      ageLabel = 'Under 13';
+      ageLabel = 'Under 16';
       ageIcon = Icons.block_rounded;
       backgroundColor = theme.error.withValues(alpha: 0.15);
-    } else if (age >= 13 && age < 18) {
+    } else if (age >= 16 && age < 18) {
       ageColor = theme.warning;
-      ageLabel = 'Teen (13-17)';
+      ageLabel = 'Teen (16-17)';
       ageIcon = Icons.child_care_rounded;
       backgroundColor = theme.warning.withValues(alpha: 0.15);
     } else {
@@ -1389,7 +1389,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
     );
   }
 
-  Widget _buildUnder13Message(FlutterFlowTheme theme) {
+  Widget _buildUnderMinimumAgeMessage(FlutterFlowTheme theme) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: BackdropFilter(
@@ -1439,7 +1439,7 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
               ),
               const SizedBox(height: 16),
               Text(
-                'App is for 13+',
+                'App is for 16+',
                 textAlign: TextAlign.center,
                 style: theme.bodyLarge.override(
                   fontFamily: 'Montserrat',

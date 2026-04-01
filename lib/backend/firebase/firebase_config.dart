@@ -1,10 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '/services/gemini_key_service.dart';
-
-const String _googleAIOverrideAppName = 'google_ai_override';
 
 Future initFirebase() async {
   try {
@@ -16,6 +15,7 @@ Future initFirebase() async {
         print(
             '✅ Existing apps: ${Firebase.apps.map((app) => app.name).join(', ')}');
       }
+      _applyFirestoreSettings();
       return;
     }
 
@@ -70,6 +70,12 @@ Future initFirebase() async {
       }
     }
 
+    // Apply Firestore client settings immediately after init, before any
+    // Firestore read/write (RevenueCat, auth listener, etc.) can open a gRPC
+    // channel.  Doing it later races with the first query and can crash inside
+    // gpr_cv_wait on iOS.
+    _applyFirestoreSettings();
+
     if (kDebugMode) {
       print('✅ Firebase initialized successfully');
     }
@@ -89,32 +95,41 @@ Future initFirebase() async {
   }
 }
 
-Future<FirebaseApp> getGoogleAIFirebaseApp() async {
-  // 1. Try fetching from Secret Manager via Cloud Function
-  final secretKey = await GeminiKeyService.instance.getKey();
-
-  // 2. Fall back to --dart-define
-  const dartDefineKey = String.fromEnvironment('GEMINI_API_KEY');
-  final overrideApiKey =
-      secretKey.isNotEmpty ? secretKey : dartDefineKey;
-
-  if (overrideApiKey.isEmpty) {
-    return Firebase.app();
-  }
-
-  // Re-use an existing override app if the key matches
-  for (final app in Firebase.apps) {
-    if (app.name == _googleAIOverrideAppName) {
-      if (app.options.apiKey == overrideApiKey) return app;
-      // Key changed — delete stale app and recreate
-      await app.delete();
-      break;
+/// Internal: called once from [initFirebase] right after [Firebase.initializeApp]
+/// and before any Firestore read/write opens a gRPC channel.
+///
+/// The iOS/macOS SDK persists offline data through file-backed caches; stack
+/// traces mentioning `LargeItemCacheType` / `NSFileManager` + `saveData` usually
+/// originate there. Using an explicit bounded disk cache (40 MiB, the SDK
+/// default) avoids unbounded offline cache edge cases and keeps GC predictable.
+/// Do not set [Settings.CACHE_SIZE_UNLIMITED] on Apple platforms.
+void _applyFirestoreSettings() {
+  if (kIsWeb) return;
+  try {
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: 40 * 1024 * 1024,
+    );
+    if (kDebugMode) {
+      print('✅ Firestore: bounded local cache (40 MiB), persistence on');
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      print('⚠️ Firestore settings could not be applied: $e');
     }
   }
+}
 
-  final baseApp = Firebase.app();
-  return Firebase.initializeApp(
-    name: _googleAIOverrideAppName,
-    options: baseApp.options.copyWith(apiKey: overrideApiKey),
-  );
+/// Public alias kept for call-sites that haven't been updated yet.
+@Deprecated('Settings are now applied inside initFirebase(). This is a no-op.')
+void configureFirestoreClientSettings() {}
+
+/// Firebase AI Logic and Gemini Live must use the real Firebase Web API key from
+/// [FirebaseOptions], not the Generative Language API key from Secret Manager.
+/// Putting a Gemini key into [FirebaseOptions.apiKey] breaks auth and can surface
+/// "API key leaked" / permission errors.
+Future<FirebaseApp> getGoogleAIFirebaseApp() async {
+  // Preload so [GeminiLiveAPIConfig.apiKey] / voice paths still resolve the key.
+  await GeminiKeyService.instance.getKey();
+  return Firebase.app();
 }

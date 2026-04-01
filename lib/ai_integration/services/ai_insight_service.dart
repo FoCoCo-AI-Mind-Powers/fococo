@@ -5,7 +5,6 @@ import 'package:fo_co_co/backend/schema/golf_rounds_record.dart';
 import 'package:fo_co_co/backend/schema/mental_sessions_record.dart';
 import 'package:fo_co_co/backend/schema/user_record.dart';
 
-
 import '/backend/push_notifications/push_notifications_util.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '../ai_client.dart';
@@ -16,7 +15,7 @@ import 'ai_cost_tracker.dart';
 /// Service for managing AI-generated golf insights
 class AIInsightService {
   AIInsightService._();
-  
+
   static AIInsightService? _instance;
   static AIInsightService get instance => _instance ??= AIInsightService._();
 
@@ -33,7 +32,8 @@ class AIInsightService {
       // Check if insight already exists for this round
       if (!forceGenerate && golfRound.aiInsightsGenerated) {
         if (kDebugMode) {
-          print('💡 Insight already exists for round ${golfRound.reference.id}');
+          print(
+              '💡 Insight already exists for round ${golfRound.reference.id}');
         }
         return null;
       }
@@ -96,7 +96,8 @@ class AIInsightService {
 
       if (kDebugMode) {
         print('✅ Generated AI insight for round ${golfRound.reference.id}');
-        print('💰 Estimated cost: \$${aiResponse.estimatedCost?.toStringAsFixed(4)}');
+        print(
+            '💰 Estimated cost: \$${aiResponse.estimatedCost?.toStringAsFixed(4)}');
       }
 
       return insightRecord;
@@ -126,7 +127,8 @@ class AIInsightService {
       }
 
       final userProfile = await _getUserProfile(userId);
-      final recentRounds = await _getHistoricalRounds(userId, limit: roundsToAnalyze);
+      final recentRounds =
+          await _getHistoricalRounds(userId, limit: roundsToAnalyze);
       final mentalSessions = await _getRecentMentalSessions(userId, limit: 10);
 
       if (recentRounds.isEmpty) {
@@ -161,11 +163,13 @@ class AIInsightService {
       await PushNotificationsUtil.triggerAIInsightNotification(
         insightId: insightRecord.reference.id,
         insightTitle: aiResponse.insightTitle,
-        customMessage: 'Your performance analysis is ready! Get insights from your last $roundsToAnalyze rounds.',
+        customMessage:
+            'Your performance analysis is ready! Get insights from your last $roundsToAnalyze rounds.',
       );
 
       if (kDebugMode) {
-        print('✅ Generated performance insight analyzing $roundsToAnalyze rounds');
+        print(
+            '✅ Generated performance insight analyzing $roundsToAnalyze rounds');
       }
 
       return insightRecord;
@@ -196,6 +200,7 @@ class AIInsightService {
       final snapshot = await query.get();
       return snapshot.docs
           .map((doc) => AiInsightsRecord.fromSnapshot(doc))
+          .where((insight) => !insight.isFoCoCoDaily)
           .toList();
     } catch (e) {
       if (kDebugMode) {
@@ -258,11 +263,15 @@ class AIInsightService {
           .where('createdTime', isGreaterThanOrEqualTo: startOfDay)
           .get();
 
-      final count = todayInsights.docs.length;
+      final count = todayInsights.docs
+          .map((doc) => AiInsightsRecord.fromSnapshot(doc))
+          .where((insight) => !insight.isFoCoCoDaily)
+          .length;
       final canGenerate = count < AIConfig.maxRequestsPerUserPerDay;
 
       if (!canGenerate && kDebugMode) {
-        print('⚠️ User $userId has reached daily insight limit ($count/${AIConfig.maxRequestsPerUserPerDay})');
+        print(
+            '⚠️ User $userId has reached daily insight limit ($count/${AIConfig.maxRequestsPerUserPerDay})');
       }
 
       return canGenerate;
@@ -288,7 +297,8 @@ class AIInsightService {
   }
 
   /// Get historical golf rounds
-  Future<List<GolfRoundsRecord>> _getHistoricalRounds(String userId, {int limit = 10}) async {
+  Future<List<GolfRoundsRecord>> _getHistoricalRounds(String userId,
+      {int limit = 10}) async {
     try {
       final snapshot = await GolfRoundsRecord.collection
           .where('userId', isEqualTo: userId)
@@ -308,7 +318,8 @@ class AIInsightService {
   }
 
   /// Get recent mental sessions
-  Future<List<MentalSessionsRecord>> _getRecentMentalSessions(String userId, {int limit = 5}) async {
+  Future<List<MentalSessionsRecord>> _getRecentMentalSessions(String userId,
+      {int limit = 5}) async {
     try {
       final snapshot = await MentalSessionsRecord.collection
           .where('userId', isEqualTo: userId)
@@ -336,7 +347,7 @@ class AIInsightService {
     required AIInsightResponse aiResponse,
   }) async {
     final docRef = AiInsightsRecord.collection.doc();
-    
+
     final data = {
       'userId': userId,
       'sourceId': sourceId,
@@ -374,14 +385,15 @@ class AIInsightService {
     };
 
     await docRef.set(data);
-    
+
     // Return the created record
     final snapshot = await docRef.get();
     return AiInsightsRecord.fromSnapshot(snapshot);
   }
 
   /// Update user AI statistics
-  Future<void> _updateUserAIStats(String userId, AIInsightResponse aiResponse) async {
+  Future<void> _updateUserAIStats(
+      String userId, AIInsightResponse aiResponse) async {
     try {
       await UserRecord.collection.doc(userId).update({
         'totalAIInsightsGenerated': FieldValue.increment(1),
@@ -394,4 +406,4 @@ class AIInsightService {
       }
     }
   }
-} 
+}

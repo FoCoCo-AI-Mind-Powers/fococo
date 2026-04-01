@@ -64,6 +64,9 @@ const List<String> _foCoCoNavRoutes = [
 final ValueNotifier<Map<String, String>> foCoCoNavLabelOverrides =
     ValueNotifier<Map<String, String>>(<String, String>{});
 
+final ValueNotifier<Map<String, Color>> foCoCoNavSelectedColorOverrides =
+    ValueNotifier<Map<String, Color>>(<String, Color>{});
+
 final ValueNotifier<Color?> foCoCoNavBarBackgroundOverride =
     ValueNotifier<Color?>(null);
 
@@ -87,6 +90,18 @@ void setFoCoCoNavBarBackgroundOverride(Color? color) {
   foCoCoNavBarBackgroundOverride.value = color;
 }
 
+void setFoCoCoNavSelectedColorOverride(String route, Color? color) {
+  final next = Map<String, Color>.from(foCoCoNavSelectedColorOverrides.value);
+  if (color == null) {
+    next.remove(route);
+  } else {
+    next[route] = color;
+  }
+  if (!mapEquals(next, foCoCoNavSelectedColorOverrides.value)) {
+    foCoCoNavSelectedColorOverrides.value = next;
+  }
+}
+
 int foCoCoNavIndexFromRoute(String route) {
   final i = _foCoCoNavRoutes.indexWhere((r) => r == route);
   return i >= 0 ? i : 0;
@@ -103,7 +118,14 @@ String foCoCoNavRouteFromIndex(int index) {
 
 /// Thin divider with centered light flare under the title (FoCoCo tab aesthetic).
 class FoCoCoAppBarGlowDivider extends StatelessWidget {
-  const FoCoCoAppBarGlowDivider({super.key});
+  const FoCoCoAppBarGlowDivider({
+    super.key,
+    this.dividerColor,
+    this.glowColor,
+  });
+
+  final Color? dividerColor;
+  final Color? glowColor;
 
   @override
   Widget build(BuildContext context) {
@@ -119,7 +141,7 @@ class FoCoCoAppBarGlowDivider extends StatelessWidget {
             bottom: 0,
             child: Container(
               height: 1,
-              color: Colors.white.withValues(alpha: 0.2),
+              color: dividerColor ?? Colors.white.withValues(alpha: 0.2),
             ),
           ),
           Center(
@@ -131,8 +153,8 @@ class FoCoCoAppBarGlowDivider extends StatelessWidget {
                   center: Alignment.bottomCenter,
                   radius: 1.2,
                   colors: [
-                    Colors.white.withValues(alpha: 0.45),
-                    Colors.white.withValues(alpha: 0.12),
+                    (glowColor ?? Colors.white).withValues(alpha: 0.45),
+                    (glowColor ?? Colors.white).withValues(alpha: 0.12),
                     Colors.transparent,
                   ],
                   stops: const [0.0, 0.35, 1.0],
@@ -153,10 +175,15 @@ PreferredSizeWidget buildFoCoCoAppBar(
   Widget? leading,
   List<Widget>? actions,
   Color? backgroundColor,
+  Color? foregroundColor,
   bool centerTitle = true,
   bool automaticallyImplyLeading = true,
+  bool showGlowDivider = true,
+  Color? dividerColor,
+  Color? glowColor,
 }) {
   final theme = FlutterFlowTheme.of(context);
+  final resolvedForeground = foregroundColor ?? theme.primaryText;
   return AppBar(
     backgroundColor: backgroundColor ?? theme.primaryBackground,
     surfaceTintColor: Colors.transparent,
@@ -166,13 +193,18 @@ PreferredSizeWidget buildFoCoCoAppBar(
     leading: leading,
     automaticallyImplyLeading: automaticallyImplyLeading,
     actions: actions,
-    iconTheme: IconThemeData(color: theme.primaryText),
-    actionsIconTheme: IconThemeData(color: theme.primaryText),
+    iconTheme: IconThemeData(color: resolvedForeground),
+    actionsIconTheme: IconThemeData(color: resolvedForeground),
     title: title,
-    bottom: const PreferredSize(
-      preferredSize: Size.fromHeight(10),
-      child: FoCoCoAppBarGlowDivider(),
-    ),
+    bottom: showGlowDivider
+        ? PreferredSize(
+            preferredSize: const Size.fromHeight(10),
+            child: FoCoCoAppBarGlowDivider(
+              dividerColor: dividerColor,
+              glowColor: glowColor,
+            ),
+          )
+        : null,
   );
 }
 
@@ -274,71 +306,79 @@ class FoCoCoBottomNavigationBar extends StatelessWidget {
         return ValueListenableBuilder<Map<String, String>>(
           valueListenable: foCoCoNavLabelOverrides,
           builder: (context, overrides, __) {
-            final bg = barBackgroundColor ??
-                overrideBackground ??
-                theme.primaryBackground;
-            final selectedIndex = foCoCoNavIndexFromRoute(currentRoute);
-            final selectedColor = _accentForRoute(currentRoute);
-            const unselectedColor = Color(0xFFB0B0B0);
-            final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+            return ValueListenableBuilder<Map<String, Color>>(
+              valueListenable: foCoCoNavSelectedColorOverrides,
+              builder: (context, selectedOverrides, ___) {
+                final bg = barBackgroundColor ??
+                    overrideBackground ??
+                    theme.primaryBackground;
+                final selectedIndex = foCoCoNavIndexFromRoute(currentRoute);
+                final selectedColor = selectedOverrides[currentRoute] ??
+                    _accentForRoute(currentRoute);
+                const unselectedColor = Color(0xFFB0B0B0);
+                final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
-            return Material(
-              color: Colors.transparent,
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: bg,
-                  border: Border(
-                    top: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.12),
-                    ),
-                  ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _NavInactiveTopDashes(
-                      itemCount: foCoCoNavDestinations.length,
-                      selectedIndex: selectedIndex,
-                    ),
-                    Padding(
-                      padding: EdgeInsets.only(bottom: bottomInset),
-                      child: SizedBox(
-                        height: 72,
-                        child: Row(
-                          children:
-                              List.generate(foCoCoNavDestinations.length, (i) {
-                            final d = foCoCoNavDestinations[i];
-                            final route = foCoCoNavRouteFromIndex(i);
-                            final isSelected = i == selectedIndex;
-                            return Expanded(
-                              child: _FoCoCoNavTile(
-                                icon: _iconData(
-                                  isSelected
-                                      ? (d.selectedIcon ?? d.icon)
-                                      : d.icon,
-                                ),
-                                label: showLabels
-                                    ? (overrides[route] ?? d.label)
-                                    : null,
-                                isSelected: isSelected,
-                                selectedColor: selectedColor,
-                                unselectedColor: unselectedColor,
-                                onTap: () {
-                                  if (!isSelected) {
-                                    HapticFeedback.lightImpact();
-                                    onTap(route);
-                                  }
-                                },
-                              ),
-                            );
-                          }),
+                return Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: bg,
+                      border: Border(
+                        top: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.12),
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _NavInactiveTopDashes(
+                          itemCount: foCoCoNavDestinations.length,
+                          selectedIndex: selectedIndex,
+                        ),
+                        Padding(
+                          padding: EdgeInsets.only(bottom: bottomInset),
+                          child: SizedBox(
+                            height: 72,
+                            child: Row(
+                              children: List.generate(
+                                foCoCoNavDestinations.length,
+                                (i) {
+                                  final d = foCoCoNavDestinations[i];
+                                  final route = foCoCoNavRouteFromIndex(i);
+                                  final isSelected = i == selectedIndex;
+                                  return Expanded(
+                                    child: _FoCoCoNavTile(
+                                      icon: _iconData(
+                                        isSelected
+                                            ? (d.selectedIcon ?? d.icon)
+                                            : d.icon,
+                                      ),
+                                      label: showLabels
+                                          ? (overrides[route] ?? d.label)
+                                          : null,
+                                      isSelected: isSelected,
+                                      selectedColor: selectedColor,
+                                      unselectedColor: unselectedColor,
+                                      onTap: () {
+                                        if (!isSelected) {
+                                          HapticFeedback.lightImpact();
+                                          onTap(route);
+                                        }
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             );
           },
         );
@@ -525,6 +565,8 @@ class FoCoCoAdaptiveScaffold extends StatefulWidget {
     this.hideAppBar = false,
     this.backgroundColor,
     this.showBottomNav = true,
+    this.appBarForegroundColor,
+    this.showAppBarGlowDivider = true,
   });
 
   final Widget body;
@@ -546,6 +588,9 @@ class FoCoCoAdaptiveScaffold extends StatefulWidget {
   /// When false, the bottom navigation bar is omitted (used inside StatefulShellRoute
   /// where the shell provides its own nav bar).
   final bool showBottomNav;
+
+  final Color? appBarForegroundColor;
+  final bool showAppBarGlowDivider;
 
   @override
   State<FoCoCoAdaptiveScaffold> createState() => _FoCoCoAdaptiveScaffoldState();
@@ -603,7 +648,7 @@ class _FoCoCoAdaptiveScaffoldState extends State<FoCoCoAdaptiveScaffold> {
             Text(
               widget.title!,
               style: theme.titleLarge.copyWith(
-                color: theme.primaryText,
+                color: widget.appBarForegroundColor ?? theme.primaryText,
                 fontWeight: FontWeight.w400,
                 letterSpacing: 0.6,
               ),
@@ -611,6 +656,8 @@ class _FoCoCoAdaptiveScaffoldState extends State<FoCoCoAdaptiveScaffold> {
         leading: leading,
         actions: widget.actions,
         automaticallyImplyLeading: leading != null || widget.drawer != null,
+        foregroundColor: widget.appBarForegroundColor,
+        showGlowDivider: widget.showAppBarGlowDivider,
       );
     } else if (showAppBar) {
       appBar = buildFoCoCoAppBar(
@@ -619,6 +666,8 @@ class _FoCoCoAdaptiveScaffoldState extends State<FoCoCoAdaptiveScaffold> {
         leading: leading,
         actions: widget.actions,
         automaticallyImplyLeading: leading != null || widget.drawer != null,
+        foregroundColor: widget.appBarForegroundColor,
+        showGlowDivider: widget.showAppBarGlowDivider,
       );
     }
 

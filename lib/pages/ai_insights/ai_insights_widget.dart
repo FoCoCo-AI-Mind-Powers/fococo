@@ -186,6 +186,7 @@ class _AiInsightsWidgetState extends State<AiInsightsWidget>
           .orderBy('createdTime', descending: true)
           .limit(50),
     );
+    _insights = _insights.where((insight) => !insight.isFoCoCoDaily).toList();
   }
 
   /// Load golf rounds from Firestore

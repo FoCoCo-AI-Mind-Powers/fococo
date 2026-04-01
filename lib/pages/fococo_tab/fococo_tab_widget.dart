@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -26,43 +27,42 @@ class FoCoCoTabWidget extends StatefulWidget {
   State<FoCoCoTabWidget> createState() => _FoCoCoTabWidgetState();
 }
 
-// ── Speaker state ────────────────────────────────────────────────────────────
-
 enum _SpeakerState { idle, playing, failed }
 
 class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
-    with TickerProviderStateMixin {
-  // ── Insight ─────────────────────────────────────────────────────────────
+    with TickerProviderStateMixin, WidgetsBindingObserver {
+  FoCoCoDailyInsight? _insight;
   String? _insightText;
   bool _insightLoading = true;
+  bool _hasBootstrapped = false;
 
-  // ── Speaker / TTS ────────────────────────────────────────────────────────
   _SpeakerState _speakerState = _SpeakerState.idle;
   AudioPlayer? _audioPlayer;
-  bool _ttsReady = false; // audio file is cached for today
-  bool _showSpeakerLoader = false; // only shown after 2s delay
+  bool _ttsReady = false;
+  bool _showSpeakerLoader = false;
+  bool _speakerTimedOut = false;
+  bool _audioPreloaded = false;
 
-  // ── Wave animation ────────────────────────────────────────────────────────
+  Timer? _speakerLoaderTimer;
+  Timer? _speakerHideTimer;
+  DateTime? _screenVisibleSince;
+  bool _isCurrentRouteVisible = true;
+
   late AnimationController _waveController;
-
-  // ── Speaker pulse animation ───────────────────────────────────────────────
   late AnimationController _pulseController;
   late Animation<double> _pulseAnim;
-
-  // ── Speaker loader shimmer ────────────────────────────────────────────────
   late AnimationController _shimmerController;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
-    // Wave: slow looping background
     _waveController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 8),
     )..repeat();
 
-    // Pulse: for "playing" state
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -71,7 +71,6 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // Shimmer: for "loading >2s" speaker state
     _shimmerController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -80,11 +79,13 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
     _audioPlayer = AudioPlayer();
     _audioPlayer!.playerStateStream.listen(_onPlayerState);
 
-    _loadInsight();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_flushScreenTime());
+    _cancelSpeakerTimers();
     _waveController.dispose();
     _pulseController.dispose();
     _shimmerController.dispose();
@@ -92,64 +93,158 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
     super.dispose();
   }
 
-  // ── Insight loading ──────────────────────────────────────────────────────
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_isCurrentRouteVisible) {
+        _resumeScreenTimer();
+      }
+      return;
+    }
+
+    unawaited(_flushScreenTime());
+    if (_speakerState == _SpeakerState.playing) {
+      unawaited(_audioPlayer?.stop());
+      if (mounted) {
+        setState(() => _speakerState = _SpeakerState.idle);
+      }
+    }
+  }
 
   Future<void> _loadInsight() async {
     setState(() => _insightLoading = true);
     try {
-      final text = await FoCoCoInsightService.instance
-          .getTodayInsight(currentUserUid);
+      final insight = await FoCoCoInsightService.instance.getTodayInsight();
       if (!mounted) return;
+
       setState(() {
-        _insightText = text;
+        _insight = insight;
+        _insightText = insight.insightText;
         _insightLoading = false;
       });
-      // Fire TTS in parallel — do not await
-      _prepareTTS(text);
-    } catch (_) {
+
+      unawaited(FoCoCoInsightService.instance.markOpened(insight));
+      _resumeScreenTimer();
+      unawaited(_prepareTTS(insight.insightText));
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('⚠️ FoCoCo tab insight load failed: $error');
+      }
       if (!mounted) return;
       setState(() => _insightLoading = false);
     }
   }
 
-  // ── TTS preparation ──────────────────────────────────────────────────────
+  Future<void> _preloadCachedAudio() async {
+    try {
+      final audioFile = await _todayAudioFile();
+      if (!await audioFile.exists()) return;
+
+      await _preloadAudioFile(audioFile);
+      if (!mounted) return;
+      setState(() {
+        _ttsReady = true;
+        _speakerState = _speakerState == _SpeakerState.failed
+            ? _SpeakerState.failed
+            : _SpeakerState.idle;
+      });
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('⚠️ FoCoCoTab cached audio preload failed: $error');
+      }
+    }
+  }
 
   Future<void> _prepareTTS(String text) async {
     try {
-      // Check if today's audio is already cached
       final audioFile = await _todayAudioFile();
       if (await audioFile.exists()) {
+        await _preloadAudioFile(audioFile);
         if (!mounted) return;
-        setState(() => _ttsReady = true);
+        setState(() {
+          _ttsReady = true;
+          _showSpeakerLoader = false;
+          _speakerTimedOut = false;
+          if (_speakerState != _SpeakerState.failed) {
+            _speakerState = _SpeakerState.idle;
+          }
+        });
         return;
       }
 
-      // Show loader after 2s if still not ready
-      final loaderTimer = Future.delayed(const Duration(seconds: 2), () {
-        if (mounted && !_ttsReady) {
-          setState(() => _showSpeakerLoader = true);
-        }
+      _cancelSpeakerTimers();
+      if (mounted) {
+        setState(() {
+          _ttsReady = false;
+          _audioPreloaded = false;
+          _showSpeakerLoader = false;
+          _speakerTimedOut = false;
+          _speakerState = _SpeakerState.idle;
+        });
+      }
+
+      _speakerLoaderTimer = Timer(const Duration(seconds: 2), () {
+        if (!mounted || _ttsReady || _speakerTimedOut) return;
+        setState(() => _showSpeakerLoader = true);
       });
 
-      // Generate audio from Cartesia
-      final audioBytes = await _generateCartesiaAudio(text);
-      await loaderTimer; // ensure timer runs
+      _speakerHideTimer = Timer(const Duration(seconds: 5), () {
+        if (!mounted || _ttsReady) return;
+        setState(() {
+          _speakerTimedOut = true;
+          _showSpeakerLoader = false;
+          _speakerState = _SpeakerState.failed;
+        });
+      });
 
-      if (!mounted) return;
+      final audioBytes = await _generateAudioWithRetry(text);
+      if (audioBytes == null) {
+        if (!mounted) return;
+        if (_speakerTimedOut) {
+          setState(() {
+            _showSpeakerLoader = false;
+            _speakerState = _SpeakerState.failed;
+          });
+        }
+        return;
+      }
+
       await audioFile.writeAsBytes(audioBytes);
+      await _preloadAudioFile(audioFile);
+      if (!mounted) return;
+
       setState(() {
         _ttsReady = true;
         _showSpeakerLoader = false;
+        if (!_speakerTimedOut) {
+          _speakerState = _SpeakerState.idle;
+        }
       });
-    } catch (e) {
-      if (kDebugMode) print('⚠️ FoCoCoTab TTS failed: $e');
-      if (mounted) {
-        setState(() {
-          _speakerState = _SpeakerState.failed;
-          _showSpeakerLoader = false;
-        });
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('⚠️ FoCoCoTab TTS preparation failed: $error');
+      }
+      if (!mounted) return;
+      setState(() {
+        _showSpeakerLoader = false;
+        _speakerState = _SpeakerState.failed;
+      });
+    }
+  }
+
+  Future<Uint8List?> _generateAudioWithRetry(String text) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await _generateCartesiaAudio(text);
+      } catch (error) {
+        if (kDebugMode) {
+          debugPrint(
+            '⚠️ FoCoCoTab TTS attempt ${attempt + 1} failed: $error',
+          );
+        }
       }
     }
+    return null;
   }
 
   Future<Uint8List> _generateCartesiaAudio(String text) async {
@@ -180,6 +275,11 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
     return response.bodyBytes;
   }
 
+  Future<void> _preloadAudioFile(File audioFile) async {
+    await _audioPlayer?.setFilePath(audioFile.path);
+    _audioPreloaded = true;
+  }
+
   Future<File> _todayAudioFile() async {
     final dir = await getApplicationDocumentsDirectory();
     final today = DateTime.now();
@@ -188,8 +288,6 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
     return File('${dir.path}/tts_audio_$key.mp3');
   }
 
-  // ── Playback ─────────────────────────────────────────────────────────────
-
   Future<void> _togglePlayback() async {
     if (_speakerState == _SpeakerState.playing) {
       await _audioPlayer?.stop();
@@ -197,16 +295,32 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
       return;
     }
 
-    if (!_ttsReady) return; // speaker icon is hidden/shimmer
+    if (!_ttsReady || _speakerState == _SpeakerState.failed) {
+      return;
+    }
 
     try {
       final file = await _todayAudioFile();
       if (!await file.exists()) return;
-      await _audioPlayer?.setFilePath(file.path);
+
+      if (!_audioPreloaded) {
+        await _preloadAudioFile(file);
+      } else {
+        await _audioPlayer?.seek(Duration.zero);
+      }
+
       await _audioPlayer?.play();
-      if (mounted) setState(() => _speakerState = _SpeakerState.playing);
-    } catch (e) {
-      if (kDebugMode) print('⚠️ FoCoCoTab playback error: $e');
+      if (!mounted) return;
+
+      setState(() => _speakerState = _SpeakerState.playing);
+      unawaited(FoCoCoInsightService.instance.markAudioPlayed(_insight));
+      if (_insight != null) {
+        _insight = _insight!.copyWith(playedAudio: true);
+      }
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('⚠️ FoCoCoTab playback error: $error');
+      }
     }
   }
 
@@ -217,27 +331,85 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
     }
   }
 
-  // ── Route change: stop audio ──────────────────────────────────────────────
+  void _resumeScreenTimer() {
+    if (!_isCurrentRouteVisible ||
+        _insight == null ||
+        !_insight!.hasRemoteRecord) {
+      return;
+    }
+    _screenVisibleSince ??= DateTime.now();
+  }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // If routed away, stop playback
-    final location = GoRouterState.of(context).uri.toString();
-    if (!location.contains('fococo') && _speakerState == _SpeakerState.playing) {
-      _audioPlayer?.stop();
-      setState(() => _speakerState = _SpeakerState.idle);
+  Future<void> _flushScreenTime() async {
+    final visibleSince = _screenVisibleSince;
+    _screenVisibleSince = null;
+    if (visibleSince == null || _insight == null) return;
+
+    final elapsed = DateTime.now().difference(visibleSince);
+    if (elapsed.inMilliseconds < 250) return;
+
+    try {
+      await FoCoCoInsightService.instance.addTimeOnScreen(_insight, elapsed);
+      _insight = _insight!.copyWith(
+        timeOnScreenSec:
+            _insight!.timeOnScreenSec + (elapsed.inMilliseconds / 1000),
+      );
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('⚠️ FoCoCoTab screen-time flush failed: $error');
+      }
     }
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
+  void _syncRouteVisibility() {
+    final isVisible =
+        GoRouterState.of(context).uri.toString().contains('fococo');
+    if (isVisible == _isCurrentRouteVisible) {
+      return;
+    }
+
+    _isCurrentRouteVisible = isVisible;
+    if (_isCurrentRouteVisible) {
+      _resumeScreenTimer();
+      return;
+    }
+
+    unawaited(_flushScreenTime());
+    if (_speakerState == _SpeakerState.playing) {
+      unawaited(_audioPlayer?.stop());
+      _speakerState = _SpeakerState.idle;
+    }
+  }
+
+  void _cancelSpeakerTimers() {
+    _speakerLoaderTimer?.cancel();
+    _speakerHideTimer?.cancel();
+    _speakerLoaderTimer = null;
+    _speakerHideTimer = null;
+  }
+
+  void _bootstrapIfVisible() {
+    final isVisible =
+        GoRouterState.of(context).uri.toString().contains(FoCoCoTabWidget.routePath);
+    if (!isVisible || _hasBootstrapped) {
+      return;
+    }
+
+    _hasBootstrapped = true;
+    unawaited(_preloadCachedAudio());
+    unawaited(_loadInsight());
+  }
 
   @override
   Widget build(BuildContext context) {
+    _syncRouteVisibility();
+    _bootstrapIfVisible();
     final theme = FlutterFlowTheme.of(context);
+    final isVisible =
+        GoRouterState.of(context).uri.toString().contains(FoCoCoTabWidget.routePath);
 
     return StreamBuilder<UserRecord>(
-      stream: loggedIn
+      stream: isVisible && loggedIn
           ? UserRecord.getDocument(
               FirebaseFirestore.instance.doc('user/$currentUserUid'))
           : null,
@@ -249,7 +421,7 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
           title: 'FoCoCo',
           currentRoute: 'fococo',
           onTap: (route) => context.goNamed(route),
-          showBottomNav: false, // Shell provides the nav bar
+          showBottomNav: false,
           enableVoiceButton: false,
           drawer: user != null
               ? FoCoCoDrawer(
@@ -266,7 +438,6 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
               bottom: false,
               child: Stack(
                 children: [
-                  // Background wave
                   Positioned.fill(
                     child: AnimatedBuilder(
                       animation: _waveController,
@@ -275,7 +446,6 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
                       ),
                     ),
                   ),
-                  // Insight content
                   Positioned.fill(
                     child: _buildContent(theme),
                   ),
@@ -338,8 +508,8 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
       builder: (context, _) {
         final shimmer = _shimmerController.value;
         return Column(
-          children: List.generate(3, (i) {
-            final width = i == 2 ? 0.6 : (i == 0 ? 1.0 : 0.85);
+          children: List.generate(3, (index) {
+            final width = index == 2 ? 0.6 : (index == 0 ? 1.0 : 0.85);
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Container(
@@ -371,12 +541,10 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
   }
 
   Widget _buildSpeakerIcon() {
-    // Failed → hide entirely per spec
     if (_speakerState == _SpeakerState.failed) {
       return const SizedBox.shrink();
     }
 
-    // Still loading and >2s have elapsed → shimmer
     if (!_ttsReady && _showSpeakerLoader) {
       return AnimatedBuilder(
         animation: _shimmerController,
@@ -392,10 +560,20 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
       );
     }
 
-    // Not ready yet (and <2s) → show nothing
-    if (!_ttsReady) return const SizedBox(height: 22);
+    if (!_ttsReady) {
+      return const SizedBox(
+        width: 44,
+        height: 44,
+        child: Center(
+          child: Icon(
+            Icons.volume_up_rounded,
+            color: Color(0xFF888888),
+            size: 22,
+          ),
+        ),
+      );
+    }
 
-    // Playing → gold pulse
     if (_speakerState == _SpeakerState.playing) {
       return AnimatedBuilder(
         animation: _pulseAnim,
@@ -410,7 +588,7 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
               child: Center(
                 child: Icon(
                   Icons.volume_up_rounded,
-                  color: Color(0xFFC9A84C), // Gold
+                  color: Color(0xFFC9A84C),
                   size: 22,
                 ),
               ),
@@ -420,7 +598,6 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
       );
     }
 
-    // Idle → grey, tappable
     return GestureDetector(
       onTap: _togglePlayback,
       behavior: HitTestBehavior.opaque,
@@ -439,8 +616,6 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
   }
 }
 
-// ── Wave background painter ──────────────────────────────────────────────────
-
 class _WavePainter extends CustomPainter {
   const _WavePainter(this.progress);
 
@@ -453,10 +628,10 @@ class _WavePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
 
-    for (var w = 0; w < 3; w++) {
-      final phase = progress * 2 * math.pi + w * (math.pi * 2 / 3);
+    for (var wave = 0; wave < 3; wave++) {
+      final phase = progress * 2 * math.pi + wave * (math.pi * 2 / 3);
       final amplitude = size.height * 0.045;
-      final yCenter = size.height * (0.35 + w * 0.12);
+      final yCenter = size.height * (0.35 + wave * 0.12);
 
       final path = Path();
       for (var x = 0.0; x <= size.width; x++) {
@@ -473,5 +648,7 @@ class _WavePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_WavePainter old) => old.progress != progress;
+  bool shouldRepaint(_WavePainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
 }

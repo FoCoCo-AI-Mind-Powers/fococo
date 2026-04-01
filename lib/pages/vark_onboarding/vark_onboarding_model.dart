@@ -11,8 +11,8 @@ class VarkOnboardingModel extends FlutterFlowModel<VarkOnboardingWidget> {
   // Slide 5: Age Verification
   DateTime? dateOfBirth;
   bool termsAccepted = false;
-  bool hasParentalPermission = false; // For ages 13-17
-  bool noParentalPermission = false; // For ages 13-17
+  bool hasParentalPermission = false; // For ages 16-17
+  bool noParentalPermission = false; // For ages 16-17
 
   // Slides 8-14: VARK Assessment (7 questions)
   int currentQuestionIndex = 0;
@@ -202,8 +202,8 @@ class VarkOnboardingModel extends FlutterFlowModel<VarkOnboardingWidget> {
     final age = getAge();
     if (age == null) return false;
     
-    if (age < 13) return false; // Will show exit message
-    if (age >= 13 && age < 18) {
+    if (age < 16) return false; // Will show exit message
+    if (age >= 16 && age < 18) {
       return hasParentalPermission; // Need parental permission
     }
     return true; // 18+

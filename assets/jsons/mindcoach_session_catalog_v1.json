@@ -1,0 +1,414 @@
+{
+  "version": "mindcoach_mobile_spec_v2_8",
+  "home_subtitle": "Select a pillar to strengthen",
+  "contexts_order": [
+    "during_round",
+    "before_round",
+    "after_round",
+    "favorites"
+  ],
+  "pillars": [
+    {
+      "key": "focus",
+      "label": "FOCUS",
+      "descriptor": "Clarity in the moment.",
+      "color_hex": "#4A90D9",
+      "row_descriptors": {
+        "during_round": "Stay present. Shot by shot.",
+        "before_round": "Set your mind before you play.",
+        "after_round": "Look back clearly. Let it go.",
+        "favorites": "Saved for instant access."
+      },
+      "contexts": {
+        "before_round": {
+          "label": "Before Round",
+          "duration_hint": "30-60 sec",
+          "sessions": [
+            {
+              "key": "focus_clear_start",
+              "name": "Clear Start",
+              "descriptor": "Settle before the first tee.",
+              "duration_sec": 30,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            },
+            {
+              "key": "focus_narrow_the_target",
+              "name": "Narrow the Target",
+              "descriptor": "One thought. One target.",
+              "duration_sec": 45,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            },
+            {
+              "key": "focus_stay_present",
+              "name": "Stay Present",
+              "descriptor": "Anchor to the moment.",
+              "duration_sec": 30,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            },
+            {
+              "key": "focus_one_thing",
+              "name": "One Thing",
+              "descriptor": "One thought. Everything else fades.",
+              "duration_sec": 45,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            },
+            {
+              "key": "focus_clean_slate",
+              "name": "Clean Slate",
+              "descriptor": "Leave everything before this behind.",
+              "duration_sec": 45,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            }
+          ]
+        },
+        "during_round": {
+          "label": "During Round",
+          "overlay": true,
+          "sessions": [
+            {
+              "key": "focus_before_shot",
+              "name": "Before Shot",
+              "descriptor": "Set target. Clear decision.",
+              "duration_sec": 10,
+              "template_id": "MC_T02_PRE_SHOT_FOCUS",
+              "overlay_phase": "before_shot"
+            },
+            {
+              "key": "focus_during_shot",
+              "name": "During Shot",
+              "descriptor": "Stay fully present through impact.",
+              "duration_sec": 10,
+              "template_id": "MC_T02_PRE_SHOT_FOCUS",
+              "overlay_phase": "during_shot"
+            },
+            {
+              "key": "focus_after_shot",
+              "name": "After Shot",
+              "descriptor": "Accept. Release. Reset.",
+              "duration_sec": 15,
+              "template_id": "MC_T04_POST_SHOT_LETTING_GO",
+              "overlay_phase": "after_shot"
+            },
+            {
+              "key": "focus_between_shots",
+              "name": "Between Shots",
+              "descriptor": "Clear the noise.",
+              "duration_sec": 15,
+              "template_id": "MC_T03_BETWEEN_SHOTS_RESET",
+              "overlay_phase": "between_shots"
+            }
+          ]
+        },
+        "after_round": {
+          "label": "After Round",
+          "duration_hint": "60-90 sec",
+          "sessions": [
+            {
+              "key": "focus_review_with_clarity",
+              "name": "Review with Clarity",
+              "descriptor": "Look back. Let it settle.",
+              "duration_sec": 60,
+              "template_id": "MC_T08_END_OF_ROUND_REFLECTION"
+            },
+            {
+              "key": "focus_what_i_controlled",
+              "name": "What I Controlled",
+              "descriptor": "Find what was yours.",
+              "duration_sec": 60,
+              "template_id": "MC_T09_POST_ROUND_INSIGHT"
+            },
+            {
+              "key": "focus_the_shift",
+              "name": "The Shift",
+              "descriptor": "Notice where focus changed.",
+              "duration_sec": 75,
+              "template_id": "MC_T09_POST_ROUND_INSIGHT"
+            },
+            {
+              "key": "focus_one_good_shot",
+              "name": "One Good Shot",
+              "descriptor": "Carry something forward.",
+              "duration_sec": 60,
+              "template_id": "MC_T08_END_OF_ROUND_REFLECTION"
+            },
+            {
+              "key": "focus_no_judgement",
+              "name": "No Judgement",
+              "descriptor": "See it clearly. Don't score it.",
+              "duration_sec": 75,
+              "template_id": "MC_T09_POST_ROUND_INSIGHT"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "key": "confidence",
+      "label": "CONFIDENCE",
+      "descriptor": "Trust in your ability.",
+      "color_hex": "#4CAF82",
+      "row_descriptors": {
+        "during_round": "Back every decision fully.",
+        "before_round": "Walk in ready to commit.",
+        "after_round": "Own your decisions. Release the rest.",
+        "favorites": "Saved for instant access."
+      },
+      "contexts": {
+        "before_round": {
+          "label": "Before Round",
+          "duration_hint": "30-60 sec",
+          "sessions": [
+            {
+              "key": "confidence_trust_the_preparation",
+              "name": "Trust the Preparation",
+              "descriptor": "The work is done. Trust it.",
+              "duration_sec": 30,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            },
+            {
+              "key": "confidence_back_the_shot",
+              "name": "Back the Shot",
+              "descriptor": "See it. Hit it.",
+              "duration_sec": 45,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            },
+            {
+              "key": "confidence_im_ready",
+              "name": "I'm Ready",
+              "descriptor": "The preparation is already done.",
+              "duration_sec": 30,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            },
+            {
+              "key": "confidence_own_it",
+              "name": "Own It",
+              "descriptor": "Walk in like it's yours.",
+              "duration_sec": 45,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            },
+            {
+              "key": "confidence_quiet_confidence",
+              "name": "Quiet Confidence",
+              "descriptor": "No noise. Just trust.",
+              "duration_sec": 60,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            }
+          ]
+        },
+        "during_round": {
+          "label": "During Round",
+          "overlay": true,
+          "sessions": [
+            {
+              "key": "confidence_before_shot",
+              "name": "Before Shot",
+              "descriptor": "Set target. Clear decision.",
+              "duration_sec": 10,
+              "template_id": "MC_T06_PRESSURE_MOMENTS",
+              "overlay_phase": "before_shot"
+            },
+            {
+              "key": "confidence_during_shot",
+              "name": "During Shot",
+              "descriptor": "Stay fully present through impact.",
+              "duration_sec": 10,
+              "template_id": "MC_T07_MOMENTUM_PROTECTION",
+              "overlay_phase": "during_shot"
+            },
+            {
+              "key": "confidence_after_shot",
+              "name": "After Shot",
+              "descriptor": "Accept. Release. Reset.",
+              "duration_sec": 15,
+              "template_id": "MC_T04_POST_SHOT_LETTING_GO",
+              "overlay_phase": "after_shot"
+            },
+            {
+              "key": "confidence_between_shots",
+              "name": "Between Shots",
+              "descriptor": "Clear the noise.",
+              "duration_sec": 15,
+              "template_id": "MC_T07_MOMENTUM_PROTECTION",
+              "overlay_phase": "between_shots"
+            }
+          ]
+        },
+        "after_round": {
+          "label": "After Round",
+          "duration_hint": "60-90 sec",
+          "sessions": [
+            {
+              "key": "confidence_detach_from_result",
+              "name": "Detach from Result",
+              "descriptor": "Decisions matter. Results don't define you.",
+              "duration_sec": 60,
+              "template_id": "MC_T09_POST_ROUND_INSIGHT"
+            },
+            {
+              "key": "confidence_i_backed_myself",
+              "name": "I Backed Myself",
+              "descriptor": "Where trust showed up.",
+              "duration_sec": 60,
+              "template_id": "MC_T08_END_OF_ROUND_REFLECTION"
+            },
+            {
+              "key": "confidence_where_doubt_crept_in",
+              "name": "Where Doubt Crept In",
+              "descriptor": "Know the pattern. Change the story.",
+              "duration_sec": 75,
+              "template_id": "MC_T09_POST_ROUND_INSIGHT"
+            },
+            {
+              "key": "confidence_build_on_it",
+              "name": "Build On It",
+              "descriptor": "Find the foundation.",
+              "duration_sec": 60,
+              "template_id": "MC_T08_END_OF_ROUND_REFLECTION"
+            },
+            {
+              "key": "confidence_the_score_isnt_the_story",
+              "name": "The Score Isn't The Story",
+              "descriptor": "Your decisions define you, not the number.",
+              "duration_sec": 75,
+              "template_id": "MC_T09_POST_ROUND_INSIGHT"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "key": "control",
+      "label": "CONTROL",
+      "descriptor": "Composure under pressure.",
+      "color_hex": "#C9A84C",
+      "row_descriptors": {
+        "during_round": "Stay steady. One shot at a time.",
+        "before_round": "Arrive calm. Begin in control.",
+        "after_round": "Let the round settle.",
+        "favorites": "Saved for instant access."
+      },
+      "contexts": {
+        "before_round": {
+          "label": "Before Round",
+          "duration_hint": "30-60 sec",
+          "sessions": [
+            {
+              "key": "control_calm_entry",
+              "name": "Calm Entry",
+              "descriptor": "Arrive calm. Begin slow.",
+              "duration_sec": 45,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            },
+            {
+              "key": "control_settle_under_pressure",
+              "name": "Settle Under Pressure",
+              "descriptor": "Feel it. Breathe through it.",
+              "duration_sec": 60,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            },
+            {
+              "key": "control_slow_start",
+              "name": "Slow Start",
+              "descriptor": "Begin slower than you think you need to.",
+              "duration_sec": 45,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            },
+            {
+              "key": "control_steady_hands",
+              "name": "Steady Hands",
+              "descriptor": "Composure is a choice before the first shot.",
+              "duration_sec": 45,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            },
+            {
+              "key": "control_breathe_first",
+              "name": "Breathe First",
+              "descriptor": "Control starts with one breath.",
+              "duration_sec": 30,
+              "template_id": "MC_T01_PRE_ROUND_CLARITY"
+            }
+          ]
+        },
+        "during_round": {
+          "label": "During Round",
+          "overlay": true,
+          "sessions": [
+            {
+              "key": "control_before_shot",
+              "name": "Before Shot",
+              "descriptor": "Set target. Clear decision.",
+              "duration_sec": 10,
+              "template_id": "MC_T02_PRE_SHOT_FOCUS",
+              "overlay_phase": "before_shot"
+            },
+            {
+              "key": "control_during_shot",
+              "name": "During Shot",
+              "descriptor": "Stay fully present through impact.",
+              "duration_sec": 10,
+              "template_id": "MC_T03_BETWEEN_SHOTS_RESET",
+              "overlay_phase": "during_shot"
+            },
+            {
+              "key": "control_after_shot",
+              "name": "After Shot",
+              "descriptor": "Accept. Release. Reset.",
+              "duration_sec": 15,
+              "template_id": "MC_T04_POST_SHOT_LETTING_GO",
+              "overlay_phase": "after_shot"
+            },
+            {
+              "key": "control_between_shots",
+              "name": "Between Shots",
+              "descriptor": "Clear the noise.",
+              "duration_sec": 15,
+              "template_id": "MC_T05_MISTAKE_RECOVERY",
+              "overlay_phase": "between_shots"
+            }
+          ]
+        },
+        "after_round": {
+          "label": "After Round",
+          "duration_hint": "60-90 sec",
+          "sessions": [
+            {
+              "key": "control_release_the_round",
+              "name": "Release the Round",
+              "descriptor": "It's done. Let it rest.",
+              "duration_sec": 90,
+              "template_id": "MC_T08_END_OF_ROUND_REFLECTION"
+            },
+            {
+              "key": "control_what_i_let_go",
+              "name": "What I Let Go",
+              "descriptor": "Find where release worked.",
+              "duration_sec": 60,
+              "template_id": "MC_T09_POST_ROUND_INSIGHT"
+            },
+            {
+              "key": "control_where_pressure_hit",
+              "name": "Where Pressure Hit",
+              "descriptor": "Understand it. Don't fear it.",
+              "duration_sec": 75,
+              "template_id": "MC_T09_POST_ROUND_INSIGHT"
+            },
+            {
+              "key": "control_steady_was_enough",
+              "name": "Steady Was Enough",
+              "descriptor": "Composure counts more than you think.",
+              "duration_sec": 60,
+              "template_id": "MC_T08_END_OF_ROUND_REFLECTION"
+            },
+            {
+              "key": "control_the_reset_that_worked",
+              "name": "The Reset That Worked",
+              "descriptor": "Build on what you already know.",
+              "duration_sec": 60,
+              "template_id": "MC_T09_POST_ROUND_INSIGHT"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

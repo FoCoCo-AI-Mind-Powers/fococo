@@ -14,6 +14,20 @@ class MindCoachV2ResumePayload {
   final MindCoachV2Session session;
 }
 
+class MindCoachV2SaveFavoriteResult {
+  MindCoachV2SaveFavoriteResult({
+    required this.saved,
+    required this.needsReplacement,
+    this.favoriteId,
+    this.currentFavorites = const <MindCoachV2Favorite>[],
+  });
+
+  final bool saved;
+  final bool needsReplacement;
+  final String? favoriteId;
+  final List<MindCoachV2Favorite> currentFavorites;
+}
+
 class MindCoachV2Repository {
   MindCoachV2Repository._({
     MindCoachV2FunctionsClient? functionsClient,
@@ -46,8 +60,8 @@ class MindCoachV2Repository {
     }
 
     try {
-      final response =
-          await _functionsClient.generateSession(userId: userId, request: request);
+      final response = await _functionsClient.generateSession(
+          userId: userId, request: request);
       _logger.log(_tag, 'generateSession: success', {
         'sessionId': response.sessionId,
       });
@@ -69,7 +83,7 @@ class MindCoachV2Repository {
       final response = await _functionsClient.completeRun(request);
       _logger.log(_tag, 'completeRun: success', {
         'runId': response.runId,
-        'favoriteSaved': response.favoriteSaved.toString(),
+        'hasReflection': (response.reflection != null).toString(),
       });
       return response;
     } catch (e, s) {
@@ -94,6 +108,86 @@ class MindCoachV2Repository {
       return const Stream<Set<String>>.empty();
     }
     return _firestoreClient.streamFavoriteSessionIds(userId: userId);
+  }
+
+  Stream<List<MindCoachV2Favorite>> streamFavorites({
+    MindCoachV2Pillar? pillar,
+  }) {
+    final userId = currentUserUid;
+    _logger.log(_tag, 'streamFavorites', {
+      'userId': userId,
+      'pillar': pillar?.wireValue ?? 'all',
+    });
+    if (userId.isEmpty) {
+      return const Stream<List<MindCoachV2Favorite>>.empty();
+    }
+    return _firestoreClient.streamFavorites(userId: userId, pillar: pillar);
+  }
+
+  Future<List<MindCoachV2Favorite>> fetchFavorites({
+    MindCoachV2Pillar? pillar,
+  }) async {
+    final userId = currentUserUid;
+    _logger.log(_tag, 'fetchFavorites', {
+      'userId': userId,
+      'pillar': pillar?.wireValue ?? 'all',
+    });
+    if (userId.isEmpty) {
+      return const <MindCoachV2Favorite>[];
+    }
+    return _firestoreClient.fetchFavorites(userId: userId, pillar: pillar);
+  }
+
+  Future<MindCoachV2SaveFavoriteResult> saveFavorite({
+    required MindCoachV2Session session,
+    String? replaceFavoriteId,
+  }) async {
+    final userId = currentUserUid;
+    _logger.log(_tag, 'saveFavorite: entry', {
+      'userId': userId,
+      'sessionId': session.sessionId,
+      'pillar': session.pillar.wireValue,
+      'replaceFavoriteId': replaceFavoriteId ?? 'null',
+    });
+    if (userId.isEmpty) {
+      throw Exception('User not authenticated');
+    }
+
+    final currentFavorites = await _firestoreClient.fetchFavorites(
+      userId: userId,
+      pillar: session.pillar,
+    );
+
+    try {
+      final favoriteId = await _firestoreClient.upsertFavorite(
+        userId: userId,
+        session: session,
+        replaceFavoriteId: replaceFavoriteId,
+      );
+      return MindCoachV2SaveFavoriteResult(
+        saved: true,
+        needsReplacement: false,
+        favoriteId: favoriteId,
+        currentFavorites: currentFavorites,
+      );
+    } on StateError catch (error, stackTrace) {
+      if (error.message == 'favorite_replacement_required') {
+        _logger.warn(_tag, 'saveFavorite: replacement required', {
+          'sessionId': session.sessionId,
+          'pillar': session.pillar.wireValue,
+        });
+        return MindCoachV2SaveFavoriteResult(
+          saved: false,
+          needsReplacement: true,
+          currentFavorites: currentFavorites,
+        );
+      }
+      _logger.error(_tag, 'saveFavorite: state error', null, error, stackTrace);
+      rethrow;
+    } catch (error, stackTrace) {
+      _logger.error(_tag, 'saveFavorite: failed', null, error, stackTrace);
+      rethrow;
+    }
   }
 
   Future<MindCoachV2ResumePayload?> getResumePayload() async {

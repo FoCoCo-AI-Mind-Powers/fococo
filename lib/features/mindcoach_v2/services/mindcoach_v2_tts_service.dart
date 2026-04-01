@@ -190,13 +190,14 @@ class MindCoachV2TTSService {
           lineIndex: line.lineIndex,
         ));
 
-        final startedAt = DateTime.now();
+        final stopwatch = Stopwatch()..start();
         try {
           final timeoutMs = _timeoutFor(line);
           await Future.any<void>([
-            _cartesia.speakText(
+            _cartesia.speakTextAndWait(
               text: line.text,
               voiceId: _voiceId,
+              voiceProfileKey: _voiceProfileKey,
               contentType: 'coaching',
             ),
             Future<void>.delayed(
@@ -204,13 +205,15 @@ class MindCoachV2TTSService {
               () => throw _MindCoachTTSLineTimeout(),
             ),
           ]);
+          stopwatch.stop();
 
           _emit(MindCoachV2TTSLineEvent(
             type: MindCoachV2TTSLineEventType.lineCompleted,
             lineIndex: line.lineIndex,
-            durationMs: DateTime.now().difference(startedAt).inMilliseconds,
+            durationMs: stopwatch.elapsedMilliseconds,
           ));
         } on _MindCoachTTSLineTimeout catch (error) {
+          stopwatch.stop();
           _setState(MindCoachV2TTSState.degraded);
           await _cartesia.stopSpeaking();
           _logger.warn(_tag, 'Line timed out, continuing in degraded mode', {
@@ -220,10 +223,11 @@ class MindCoachV2TTSService {
           _emit(MindCoachV2TTSLineEvent(
             type: MindCoachV2TTSLineEventType.lineTimeout,
             lineIndex: line.lineIndex,
-            durationMs: DateTime.now().difference(startedAt).inMilliseconds,
+            durationMs: stopwatch.elapsedMilliseconds,
             error: error,
           ));
         } catch (error, stackTrace) {
+          stopwatch.stop();
           _setState(MindCoachV2TTSState.error);
           _logger.error(
               _tag,

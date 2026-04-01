@@ -77,7 +77,6 @@ class MindCoachV2FunctionsClient {
     _logger.log(_tag, 'completeRun: calling Cloud Function', {
       'sessionId': payload['session_id'],
       'completionStatus': payload['completion_status'],
-      'saveFavorite': payload['save_favorite']?.toString(),
     });
 
     final callable = _functions.httpsCallable('completeMindCoachSessionRunV2');
@@ -93,7 +92,7 @@ class MindCoachV2FunctionsClient {
 
       _logger.log(_tag, 'completeRun: raw response received', {
         'runId': raw['run_id']?.toString(),
-        'favoriteSaved': raw['favorite_saved']?.toString(),
+        'hasReflection': (raw['reflection'] != null).toString(),
       });
 
       final response = MindCoachV2Mappers.parseCompleteResponse(
@@ -102,7 +101,7 @@ class MindCoachV2FunctionsClient {
 
       _logger.log(_tag, 'completeRun: parsed successfully', {
         'runId': response.runId,
-        'favoriteSaved': response.favoriteSaved.toString(),
+        'hasReflection': (response.reflection != null).toString(),
       });
 
       return response;

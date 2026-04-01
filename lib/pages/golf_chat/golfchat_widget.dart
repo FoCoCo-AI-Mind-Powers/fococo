@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:firebase_ai/firebase_ai.dart';
@@ -38,6 +39,10 @@ export 'golfchat_model.dart';
 
 /// Space so the message list does not sit under the composer when it is pinned.
 const double _kGolfChatComposerClearance = 140;
+
+/// Breathing room between the tab bar (shell) and the composer — tab shell uses
+/// [kFoCoCoBottomNavStripAndTabsHeight] + [MediaQuery.viewPadding.bottom].
+const double _kGolfChatComposerGapAboveNav = 10;
 
 class GolfChatWidget extends StatefulWidget {
   const GolfChatWidget({
@@ -162,6 +167,9 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   bool _liveAudioPlaylistLoaded = false;
   int _liveAudioChunkCount = 0;
   bool _awaitingPlaybackDrain = false;
+  final BytesBuilder _pcmBuffer = BytesBuilder(copy: false);
+  // Flush threshold: ~200ms of 24kHz 16-bit mono = 9600 bytes
+  static const int _pcmFlushThreshold = 9600;
   String _liveTranscription = '';
   String _liveInputTranscript = '';
   String _liveOutputTranscript = '';
@@ -175,14 +183,13 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   late AnimationController _gradientAnimationController;
   late Animation<double> _waveAnimation;
   late Animation<double> _gradientAnimation;
+  bool _hasBootstrapped = false;
 
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => GolfChatModel());
     _configureAudioPlayer();
-    _initialize();
-    _initTts();
     _initAnimations();
   }
 
@@ -409,6 +416,9 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     super.dispose();
   }
 
+  int _voiceReconnectAttempts = 0;
+  static const int _maxVoiceReconnectAttempts = 2;
+
   Future<void> _enterVoiceMode() async {
     if (_isVoiceMode) {
       return;
@@ -426,11 +436,21 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
       _audioLevels.fillRange(0, _audioLevels.length, 0.0);
     });
 
+    _voiceReconnectAttempts = 0;
+    await _connectLiveSession();
+  }
+
+  Future<void> _connectLiveSession() async {
     try {
-      final liveModel = FirebaseAI.googleAI(
-        app: await getGoogleAIFirebaseApp(),
-      ).liveGenerativeModel(
-        model: GeminiVoiceConfig.nativeAudioDialogModel,
+      final app = await getGoogleAIFirebaseApp();
+      final modelName = _voiceReconnectAttempts > 0
+          ? GeminiVoiceConfig.nativeAudioDialogModelFallback
+          : GeminiVoiceConfig.nativeAudioDialogModel;
+
+      debugPrint('Connecting Gemini Live with model: $modelName');
+
+      final liveModel = FirebaseAI.googleAI(app: app).liveGenerativeModel(
+        model: modelName,
         liveGenerationConfig: LiveGenerationConfig(
           responseModalities: [ResponseModalities.audio],
           speechConfig: SpeechConfig(
@@ -453,6 +473,15 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
       }
     } catch (e) {
       debugPrint('Voice mode connection failed: $e');
+
+      // If first model fails, try fallback model once
+      if (_voiceReconnectAttempts == 0 && _isVoiceMode) {
+        _voiceReconnectAttempts++;
+        debugPrint('Retrying with fallback model...');
+        await _connectLiveSession();
+        return;
+      }
+
       if (mounted) {
         setState(() => _voiceState = _VoiceModeState.error);
         _showSnack(_describeVoiceError(e));
@@ -469,19 +498,31 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     _isLiveReceiveLoopRunning = true;
     try {
       while (_keepReceivingLiveResponses && identical(session, _liveSession)) {
-        await for (final response in session.receive()) {
-          await _handleLiveResponse(response);
+        try {
+          await for (final response in session.receive()) {
+            if (!_keepReceivingLiveResponses ||
+                !identical(session, _liveSession)) {
+              break;
+            }
+            await _handleLiveResponse(response);
+          }
+        } catch (e) {
+          // If the receive() stream threw but we still want responses,
+          // check if it's a transient error and the session is still alive.
           if (!_keepReceivingLiveResponses ||
               !identical(session, _liveSession)) {
             break;
           }
+          // Re-throw to be caught by outer handler
+          rethrow;
         }
 
         if (!_keepReceivingLiveResponses || !identical(session, _liveSession)) {
           break;
         }
 
-        await Future<void>.delayed(const Duration(milliseconds: 32));
+        // Small delay before re-entering receive() after turnComplete
+        await Future<void>.delayed(const Duration(milliseconds: 16));
       }
     } catch (error) {
       if (_keepReceivingLiveResponses) {
@@ -498,10 +539,18 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     if (message is GoingAwayNotice) {
       debugPrint(
           'Voice session going away soon. Time left: ${message.timeLeft}');
+      // Attempt reconnection before the session terminates
+      if (_isVoiceMode &&
+          _voiceReconnectAttempts < _maxVoiceReconnectAttempts) {
+        _voiceReconnectAttempts++;
+        unawaited(_reconnectLiveSession());
+      }
       return;
     }
 
     if (message is! LiveServerContent) {
+      // Covers LiveServerSetupComplete and other non-content messages
+      debugPrint('Gemini Live non-content message: ${message.runtimeType}');
       return;
     }
 
@@ -530,6 +579,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     }
 
     if (message.interrupted == true) {
+      _pcmBuffer.clear();
       await _resetLiveAudioPlayback();
       if (mounted) {
         setState(() => _voiceState = _VoiceModeState.listening);
@@ -538,6 +588,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     }
 
     if (message.turnComplete == true) {
+      // Flush any remaining buffered PCM data before finishing the turn
+      await _flushPcmBuffer();
       await _commitLiveVoiceTurn();
       final shouldWaitForPlayback = _liveAudioChunkCount > 0 &&
           _audioPlayer.processingState != ProcessingState.completed;
@@ -548,16 +600,54 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     }
   }
 
+  Future<void> _reconnectLiveSession() async {
+    debugPrint('Reconnecting Gemini Live session...');
+    _keepReceivingLiveResponses = false;
+
+    // Stop current audio capture
+    try {
+      await _audioStreamSubscription?.cancel();
+    } catch (_) {}
+    _audioStreamSubscription = null;
+    try {
+      await _audioRecorder.stop();
+    } catch (_) {}
+
+    await _resetLiveAudioPlayback();
+
+    // Close old session
+    try {
+      await _liveSession?.close();
+    } catch (_) {}
+    _liveSession = null;
+
+    try {
+      await _liveReceiveTask;
+    } catch (_) {}
+    _liveReceiveTask = null;
+
+    if (!_isVoiceMode || !mounted) return;
+
+    if (mounted) {
+      setState(() => _voiceState = _VoiceModeState.connecting);
+    }
+
+    // Reconnect
+    await _connectLiveSession();
+  }
+
   Future<void> _sendAudioChunk(Uint8List audioData) async {
     final session = _liveSession;
     if (session == null ||
         !_keepReceivingLiveResponses ||
-        _voiceState == _VoiceModeState.error) {
+        _voiceState == _VoiceModeState.error ||
+        _voiceState == _VoiceModeState.connecting) {
       return;
     }
 
     try {
-      await session.sendAudioRealtime(InlineDataPart('audio/pcm', audioData));
+      await session.sendAudioRealtime(
+          InlineDataPart('audio/pcm;rate=16000', audioData));
     } catch (e) {
       await _handleVoiceSessionError(e);
     }
@@ -688,7 +778,16 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   }
 
   Future<void> _playPcmAudio(Uint8List pcmData) async {
+    _pcmBuffer.add(pcmData);
+    if (_pcmBuffer.length >= _pcmFlushThreshold) {
+      await _flushPcmBuffer();
+    }
+  }
+
+  Future<void> _flushPcmBuffer() async {
+    if (_pcmBuffer.isEmpty) return;
     try {
+      final pcmData = _pcmBuffer.takeBytes();
       final wavData = _buildWavFile(pcmData, sampleRate: 24000);
       final audioChunk = _BytesAudioSource(wavData);
 
@@ -849,6 +948,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   }
 
   Future<void> _resetLiveAudioPlayback() async {
+    _pcmBuffer.clear();
+
     try {
       await _audioPlayer.stop();
     } catch (_) {}
@@ -888,16 +989,21 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
 
   @override
   Widget build(BuildContext context) {
+    _bootstrapIfVisible();
     final theme = FlutterFlowTheme.of(context);
     final viewPadding = MediaQuery.viewPaddingOf(context);
     final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
     final hasKeyboard = keyboardHeight > 0;
+    final isVisible =
+        GoRouterState.of(context).uri.toString().contains(GolfChatWidget.routePath);
     final bottomNavReserve = hasKeyboard
         ? 0.0
-        : (kFoCoCoBottomNavStripAndTabsHeight + viewPadding.bottom);
+        : (kFoCoCoBottomNavStripAndTabsHeight +
+            viewPadding.bottom +
+            _kGolfChatComposerGapAboveNav);
 
     return StreamBuilder<UserRecord>(
-      stream: currentUserUid.isNotEmpty
+      stream: isVisible && currentUserUid.isNotEmpty
           ? UserRecord.getDocument(
               FirebaseFirestore.instance.doc('user/$currentUserUid'))
           : null,
@@ -989,6 +1095,18 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         );
       },
     );
+  }
+
+  void _bootstrapIfVisible() {
+    final isVisible =
+        GoRouterState.of(context).uri.toString().contains(GolfChatWidget.routePath);
+    if (!isVisible || _hasBootstrapped) {
+      return;
+    }
+
+    _hasBootstrapped = true;
+    unawaited(_initialize());
+    unawaited(_initTts());
   }
 
   Widget _buildVoiceModeOverlay(
@@ -1993,18 +2111,23 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     );
 
     if (!voiceGlass) {
-      return Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        decoration: BoxDecoration(
-          color: theme.primaryBackground,
-          border: Border(
-            top: BorderSide(
-              color: theme.alternate.withValues(alpha: 0.15),
-              width: 0.5,
+      return Material(
+        color: theme.primaryBackground,
+        elevation: 6,
+        shadowColor: Colors.black.withValues(alpha: 0.35),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(
+            color: theme.primaryBackground,
+            border: Border(
+              top: BorderSide(
+                color: theme.alternate.withValues(alpha: 0.28),
+                width: 1,
+              ),
             ),
           ),
+          child: inner,
         ),
-        child: inner,
       );
     }
 

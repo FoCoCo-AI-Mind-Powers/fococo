@@ -55,6 +55,13 @@ class RevenueCatService {
   /// Grace period in days (16 days)
   static const int gracePeriodDays = 16;
 
+  Future<void> _ensureInitialized() async {
+    if (_isInitialized) {
+      return;
+    }
+    await initialize();
+  }
+
   /// Initialize RevenueCat SDK
   Future<void> initialize() async {
     if (_isInitialized) {
@@ -135,6 +142,7 @@ class RevenueCatService {
   /// Refresh customer info from RevenueCat
   Future<CustomerInfo> refreshCustomerInfo() async {
     try {
+      await _ensureInitialized();
       _customerInfo = await Purchases.getCustomerInfo();
       debugPrint('✅ Customer info refreshed');
 
@@ -184,6 +192,7 @@ class RevenueCatService {
   /// through the dashboard configuration.
   Future<Offerings> getOfferings() async {
     try {
+      await _ensureInitialized();
       final offerings = await Purchases.getOfferings();
       final preferredOffering = getPreferredOffering(offerings);
 
@@ -225,6 +234,7 @@ class RevenueCatService {
   /// Purchase a package
   Future<CustomerInfo> purchasePackage(Package package) async {
     try {
+      await _ensureInitialized();
       debugPrint('🛒 Purchasing package: ${package.identifier}');
 
       final purchaseResult =
@@ -270,6 +280,7 @@ class RevenueCatService {
   /// Restore purchases
   Future<CustomerInfo> restorePurchases() async {
     try {
+      await _ensureInitialized();
       debugPrint('🔄 Restoring purchases...');
 
       final customerInfo = await Purchases.restorePurchases();
@@ -466,6 +477,7 @@ class RevenueCatService {
   /// Identify user with RevenueCat
   Future<void> identifyUser(String userId) async {
     try {
+      await _ensureInitialized();
       await Purchases.logIn(userId);
       debugPrint('✅ User identified: $userId');
       await refreshCustomerInfo();
@@ -478,6 +490,10 @@ class RevenueCatService {
   /// Log out user from RevenueCat
   Future<void> logOut() async {
     try {
+      if (!_isInitialized) {
+        _customerInfo = null;
+        return;
+      }
       await Purchases.logOut();
       _customerInfo = null;
       debugPrint('✅ User logged out from RevenueCat');

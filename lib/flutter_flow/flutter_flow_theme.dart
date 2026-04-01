@@ -15,17 +15,12 @@ abstract class FlutterFlowTheme {
   static Future initialize() async =>
       _prefs = await SharedPreferences.getInstance();
 
-  static ThemeMode get themeMode {
-    final darkMode = _prefs?.getBool(kThemeModeKey);
-    if (darkMode == null) {
-      return ThemeMode.system; // Use system preference by default
-    }
-    return darkMode ? ThemeMode.dark : ThemeMode.light;
-  }
+  /// FoCoCo is dark-only; light / system themes are not offered.
+  static ThemeMode get themeMode => ThemeMode.dark;
 
-  static void saveThemeMode(ThemeMode mode) => mode == ThemeMode.system
-      ? _prefs?.remove(kThemeModeKey)
-      : _prefs?.setBool(kThemeModeKey, mode == ThemeMode.dark);
+  static void saveThemeMode(ThemeMode mode) {
+    _prefs?.setBool(kThemeModeKey, true);
+  }
 
   static FlutterFlowTheme of(BuildContext context) {
     return Theme.of(context).brightness == Brightness.dark

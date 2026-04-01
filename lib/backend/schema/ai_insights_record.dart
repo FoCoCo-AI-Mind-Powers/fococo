@@ -1,6 +1,5 @@
 import 'dart:async';
 
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fo_co_co/backend/schema/structs/recommendation_struct.dart';
 import 'package:fo_co_co/backend/schema/util/schema_util.dart';
@@ -64,7 +63,8 @@ class AiInsightsRecord extends FirestoreRecord {
 
   // "recommendations" field.
   List<RecommendationStruct>? _recommendations;
-  List<RecommendationStruct> get recommendations => _recommendations ?? const [];
+  List<RecommendationStruct> get recommendations =>
+      _recommendations ?? const [];
   bool hasRecommendations() => _recommendations != null;
 
   // "personalizedElements" field.
@@ -131,6 +131,51 @@ class AiInsightsRecord extends FirestoreRecord {
   String? _generationVersion;
   String get generationVersion => _generationVersion ?? '';
   bool hasGenerationVersion() => _generationVersion != null;
+
+  // "insightDate" field.
+  String? _insightDate;
+  String get insightDate => _insightDate ?? '';
+  bool hasInsightDate() => _insightDate != null;
+
+  // "contextPayloadHash" field.
+  String? _contextPayloadHash;
+  String get contextPayloadHash => _contextPayloadHash ?? '';
+  bool hasContextPayloadHash() => _contextPayloadHash != null;
+
+  // "dataSignals" field.
+  Map<String, dynamic>? _dataSignals;
+  Map<String, dynamic> get dataSignals => _dataSignals ?? {};
+  bool hasDataSignals() => _dataSignals != null;
+
+  // "variationToneType" field.
+  String? _variationToneType;
+  String get variationToneType => _variationToneType ?? '';
+  bool hasVariationToneType() => _variationToneType != null;
+
+  // "variationStructureType" field.
+  String? _variationStructureType;
+  String get variationStructureType => _variationStructureType ?? '';
+  bool hasVariationStructureType() => _variationStructureType != null;
+
+  // "variationAngleType" field.
+  String? _variationAngleType;
+  String get variationAngleType => _variationAngleType ?? '';
+  bool hasVariationAngleType() => _variationAngleType != null;
+
+  // "opened" field.
+  bool? _opened;
+  bool get opened => _opened ?? false;
+  bool hasOpened() => _opened != null;
+
+  // "playedAudio" field.
+  bool? _playedAudio;
+  bool get playedAudio => _playedAudio ?? false;
+  bool hasPlayedAudio() => _playedAudio != null;
+
+  // "timeOnScreenSec" field.
+  double? _timeOnScreenSec;
+  double get timeOnScreenSec => _timeOnScreenSec ?? 0.0;
+  bool hasTimeOnScreenSec() => _timeOnScreenSec != null;
 
   // "status" field.
   String? _status;
@@ -199,6 +244,17 @@ class AiInsightsRecord extends FirestoreRecord {
     _tokensUsed = castToType<int>(snapshotData['tokensUsed']);
     _costPerInsight = castToType<double>(snapshotData['costPerInsight']);
     _generationVersion = snapshotData['generationVersion'] as String?;
+    _insightDate = snapshotData['insightDate'] as String?;
+    _contextPayloadHash = snapshotData['contextPayloadHash'] as String?;
+    _dataSignals = snapshotData['dataSignals'] is Map
+        ? Map<String, dynamic>.from(snapshotData['dataSignals'] as Map)
+        : null;
+    _variationToneType = snapshotData['variationToneType'] as String?;
+    _variationStructureType = snapshotData['variationStructureType'] as String?;
+    _variationAngleType = snapshotData['variationAngleType'] as String?;
+    _opened = snapshotData['opened'] as bool?;
+    _playedAudio = snapshotData['playedAudio'] as bool?;
+    _timeOnScreenSec = castToType<double>(snapshotData['timeOnScreenSec']);
     _status = snapshotData['status'] as String?;
     _expiryDate = snapshotData['expiryDate'] as DateTime?;
     _viewCount = castToType<int>(snapshotData['viewCount']);
@@ -218,7 +274,8 @@ class AiInsightsRecord extends FirestoreRecord {
   static Future<AiInsightsRecord> getDocumentOnce(DocumentReference ref) =>
       ref.get().then((s) => AiInsightsRecord.fromSnapshot(s));
 
-  static AiInsightsRecord fromSnapshot(DocumentSnapshot snapshot) => AiInsightsRecord._(
+  static AiInsightsRecord fromSnapshot(DocumentSnapshot snapshot) =>
+      AiInsightsRecord._(
         snapshot.reference,
         mapFromFirestore(snapshot.data() as Map<String, dynamic>),
       );
@@ -240,4 +297,6 @@ class AiInsightsRecord extends FirestoreRecord {
   bool operator ==(other) =>
       other is AiInsightsRecord &&
       reference.path.hashCode == other.reference.path.hashCode;
-} 
+
+  bool get isFoCoCoDaily => insightType == 'fococo_daily';
+}

@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/widget_data_service.dart';
 import 'caddyplay_models.dart';
 
 class CaddyPlaySessionService {
@@ -42,6 +43,24 @@ class CaddyPlaySessionService {
       _firestore.collection('golf_rounds');
 
   String get currentUserId => _auth.currentUser?.uid ?? '';
+
+  /// Make sure Firestore has a fresh ID token attached before issuing reads
+  /// or writes. Without this we occasionally see `permission-denied` when
+  /// CaddyPlay tries to sync immediately after sign-in / app cold start
+  /// because the auth token hasn't propagated to the Firestore SDK yet.
+  Future<bool> _ensureAuthTokenReady() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return false;
+    }
+    try {
+      await user.getIdToken();
+      return true;
+    } catch (e) {
+      debugPrint('CaddyPlay: failed to refresh ID token: $e');
+      return false;
+    }
+  }
 
   Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
 
@@ -90,6 +109,7 @@ class CaddyPlaySessionService {
   Future<void> clearLocalActiveRound() async {
     final prefs = await _prefs;
     await prefs.remove(activeRoundKey);
+    await WidgetDataService.clearActiveRound();
   }
 
   Future<List<CaddyPlayActiveRound>> loadCompletedRounds() async {
@@ -209,6 +229,17 @@ class CaddyPlaySessionService {
       return round.copyWith(
         syncState: CaddyPlaySyncState.localOnly,
         lastSyncError: 'Not authenticated.',
+        snapshot: (round.snapshot ?? buildRoundSnapshot(round)).copyWith(
+          syncedToWebApp: false,
+          availableInWebApp: false,
+        ),
+      );
+    }
+
+    if (!await _ensureAuthTokenReady()) {
+      return round.copyWith(
+        syncState: CaddyPlaySyncState.localOnly,
+        lastSyncError: 'Auth token not ready.',
         snapshot: (round.snapshot ?? buildRoundSnapshot(round)).copyWith(
           syncedToWebApp: false,
           availableInWebApp: false,
@@ -428,6 +459,11 @@ class CaddyPlaySessionService {
     await prefs.setString(
       activeRoundKey,
       jsonEncode(round.toJson()),
+    );
+    await WidgetDataService.pushActiveRound(
+      courseName: round.courseName,
+      currentHole: round.currentHole,
+      holesTotal: round.holesTotal,
     );
   }
 

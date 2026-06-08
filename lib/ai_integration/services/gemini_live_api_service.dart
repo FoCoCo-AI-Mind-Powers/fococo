@@ -13,6 +13,7 @@ import 'package:audioplayers/audioplayers.dart';
 
 import '/backend/schema/structs/vark_preferences_struct.dart';
 import '../config/gemini_live_config.dart';
+import 'audio_session_service.dart';
 import 'permission_service.dart';
 
 /// Gemini Live API Service States
@@ -175,11 +176,12 @@ class GeminiLiveAPIService {
     try {
       _updateState(GeminiLiveState.connecting);
 
-      // Fetch API key from Secret Manager (or cache / dart-define fallback)
+      // Raw-key WebSocket path is disabled — see GeminiLiveAPIConfig.
+      // Live features should go through FirebaseAI.googleAI().liveModel(...).
       final apiKey = await GeminiLiveAPIConfig.getApiKey();
       if (apiKey.isEmpty) {
         throw Exception(
-            'Gemini API key not configured. Add it to Secret Manager or set GEMINI_API_KEY.');
+            'Gemini Live (raw-key) is disabled. Migrate this path to firebase_ai Live bidi.');
       }
 
       // Connect to Gemini Live API WebSocket
@@ -199,6 +201,7 @@ class GeminiLiveAPIService {
       await _sendSetupMessage();
 
       _updateState(GeminiLiveState.connected);
+      await AudioSessionService.activateVoiceChat();
 
       if (kDebugMode) {
         print('✅ Connected to Gemini Live API');
@@ -323,6 +326,7 @@ class GeminiLiveAPIService {
     try {
       await stopListening();
       await _audioPlayer.stop();
+      await AudioSessionService.deactivateVoiceChat();
 
       _channel?.sink.close(status.goingAway);
       _channel = null;

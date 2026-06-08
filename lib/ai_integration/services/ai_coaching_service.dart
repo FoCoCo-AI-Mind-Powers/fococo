@@ -549,11 +549,10 @@ class AICoachingService {
         if (errorMessage.contains('leaked') ||
             errorMessage.contains('API key')) {
           print('❌ Error generating Gemini coaching recommendations: $e');
-          print('⚠️ API key issue detected. Please:');
-          print('   1. Get a new API key from https://aistudio.google.com/');
-          print('   2. Configure it in Firebase AI Logic settings');
-          print('   3. Or set GEMINI_API_KEY environment variable');
-          print('   4. Rebuild the app');
+          print('⚠️ API key issue detected.');
+          print('   → Rotate the key in Google Secret Manager (secret name: GEMINI_KEY_APP)');
+          print('   → Redeploy Cloud Functions so they pick up the new version');
+          print('   → Never set the key via --dart-define or commit it to git');
         } else {
           print('❌ Error generating Gemini coaching recommendations: $e');
         }

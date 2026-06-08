@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.widgetkit-extension</string>
+	</dict>
+	<!--
+	  Required by the live_activities Flutter plugin: the widget extension
+	  must declare Live Activity support in its own Info.plist (separate from
+	  the host app). Without this, ActivityConfiguration is registered but the
+	  system never delivers state updates to the widget.
+	-->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+</dict>
+</plist>

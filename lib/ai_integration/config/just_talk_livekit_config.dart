@@ -19,7 +19,7 @@ class JustTalkLiveKitConfig {
   /// Default Cartesia voice clone ID requested for agent speech.
   static const String defaultCartesiaVoiceId = String.fromEnvironment(
     'JUST_TALK_CARTESIA_VOICE_ID',
-    defaultValue: '7442d6b8-ff51-4477-bd30-0c0d16df84eb',
+    defaultValue: 'fee439a9-751d-4d14-9974-a09de45bd053',
   );
 
   /// Whether JustTalk can automatically fall back to legacy voice services.

@@ -22,6 +22,7 @@ export 'services/gemini_cost_tracker.dart';
 export 'services/gemini_voice_service.dart';
 export 'services/unified_ai_service.dart';
 export 'services/gemini_live_api_service.dart';
+export 'services/audio_session_service.dart';
 export 'services/permission_service.dart';
 
 // ============================================================================
@@ -78,9 +79,8 @@ class FoCoCoAI {
   static FoCoCoAI? _instance;
   static FoCoCoAI get instance => _instance ??= FoCoCoAI._();
 
-  /// Gemini AI Client for direct API access
-  static GeminiAIClient get client =>
-      GeminiAIClient(apiKey: 'firebase_ai_logic');
+  /// Gemini AI Client — authenticates via Firebase AI Logic + App Check.
+  static GeminiAIClient get client => GeminiAIClient();
 
   /// Mental Coach System for specialized coaching
   static MentalCoachSystem get mentalCoach => MentalCoachSystem(

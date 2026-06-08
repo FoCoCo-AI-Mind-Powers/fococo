@@ -38,14 +38,11 @@ flutter run --dart-define=GOOGLE_CLOUD_PROJECT=your-project-id
 
 ### 2. Authentication Options
 
-#### Option A: API Key (Simpler - for development)
-```bash
-# Set Gemini API key (works with Vertex AI endpoint)
-export GEMINI_API_KEY=your-api-key-here
-
-# Or use dart-define
-flutter run --dart-define=GEMINI_API_KEY=your-api-key-here
-```
+#### Option A: Firebase AI Logic (required going forward)
+Gemini is resolved server-side. The Flutter client authenticates via
+**Firebase App Check**, and the Cloud Functions runtime reads the key from
+**Secret Manager** (`GEMINI_KEY_APP`). No raw key is shipped to the client
+and no `--dart-define=GEMINI_API_KEY` is used anymore.
 
 #### Option B: Application Default Credentials (Recommended for production)
 ```bash
@@ -121,8 +118,8 @@ await service.disconnect();
 # Required
 GOOGLE_CLOUD_PROJECT=your-project-id
 
-# Optional (if using API key)
-GEMINI_API_KEY=your-api-key
+# Gemini key is NOT a client env-var. Stored in Secret Manager as
+# `GEMINI_KEY_APP` and consumed by Cloud Functions only.
 
 # Optional (default: 'global')
 GOOGLE_CLOUD_LOCATION=global

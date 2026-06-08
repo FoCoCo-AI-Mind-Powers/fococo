@@ -67,7 +67,12 @@ const FORBIDDEN_LANGUAGE_PATTERNS = [
   /\bnew routine type\b/i,
 ];
 
-const MINDCOACH_DATA_PATH = path.join(
+// MindCoach reference data ships with the Cloud Functions bundle so the
+// runtime never has to reach into the Flutter `Docs/` tree (which isn't
+// deployed). Local emulator runs from the repo root fall back to the
+// canonical authoring path under `Docs/MindCoach/FoCoCo - B - AI Data/`.
+const BUNDLED_MINDCOACH_DATA_PATH = path.join(__dirname, 'data');
+const LEGACY_MINDCOACH_DATA_PATH = path.join(
   __dirname,
   '..',
   '..',
@@ -76,6 +81,9 @@ const MINDCOACH_DATA_PATH = path.join(
   'MindCoach',
   'FoCoCo - B - AI Data',
 );
+const MINDCOACH_DATA_PATH = require('fs').existsSync(BUNDLED_MINDCOACH_DATA_PATH)
+  ? BUNDLED_MINDCOACH_DATA_PATH
+  : LEGACY_MINDCOACH_DATA_PATH;
 
 const TEMPLATES_JSON_PATH = path.join(
   MINDCOACH_DATA_PATH,

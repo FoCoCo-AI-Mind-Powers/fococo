@@ -288,6 +288,7 @@ class _MindCoachWidgetState extends State<MindCoachWidget>
                     currentUser: userData,
                     currentRoute: 'mind_coach',
                     onNavigate: (route) => context.goNamed(route),
+                    variant: FoCoCoDrawerVariant.mind,
                   );
                 },
               )
@@ -534,13 +535,15 @@ class _MindCoachWidgetState extends State<MindCoachWidget>
   ) {
     return Tab(
       child: Container(
+        constraints: const BoxConstraints(minWidth: 112),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? color : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.max,
           children: [
             Icon(
               icon,

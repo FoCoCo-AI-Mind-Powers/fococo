@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 
+import '/services/cms_content_service.dart';
+
 class RemoteConfigService {
   static final RemoteConfigService _instance = RemoteConfigService._internal();
   factory RemoteConfigService() => _instance;
@@ -30,10 +32,13 @@ class RemoteConfigService {
     if (_isInitialized) return;
 
     try {
-      // TODO: Replace with actual Firebase Remote Config when dependency is resolved
-      // For now, use default values
+      await CmsContentService.instance.initialize();
+      _defaultValues['maintenance_mode'] =
+          CmsContentService.instance.maintenanceMode;
+      _defaultValues['maintenance_message'] =
+          CmsContentService.instance.maintenanceMessage;
       _isInitialized = true;
-      debugPrint('✅ Remote Config initialized with default values (temporary)');
+      debugPrint('✅ Remote Config initialized (CMS app_settings merged)');
     } catch (e) {
       debugPrint('❌ Remote Config initialization failed: $e');
       _isInitialized = true; // Set to true to prevent repeated attempts

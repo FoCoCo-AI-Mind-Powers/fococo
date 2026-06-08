@@ -216,11 +216,13 @@ class _RegisterWidgetState extends State<RegisterWidget> {
         'lastActive': FieldValue.serverTimestamp(),
         'currentMembershipTier': 'junior',
         'mandatoryPaywallCompleted': false,
+        'onboardingCompleted': false,
         'dateOfBirth': Timestamp.fromDate(_selectedDate),
         'termsAcceptedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
       if (!mounted) return;
+      GoRouter.of(context).clearRedirectLocation();
       context.goNamed(AccountCreatedWidget.routeName);
     } catch (e) {
       if (mounted) {
@@ -591,10 +593,30 @@ class _RegisterWidgetState extends State<RegisterWidget> {
                 ),
               ),
               GestureDetector(
-                onTap: () => _openUrl(
-                    'https://fococo.app/terms'),
+                onTap: () => _openUrl('https://www.fococo.ai/terms'),
                 child: Text(
-                  'Terms & Privacy Policy',
+                  'Terms of Service',
+                  style: theme.bodyMedium.override(
+                    fontFamily: 'Inter',
+                    color: Colors.white,
+                    fontSize: 14,
+                    decoration: TextDecoration.underline,
+                    decorationColor: Colors.white,
+                  ),
+                ),
+              ),
+              Text(
+                ' and ',
+                style: theme.bodyMedium.override(
+                  fontFamily: 'Inter',
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 14,
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _openUrl('https://www.fococo.ai/privacy-policy'),
+                child: Text(
+                  'Privacy Policy',
                   style: theme.bodyMedium.override(
                     fontFamily: 'Inter',
                     color: Colors.white,

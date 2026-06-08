@@ -35,11 +35,21 @@ const livekitToken = require('./livekit_token');
 // Import MindCoach data seeding
 const seedMindCoachData = require('./seed_mindcoach_data');
 
-// Import Gemini key function
-const geminiKeyModule = require('./gemini_key');
+// NOTE: the legacy `getGeminiKey` callable and its source (`gemini_key.js`)
+// were deleted on purpose. Clients must NOT receive the raw Gemini key —
+// all AI traffic now goes through Firebase AI Logic (App Check authenticated)
+// on-device, and through Cloud Functions that read `GEMINI_KEY_APP` from
+// Secret Manager server-side. Do not re-introduce a client-facing key
+// endpoint; that pattern is what caused the prior leak.
 const fococoDailyInsights = require('./fococo_daily_insights');
+const intelligenceLayer = require('./intelligence_layer');
 const mindCoachGenerateV2 = require('./mindcoach_v2/generate_session_v2');
 const mindCoachCompleteRunV2 = require('./mindcoach_v2/complete_run_v2');
+const mindCoachWebappSessions = require('./mindcoach_v2/webapp_sessions');
+const golfChatGenerate = require('./golf_chat_generate');
+const cartesiaTts = require('./cartesia_tts');
+const cartesiaAccess = require('./cartesia_access');
+const accountDeletion = require('./account_deletion');
 
 // ============================================================================
 // STRIPE SUBSCRIPTION MANAGEMENT FUNCTIONS
@@ -342,16 +352,53 @@ exports.generateMindCoachSessionV2 =
     mindCoachGenerateV2.generateMindCoachSessionV2;
 exports.completeMindCoachSessionRunV2 =
     mindCoachCompleteRunV2.completeMindCoachSessionRunV2;
+exports.getWebAppMindCoachSessions =
+    mindCoachWebappSessions.getWebAppMindCoachSessions;
 
 // ============================================================================
-// GEMINI API KEY (from Secret Manager)
+// GOLF CHAT - SERVER-SIDE FALLBACK (uses GEMINI_KEY_APP secret)
 // ============================================================================
 
-exports.getGeminiKey = geminiKeyModule.getGeminiKey;
+exports.generateGolfChatResponse = golfChatGenerate.generateGolfChatResponse;
+
+// ============================================================================
+// CARTESIA TTS - SERVER-SIDE PROXY (uses CARTESIA_API secret)
+// ============================================================================
+
+exports.synthesizeSpeech = cartesiaTts.synthesizeSpeech;
+exports.transcribeSpeech = cartesiaTts.transcribeSpeech;
+exports.verifyVoice = cartesiaTts.verifyVoice;
+exports.getCartesiaVoiceRuntimeConfig = cartesiaAccess.getCartesiaVoiceRuntimeConfig;
+exports.mintCartesiaAccessToken = cartesiaAccess.mintCartesiaAccessToken;
+exports.mintCartesiaTtsAccessToken = cartesiaAccess.mintCartesiaTtsAccessToken;
+
+// ============================================================================
+// FOCOCO / INTELLIGENCE
+// ============================================================================
+
+exports.onAccountDeletionRequestCreate =
+    accountDeletion.onAccountDeletionRequestCreate;
+
 exports.getOrCreateFoCoCoDailyInsight =
     fococoDailyInsights.getOrCreateFoCoCoDailyInsight;
 exports.exportFoCoCoDailyInsightsReview =
     fococoDailyInsights.exportFoCoCoDailyInsightsReview;
+exports.rebuildRoundIntelligence =
+    intelligenceLayer.rebuildRoundIntelligence;
+exports.rebuildUserIntelligence =
+    intelligenceLayer.rebuildUserIntelligence;
+exports.repairRecentIntelligence =
+    intelligenceLayer.repairRecentIntelligence;
+exports.onGolfRoundIntelligenceWrite =
+    intelligenceLayer.onGolfRoundIntelligenceWrite;
+exports.onMindCoachRunIntelligenceWrite =
+    intelligenceLayer.onMindCoachRunIntelligenceWrite;
+exports.onGolfChatSessionIntelligenceWrite =
+    intelligenceLayer.onGolfChatSessionIntelligenceWrite;
+exports.syncLegacyFoCoCoInsightEngagement =
+    intelligenceLayer.syncLegacyFoCoCoInsightEngagement;
+exports.nightlyRefreshIntelligence =
+    intelligenceLayer.nightlyRefreshIntelligence;
 
 // ============================================================================
 // STRIPE WEBHOOK EVENT HANDLERS

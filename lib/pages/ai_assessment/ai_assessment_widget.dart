@@ -75,10 +75,7 @@ class _AiAssessmentWidgetState extends State<AiAssessmentWidget>
     _fadeController.forward();
     _slideController.forward();
 
-    // Initialize AI client with proper API key
-    // Note: GeminiAIClient uses Firebase AI internally, but we need to pass a non-empty key
-    // The actual API key is retrieved from GeminiLiveAPIConfig in the service layer
-    _aiClient = GeminiAIClient(apiKey: 'firebase_ai_logic');
+    _aiClient = GeminiAIClient();
 
     // Generate assessment on load
     _generateAssessment();

@@ -1,9 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_ai/firebase_ai.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '/ai_integration/config/gemini_config.dart';
+import '/services/units_preference_service.dart';
 
 class FoCoCoDailyInsight {
   const FoCoCoDailyInsight({
@@ -102,11 +108,23 @@ class FoCoCoInsightService {
   static const _prefKeyLastJson = 'fococo_insight_last_json';
 
   static const _brandNewFallback =
-      'The MindGame System is ready. Every round, every session, every conversation builds the picture of your mental game.';
+      'Your first rounds will sharpen what repeats under pressure.\n\nBefore you tee off, pick one thought and stay with it for three holes.';
+  static const Duration _callTimeout = Duration(seconds: 16);
+  static const Duration _retryDelay = Duration(milliseconds: 500);
+
+  /// Ensures Cloud Functions and Firestore requests carry a fresh ID token.
+  /// See [User.getIdToken](https://pub.dev/documentation/firebase_auth/latest/firebase_auth/User/getIdToken.html).
+  Future<void> _ensureFreshIdToken() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('Not signed in');
+    }
+    await user.getIdToken(true);
+  }
 
   Future<FoCoCoDailyInsight> getTodayInsight() async {
     final prefs = await SharedPreferences.getInstance();
-    final today = _todayIso();
+    final today = await _todayIso();
 
     final cachedDate = prefs.getString(_prefKeyCurrentDate);
     final cachedJson = prefs.getString(_prefKeyCurrentJson);
@@ -118,22 +136,28 @@ class FoCoCoInsightService {
     }
 
     try {
-      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
-          .httpsCallable('getOrCreateFoCoCoDailyInsight');
-      final result = await callable.call().timeout(const Duration(seconds: 12));
-      final raw = result.data;
-      if (raw is! Map) {
-        throw Exception('Invalid FoCoCo insight payload');
-      }
-
-      final insight = FoCoCoDailyInsight.fromMap(
-        Map<String, dynamic>.from(raw),
-      );
+      final insight = await _fetchRemoteInsight();
       await _cacheCurrentInsight(prefs, insight);
       return insight;
     } catch (error) {
       if (kDebugMode) {
-        debugPrint('⚠️ FoCoCo insight fetch failed: $error');
+        debugPrint('⚠️ FoCoCo insight fetch failed: ${_errorLabel(error)}');
+      }
+      if (FirebaseAuth.instance.currentUser != null) {
+        try {
+          await _ensureFreshIdToken();
+          final clientInsight = await _generateClientFallbackInsight();
+          await _cacheCurrentInsight(prefs, clientInsight);
+          if (kDebugMode) {
+            debugPrint('✅ FoCoCo tab: used on-device Firebase AI fallback insight');
+          }
+          return clientInsight;
+        } catch (fallbackError) {
+          if (kDebugMode) {
+            debugPrint(
+                '⚠️ FoCoCo client AI fallback failed: ${_errorLabel(fallbackError)}');
+          }
+        }
       }
     }
 
@@ -155,6 +179,7 @@ class FoCoCoInsightService {
     }
 
     try {
+      await _ensureFreshIdToken();
       await _mergeIntoInsightDoc(insight.insightId, {
         'opened': true,
         'updatedTime': FieldValue.serverTimestamp(),
@@ -177,6 +202,7 @@ class FoCoCoInsightService {
     }
 
     try {
+      await _ensureFreshIdToken();
       await _mergeIntoInsightDoc(insight.insightId, {
         'playedAudio': true,
         'updatedTime': FieldValue.serverTimestamp(),
@@ -205,6 +231,7 @@ class FoCoCoInsightService {
     if (seconds <= 0) return;
 
     try {
+      await _ensureFreshIdToken();
       await _mergeIntoInsightDoc(insight.insightId, {
         'timeOnScreenSec': FieldValue.increment(seconds),
         'updatedTime': FieldValue.serverTimestamp(),
@@ -231,6 +258,108 @@ class FoCoCoInsightService {
         .collection('ai_insights')
         .doc(insightId)
         .set(data, SetOptions(merge: true));
+  }
+
+  Future<FoCoCoDailyInsight> _fetchRemoteInsight() async {
+    await _ensureFreshIdToken();
+
+    final callable = FirebaseFunctions.instanceFor(
+      region: 'us-central1',
+    ).httpsCallable('getOrCreateFoCoCoDailyInsight');
+
+    Object? lastError;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final result = await callable.call().timeout(_callTimeout);
+        final raw = result.data;
+        if (raw is! Map) {
+          throw Exception('Invalid FoCoCo insight payload');
+        }
+        return FoCoCoDailyInsight.fromMap(Map<String, dynamic>.from(raw));
+      } catch (error) {
+        lastError = error;
+        final isUnauth = error is FirebaseFunctionsException &&
+            error.code == 'unauthenticated';
+
+        if (attempt == 0 && isUnauth) {
+          await _ensureFreshIdToken();
+          await Future<void>.delayed(_retryDelay);
+          continue;
+        }
+        if (attempt == 0 && _isRetryable(error)) {
+          await Future<void>.delayed(_retryDelay);
+          continue;
+        }
+        rethrow;
+      }
+    }
+    throw lastError ?? Exception('FoCoCo insight fetch failed');
+  }
+
+  /// When the callable fails (e.g. backend Gemini key / deploy), generate a short
+  /// FoCoCo-style line via Firebase AI Logic on-device (still requires sign-in).
+  Future<FoCoCoDailyInsight> _generateClientFallbackInsight() async {
+    final today = await _todayIso();
+    final unitsLine = await UnitsPreferenceService.aiContextLine();
+    final model = GeminiConfig.createModel(
+      modelName: GeminiConfig.insightModel,
+      generationConfig: GenerationConfig(
+        temperature: 0.55,
+        maxOutputTokens: 280,
+        topP: 0.9,
+      ),
+      systemInstruction:
+          'You write one FoCoCo Tab daily insight for golfers. '
+          'Exactly two complete sentences on two lines separated by one blank line. '
+          'Line 1: one personal observation. Line 2: one practical direction for today. '
+          'No medical claims, marketing copy, generic motivation, numbers, or exclamation marks. '
+          'No greetings or cliché openers. Plain text only. $unitsLine',
+    );
+
+    final response = await model.generateContent([
+      Content.text(
+        'Generate today\'s FoCoCo tab insight. Date: $today. '
+        'Ground on focus, confidence, and control patterns—not swing mechanics.',
+      ),
+    ]);
+
+    final text =
+        response.text?.trim().isNotEmpty == true ? response.text!.trim() : '';
+
+    final safe = text.isNotEmpty ? text : _brandNewFallback;
+
+    return FoCoCoDailyInsight(
+      insightId: '',
+      insightText: safe,
+      insightDate: today,
+      playedAudio: false,
+      opened: false,
+      timeOnScreenSec: 0,
+      generationVersion: 'client_firebase_ai_v2',
+    );
+  }
+
+  bool _isRetryable(Object error) {
+    if (error is TimeoutException) {
+      return true;
+    }
+    if (error is FirebaseFunctionsException) {
+      return error.code == 'internal' ||
+          error.code == 'unavailable' ||
+          error.code == 'deadline-exceeded' ||
+          error.code == 'resource-exhausted';
+    }
+    final message = error.toString().toLowerCase();
+    return message.contains('timeout') ||
+        message.contains('internal') ||
+        message.contains('unavailable');
+  }
+
+  String _errorLabel(Object error) {
+    if (error is FirebaseFunctionsException) {
+      return '[firebase_functions/${error.code}] ${error.message ?? 'unknown'}';
+    }
+    return error.toString();
   }
 
   Future<void> _cacheCurrentInsight(
@@ -276,8 +405,24 @@ class FoCoCoInsightService {
     }
   }
 
-  String _todayIso() {
+  Future<String> _todayIso() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        final snap = await FirebaseFirestore.instance
+            .collection('user')
+            .doc(uid)
+            .get();
+        final tzName = snap.data()?['timezone'] as String?;
+        if (tzName != null && tzName.isNotEmpty) {
+          final now = DateTime.now().toUtc();
+          return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+        }
+      }
+    } catch (_) {}
     final now = DateTime.now();
     return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
+
+  Future<void> warmTodayInsight() => getTodayInsight();
 }

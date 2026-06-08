@@ -1,8 +1,9 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
+
 import '/backend/backend.dart';
 import '/services/subscription_state_provider.dart';
 
@@ -268,18 +269,38 @@ class StoreSubscriptionService {
 
       final platform = Platform.isIOS ? 'app_store' : 'google_play';
 
+      // Query without orderBy avoids extra index coupling; pick latest in memory.
       final subscriptionQuery = await FirebaseFirestore.instance
           .collection('user_subscriptions')
           .where('userId', isEqualTo: user.uid)
           .where('platform', isEqualTo: platform)
-          .orderBy('currentPeriodEnd', descending: true)
-          .limit(1)
           .get();
 
       if (subscriptionQuery.docs.isEmpty) return null;
 
-      final data = subscriptionQuery.docs.first.data();
-      return StoreSubscriptionInfo.fromMap(data);
+      QueryDocumentSnapshot<Map<String, dynamic>>? bestDoc;
+      var bestEnd = DateTime.fromMillisecondsSinceEpoch(0);
+      for (final doc in subscriptionQuery.docs) {
+        final data = doc.data();
+        final end = (data['currentPeriodEnd'] as Timestamp?)?.toDate();
+        if (end != null && end.isAfter(bestEnd)) {
+          bestEnd = end;
+          bestDoc = doc;
+        }
+      }
+      final chosen = bestDoc ?? subscriptionQuery.docs.first;
+      return StoreSubscriptionInfo.fromMap(chosen.data());
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        if (kDebugMode) {
+          debugPrint(
+            '⚠️ user_subscriptions read denied — deploy firestore.rules + indexes, or check auth.',
+          );
+        }
+        return null;
+      }
+      debugPrint('❌ Failed to get current subscription: $e');
+      return null;
     } catch (e) {
       debugPrint('❌ Failed to get current subscription: $e');
       return null;
@@ -305,16 +326,28 @@ class StoreSubscriptionService {
     // Fallback: check user document
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('user')
-          .doc(user.uid)
-          .get();
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('user')
+            .doc(user.uid)
+            .get();
 
-      if (userDoc.exists) {
-        final userData = userDoc.data();
-        final tier = userData?['currentMembershipTier'] as String?;
-        if (tier != null && tier.isNotEmpty && tier != 'junior') {
-          return tier;
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          final tier = userData?['currentMembershipTier'] as String?;
+          if (tier != null && tier.isNotEmpty && tier != 'junior') {
+            return tier;
+          }
+        }
+      } on FirebaseException catch (e) {
+        if (e.code == 'permission-denied') {
+          if (kDebugMode) {
+            debugPrint(
+              '⚠️ user/{uid} read denied for tier — check Firestore rules (match /user/{{uid}}).',
+            );
+          }
+        } else {
+          debugPrint('❌ Error reading user tier from Firestore: $e');
         }
       }
     }

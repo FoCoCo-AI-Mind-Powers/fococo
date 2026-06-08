@@ -197,6 +197,26 @@ class VoiceChatDatabaseService {
 
   String? get _currentUserId => _auth.currentUser?.uid;
 
+  /// Make sure the Firestore SDK has a fresh auth token attached before
+  /// hitting collections that are gated by `request.auth.uid`. This is the
+  /// single biggest source of `[cloud_firestore/permission-denied]` right
+  /// after sign-in / app cold start.
+  Future<bool> _ensureAuthReady() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return false;
+    }
+    try {
+      await user.getIdToken();
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ VoiceChat: failed to refresh ID token: $e');
+      }
+      return false;
+    }
+  }
+
   /// Initialize the service
   Future<void> initialize() async {
     if (kDebugMode) {
@@ -218,6 +238,8 @@ class VoiceChatDatabaseService {
     if (_currentUserId == null) {
       throw Exception('User not authenticated');
     }
+
+    await _ensureAuthReady();
 
     final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
     final sessionTitle = title ?? _generateSessionTitle();
@@ -319,6 +341,8 @@ class VoiceChatDatabaseService {
   /// Save a voice chat message
   Future<void> saveMessage(VoiceChatMessage message) async {
     if (_currentUserId == null) return;
+
+    await _ensureAuthReady();
 
     await _firestore
         .collection(_messagesCollection)

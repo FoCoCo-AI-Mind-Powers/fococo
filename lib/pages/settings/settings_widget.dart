@@ -5,7 +5,8 @@ import '/backend/schema/structs/app_preferences_struct.dart';
 import '/backend/schema/user_subscriptions_record.dart';
 import '/backend/push_notifications/push_notifications_util.dart';
 import '/backend/push_notifications/notification_settings_widget.dart';
-import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
@@ -14,15 +15,23 @@ import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_components.dart';
-import '/flutter_flow/glass_design_system.dart';
+import '/services/ai_voice_preference_service.dart';
+import '/services/account_deletion_service.dart';
+import '/services/app_session_prefs_service.dart';
+import '/services/cms_content_service.dart';
+import '/services/haptic_service.dart';
 import '/services/revenuecat_service.dart';
 import '/services/subscription_state_provider.dart';
+import '/services/units_preference_service.dart';
 import '/main.dart';
+import '/widgets/fococo_confirm_dialog.dart';
 import '/widgets/fococo_drawer_widget.dart';
 import 'settings_model.dart';
 export 'settings_model.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsWidget extends StatefulWidget {
   const SettingsWidget({Key? key}) : super(key: key);
@@ -59,6 +68,10 @@ class _SettingsWidgetState extends State<SettingsWidget>
   bool _reduceMotion = false;
   bool _offlineMode = false;
   bool _isLoadingAdditionalPrefs = true;
+  bool _aiVoiceEnabled = true;
+  String _unitsPreference = UnitsPreferenceService.metric;
+  bool _notificationsMasterEnabled = false;
+  bool _gpsAppEnabled = false;
 
   // Permission states
   bool? _microphonePermission;
@@ -71,6 +84,7 @@ class _SettingsWidgetState extends State<SettingsWidget>
       SubscriptionStateProvider();
   Offerings? _offerings;
   bool _isLoadingOfferings = false;
+  bool? _hasProAccess;
 
   @override
   void initState() {
@@ -103,8 +117,24 @@ class _SettingsWidgetState extends State<SettingsWidget>
     _loadNotificationSettings();
     _loadAppPreferences();
     _loadAdditionalPreferences();
+    _loadUnitsAndVoicePrefs();
     _checkPermissions();
     _loadOfferings();
+    _loadProAccess();
+  }
+
+  Future<void> _loadProAccess() async {
+    try {
+      final hasAccess = await _revenueCatService.hasProAccess();
+      if (mounted) setState(() => _hasProAccess = hasAccess);
+    } catch (e) {
+      if (kDebugMode) debugPrint('Failed to load pro access: $e');
+      if (mounted) setState(() => _hasProAccess = false);
+    }
+  }
+
+  Future<void> _openNativeManageSubscriptions() async {
+    await _revenueCatService.openManageSubscriptions();
   }
 
   Future<void> _loadOfferings() async {
@@ -423,96 +453,68 @@ class _SettingsWidgetState extends State<SettingsWidget>
   }
 
   Future<void> _exportUserData() async {
+    if (currentUserUid.isEmpty) return;
+
+    final confirmed = await showFoCoCoConfirmDialog(
+      context: context,
+      title: 'Download your data?',
+      message:
+          "We'll prepare a copy of your account and activity data and email you when it's ready.",
+      confirmLabel: 'Request Data',
+      icon: Icons.download_outlined,
+    );
+    if (confirmed != true || !mounted) return;
+
     try {
-      if (currentUserUid.isEmpty) return;
-
-      // Show loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-
-      final userDoc = await FirebaseFirestore.instance
-          .collection('user')
-          .doc(currentUserUid)
-          .get();
-
-      // Close loading dialog
-      if (mounted) Navigator.of(context).pop();
-
-      if (userDoc.exists) {
-        // Show export summary dialog
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('📊 Data Export Ready'),
-              content: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Your personal data has been compiled. This includes:',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDataItem('Profile Information', '✅'),
-                    _buildDataItem('Golf Statistics', '✅'),
-                    _buildDataItem('Coaching Progress', '✅'),
-                    _buildDataItem('Preferences & Settings', '✅'),
-                    _buildDataItem('Subscription Details', '✅'),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Note: For security reasons, passwords and sensitive payment information are not included in exports.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
-        }
-      }
+      await FirebaseFirestore.instance.collection('data_export_requests').add({
+        'userId': currentUserUid,
+        'email': currentUserEmail,
+        'requestedAt': FieldValue.serverTimestamp(),
+        'status': 'pending',
+      });
     } catch (e) {
-      // Close loading if still open
-      if (mounted) Navigator.of(context).pop();
-
-      debugPrint('❌ Error exporting data: $e');
+      debugPrint('Error requesting data export: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Failed to export data'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: Text('Failed to request data export: $e'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
           ),
         );
       }
+      return;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Data request received. We'll email you when your export is ready.",
+          ),
+        ),
+      );
     }
   }
 
-  Widget _buildDataItem(String title, String status) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Text(status),
-          const SizedBox(width: 8),
-          Text(title),
-        ],
-      ),
-    );
+  Future<void> _loadUnitsAndVoicePrefs() async {
+    try {
+      final units = await UnitsPreferenceService.load();
+      final voiceOn = await AiVoicePreferenceService.isEnabled();
+      final gpsOn = await AppSessionPrefsService.isGpsEnabled();
+      final prefs = await SharedPreferences.getInstance();
+      final notificationsOn =
+          prefs.getBool('fococo_notifications_enabled') ?? false;
+      if (mounted) {
+        setState(() {
+          _unitsPreference = units;
+          _aiVoiceEnabled = voiceOn;
+          _gpsAppEnabled = gpsOn;
+          _notificationsMasterEnabled = notificationsOn;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading units/voice prefs: $e');
+    }
   }
 
   Future<void> _loadAdditionalPreferences() async {
@@ -641,27 +643,18 @@ class _SettingsWidgetState extends State<SettingsWidget>
 
       if (!granted && status.isPermanentlyDenied) {
         if (mounted) {
-          showDialog(
+          final openSettings = await showFoCoCoConfirmDialog(
             context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Microphone Permission Required'),
-              content: const Text(
-                  'Please enable microphone permission in app settings to use voice features.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    openAppSettings();
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Open Settings'),
-                ),
-              ],
-            ),
+            title: 'Microphone access needed',
+            message:
+                'Enable microphone permission in Settings to use voice features.',
+            confirmLabel: 'Open Settings',
+            cancelLabel: 'Not now',
+            icon: Icons.mic_off_outlined,
           );
+          if (openSettings) {
+            await openAppSettings();
+          }
         }
       }
     } catch (e) {
@@ -669,166 +662,21 @@ class _SettingsWidgetState extends State<SettingsWidget>
     }
   }
 
-  Future<void> _requestGPSPermission() async {
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      final granted = permission == LocationPermission.always ||
-          permission == LocationPermission.whileInUse;
-
-      setState(() {
-        _gpsPermission = granted;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(granted
-                ? '✅ Location permission granted'
-                : '❌ Location permission denied'),
-            backgroundColor: granted ? Colors.green : Colors.orange,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-
-      if (!granted && permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Location Permission Required'),
-              content: const Text(
-                  'Please enable location permission in app settings to use GPS features.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    openAppSettings();
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Open Settings'),
-                ),
-              ],
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('❌ Error requesting GPS permission: $e');
-    }
-  }
-
   Future<void> _showSignOutConfirmation() async {
-    final theme = FlutterFlowTheme.of(context);
-
-    final confirmed = await GlassDesignSystem.showGlassModal<bool>(
+    final confirmed = await showFoCoCoConfirmDialog(
       context: context,
-      barrierDismissible: true,
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: theme.error.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.logout,
-                      color: theme.error,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      'Sign Out',
-                      style: theme.headlineSmall.copyWith(
-                        color: theme.primaryText,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Are you sure you want to sign out?',
-                style: theme.bodyLarge.copyWith(
-                  color: theme.primaryText,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'You\'ll need to sign in again to access your account and continue your mental performance journey.',
-                style: theme.bodyMedium.copyWith(
-                  color: theme.secondaryText,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: Text(
-                      'Cancel',
-                      style: theme.bodyMedium.copyWith(
-                        color: theme.secondaryText,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.error,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      'Sign Out',
-                      style: theme.bodyMedium.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
+      title: 'Sign out?',
+      message:
+          'Are you sure you want to sign out? '
+          'You\'ll need to sign in again to access your account.',
+      confirmLabel: 'Sign Out',
+      icon: Icons.logout_rounded,
+      accent: FoCoCoDialogAccent.destructive,
     );
 
-    if (confirmed == true && mounted) {
+    if (confirmed && mounted) {
+      await HapticService.light();
+      await AppSessionPrefsService.setPostLoginTabFoCoCo();
       await authManager.signOut();
       if (mounted) {
         context.go('/login');
@@ -837,81 +685,15 @@ class _SettingsWidgetState extends State<SettingsWidget>
   }
 
   Future<void> _deleteAccount() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('⚠️ Delete Account'),
-        content: const Text(
-          'Are you sure you want to permanently delete your account? This action cannot be undone and will delete all your data, including:\n\n'
-          '• Profile information\n'
-          '• Golf statistics\n'
-          '• Coaching progress\n'
-          '• All saved preferences\n\n'
-          'This action is permanent.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-            ),
-            child: const Text('Delete Account'),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showFoCoCoDeleteAccountDialog(context);
 
-    if (confirmed == true) {
-      try {
-        // Show loading
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const Center(
-            child: CircularProgressIndicator(),
-          ),
-        );
-
-        // Delete user data from Firestore
-        await FirebaseFirestore.instance
-            .collection('user')
-            .doc(currentUserUid)
-            .delete();
-
-        // Sign out
-        await authManager.signOut();
-
-        // Close loading dialog
-        if (mounted) Navigator.of(context).pop();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Account deleted successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          context.go('/login');
-        }
-      } catch (e) {
-        // Close loading if still open
-        if (mounted) Navigator.of(context).pop();
-
-        debugPrint('❌ Error deleting account: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('❌ Failed to delete account'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
+    final email = currentUserEmail;
+    await AccountDeletionService.requestDeletion(email: email);
+    await AccountDeletionService.clearLocalState();
+    if (!mounted) return;
+    final router = GoRouter.of(context);
+    await authManager.signOut();
+    router.go('/login');
   }
 
   @override
@@ -941,13 +723,7 @@ class _SettingsWidgetState extends State<SettingsWidget>
           return Scaffold(
             key: scaffoldKey,
             backgroundColor: theme.primaryBackground,
-            drawer: user != null
-                ? FoCoCoDrawer(
-                    currentUser: user,
-                    currentRoute: 'settings',
-                    onNavigate: (route) => context.goNamed(route),
-                  )
-                : null,
+            drawer: null,
             body: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -974,31 +750,13 @@ class _SettingsWidgetState extends State<SettingsWidget>
                         elevation: 0,
                         surfaceTintColor: Colors.transparent,
                         automaticallyImplyLeading: false,
-                        leading: Padding(
-                          padding: const EdgeInsets.only(left: 16),
-                          child: GestureDetector(
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              scaffoldKey.currentState?.openDrawer();
-                            },
-                            child: Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: theme.glassBackground.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: theme.glassBorder.withValues(alpha: 0.2),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.menu_rounded,
-                                color: theme.primaryText,
-                                size: 24,
-                              ),
-                            ),
+                        leading: IconButton(
+                          icon: Icon(
+                            Icons.arrow_back_ios,
+                            color: theme.primaryText,
+                            size: 20,
                           ),
+                          onPressed: () => context.pop(),
                         ),
                         flexibleSpace: FlexibleSpaceBar(
                           background: SafeArea(
@@ -1064,6 +822,42 @@ class _SettingsWidgetState extends State<SettingsWidget>
     final isWithinTrial = _subscriptionProvider.isWithinTrialPeriod();
     final trialDaysRemaining = _subscriptionProvider.getTrialDaysRemaining();
 
+    if (_hasProAccess == true) {
+      return GlassDashboardCard(
+        title: 'Subscription',
+        subtitle: 'FoCoCo Prime membership',
+        children: [
+          Column(
+            children: [
+              const SizedBox(height: 16),
+              Text(
+                "You're on FoCoCo Prime",
+                style: theme.titleMedium.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.primaryText,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Manage billing, renewal, or cancellation in your app store account.',
+                style: theme.bodyMedium.copyWith(color: theme.secondaryText),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              _buildSettingsItem(
+                theme,
+                Icons.workspace_premium,
+                'Manage Subscription',
+                'Open your app store subscription settings',
+                _openNativeManageSubscriptions,
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
     return GlassDashboardCard(
       title: 'Subscription',
       subtitle: hasActiveSubscription
@@ -1104,7 +898,7 @@ class _SettingsWidgetState extends State<SettingsWidget>
                     Icons.workspace_premium,
                     'Manage Subscription',
                     'View and manage your subscription details',
-                    _showPaywall,
+                    _openNativeManageSubscriptions,
                   );
                 } else {
                   return Column(
@@ -1244,20 +1038,12 @@ class _SettingsWidgetState extends State<SettingsWidget>
               'Change Password',
               'Update your account password',
               () {
-                showDialog(
+                showFoCoCoAlertDialog(
                   context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('🔐 Change Password'),
-                    content: const Text(
-                      'To change your password, please sign out and use "Forgot Password" on the login screen.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('OK'),
-                      ),
-                    ],
-                  ),
+                  title: 'Change password',
+                  message:
+                      'To change your password, sign out and use Forgot Password on the login screen.',
+                  icon: Icons.lock_outline_rounded,
                 );
               },
             ),
@@ -1383,44 +1169,58 @@ class _SettingsWidgetState extends State<SettingsWidget>
             const SizedBox(height: 16),
             _buildSettingsItem(
               theme,
-              Icons.medical_information_outlined,
-              'Medical Disclaimer',
-              'See below',
-              () => _showMedicalDisclaimer(),
-            ),
-            _buildSettingsItem(
-              theme,
-              Icons.description_outlined,
-              'Terms & Conditions',
-              'View terms of service',
-              () => _openLegalDocument('terms'),
-            ),
-            _buildSettingsItem(
-              theme,
               Icons.privacy_tip_outlined,
               'Privacy Policy',
-              'View privacy policy',
+              'How we collect and protect your data',
               () => _openLegalDocument('privacy'),
             ),
             _buildSettingsItem(
               theme,
-              Icons.accessibility_new_outlined,
-              'Accessibility Statement',
-              'View accessibility information',
-              () => _openLegalDocument('accessibility'),
+              Icons.description_outlined,
+              'Terms',
+              'Terms of service for using FoCoCo',
+              () => _openLegalDocument('terms'),
+            ),
+            _buildSettingsItem(
+              theme,
+              Icons.smart_toy_outlined,
+              'AI Disclosure',
+              'You are interacting with an AI system',
+              () => _openLegalDocument('ai'),
+            ),
+            _buildSettingsItem(
+              theme,
+              Icons.shield_outlined,
+              'Data Security',
+              'How your data is stored and secured',
+              () => _openLegalDocument('data_security'),
+            ),
+            _buildSettingsItem(
+              theme,
+              Icons.medical_information_outlined,
+              'Non-Medical Disclaimer',
+              'FoCoCo is not a medical or therapy product',
+              () => _openLegalDocument('non_medical'),
             ),
             _buildSettingsItem(
               theme,
               Icons.cookie_outlined,
               'Cookie Policy',
-              'View cookie policy',
-              () => _openLegalDocument('cookies'),
+              'How we use cookies and similar technologies',
+              () => _openLegalDocument('cookie'),
+            ),
+            _buildSettingsItem(
+              theme,
+              Icons.delete_forever_outlined,
+              'Account Deletion',
+              'Permanently delete your account and data',
+              () => _deleteAccount(),
             ),
             _buildSettingsItem(
               theme,
               Icons.attribution_outlined,
               'Licenses & Attributions',
-              'View open source licenses',
+              'Open source licenses',
               () => _openLegalDocument('licenses'),
             ),
           ],
@@ -1429,62 +1229,8 @@ class _SettingsWidgetState extends State<SettingsWidget>
     );
   }
 
-  void _showMedicalDisclaimer() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Medical Disclaimer'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'FoCoCo provides mindset, focus, and performance guidance for golf and other sports.',
-                style: TextStyle(height: 1.5),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'It does not diagnose, treat, or replace any form of medical, psychological, or therapeutic care.',
-                style: TextStyle(height: 1.5),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Content is for educational and self-development purposes only.',
-                style: TextStyle(height: 1.5),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Always consult a qualified medical or mental-health professional before making decisions that may affect your health or wellbeing.',
-                style: TextStyle(
-                  height: 1.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _openLegalDocument(String documentType) async {
-    // Placeholder URLs - replace with actual URLs when available
-    final Map<String, String> documentUrls = {
-      'terms': 'https://fococo.app/terms',
-      'privacy': 'https://fococo.app/privacy',
-      'accessibility': 'https://fococo.app/accessibility',
-      'cookies': 'https://fococo.app/cookies',
-      'licenses': 'https://fococo.app/licenses',
-    };
-
-    final url = documentUrls[documentType] ?? 'https://fococo.app';
+    final url = CmsContentService.instance.legalUrl(documentType);
     final Uri uri = Uri.parse(url);
 
     try {
@@ -1505,6 +1251,40 @@ class _SettingsWidgetState extends State<SettingsWidget>
         );
       }
     }
+  }
+
+  Future<void> _showUnitsPicker(FlutterFlowTheme theme) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: theme.primaryBackground,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Metric (metres)'),
+              onTap: () => Navigator.pop(
+                context,
+                UnitsPreferenceService.metric,
+              ),
+            ),
+            ListTile(
+              title: const Text('Imperial (yards)'),
+              onTap: () => Navigator.pop(
+                context,
+                UnitsPreferenceService.imperial,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) {
+      return;
+    }
+    await UnitsPreferenceService.setUnits(choice);
+    await HapticService.light();
+    setState(() => _unitsPreference = choice);
   }
 
   Widget _buildPreferencesSection(FlutterFlowTheme theme) {
@@ -1529,14 +1309,36 @@ class _SettingsWidgetState extends State<SettingsWidget>
                 _microphonePermission ?? false,
                 _requestMicrophonePermission,
               ),
-              // GPS permission
-              _buildPermissionItem(
+              _buildSwitchItem(
+                theme,
+                Icons.notifications_outlined,
+                'Notifications',
+                _notificationsMasterEnabled ? 'On' : 'Off',
+                _notificationsMasterEnabled,
+                (value) async {
+                  if (!value) {
+                    await openAppSettings();
+                  }
+                  setState(() => _notificationsMasterEnabled = value);
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('fococo_notifications_enabled', value);
+                  await HapticService.light();
+                },
+              ),
+              _buildSwitchItem(
                 theme,
                 Icons.location_on_outlined,
                 'GPS',
-                _gpsPermission == true ? 'Allowed' : 'Not Allowed',
-                _gpsPermission ?? false,
-                _requestGPSPermission,
+                _gpsAppEnabled ? 'On' : 'Off',
+                _gpsAppEnabled,
+                (value) async {
+                  if (value) {
+                    await Permission.locationWhenInUse.request();
+                  }
+                  await AppSessionPrefsService.setGpsEnabled(value);
+                  await HapticService.light();
+                  setState(() => _gpsAppEnabled = value);
+                },
               ),
               _buildSettingsItem(
                 theme,
@@ -1545,6 +1347,27 @@ class _SettingsWidgetState extends State<SettingsWidget>
                 'Dark (FoCoCo default)',
                 null,
                 showTrailing: false,
+              ),
+              _buildSettingsItem(
+                theme,
+                Icons.straighten_outlined,
+                'Units',
+                _unitsPreference == UnitsPreferenceService.imperial
+                    ? 'Imperial (yards)'
+                    : 'Metric (metres)',
+                () => _showUnitsPicker(theme),
+              ),
+              _buildSwitchItem(
+                theme,
+                Icons.record_voice_over_outlined,
+                'AI Voice',
+                _aiVoiceEnabled ? 'On' : 'Off',
+                _aiVoiceEnabled,
+                (value) async {
+                  setState(() => _aiVoiceEnabled = value);
+                  await AiVoicePreferenceService.setEnabled(value);
+                  await HapticService.light();
+                },
               ),
               _buildSwitchItem(
                 theme,

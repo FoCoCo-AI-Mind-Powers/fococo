@@ -469,6 +469,11 @@ class GeminiConversationResponse extends BaseGeminiResponse {
   final String sessionId;
   final Map<String, dynamic> context;
 
+  /// Client-rendered visual specs emitted by the model via function calling
+  /// (charts, tables). Each entry has a `type` ('chart' | 'table') plus the
+  /// fields the renderer needs. Empty when the reply is plain text.
+  final List<Map<String, dynamic>> visuals;
+
   const GeminiConversationResponse({
     required this.response,
     required this.conversationType,
@@ -478,6 +483,7 @@ class GeminiConversationResponse extends BaseGeminiResponse {
     required super.model,
     required super.userId,
     super.tokensUsed,
+    this.visuals = const [],
   });
 
   @override
@@ -487,6 +493,7 @@ class GeminiConversationResponse extends BaseGeminiResponse {
       'conversationType': conversationType,
       'sessionId': sessionId,
       'context': context,
+      'visuals': visuals,
       'timestamp': timestamp.toIso8601String(),
       'model': model,
       'userId': userId,

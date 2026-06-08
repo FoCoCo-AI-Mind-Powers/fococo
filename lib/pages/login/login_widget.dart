@@ -2,11 +2,17 @@ import '/ai_integration/widgets/navbar_widget.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/services/biometric_auth_service.dart';
+import '/pages/fococo_tab/fococo_tab_widget.dart';
+import '/pages/register/age_verification_widget.dart';
+import '/services/app_session_prefs_service.dart';
 import '/services/auth_flow_service.dart';
+import '/services/biometric_auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'login_model.dart';
 export 'login_model.dart';
 
@@ -159,7 +165,274 @@ class _LoginWidgetState extends State<LoginWidget>
     final decision = await AuthFlowService.instance.resolvePostAuthDecision();
     if (!mounted) return;
     GoRouter.of(context).clearRedirectLocation();
+    if (decision.routeName == 'fococo') {
+      final tab = await AppSessionPrefsService.postLoginTab();
+      context.goNamed(tab);
+      return;
+    }
     context.goNamed(decision.routeName, extra: decision.extra);
+  }
+
+  int _calculateAge(DateTime dob) {
+    final now = DateTime.now();
+    var age = now.year - dob.year;
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  Future<DateTime?> _collectAgeAndTermsForSocialSignUp() async {
+    DateTime selectedDate =
+        DateTime(DateTime.now().year - 18, DateTime.now().month, DateTime.now().day);
+    var termsAccepted = false;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1A1030),
+            title: const Text(
+              'Confirm age & terms',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Date of birth',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(1920),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => selectedDate = picked);
+                      }
+                    },
+                    child: Text(
+                      '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Checkbox(
+                        value: termsAccepted,
+                        onChanged: (v) =>
+                            setDialogState(() => termsAccepted = v ?? false),
+                      ),
+                      Expanded(
+                        child: Wrap(
+                          children: [
+                            Text(
+                              'By continuing you agree to our ',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.75),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => launchUrl(
+                                Uri.parse('https://www.fococo.ai/terms'),
+                                mode: LaunchMode.externalApplication,
+                              ),
+                              child: const Text(
+                                'Terms of Service',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              ' and ',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.75),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => launchUrl(
+                                Uri.parse(
+                                  'https://www.fococo.ai/privacy-policy',
+                                ),
+                                mode: LaunchMode.externalApplication,
+                              ),
+                              child: const Text(
+                                'Privacy Policy',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '.',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.75),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: termsAccepted
+                    ? () => Navigator.of(ctx).pop(true)
+                    : null,
+                child: const Text('Continue'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (confirmed != true) return null;
+    if (_calculateAge(selectedDate) < 16) {
+      if (mounted) context.goNamed(AgeVerificationWidget.routeName);
+      return null;
+    }
+    return selectedDate;
+  }
+
+  Future<void> _persistSocialSignupMetadata(
+    String uid,
+    DateTime dateOfBirth,
+  ) async {
+    await FirebaseFirestore.instance.collection('user').doc(uid).set(
+      {
+        'dateOfBirth': Timestamp.fromDate(dateOfBirth),
+        'termsAcceptedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  Future<bool> _ensureSocialUserHasAgeAndTerms(
+    String uid,
+    DateTime? preCollectedDob,
+  ) async {
+    if (preCollectedDob != null) {
+      await _persistSocialSignupMetadata(uid, preCollectedDob);
+      return true;
+    }
+
+    try {
+      final snap =
+          await FirebaseFirestore.instance.collection('user').doc(uid).get();
+      if (snap.data()?['dateOfBirth'] != null) {
+        return true;
+      }
+    } catch (_) {}
+
+    final dob = await _collectAgeAndTermsForSocialSignUp();
+    if (dob == null) {
+      await authManager.signOut();
+      return false;
+    }
+    await _persistSocialSignupMetadata(uid, dob);
+    return true;
+  }
+
+  Future<void> _maybeOfferBiometricEnrollment(String? email) async {
+    if (email == null || email.isEmpty) return;
+    if (!_isBiometricAvailable || _isBiometricEnabled) return;
+    if (!mounted) return;
+
+    final enable = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Enable $_biometricName?'),
+        content: Text(
+          'Sign in faster next time with $_biometricName. '
+          'This unlocks your saved session only.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Not now'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Enable'),
+          ),
+        ],
+      ),
+    );
+    if (enable != true) return;
+    final ok = await _biometricService.enableBiometricAuth(email);
+    if (ok && mounted) {
+      setState(() => _isBiometricEnabled = true);
+    }
+  }
+
+  Future<void> _signInWithApple({required bool requireAgeGate}) async {
+    if (_isAppleSigningIn) return;
+    DateTime? dob;
+    if (requireAgeGate) {
+      dob = await _collectAgeAndTermsForSocialSignUp();
+      if (dob == null) return;
+    }
+    setState(() => _isAppleSigningIn = true);
+    try {
+      GoRouter.of(context).prepareAuthEvent();
+      final user = await authManager.signInWithApple(context);
+      if (user == null || user.uid == null) return;
+      final ok = await _ensureSocialUserHasAgeAndTerms(user.uid!, dob);
+      if (!ok || !mounted) return;
+      await _navigateAfterAuth();
+      await _maybeOfferBiometricEnrollment(user.email);
+    } catch (e) {
+      _showError('Apple Sign In failed. Please try again or use another method.');
+    } finally {
+      if (mounted) setState(() => _isAppleSigningIn = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle({required bool requireAgeGate}) async {
+    if (_isGoogleSigningIn) return;
+    DateTime? dob;
+    if (requireAgeGate) {
+      dob = await _collectAgeAndTermsForSocialSignUp();
+      if (dob == null) return;
+    }
+    setState(() => _isGoogleSigningIn = true);
+    try {
+      GoRouter.of(context).prepareAuthEvent();
+      final user = await authManager.signInWithGoogle(context);
+      if (user == null || user.uid == null) return;
+      final ok = await _ensureSocialUserHasAgeAndTerms(user.uid!, dob);
+      if (!ok || !mounted) return;
+      await _navigateAfterAuth();
+      await _maybeOfferBiometricEnrollment(user.email);
+    } catch (e) {
+      _showError(
+        'Google Sign In failed. Please try again or use another method.',
+      );
+    } finally {
+      if (mounted) setState(() => _isGoogleSigningIn = false);
+    }
   }
 
   void _showError(String message) {
@@ -445,22 +718,7 @@ class _LoginWidgetState extends State<LoginWidget>
                     color: Colors.white, size: 18),
                 text: 'Sign in with Apple',
                 isLoading: _isAppleSigningIn,
-                onTap: () async {
-                  if (_isAppleSigningIn) return;
-                  setState(() => _isAppleSigningIn = true);
-                  try {
-                    GoRouter.of(context).prepareAuthEvent();
-                    final user =
-                        await authManager.signInWithApple(context);
-                    if (user == null) return;
-                    await _navigateAfterAuth();
-                  } catch (e) {
-                    _showError(
-                        'Apple Sign In failed. Please try again or use another method.');
-                  } finally {
-                    if (mounted) setState(() => _isAppleSigningIn = false);
-                  }
-                },
+                onTap: () => _signInWithApple(requireAgeGate: true),
               ),
               const SizedBox(height: 12),
             ],
@@ -473,22 +731,7 @@ class _LoginWidgetState extends State<LoginWidget>
               ),
               text: 'Sign in with Google',
               isLoading: _isGoogleSigningIn,
-              onTap: () async {
-                if (_isGoogleSigningIn) return;
-                setState(() => _isGoogleSigningIn = true);
-                try {
-                  GoRouter.of(context).prepareAuthEvent();
-                  final user =
-                      await authManager.signInWithGoogle(context);
-                  if (user == null) return;
-                  await _navigateAfterAuth();
-                } catch (e) {
-                  _showError(
-                      'Google Sign In failed. Please try again or use another method.');
-                } finally {
-                  if (mounted) setState(() => _isGoogleSigningIn = false);
-                }
-              },
+              onTap: () => _signInWithGoogle(requireAgeGate: true),
             ),
 
             const SizedBox(height: 16),
@@ -647,6 +890,8 @@ class _LoginWidgetState extends State<LoginWidget>
                         }
                         await _saveRememberMe();
                         await _navigateAfterAuth();
+                        await _maybeOfferBiometricEnrollment(user.email);
+                        if (mounted) setState(() => _isEmailSigningIn = false);
                       } catch (e) {
                         if (mounted) {
                           setState(() {
@@ -695,21 +940,7 @@ class _LoginWidgetState extends State<LoginWidget>
                     color: Colors.white, size: 18),
                 text: 'Sign in with Apple',
                 isLoading: _isAppleSigningIn,
-                onTap: () async {
-                  if (_isAppleSigningIn) return;
-                  setState(() => _isAppleSigningIn = true);
-                  try {
-                    GoRouter.of(context).prepareAuthEvent();
-                    final user =
-                        await authManager.signInWithApple(context);
-                    if (user == null) return;
-                    await _navigateAfterAuth();
-                  } catch (e) {
-                    _showError('Apple Sign In failed. Please try again.');
-                  } finally {
-                    if (mounted) setState(() => _isAppleSigningIn = false);
-                  }
-                },
+                onTap: () => _signInWithApple(requireAgeGate: false),
               ),
               const SizedBox(height: 12),
             ],
@@ -722,21 +953,7 @@ class _LoginWidgetState extends State<LoginWidget>
               ),
               text: 'Sign in with Google',
               isLoading: _isGoogleSigningIn,
-              onTap: () async {
-                if (_isGoogleSigningIn) return;
-                setState(() => _isGoogleSigningIn = true);
-                try {
-                  GoRouter.of(context).prepareAuthEvent();
-                  final user =
-                      await authManager.signInWithGoogle(context);
-                  if (user == null) return;
-                  await _navigateAfterAuth();
-                } catch (e) {
-                  _showError('Google Sign In failed. Please try again.');
-                } finally {
-                  if (mounted) setState(() => _isGoogleSigningIn = false);
-                }
-              },
+              onTap: () => _signInWithGoogle(requireAgeGate: false),
             ),
           ],
         ),

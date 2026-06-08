@@ -29,6 +29,18 @@ class MindCoachV2Visuals {
       accentForPillar(pillar).withValues(alpha: 0.74);
 
   static Color dimTextColor = Colors.white.withValues(alpha: 0.62);
+
+  static String iconAssetForPillar(MindCoachV2Pillar pillar) => switch (pillar) {
+        MindCoachV2Pillar.focus => 'carbon:center-square',
+        MindCoachV2Pillar.confidence => 'carbon:idea',
+        MindCoachV2Pillar.control => 'carbon:scale',
+      };
+
+  static const List<MindCoachV2Pillar> homePillarOrder = [
+    MindCoachV2Pillar.focus,
+    MindCoachV2Pillar.confidence,
+    MindCoachV2Pillar.control,
+  ];
 }
 
 class MindCoachV2Backdrop extends StatelessWidget {
@@ -177,6 +189,7 @@ class MindCoachGlowCard extends StatelessWidget {
     this.padding = const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
     this.borderRadius = 18,
     this.onTap,
+    this.showTopGlow = false,
   });
 
   final Color color;
@@ -184,6 +197,7 @@ class MindCoachGlowCard extends StatelessWidget {
   final EdgeInsets padding;
   final double borderRadius;
   final VoidCallback? onTap;
+  final bool showTopGlow;
 
   @override
   Widget build(BuildContext context) {
@@ -218,6 +232,16 @@ class MindCoachGlowCard extends StatelessWidget {
             padding: padding,
             child: child,
           ),
+          if (showTopGlow)
+            Positioned(
+              left: 14,
+              right: 14,
+              top: -1,
+              child: MindCoachGlowLine(
+                color: color,
+                width: double.infinity,
+              ),
+            ),
           Positioned(
             left: 14,
             right: 14,

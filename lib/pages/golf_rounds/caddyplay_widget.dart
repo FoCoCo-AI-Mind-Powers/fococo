@@ -1,19 +1,23 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
-import 'package:speech_to_text/speech_to_text.dart';
 
+import '/ai_integration/services/cartesia_api_service.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/services/haptic_service.dart';
 
 import 'caddyplay_models.dart';
 import 'caddyplay_session_service.dart';
@@ -56,7 +60,6 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   static const Duration _messageDuration = Duration(seconds: 2);
 
   final CaddyPlaySessionService _sessionService = CaddyPlaySessionService();
-  final SpeechToText _speechToText = SpeechToText();
   final AudioRecorder _audioRecorder = AudioRecorder();
   final TextEditingController _courseController = TextEditingController();
   final ScrollController _momentScrollController = ScrollController();
@@ -67,7 +70,6 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   bool _isLoading = true;
   bool _isSaving = false;
   bool _showAdvancedSettings = false;
-  bool _speechReady = false;
   bool _snapshotLoading = false;
   int _selectedHoles = 18;
 
@@ -98,8 +100,18 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   String? _justTalkAudioPath;
 
   int _mindSnapStep = 0;
+  Timer? _mindSnapTimer;
+  String _mindSnapOpeningLine = 'Quick reset. Back in 10 seconds.';
+  int? _lastMindSnapOpeningIndex;
   CaddyPlayMindSnapSequence _mindSnapSequence =
       CaddyPlayMindSnapSequence.general;
+
+  static const List<String> _mindSnapOpenings = <String>[
+    'Quick reset. Back in 10 seconds.',
+    'One breath. Then back to the shot.',
+    'Slow down. Reset your focus.',
+    'Ten seconds. Clear the noise.',
+  ];
 
   List<CaddyPlayHole> _scorecardDraft = <CaddyPlayHole>[];
 
@@ -119,8 +131,17 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Defer the nav-bar override mutation to after the current frame.
+    // setFoCoCoNavBarBackgroundOverride writes to a ValueNotifier, which
+    // synchronously notifies its ValueListenableBuilder ancestor — calling
+    // it from inside didChangeDependencies (which runs during build) trips
+    // "setState() called during build" because the listener tries to
+    // markNeedsBuild on an ancestor that is still being built.
     if (_isRouteVisible(context)) {
-      setFoCoCoNavBarBackgroundOverride(_kBackgroundStart);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setFoCoCoNavBarBackgroundOverride(_kBackgroundStart);
+      });
     }
   }
 
@@ -128,7 +149,6 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     setState(() => _isLoading = true);
     try {
       await _sessionService.cleanupExpiredLocalArtifacts();
-      _speechReady = await _speechToText.initialize();
       _advancedDefaults = await _sessionService.loadAdvancedDefaults();
       _applyAdvancedDefaults(_advancedDefaults);
 
@@ -164,7 +184,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     _bannerTimer?.cancel();
     _microInsightTimer?.cancel();
     _justTalkTimer?.cancel();
-    _speechToText.cancel();
+    _mindSnapTimer?.cancel();
     unawaited(_audioRecorder.stop());
     _audioRecorder.dispose();
     super.dispose();
@@ -187,45 +207,16 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       );
     }
 
-    return StreamBuilder<UserRecord>(
-      stream: isVisible
-          ? UserRecord.getDocument(
-              FirebaseFirestore.instance.doc('user/$currentUserUid'),
-            )
-          : null,
-      builder: (context, snapshot) {
-        final user = snapshot.data;
-        return FoCoCoAdaptiveScaffold(
-          backgroundColor: _kBackgroundStart,
-          currentRoute: CaddyPlayWidget.routeName,
-          onTap: _handleNavigation,
-          titleWidget: Text(
-            _appBarTitle,
-            style: theme.titleLarge.copyWith(
-              color: _appBarTitleColor,
-              fontWeight: FontWeight.w400,
-              letterSpacing: 0.8,
-            ),
-          ),
-          leading: _buildLeading(theme),
-          actions: _buildActions(theme),
-          drawer: _canUseDrawer && user != null
-              ? FoCoCoDrawer(
-                  currentUser: user,
-                  currentRoute: CaddyPlayWidget.routeName,
-                  onNavigate: (route) => context.goNamed(route),
-                )
-              : null,
-          showBottomNav: false,
-          enableVoiceButton: false,
-          body: _buildBody(theme),
-        );
-      },
+    return FoCoCoAdaptiveScaffold(
+      backgroundColor: _kBackgroundStart,
+      hideAppBar: true,
+      currentRoute: CaddyPlayWidget.routeName,
+      onTap: _handleNavigation,
+      showBottomNav: false,
+      enableVoiceButton: false,
+      body: _buildBody(theme),
     );
   }
-
-  bool get _canUseDrawer =>
-      _overlay == _CaddyPlayOverlay.none && _screen == _CaddyPlayScreen.home;
 
   bool _isRouteVisible(BuildContext context) {
     return GoRouterState.of(context).uri.toString().contains(
@@ -267,6 +258,15 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     };
   }
 
+  Widget _buildInlineHeader(FlutterFlowTheme theme) {
+    return FoCoCoInlineScreenHeader(
+      title: _appBarTitle,
+      titleColor: _appBarTitleColor,
+      leading: _buildLeading(theme),
+      topInset: MediaQuery.viewPaddingOf(context).top,
+    );
+  }
+
   Color get _appBarTitleColor {
     if (_overlay == _CaddyPlayOverlay.justTalkRecording ||
         _overlay == _CaddyPlayOverlay.justTalkProcessing ||
@@ -290,61 +290,23 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         _overlay == _CaddyPlayOverlay.justTalkProcessing ||
         _overlay == _CaddyPlayOverlay.justTalkConfirmation) {
       return IconButton(
-        icon: Icon(Icons.menu_rounded, color: theme.primaryText),
+        icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.primaryText),
         onPressed: _dismissTalkOrTapOverlay,
       );
     }
 
     if (_overlay == _CaddyPlayOverlay.scorecard) {
       return IconButton(
-        icon: Icon(Icons.menu_rounded, color: theme.primaryText),
+        icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.primaryText),
         onPressed: () => _setOverlay(_CaddyPlayOverlay.none),
       );
     }
 
     if (_screen == _CaddyPlayScreen.newRound) {
       return IconButton(
-        icon: Icon(Icons.menu_rounded, color: theme.primaryText),
+        icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.primaryText),
         onPressed: _backToHome,
       );
-    }
-
-    return null;
-  }
-
-  List<Widget>? _buildActions(FlutterFlowTheme theme) {
-    if (_overlay == _CaddyPlayOverlay.scorecard) {
-      return <Widget>[
-        Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: _HeaderCircleButton(
-            icon: Icons.close_rounded,
-            onTap: () => _setOverlay(_CaddyPlayOverlay.none),
-          ),
-        ),
-      ];
-    }
-
-    if (_overlay == _CaddyPlayOverlay.none &&
-        _screen == _CaddyPlayScreen.active &&
-        _activeRound != null) {
-      return <Widget>[
-        PopupMenuButton<String>(
-          color: _kCardSolid,
-          onSelected: (value) {
-            if (value == 'end_round') {
-              _enterSnapshot();
-            }
-          },
-          itemBuilder: (context) => const <PopupMenuEntry<String>>[
-            PopupMenuItem<String>(
-              value: 'end_round',
-              child: Text('End Round'),
-            ),
-          ],
-          icon: Icon(Icons.menu_rounded, color: theme.primaryText),
-        ),
-      ];
     }
 
     return null;
@@ -362,6 +324,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         Positioned.fill(child: _buildBackdrop()),
         Column(
           children: [
+            _buildInlineHeader(theme),
             if (_isLoading || _isSaving || _snapshotLoading)
               LinearProgressIndicator(
                 minHeight: 2,
@@ -484,7 +447,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       _CaddyPlayScreen.newRound => _buildNewRound(theme, bottomReserve),
       _CaddyPlayScreen.active => _buildActiveRound(theme, bottomReserve),
       _CaddyPlayScreen.snapshot => _buildSnapshot(theme, bottomReserve),
-      _CaddyPlayScreen.completed => _buildCompleted(theme, bottomReserve),
+      _CaddyPlayScreen.completed => _buildSnapshot(theme, bottomReserve),
     };
   }
 
@@ -668,96 +631,108 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
 
     final currentHoleMoments = _displayMomentsForCurrentHole(round);
     final tapDisabled = round.tapCountForHole(round.currentHole) >= 10;
+    final onLastHole = round.currentHole >= round.holesTotal;
+    final canGoBack = round.currentHole > 1;
 
-    return ListView(
-      padding: EdgeInsets.fromLTRB(20, 18, 20, bottomReserve),
-      children: [
-        Text(
-          round.courseName,
-          textAlign: TextAlign.center,
-          style: theme.bodyLarge.copyWith(color: Colors.white),
-        ),
-        const SizedBox(height: 10),
-        Center(
-          child: _BadgePill(
-            label: enumLabel(round.roundType),
-            borderColor: Colors.white.withValues(alpha: 0.45),
-          ),
-        ),
-        const SizedBox(height: 28),
-        Text(
-          'Hole ${round.currentHole}',
-          textAlign: TextAlign.center,
-          style: theme.displaySmall.copyWith(
-            color: _kCaddyGreen,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          'Moments Captured',
-          textAlign: TextAlign.center,
-          style: theme.bodyMedium.copyWith(
-            color: Colors.white.withValues(alpha: 0.7),
-          ),
-        ),
-        const SizedBox(height: 12),
-        _MomentRow(
-          controller: _momentScrollController,
-          moments: currentHoleMoments,
-        ),
-        const SizedBox(height: 24),
-        _SectionLabel(label: 'Log Shot'),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _ActionTile(
-                icon: Icons.touch_app_outlined,
-                label: 'TAP',
-                onTap: tapDisabled ? _showTapCapMessage : _openTapLog,
-                disabled: tapDisabled,
-              ),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 12, 20, bottomReserve),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Hole ${round.currentHole}',
+            textAlign: TextAlign.center,
+            style: theme.displaySmall.copyWith(
+              color: _kCaddyGreen,
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _ActionTile(
-                icon: Icons.mic_none_rounded,
-                label: 'TALK',
-                onTap: _openJustTalk,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Moments Captured',
+            textAlign: TextAlign.center,
+            style: theme.bodyMedium.copyWith(
+              color: Colors.white.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 72,
+            child: _MomentRow(
+              controller: _momentScrollController,
+              moments: currentHoleMoments,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const _SectionLabel(label: 'Log Shot'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _ActionTile(
+                  icon: Icons.touch_app_outlined,
+                  label: 'TAP',
+                  onTap: tapDisabled ? _showTapCapMessage : _openTapLog,
+                  disabled: tapDisabled,
+                ),
               ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _ActionTile(
+                  icon: Icons.mic_none_rounded,
+                  label: 'TALK',
+                  onTap: _openJustTalk,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _CaddyGhostButton(
+                  label: 'BACK',
+                  onTap: canGoBack ? _retreatHole : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _CaddyGlowButton(
+                  label: onLastHole ? 'END ROUND' : 'NEXT HOLE',
+                  onTap: onLastHole ? _enterSnapshot : _advanceHole,
+                ),
+              ),
+            ],
+          ),
+          if (!onLastHole) ...[
+            const SizedBox(height: 10),
+            _CaddyGhostButton(
+              label: 'END ROUND',
+              onTap: _enterSnapshot,
             ),
           ],
-        ),
-        const SizedBox(height: 18),
-        _CaddyGhostButton(
-          label:
-              round.currentHole >= round.holesTotal ? 'END ROUND' : 'NEXT HOLE',
-          onTap: round.currentHole >= round.holesTotal
-              ? _enterSnapshot
-              : _advanceHole,
-        ),
-        const SizedBox(height: 18),
-        Row(
-          children: [
-            Expanded(
-              child: _SecondaryActionTile(
-                icon: Icons.edit_note_rounded,
-                label: 'Scorecard',
-                onTap: _openScorecard,
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _SecondaryActionTile(
+                  icon: Icons.edit_note_rounded,
+                  label: 'Scorecard',
+                  onTap: _openScorecard,
+                ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _SecondaryActionTile(
-                icon: Icons.autorenew_rounded,
-                label: 'MindSnap',
-                onTap: _openMindSnap,
+              const SizedBox(width: 16),
+              Expanded(
+                child: _SecondaryActionTile(
+                  icon: Icons.autorenew_rounded,
+                  label: 'MindSnap',
+                  onTap: _openMindSnap,
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -844,9 +819,10 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
               Expanded(
                 child: _SnapshotNumberBlock(
                   label: 'SCORE',
-                  value: snapshot.scoreToPar >= 0
-                      ? '+${snapshot.scoreToPar}'
-                      : '${snapshot.scoreToPar}',
+                  value: formatCaddyPlayScoreToParLabel(
+                    snapshot.scoreToPar,
+                    approximate: snapshot.scoreToParIsApproximate,
+                  ),
                   sublabel: '${snapshot.holesPlayed} holes',
                   color: _kCaddyGreen,
                 ),
@@ -1034,50 +1010,58 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     return ListView(
       padding: EdgeInsets.fromLTRB(20, 18, 20, bottomReserve),
       children: [
-        _buildChoiceGroup<CaddyPlayCommitmentLevel>(
-          theme: theme,
-          label: 'Commitment',
-          values: CaddyPlayCommitmentLevel.values,
-          selected: _tapCommitment,
-          labelFor: (value) => enumLabel(value),
-          onSelected: (value) => setState(() => _tapCommitment = value),
+        Center(
+          child: _buildChoiceGroup<CaddyPlayShotResult>(
+            theme: theme,
+            label: 'Shot Result',
+            values: CaddyPlayShotResult.values,
+            selected: _tapResult,
+            labelFor: (value) =>
+                value == CaddyPlayShotResult.ok ? 'OK' : enumLabel(value),
+            onSelected: (value) => setState(() => _tapResult = value),
+          ),
         ),
         const SizedBox(height: 18),
         const _GlowSeparator(),
         const SizedBox(height: 18),
-        _buildChoiceGroup<CaddyPlayFocusLevel>(
-          theme: theme,
-          label: 'Focus Level',
-          values: CaddyPlayFocusLevel.values,
-          selected: _tapFocus,
-          labelFor: (value) => enumLabel(value),
-          onSelected: (value) => setState(() => _tapFocus = value),
+        Center(
+          child: _buildChoiceGroup<CaddyPlayFocusLevel>(
+            theme: theme,
+            label: 'Focus Level',
+            values: CaddyPlayFocusLevel.values,
+            selected: _tapFocus,
+            labelFor: (value) => enumLabel(value),
+            onSelected: (value) => setState(() => _tapFocus = value),
+          ),
         ),
         const SizedBox(height: 18),
         const _GlowSeparator(),
         const SizedBox(height: 18),
-        _buildChoiceGroup<CaddyPlayShotResult>(
-          theme: theme,
-          label: 'Shot Result',
-          values: CaddyPlayShotResult.values,
-          selected: _tapResult,
-          labelFor: (value) =>
-              value == CaddyPlayShotResult.ok ? 'OK' : enumLabel(value),
-          onSelected: (value) => setState(() => _tapResult = value),
+        Center(
+          child: _buildChoiceGroup<CaddyPlayCommitmentLevel>(
+            theme: theme,
+            label: 'Commitment',
+            values: CaddyPlayCommitmentLevel.values,
+            selected: _tapCommitment,
+            labelFor: (value) => enumLabel(value),
+            onSelected: (value) => setState(() => _tapCommitment = value),
+          ),
         ),
         const SizedBox(height: 18),
         const _GlowSeparator(),
         const SizedBox(height: 18),
-        _buildChoiceGroup<CaddyPlayRoutineStatus>(
-          theme: theme,
-          label: 'Pre-Shot Routine',
-          values: CaddyPlayRoutineStatus.values,
-          selected: _tapRoutine,
-          labelFor: (value) => switch (value) {
-            CaddyPlayRoutineStatus.partly => 'Partly',
-            _ => enumLabel(value),
-          },
-          onSelected: (value) => setState(() => _tapRoutine = value),
+        Center(
+          child: _buildChoiceGroup<CaddyPlayRoutineStatus>(
+            theme: theme,
+            label: 'Pre-Shot Routine',
+            values: CaddyPlayRoutineStatus.values,
+            selected: _tapRoutine,
+            labelFor: (value) => switch (value) {
+              CaddyPlayRoutineStatus.partly => 'Partly',
+              _ => enumLabel(value),
+            },
+            onSelected: (value) => setState(() => _tapRoutine = value),
+          ),
         ),
         const SizedBox(height: 18),
         const _GlowSeparator(),
@@ -1096,23 +1080,13 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       padding: EdgeInsets.fromLTRB(20, 18, 20, bottomReserve),
       children: [
         Text(
-          'Example',
+          'Tap the mic when you\'re done (30s max)',
           textAlign: TextAlign.center,
-          style: theme.headlineSmall.copyWith(
-            color: Colors.white.withValues(alpha: 0.92),
+          style: theme.bodyLarge.copyWith(
+            color: Colors.white.withValues(alpha: 0.78),
           ),
         ),
-        const SizedBox(height: 12),
-        Text(
-          '7 iron, rushed routine, pushed it right',
-          textAlign: TextAlign.center,
-          style: theme.titleLarge.copyWith(
-            color: Colors.white.withValues(alpha: 0.72),
-            fontStyle: FontStyle.italic,
-            fontWeight: FontWeight.w300,
-          ),
-        ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 28),
         const _GlowSeparator(color: _kCaddyGreen),
         const SizedBox(height: 36),
         Center(
@@ -1120,12 +1094,8 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             warning: _justTalkWarning,
             transcript: transcript,
             elapsedLabel: _formatDuration(_justTalkDuration),
+            onTap: _stopJustTalkRecording,
           ),
-        ),
-        const SizedBox(height: 36),
-        _CaddyGhostButton(
-          label: 'Stop',
-          onTap: _stopJustTalkRecording,
         ),
       ],
     );
@@ -1229,15 +1199,13 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
 
     return Material(
       color: Colors.black.withValues(alpha: 0.62),
-      child: InkWell(
-        onTap: _advanceMindSnap,
-        child: Padding(
+      child: Padding(
           padding: EdgeInsets.fromLTRB(20, 40, 20, bottomReserve),
           child: Column(
             children: [
               const SizedBox(height: 28),
               Text(
-                'Quick reset. Back in 10 seconds.',
+                _mindSnapOpeningLine,
                 textAlign: TextAlign.center,
                 style: theme.titleMedium.copyWith(color: _kCaddyGreen),
               ),
@@ -1294,17 +1262,9 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
                 }),
               ),
               const Spacer(),
-              Text(
-                'Tap anywhere to advance',
-                style: theme.bodyLarge.copyWith(
-                  color: Colors.white.withValues(alpha: 0.7),
-                ),
-              ),
-              const SizedBox(height: 8),
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -1389,7 +1349,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           ),
           const SizedBox(height: 20),
           _CaddyGlowButton(
-            label: 'SAVE HOLE',
+            label: 'SAVE SCORE',
             onTap: _saveScorecard,
           ),
         ],
@@ -1399,25 +1359,13 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
 
   List<Widget> _buildScorecardRows(
       FlutterFlowTheme theme, CaddyPlayActiveRound round) {
-    final children = <Widget>[];
-    final outHoles =
-        _scorecardDraft.where((hole) => hole.holeNumber <= 9).toList();
-    final inHoles =
-        _scorecardDraft.where((hole) => hole.holeNumber > 9).toList();
-
-    for (final hole in outHoles) {
-      children.add(_buildScorecardRow(theme, round, hole));
-    }
-    if (round.holesTotal >= 9) {
-      children.add(_buildSubtotalRow('OUT', outHoles));
-    }
-    for (final hole in inHoles) {
-      children.add(_buildScorecardRow(theme, round, hole));
-    }
-    if (round.holesTotal == 18) {
-      children.add(_buildSubtotalRow('IN', inHoles));
-    }
-    return children;
+    final hole = _scorecardDraft.firstWhere(
+      (entry) => entry.holeNumber == round.currentHole,
+      orElse: () => CaddyPlayHole(holeNumber: round.currentHole),
+    );
+    return <Widget>[
+      _buildScorecardRow(theme, round, hole),
+    ];
   }
 
   Widget _buildScorecardRow(
@@ -1460,8 +1408,10 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             child: _ScoreStepper(
               value: hole.par,
               allowBlank: false,
-              onMinus: () => _updateDraftPar(hole.holeNumber, hole.par - 1),
-              onPlus: () => _updateDraftPar(hole.holeNumber, hole.par + 1),
+              onMinus: () => _updateDraftPar(
+                  hole.holeNumber, (hole.par ?? 4) - 1),
+              onPlus: () => _updateDraftPar(
+                  hole.holeNumber, (hole.par ?? 4) + 1),
             ),
           ),
           Expanded(
@@ -1494,9 +1444,10 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   }
 
   Widget _buildSubtotalRow(String label, List<CaddyPlayHole> holes) {
-    final totalPar = holes.fold<int>(0, (sum, hole) => sum + hole.par);
-    final totalScore =
-        holes.fold<int>(0, (sum, hole) => sum + (hole.score ?? 0));
+    final totals = caddyPlayScoringTotals(holes);
+    final hasScored = holes.any((hole) => hole.score != null);
+    final totalPar = totals.totalEffectivePar;
+    final totalScore = totals.totalStrokes;
     return Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Row(
@@ -1515,7 +1466,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           Expanded(
             flex: 2,
             child: Text(
-              '$totalPar',
+              hasScored ? '$totalPar' : '-',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,
@@ -1527,7 +1478,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           Expanded(
             flex: 2,
             child: Text(
-              holes.any((hole) => hole.score != null) ? '$totalScore' : '-',
+              hasScored ? '$totalScore' : '-',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,
@@ -1551,14 +1502,16 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     required void Function(T value) onSelected,
   }) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           label,
+          textAlign: TextAlign.center,
           style: theme.titleMedium.copyWith(color: Colors.white),
         ),
         const SizedBox(height: 10),
         Wrap(
+          alignment: WrapAlignment.center,
           spacing: 10,
           runSpacing: 10,
           children: values
@@ -1591,10 +1544,13 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
 
   void _openNewRound() {
     _courseController.clear();
-    _applyAdvancedDefaults(_advancedDefaults);
     setState(() {
       _selectedHoles = 18;
       _showAdvancedSettings = false;
+      _selectedRoundType = CaddyPlayRoundType.practice;
+      _selectedPlayingPartners = CaddyPlayPlayingPartners.friends;
+      _selectedPreRoundMindset = CaddyPlayPreRoundMindset.positive;
+      _selectedWeather = CaddyPlayWeather.good;
       _screen = _CaddyPlayScreen.newRound;
     });
   }
@@ -1645,6 +1601,8 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   Future<void> _startRound() async {
     final courseName = _courseController.text.trim();
     if (courseName.isEmpty) {
+      _showBanner('Enter a course name to start your round.',
+          color: _kPendingAmber);
       return;
     }
 
@@ -1732,7 +1690,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       preShotRoutine: _tapRoutine,
     );
 
-    HapticFeedback.lightImpact();
+    await HapticService.light();
     final updatedRound = round.addMoment(moment);
     await _saveRound(updatedRound);
     if (!mounted) {
@@ -1773,22 +1731,8 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         path: _justTalkAudioPath!,
       );
 
-      if (_speechReady) {
-        await _speechToText.listen(
-          onResult: (result) {
-            if (!mounted) {
-              return;
-            }
-            setState(() {
-              _justTalkTranscript = result.recognizedWords.trim();
-            });
-          },
-          listenFor: const Duration(seconds: 30),
-          pauseFor: const Duration(seconds: 3),
-          localeId: 'en_US',
-        );
-      }
-
+      // Transcription is done after recording via Cartesia STT (the single
+      // voice provider) — no live on-device speech recognition here.
       _justTalkTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (!mounted) {
           return;
@@ -1821,17 +1765,24 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     }
 
     _justTalkTimer?.cancel();
-    await _speechToText.stop();
     final stoppedPath = await _audioRecorder.stop();
     if (stoppedPath != null && stoppedPath.isNotEmpty) {
       _justTalkAudioPath = stoppedPath;
     }
 
-    final transcript = _justTalkTranscript.trim();
     final round = _activeRound;
     if (round == null) {
       return;
     }
+
+    // Cartesia STT — transcribe the recording (the app's single voice
+    // provider). Show the processing overlay while the request runs.
+    setState(() => _overlay = _CaddyPlayOverlay.justTalkProcessing);
+    final transcript = await _transcribeJustTalkAudio(_justTalkAudioPath);
+    if (!mounted) {
+      return;
+    }
+    _justTalkTranscript = transcript;
 
     final pendingMoment = CaddyPlayMoment(
       id: 'talk_${DateTime.now().microsecondsSinceEpoch}',
@@ -1860,6 +1811,24 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       return;
     }
 
+    final trimmed = analysis.transcript.trim();
+    if (trimmed.isEmpty) {
+      await _discardPendingAudioFile();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _pendingTalkMoment = null;
+        _justTalkAnalysis = null;
+        _overlay = _CaddyPlayOverlay.none;
+      });
+      _showBanner(
+        'We couldn\'t capture that moment. Try speaking a little louder.',
+        color: _kPendingAmber,
+      );
+      return;
+    }
+
     setState(() {
       _justTalkAnalysis = analysis;
       _pendingTalkMoment = pendingMoment.copyWith(
@@ -1870,8 +1839,41 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         audioPath: analysis.audioPath,
         pendingProcessing: false,
       );
-      _overlay = _CaddyPlayOverlay.justTalkConfirmation;
     });
+
+    await _saveJustTalkMoment();
+  }
+
+  /// Transcribe a JustTalk recording with the Cartesia speech-to-text API.
+  /// Returns an empty string when nothing usable could be captured.
+  Future<String> _transcribeJustTalkAudio(String? path) async {
+    if (path == null || path.isEmpty) {
+      return '';
+    }
+    try {
+      final file = File(path);
+      if (!file.existsSync()) {
+        return '';
+      }
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        return '';
+      }
+      final result = await CartesiaAPIService.instance
+          .transcribeAudio(
+            audioBytes: bytes,
+            fileName: 'justtalk.m4a',
+            contentType: MediaType('audio', 'mp4'),
+            language: 'en',
+          )
+          .timeout(const Duration(seconds: 20));
+      return result.text.trim();
+    } catch (error) {
+      if (kDebugMode) {
+        print('⚠️ JustTalk Cartesia STT failed: $error');
+      }
+      return '';
+    }
   }
 
   Future<CaddyPlayTalkAnalysis> _runTalkAnalysis({
@@ -1903,7 +1905,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       return;
     }
 
-    HapticFeedback.lightImpact();
+    await HapticService.light();
     final updated = round.addMoment(
       pendingMoment.copyWith(
         pendingProcessing: false,
@@ -1960,7 +1962,6 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
 
     if (_overlay == _CaddyPlayOverlay.justTalkRecording) {
       _justTalkTimer?.cancel();
-      await _speechToText.stop();
       await _audioRecorder.stop();
       await _discardPendingAudioFile();
       if (!mounted) {
@@ -1982,23 +1983,52 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     if (round == null) {
       return;
     }
+
+    _mindSnapTimer?.cancel();
+    final random = math.Random();
+    var index = random.nextInt(_mindSnapOpenings.length);
+    if (_mindSnapOpenings.length > 1 &&
+        _lastMindSnapOpeningIndex != null &&
+        index == _lastMindSnapOpeningIndex) {
+      index = (index + 1) % _mindSnapOpenings.length;
+    }
+    _lastMindSnapOpeningIndex = index;
+
     setState(() {
       _mindSnapSequence = _sessionService.nextMindSnapSequence(round);
       _mindSnapStep = 0;
+      _mindSnapOpeningLine = _mindSnapOpenings[index];
       _overlay = _CaddyPlayOverlay.mindSnap;
+    });
+
+    _mindSnapTimer = Timer.periodic(const Duration(milliseconds: 400), (timer) {
+      if (!mounted || _overlay != _CaddyPlayOverlay.mindSnap) {
+        timer.cancel();
+        return;
+      }
+      final elapsedMs = timer.tick * 400;
+      final nextStep = elapsedMs < 4000
+          ? 0
+          : elapsedMs < 6000
+              ? 1
+              : 2;
+      if (elapsedMs >= 10000) {
+        timer.cancel();
+        unawaited(_finishMindSnap());
+        return;
+      }
+      if (nextStep != _mindSnapStep) {
+        setState(() => _mindSnapStep = nextStep);
+      }
     });
   }
 
-  Future<void> _advanceMindSnap() async {
+  Future<void> _finishMindSnap() async {
     if (_overlay != _CaddyPlayOverlay.mindSnap) {
       return;
     }
 
-    if (_mindSnapStep < 2) {
-      setState(() => _mindSnapStep += 1);
-      return;
-    }
-
+    _mindSnapTimer?.cancel();
     final round = _activeRound;
     if (round == null) {
       return;
@@ -2018,7 +2048,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       return;
     }
 
-    HapticFeedback.lightImpact();
+    await HapticService.light();
     _setOverlay(_CaddyPlayOverlay.none);
     _scrollMomentRowToEnd();
   }
@@ -2082,7 +2112,15 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       return;
     }
 
-    _showBanner('Hole saved.');
+    _showBanner('Score saved.');
+  }
+
+  Future<void> _retreatHole() async {
+    final round = _activeRound;
+    if (round == null || round.currentHole <= 1) {
+      return;
+    }
+    await _saveRound(round.retreatHole());
   }
 
   Future<void> _advanceHole() async {
@@ -2142,7 +2180,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         _completedRound = completed;
         _snapshot = completed.snapshot;
         _activeRound = null;
-        _screen = _CaddyPlayScreen.completed;
+        _screen = _CaddyPlayScreen.snapshot;
       });
     } catch (error) {
       _showBanner('Unable to complete round: $error', color: _kPendingAmber);
@@ -2171,12 +2209,14 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   }
 
   String _scorecardScoreToPar() {
-    final totalPar =
-        _scorecardDraft.fold<int>(0, (sum, hole) => sum + hole.par);
-    final totalScore =
-        _scorecardDraft.fold<int>(0, (sum, hole) => sum + (hole.score ?? 0));
-    final delta = totalScore - totalPar;
-    return delta >= 0 ? '+$delta' : '$delta';
+    if (!_scorecardDraft.any((hole) => hole.score != null)) {
+      return '-';
+    }
+    final totals = caddyPlayScoringTotals(_scorecardDraft);
+    return formatCaddyPlayScoreToParLabel(
+      totals.scoreToPar,
+      approximate: totals.usesDefaultedPar,
+    );
   }
 
   void _showBanner(String message, {Color color = _kCaddyGreen}) {
@@ -2885,11 +2925,13 @@ class _MicOrb extends StatelessWidget {
     required this.warning,
     required this.transcript,
     required this.elapsedLabel,
+    this.onTap,
   });
 
   final bool warning;
   final String transcript;
   final String elapsedLabel;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -2899,7 +2941,9 @@ class _MicOrb extends StatelessWidget {
 
     return Column(
       children: [
-        Container(
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
           width: 240,
           height: 240,
           decoration: BoxDecoration(
@@ -2923,6 +2967,7 @@ class _MicOrb extends StatelessWidget {
             color: glowColor,
             size: 110,
           ),
+        ),
         ),
         const SizedBox(height: 16),
         Text(
@@ -2966,22 +3011,49 @@ class _ScoreStepper extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
-      child: Row(
-        children: [
-          _StepperButton(icon: Icons.remove_rounded, onTap: onMinus),
-          Expanded(
-            child: Text(
-              displayValue,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Scale the stepper buttons so two of them plus the score label fit
+          // the cell width even on small screens / narrow score grids
+          // (the per-hole grid hands us cells around 67pt wide).
+          final available = constraints.maxWidth.isFinite
+              ? constraints.maxWidth
+              : 80.0;
+          final buttonWidth = available < 80
+              ? (available * 0.32).clamp(22.0, 30.0)
+              : 32.0;
+          final iconSize = buttonWidth >= 28 ? 20.0 : 18.0;
+          return Row(
+            children: [
+              _StepperButton(
+                icon: Icons.remove_rounded,
+                onTap: onMinus,
+                width: buttonWidth,
+                iconSize: iconSize,
               ),
-            ),
-          ),
-          _StepperButton(icon: Icons.add_rounded, onTap: onPlus),
-        ],
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    displayValue,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              _StepperButton(
+                icon: Icons.add_rounded,
+                onTap: onPlus,
+                width: buttonWidth,
+                iconSize: iconSize,
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -2991,10 +3063,14 @@ class _StepperButton extends StatelessWidget {
   const _StepperButton({
     required this.icon,
     required this.onTap,
+    this.width = 32,
+    this.iconSize = 20,
   });
 
   final IconData icon;
   final VoidCallback onTap;
+  final double width;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -3002,9 +3078,9 @@ class _StepperButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: SizedBox(
-        width: 36,
+        width: width,
         height: double.infinity,
-        child: Icon(icon, color: Colors.white),
+        child: Icon(icon, color: Colors.white, size: iconSize),
       ),
     );
   }

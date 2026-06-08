@@ -13,7 +13,7 @@ class GeminiConfig {
   static const String defaultModel = 'gemini-3-flash-preview';
   
   /// Gemini model for complex analysis and insights
-  static const String insightModel = 'gemini-3-flash-preview';
+  static const String insightModel = 'gemini-3.1-pro-preview';
   
   /// Gemini model for coaching recommendations
   static const String coachingModel = 'gemini-3-flash-preview';

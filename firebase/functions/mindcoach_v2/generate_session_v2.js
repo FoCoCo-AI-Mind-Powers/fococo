@@ -3,7 +3,7 @@ const path = require('path');
 const axios = require('axios');
 const functions = require('firebase-functions/v1');
 const logger = require('firebase-functions/logger');
-const { defineString } = require('firebase-functions/params');
+const { defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 
 const {
@@ -33,12 +33,46 @@ const {
 } = require('./csv_utils_v2');
 
 const db = admin.firestore();
-const GEMINI_API_KEY_PARAM = defineString('GEMINI_API_KEY', { default: '' });
+const GEMINI_KEY_SECRET = defineSecret('GEMINI_KEY_APP');
 
 let promptCache = null;
 let templatesCache = null;
 let contentCache = null;
 let scenarioCache = null;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function sanitizeForFirestore(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => sanitizeForFirestore(item))
+      .filter((item) => item !== undefined);
+  }
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [key, item] of Object.entries(value)) {
+      const sanitized = sanitizeForFirestore(item);
+      if (sanitized !== undefined) {
+        out[key] = sanitized;
+      }
+    }
+    return out;
+  }
+  return value === undefined ? undefined : value;
+}
+
+function getGeminiApiKeySafe() {
+  try {
+    return GEMINI_KEY_SECRET.value() || process.env.GEMINI_KEY_APP || '';
+  } catch (error) {
+    logger.warn('[MCv2:gemini] failed reading GEMINI_KEY_APP secret, falling back to env', {
+      error: error.message,
+    });
+    return process.env.GEMINI_KEY_APP || '';
+  }
+}
 
 const FALLBACK_TEMPLATES = [
   {
@@ -601,7 +635,7 @@ function parseJsonFromModelText(text) {
 }
 
 async function generateWithGemini({ prompt }) {
-  const apiKey = GEMINI_API_KEY_PARAM.value() || process.env.GEMINI_API_KEY || '';
+  const apiKey = getGeminiApiKeySafe();
 
   if (!apiKey) {
     logger.warn('[MCv2:gemini] No API key available, skipping generation');
@@ -618,7 +652,7 @@ async function generateWithGemini({ prompt }) {
     logger.info('[MCv2:gemini] generation attempt', { attempt: attempt + 1 });
     try {
       const response = await axios.post(
-        `${endpoint}?key=${apiKey}`,
+        endpoint,
         {
           generationConfig: {
             responseMimeType: 'application/json',
@@ -634,6 +668,10 @@ async function generateWithGemini({ prompt }) {
         },
         {
           timeout: 12000,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
         },
       );
 
@@ -666,6 +704,26 @@ async function generateWithGemini({ prompt }) {
     output: null,
     modelVersion: 'gemini_generation_failed',
   };
+}
+
+async function commitBatchWithRetry(batch, attempts = 2) {
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      await batch.commit();
+      return;
+    } catch (error) {
+      lastError = error;
+      logger.warn('[MCv2:generate] Firestore batch commit failed', {
+        attempt: attempt + 1,
+        error: error.message,
+      });
+      if (attempt < attempts - 1) {
+        await sleep(250);
+      }
+    }
+  }
+  throw lastError;
 }
 
 function buildDeterministicOutput({
@@ -965,52 +1023,35 @@ function buildTimedFallbackLines({
   };
 }
 
-async function applyRateLimit(userId) {
+/** Optional monthly soft nudge only — never blocks generation. */
+async function trackMonthlySessionUsage(userId) {
   const profileRef = db.collection('mindcoach_user_profiles').doc(userId);
   const profileSnap = await profileRef.get();
-
   const now = new Date();
-  const dayKey = now.toISOString().slice(0, 10);
-  const hourKey = `${dayKey}-${now.getUTCHours()}`;
+  const monthKey = now.toISOString().slice(0, 7);
 
-  let dailyCount = 0;
-  let hourlyCount = 0;
-
+  let monthlyCount = 0;
   if (profileSnap.exists) {
     const data = profileSnap.data() || {};
-    dailyCount = data.daily_key === dayKey ? Number(data.daily_count || 0) : 0;
-    hourlyCount = data.hourly_key === hourKey ? Number(data.hourly_count || 0) : 0;
+    monthlyCount =
+      data.monthly_key === monthKey ? Number(data.monthly_count || 0) : 0;
   }
 
-  logger.info('[MCv2:rateLimit] current counts', { dailyCount, hourlyCount, dayKey, hourKey });
-
-  if (dailyCount >= 25) {
-    logger.warn('[MCv2:rateLimit] daily limit reached', { dailyCount });
-    throw new functions.https.HttpsError(
-      'resource-exhausted',
-      'Daily MindCoach generation limit reached.',
-    );
-  }
-  if (hourlyCount >= 10) {
-    logger.warn('[MCv2:rateLimit] hourly limit reached', { hourlyCount });
-    throw new functions.https.HttpsError(
-      'resource-exhausted',
-      'Hourly MindCoach generation limit reached.',
-    );
-  }
-
+  const nextCount = monthlyCount + 1;
   await profileRef.set(
     {
       user_id: userId,
-      daily_key: dayKey,
-      daily_count: dailyCount + 1,
-      hourly_key: hourKey,
-      hourly_count: hourlyCount + 1,
+      monthly_key: monthKey,
+      monthly_count: nextCount,
       last_request_at: admin.firestore.FieldValue.serverTimestamp(),
       updated_at: admin.firestore.FieldValue.serverTimestamp(),
     },
     { merge: true },
   );
+
+  if (nextCount === 80) {
+    logger.info('[MCv2:usage] monthly soft nudge threshold', { userId, nextCount });
+  }
 }
 
 async function assertUserConsent(userId) {
@@ -1139,9 +1180,8 @@ async function _generateMindCoachSessionV2Impl(data, context) {
 
   logger.info('[MCv2:generate] checking consent');
   await assertUserConsent(userId);
-  logger.info('[MCv2:generate] consent OK, checking rate limit');
-  await applyRateLimit(userId);
-  logger.info('[MCv2:generate] rate limit OK');
+  logger.info('[MCv2:generate] consent OK, tracking monthly usage');
+  await trackMonthlySessionUsage(userId);
 
   const lockedSession = sessionKey ? getMindCoachSessionDefinition(sessionKey) : null;
   if (sessionKey && !lockedSession) {
@@ -1175,20 +1215,33 @@ async function _generateMindCoachSessionV2Impl(data, context) {
       },
     };
   } else {
-    const resolvedBase = await resolveContextMode({
-      requestedMode: requestedContextMode,
-      userId,
-      db,
-    });
-    resolved = { ...resolvedBase };
-    if (entrySource === 'builder' && resolved.contextMode === 'during_round') {
-      resolved.contextMode = 'off_day';
-      resolved.uiMode = 'guided_extended';
-      resolved.signals = {
-        ...resolved.signals,
-        builder_mode_adjusted: true,
+    try {
+      const resolvedBase = await resolveContextMode({
+        requestedMode: requestedContextMode,
+        userId,
+        db,
+      });
+      resolved = { ...resolvedBase };
+      if (entrySource === 'builder' && resolved.contextMode === 'during_round') {
+        resolved.contextMode = 'off_day';
+        resolved.uiMode = 'guided_extended';
+        resolved.signals = {
+          ...resolved.signals,
+          builder_mode_adjusted: true,
+        };
+        logger.info('[MCv2:generate] builder during-round adjusted to off_day');
+      }
+    } catch (error) {
+      logger.error('[MCv2:generate] resolveContextMode failed, using safe defaults', {
+        error: error.message,
+      });
+      resolved = {
+        contextMode: requestedContextMode === 'during_round' ? 'during_round' : 'off_day',
+        uiMode: requestedContextMode === 'during_round' ? 'live_minimal' : 'guided_extended',
+        signals: {
+          context_resolver_fallback: true,
+        },
       };
-      logger.info('[MCv2:generate] builder during-round adjusted to off_day');
     }
   }
   logger.info('[MCv2:generate] context resolved', {
@@ -1197,11 +1250,35 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     signals: resolved.signals,
   });
 
-  const templates = await loadTemplates();
+  let templates = [];
+  try {
+    templates = await loadTemplates();
+  } catch (error) {
+    logger.error('[MCv2:generate] loadTemplates failed, using fallback templates only', {
+      error: error.message,
+    });
+    templates = FALLBACK_TEMPLATES;
+  }
   const templatesById = new Map(templates.map((t) => [t.id, t]));
 
-  const contentLibrary = await loadContentLibrary();
-  const scenarioRows = await loadScenarioTags();
+  let contentLibrary = [];
+  let scenarioRows = [];
+  try {
+    contentLibrary = await loadContentLibrary();
+  } catch (error) {
+    logger.error('[MCv2:generate] loadContentLibrary failed, using deterministic fallback content', {
+      error: error.message,
+    });
+    contentLibrary = [];
+  }
+  try {
+    scenarioRows = await loadScenarioTags();
+  } catch (error) {
+    logger.warn('[MCv2:generate] loadScenarioTags failed, continuing without scenario tags', {
+      error: error.message,
+    });
+    scenarioRows = [];
+  }
 
   let recentTemplateId = null;
   let recentSessionCount = 0;
@@ -1261,9 +1338,10 @@ async function _generateMindCoachSessionV2Impl(data, context) {
 
   const template = templatesById.get(templateId) || templatesById.get(FALLBACK_TEMPLATE_ID);
   const fallbackTemplate = templatesById.get(FALLBACK_TEMPLATE_ID) || templates[0];
+  const effectiveTemplate = template || fallbackTemplate || FALLBACK_TEMPLATES[0];
   logger.info('[MCv2:generate] template selected', {
     templateId,
-    templateName: template ? template.name : 'MISSING',
+    templateName: effectiveTemplate ? effectiveTemplate.name : 'MISSING',
   });
 
   const fixedTargetSec = lockedSession
@@ -1273,7 +1351,7 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     : 0;
   const selectedDeliveryLength = pickNearestDeliveryLength({
     preferred: preferredDeliveryLength,
-    template,
+    template: effectiveTemplate,
     targetSec: fixedTargetSec,
     contextMode: resolved.contextMode,
   });
@@ -1289,7 +1367,7 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     contextMode: resolved.contextMode,
     recentSessionCount,
   });
-  const rotationSeed = `${userId}|${template.id}|${resolved.contextMode}|${selectedDeliveryLength}|${scenarioTags.join(',')}`;
+  const rotationSeed = `${userId}|${effectiveTemplate.id}|${resolved.contextMode}|${selectedDeliveryLength}|${scenarioTags.join(',')}`;
 
   logger.info('[MCv2:generate] delivery preferences selected', {
     selectedDeliveryLength,
@@ -1299,7 +1377,7 @@ async function _generateMindCoachSessionV2Impl(data, context) {
 
   const selectedContent = selectContent({
     entries: contentLibrary,
-    templateId: template.id,
+    templateId: effectiveTemplate.id,
     varkMode: effectiveVarkMode,
     level: effectiveLevel,
     length: normalizeLength(selectedDeliveryLength),
@@ -1314,7 +1392,7 @@ async function _generateMindCoachSessionV2Impl(data, context) {
   });
 
   const prompt = buildPromptText({
-    template,
+    template: effectiveTemplate,
     content: selectedContent,
     selectedDeliveryLength,
     fixedTargetSec,
@@ -1357,7 +1435,7 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     logger.info('[MCv2:generate] timed lines not present or rejected, using fallback text');
   }
   const deterministicOutput = buildDeterministicOutput({
-    template,
+    template: effectiveTemplate,
     content: selectedContent,
     selectedDeliveryLength,
     fixedTargetSec,
@@ -1383,11 +1461,11 @@ async function _generateMindCoachSessionV2Impl(data, context) {
 
   const { session: validatedSession, log } = validateAndCorrect({
     aiOutput: validatorInput,
-    template,
+    template: effectiveTemplate,
     fallbackTemplate,
     modelVersion: aiResult.modelVersion,
     promptVersion: PROMPT_VERSION,
-    requestedTemplateId: template.id,
+    requestedTemplateId: effectiveTemplate.id,
   });
   logger.info('[MCv2:generate] validation complete', {
     validatorStatus: log.validator_status,
@@ -1414,11 +1492,11 @@ async function _generateMindCoachSessionV2Impl(data, context) {
 
   validatedSession.session_key = safeString(
     validatedSession.session_key,
-    sessionKey || template.id,
+    sessionKey || effectiveTemplate.id,
   );
   validatedSession.session_name = safeString(
     validatedSession.session_name,
-    requestedSessionName || safeString(lockedSession?.name, template.name),
+    requestedSessionName || safeString(lockedSession?.name, effectiveTemplate.name),
   );
   validatedSession.session_descriptor = safeString(
     validatedSession.session_descriptor,
@@ -1520,16 +1598,20 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     createdTime: now,
   };
 
+  const sanitizedSessionDoc = sanitizeForFirestore(sessionDoc);
+  const sanitizedRunDoc = sanitizeForFirestore(runDoc);
+  const sanitizedLogDoc = sanitizeForFirestore(logDoc);
+
   const batch = db.batch();
-  batch.set(sessionRef, sessionDoc);
-  batch.set(runRef, runDoc);
-  batch.set(validatorLogRef, logDoc);
+  batch.set(sessionRef, sanitizedSessionDoc);
+  batch.set(runRef, sanitizedRunDoc);
+  batch.set(validatorLogRef, sanitizedLogDoc);
   logger.info('[MCv2:generate] persisting to Firestore', {
     sessionDocId: sessionRef.id,
     runDocId: runRef.id,
     validatorLogDocId: validatorLogRef.id,
   });
-  await batch.commit();
+  await commitBatchWithRetry(batch, 2);
   logger.info('[MCv2:generate] Firestore batch committed');
 
   logger.info('[MCv2:generate] RESPONSE', {
@@ -1576,5 +1658,7 @@ async function _generateMindCoachSessionV2Impl(data, context) {
 }
 
 module.exports = {
-  generateMindCoachSessionV2: functions.https.onCall(generateMindCoachSessionV2),
+  generateMindCoachSessionV2: functions
+    .runWith({ secrets: [GEMINI_KEY_SECRET] })
+    .https.onCall(generateMindCoachSessionV2),
 };

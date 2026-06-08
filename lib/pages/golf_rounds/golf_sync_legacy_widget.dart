@@ -278,6 +278,8 @@ class _GolfSyncLegacyWidgetState extends State<GolfSyncLegacyWidget>
               onNavigate: (route) => context.goNamed(route),
             )
           : null,
+      drawerEnableOpenDragGesture: user != null,
+      drawerEdgeDragWidth: user != null ? 28.0 : null,
       body: Stack(
         children: [
           Container(

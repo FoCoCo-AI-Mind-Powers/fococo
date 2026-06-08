@@ -119,8 +119,8 @@ Map<String, dynamic> voiceSettings = _getVoiceSettings(
 
 ### Environment Variables
 ```bash
-# Required API keys
-GEMINI_API_KEY=your_gemini_api_key_here
+# Gemini key is stored in Google Cloud Secret Manager as `GEMINI_KEY_APP`
+# and consumed only by Cloud Functions. It is not a client env-var.
 CARTESIA_API_KEY=sk_car_hksASYyHegCKwWLWfAL8SW
 ```
 

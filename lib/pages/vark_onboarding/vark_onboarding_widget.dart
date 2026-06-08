@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '/services/store_subscription_service.dart';
 import '/services/subscription_state_provider.dart';
+import '/services/auth_flow_service.dart';
 import 'vark_onboarding_model.dart';
 export 'vark_onboarding_model.dart';
 
@@ -256,7 +257,11 @@ class _VarkOnboardingWidgetState extends State<VarkOnboardingWidget>
         await _clearLocalStorage();
 
         if (mounted) {
-          context.go('/dashboard');
+          final decision =
+              await AuthFlowService.instance.resolvePostAuthDecision();
+          if (!mounted) return;
+          GoRouter.of(context).clearRedirectLocation();
+          context.goNamed(decision.routeName, extra: decision.extra);
         }
       } catch (e) {
         if (mounted) {

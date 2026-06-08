@@ -1,28 +1,55 @@
 import 'dart:convert';
 import 'package:firebase_ai/firebase_ai.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_performance/firebase_performance.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 
 import 'models/gemini_models.dart';
 import 'config/gemini_config.dart';
 import 'services/gemini_cost_tracker.dart';
 import 'services/gemini_interactions_service.dart';
+import '/services/units_preference_service.dart';
 
-/// Main client for Google Generative AI Gemini integration
+/// Main client for Gemini integration — routes all traffic through
+/// Firebase AI Logic (`firebase_ai`). No raw API key is held on the client;
+/// authentication is Firebase App Check + project auth. Server-side paths
+/// (Cloud Functions) use the `GEMINI_KEY_APP` secret directly.
 class GeminiAIClient {
-  final String _apiKey;
   final GeminiCostTracker _costTracker;
 
-  GeminiAIClient({
-    required String apiKey,
-    GeminiCostTracker? costTracker,
-  })  : _apiKey = apiKey,
-        _costTracker = costTracker ?? GeminiCostTracker.instance;
+  GeminiAIClient({GeminiCostTracker? costTracker})
+      : _costTracker = costTracker ?? GeminiCostTracker.instance;
 
-  // Add getter to use the _apiKey field
-  String get apiKey => _apiKey;
+  /// Wraps an AI call in a Firebase Performance custom trace so token counts,
+  /// model id, and duration show up alongside `_app_start` and HTTP traces
+  /// in the Firebase console. Failures are swallowed — monitoring must never
+  /// break the feature it measures.
+  Future<T> _withTrace<T>(
+    String name,
+    Future<T> Function() body, {
+    String? model,
+    String? userId,
+  }) async {
+    Trace? trace;
+    try {
+      trace = FirebasePerformance.instance.newTrace(name);
+      if (model != null) trace.putAttribute('model', model);
+      if (userId != null) trace.putAttribute('user_id', userId);
+      await trace.start();
+    } catch (_) {
+      trace = null;
+    }
+    try {
+      final result = await body();
+      return result;
+    } finally {
+      try {
+        await trace?.stop();
+      } catch (_) {}
+    }
+  }
 
   // ============================================================================
   // GOLF INSIGHT GENERATION
@@ -30,6 +57,25 @@ class GeminiAIClient {
 
   /// Generate golf performance insights from round data
   Future<GeminiInsightResponse> generateGolfInsight({
+    required Map<String, dynamic> roundData,
+    required String userId,
+    String? userNotes,
+    List<String>? previousInsights,
+    Map<String, dynamic>? contextualFactors,
+  }) => _withTrace(
+        'gemini_generate_golf_insight',
+        () => _generateGolfInsightImpl(
+          roundData: roundData,
+          userId: userId,
+          userNotes: userNotes,
+          previousInsights: previousInsights,
+          contextualFactors: contextualFactors,
+        ),
+        model: GeminiConfig.insightModel,
+        userId: userId,
+      );
+
+  Future<GeminiInsightResponse> _generateGolfInsightImpl({
     required Map<String, dynamic> roundData,
     required String userId,
     String? userNotes,
@@ -129,6 +175,29 @@ class GeminiAIClient {
 
   /// Generate mental coaching recommendations
   Future<GeminiCoachingResponse> generateMentalCoachingRecommendations({
+    required String userId,
+    required Map<String, dynamic> userProfile,
+    required String subscriptionTier,
+    required Map<String, dynamic> varkPreferences,
+    List<Map<String, dynamic>>? recentRounds,
+    List<String>? completedModules,
+    Map<String, dynamic>? performancePatterns,
+  }) => _withTrace(
+        'gemini_generate_coaching',
+        () => _generateMentalCoachingRecommendationsImpl(
+          userId: userId,
+          userProfile: userProfile,
+          subscriptionTier: subscriptionTier,
+          varkPreferences: varkPreferences,
+          recentRounds: recentRounds,
+          completedModules: completedModules,
+          performancePatterns: performancePatterns,
+        ),
+        model: GeminiConfig.coachingModel,
+        userId: userId,
+      );
+
+  Future<GeminiCoachingResponse> _generateMentalCoachingRecommendationsImpl({
     required String userId,
     required Map<String, dynamic> userProfile,
     required String subscriptionTier,
@@ -238,6 +307,31 @@ class GeminiAIClient {
 
   /// Generate personalized content based on user preferences
   Future<GeminiContentResponse> generatePersonalizedContent({
+    required String userId,
+    required String contentType,
+    required Map<String, dynamic> varkPreferences,
+    required String userTier,
+    String? specificTopic,
+    String? difficultyLevel,
+    int? targetDuration,
+    List<String>? learningObjectives,
+  }) => _withTrace(
+        'gemini_generate_content',
+        () => _generatePersonalizedContentImpl(
+          userId: userId,
+          contentType: contentType,
+          varkPreferences: varkPreferences,
+          userTier: userTier,
+          specificTopic: specificTopic,
+          difficultyLevel: difficultyLevel,
+          targetDuration: targetDuration,
+          learningObjectives: learningObjectives,
+        ),
+        model: GeminiConfig.contentModel,
+        userId: userId,
+      );
+
+  Future<GeminiContentResponse> _generatePersonalizedContentImpl({
     required String userId,
     required String contentType,
     required Map<String, dynamic> varkPreferences,
@@ -415,60 +509,93 @@ class GeminiAIClient {
     required List<Map<String, dynamic>> conversationHistory,
     String? context,
     Map<String, dynamic>? userProfile,
+  }) =>
+      _withTrace(
+        'gemini_generate_conversation',
+        () => _generateConversationResponseImpl(
+          userId: userId,
+          conversationId: conversationId,
+          userMessage: userMessage,
+          conversationHistory: conversationHistory,
+          context: context,
+          userProfile: userProfile,
+        ),
+        model: GeminiConfig.defaultModel,
+        userId: userId,
+      );
+
+  Future<GeminiConversationResponse> _generateConversationResponseImpl({
+    required String userId,
+    required String conversationId,
+    required String userMessage,
+    required List<Map<String, dynamic>> conversationHistory,
+    String? context,
+    Map<String, dynamic>? userProfile,
   }) async {
     final startTime = DateTime.now();
 
     try {
       String responseText = '';
-      Object? firebaseError;
+      List<Map<String, dynamic>> visuals = const [];
+      Object? primaryError;
 
+      // Primary path: Cloud Function `generateGolfChatResponse`. It reads
+      // `GEMINI_KEY_APP` from Secret Manager server-side, so the device never
+      // touches a Gemini key. This is preferred because (a) the Firebase
+      // project web key has been seen to expire / get flagged as leaked,
+      // breaking client-side Firebase AI Logic, and (b) Secret Manager makes
+      // rotation a one-line server change with no app release.
       try {
-        responseText = await _generateConversationResponseViaFirebaseAI(
+        final callableResult = await _generateConversationResponseViaCallable(
           userMessage: userMessage,
           conversationHistory: conversationHistory,
           context: context,
-          userProfile: userProfile,
         );
+        responseText = callableResult.text;
+        visuals = callableResult.visuals;
       } catch (e) {
-        firebaseError = e;
+        primaryError = e;
         if (kDebugMode) {
-          print('⚠️ Firebase AI conversation failed: $e');
+          print('⚠️ GolfChat callable (Secret Manager) failed: $e');
         }
       }
 
-      if (responseText.isEmpty && _apiKey.isNotEmpty) {
+      // Fallback: client-side Firebase AI Logic. Useful when functions are
+      // not deployed yet (local dev) or temporarily down. Note: this path
+      // depends on the Firebase project's web API key — if it's expired or
+      // flagged, the user will see "API key expired/leaked" here.
+      if (responseText.isEmpty) {
         try {
-          responseText = await _generateConversationResponseViaRest(
+          responseText = await _generateConversationResponseViaFirebaseAI(
             userMessage: userMessage,
             conversationHistory: conversationHistory,
             context: context,
             userProfile: userProfile,
           );
-          if (kDebugMode && responseText.isNotEmpty) {
-            print('✅ GolfChat: used Gemini REST fallback');
-          }
-        } catch (restError) {
-          final msg = restError.toString();
+        } catch (firebaseError) {
           if (kDebugMode) {
-            print('⚠️ Gemini REST failed: $restError');
+            print('⚠️ Firebase AI conversation fallback failed: $firebaseError');
           }
-          if (msg.contains('403') ||
-              msg.contains('PERMISSION_DENIED') ||
-              msg.contains('API_KEY_SERVICE_BLOCKED') ||
-              msg.contains('leaked')) {
-            throw Exception(
-              _geminiUnavailableMessage(firebaseError, restError),
-            );
-          }
-          rethrow;
+          primaryError ??= firebaseError;
         }
       }
+      final firebaseError = primaryError;
+
+      // NOTE: The legacy `generativelanguage.googleapis.com` REST fallback
+      // (with `?key=…` in the URL) is intentionally disabled — that's exactly
+      // the pattern Google's scanner flags as "leaked". The callable above is
+      // the only acceptable fallback because the key never leaves the server.
 
       if (responseText.isEmpty) {
         if (firebaseError != null) {
           throw Exception(_geminiUnavailableMessage(firebaseError, null));
         }
-        throw Exception('Empty response from Gemini API');
+        // Firebase AI Logic returned an empty (but non-error) response.
+        // Treat as transient.
+        throw Exception(
+          'Gemini returned an empty response. Try again or check the '
+          'configured Firebase AI Logic model.',
+        );
       }
 
       final conversationResponse = GeminiConversationResponse(
@@ -480,6 +607,7 @@ class GeminiAIClient {
         model: GeminiConfig.defaultModel,
         userId: userId,
         tokensUsed: _estimateTokens(responseText),
+        visuals: visuals,
       );
 
       await _trackConversationUsage(
@@ -506,12 +634,24 @@ class GeminiAIClient {
     }
   }
 
-  String _geminiUnavailableMessage(Object? firebaseErr, Object? restErr) {
-    return 'Gemini is not available. Enable Firebase AI Logic / Gemini for this '
+  String _geminiUnavailableMessage(Object? firebaseErr, Object? _) {
+    final isLeaked = firebaseErr?.toString().contains('leaked') ?? false;
+
+    if (isLeaked) {
+      // If we land here the rotated `GEMINI_KEY_APP` secret is either empty,
+      // expired, or pointing at a key Google has already flagged. The user
+      // must rotate in Secret Manager — not on device.
+      return 'Gemini API key flagged as leaked by Google.\n'
+          'Rotate the key in Google Secret Manager under secret name '
+          '`GEMINI_KEY_APP` (Cloud Functions will pick up the new version '
+          'on next deploy/restart). Never ship the key to the client or '
+          'pass it via --dart-define.\n'
+          'Original error: $firebaseErr';
+    }
+
+    return 'Gemini is not available. Enable Firebase AI Logic for this '
         'Firebase project and use a valid model (${GeminiConfig.defaultModel}). '
-        'If you see "leaked" or 403, create a new API key in Google AI Studio and '
-        'update Secret Manager / Cloud Functions. '
-        'Firebase AI error: $firebaseErr. REST error: $restErr';
+        'Firebase AI error: $firebaseErr.';
   }
 
   /// Generate conversation response via Firebase AI Logic (default [Firebase.app]).
@@ -536,85 +676,50 @@ class GeminiAIClient {
     return response.text ?? '';
   }
 
-  /// Call Gemini REST API for conversation (fallback when Firebase AI returns empty).
-  Future<String> _generateConversationResponseViaRest({
+  /// Server-side fallback when Firebase AI Logic is blocked (e.g. the
+  /// underlying Google AI key has been flagged as "leaked"). The callable
+  /// reads `GEMINI_KEY_APP` from Secret Manager — the key never travels with
+  /// the client.
+  Future<({String text, List<Map<String, dynamic>> visuals})>
+      _generateConversationResponseViaCallable({
     required String userMessage,
     required List<Map<String, dynamic>> conversationHistory,
     String? context,
-    Map<String, dynamic>? userProfile,
   }) async {
-    final contents = <Map<String, dynamic>>[];
+    final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+        .httpsCallable('generateGolfChatResponse');
 
-    if (context != null && context.isNotEmpty) {
-      contents.add({
-        'role': 'user',
-        'parts': [{'text': 'Context: $context'}],
-      });
-      contents.add({
-        'role': 'model',
-        'parts': [{'text': 'Understood.'}],
-      });
-    }
-    if (userProfile != null && userProfile.isNotEmpty) {
-      contents.add({
-        'role': 'user',
-        'parts': [{'text': 'User Profile: ${json.encode(userProfile)}'}],
-      });
-      contents.add({
-        'role': 'model',
-        'parts': [{'text': 'Understood.'}],
-      });
-    }
-    for (final message in conversationHistory) {
-      final role = message['role'] as String? ?? 'user';
-      final content = message['content'] as String? ?? '';
-      contents.add({
-        'role': role == 'assistant' ? 'model' : 'user',
-        'parts': [{'text': content}],
-      });
-    }
-    contents.add({
-      'role': 'user',
-      'parts': [{'text': userMessage}],
+    final preferredUnits = await UnitsPreferenceService.load();
+
+    final result = await callable.call(<String, dynamic>{
+      'user_message': userMessage,
+      'conversation_history': conversationHistory,
+      if (context != null && context.trim().isNotEmpty) 'context': context,
+      'preferred_units': preferredUnits,
+      'model': GeminiConfig.defaultModel,
     });
 
-    final uri = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$_apiKey',
-    );
-    final body = json.encode({
-      'contents': contents,
-      'generationConfig': {
-        'temperature': 0.8,
-        'topK': 40,
-        'topP': 0.95,
-        'maxOutputTokens': 1024,
-      },
-    });
-
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: body,
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception(
-        'Gemini API error: ${response.statusCode} ${response.body}',
-      );
+    final data = result.data;
+    if (data is Map) {
+      final response = (data['response'] ?? '').toString();
+      final rawVisuals = data['visuals'];
+      final visuals = rawVisuals is List
+          ? rawVisuals
+              .whereType<Map>()
+              .map((m) => Map<String, dynamic>.from(m))
+              .toList(growable: false)
+          : const <Map<String, dynamic>>[];
+      return (text: response.trim(), visuals: visuals);
     }
-
-    final map = json.decode(response.body) as Map<String, dynamic>;
-    final candidates = map['candidates'] as List<dynamic>?;
-    if (candidates == null || candidates.isEmpty) {
-      throw Exception('No candidates in Gemini response');
-    }
-    final parts = (candidates.first as Map<String, dynamic>)['content']?['parts'] as List<dynamic>?;
-    if (parts == null || parts.isEmpty) {
-      throw Exception('No parts in Gemini response');
-    }
-    final text = (parts.first as Map<String, dynamic>)['text'] as String?;
-    return text ?? '';
+    return (text: '', visuals: const <Map<String, dynamic>>[]);
   }
+
+  // The legacy `_generateConversationResponseViaRest` helper was removed —
+  // it embedded the API key directly in the request URL and was the primary
+  // source of "key reported as leaked" 403s. All Gemini conversation traffic
+  // now goes through Firebase AI Logic (App Check authenticated). If you
+  // need a service-side fallback, add it as a Cloud Function — never call
+  // generativelanguage.googleapis.com directly from the client.
 
   // ============================================================================
   // VARK ASSESSMENT GENERATION
@@ -735,42 +840,17 @@ Return ONLY valid JSON, no markdown formatting or code blocks.
   // IMAGE GENERATION
   // ============================================================================
 
-  /// Generate image using Gemini 2.5 Flash Image Preview
-  /// Note: This uses the REST API as Firebase AI SDK doesn't support image generation yet
+  /// Image generation placeholder. If/when enabled, route through a Cloud
+  /// Function that reads `GEMINI_KEY_APP` from Secret Manager — never call
+  /// the REST endpoint directly from the client with an inline key.
   Future<String?> generateImage({
     required String prompt,
     String? userId,
   }) async {
-    try {
-      // For now, return null as Gemini 2.5 Flash Image Preview API integration
-      // requires REST API calls which need proper API key management
-      // This is a placeholder for future implementation
-      if (kDebugMode) {
-        print('🎨 Image generation requested with prompt: $prompt');
-        print('⚠️ Image generation not yet implemented - requires Gemini Image API integration');
-      }
-      
-      // TODO: Implement Gemini 2.5 Flash Image Preview API call
-      // Example structure:
-      // final response = await http.post(
-      //   Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict'),
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'x-goog-api-key': _apiKey,
-      //   },
-      //   body: jsonEncode({
-      //     'prompt': prompt,
-      //     'number_of_images': 1,
-      //   }),
-      // );
-      
-      return null;
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error generating image: $e');
-      }
-      return null;
+    if (kDebugMode) {
+      print('⚠️ Image generation not implemented (must go through Cloud Function).');
     }
+    return null;
   }
 
   // ============================================================================

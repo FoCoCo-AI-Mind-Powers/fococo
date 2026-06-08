@@ -8,6 +8,8 @@ import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart';
 import '/features/mindcoach_v2/presentation/shared/mindcoach_v2_visuals.dart';
 import '/features/mindcoach_v2/services/mindcoach_v2_debug_logger.dart';
 import '/features/mindcoach_v2/services/mindcoach_v2_tts_service.dart';
+import '/features/mindcoach_v2/services/mindcoach_replay_cache.dart';
+import '/services/haptic_service.dart';
 
 const int kMindCoachFavoriteLimitPerPillar = 5;
 
@@ -521,6 +523,12 @@ class _MindCoachSessionPlayerV2WidgetState
       );
     }
 
+    if (status == MindCoachV2CompletionStatus.completed) {
+      unawaited(
+        MindCoachReplayCache.saveFromResponse(widget.generateResponse),
+      );
+    }
+
     if (!mounted) {
       return;
     }
@@ -597,76 +605,56 @@ class _MindCoachSessionPlayerV2WidgetState
         ),
         const SizedBox(height: 10),
         MindCoachGlowLine(color: _accent, width: 158),
-        const SizedBox(height: 34),
+        const SizedBox(height: 24),
+        MindCoachGlowLine(color: _accent, width: 158),
+        const SizedBox(height: 24),
         MindCoachOrb(
           color: _accent,
           active: !_ttsMuted && !_playbackFinished,
         ),
-        const SizedBox(height: 42),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 280),
-          child: Column(
-            key: ValueKey<String>('line_${centerIndex}_$_visibleLineCount'),
-            children: [
-              for (final index in lineWindow)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: Text(
-                    _lines[index],
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: Colors.white.withValues(
-                            alpha: index == centerIndex
-                                ? 0.98
-                                : index < centerIndex
-                                    ? 0.36
-                                    : 0.3,
-                          ),
-                          fontWeight: index == centerIndex
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          height: 1.35,
+        const SizedBox(height: 24),
+        Expanded(
+          child: Center(
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 280),
+                child: Column(
+                  key: ValueKey<String>('line_${centerIndex}_$_visibleLineCount'),
+                  children: [
+                    for (final index in lineWindow)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: Text(
+                          _lines[index],
+                          textAlign: TextAlign.center,
+                          style:
+                              Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                    color: Colors.white.withValues(
+                                      alpha: index == centerIndex
+                                          ? 0.98
+                                          : index < centerIndex
+                                              ? 0.36
+                                              : 0.3,
+                                    ),
+                                    fontWeight: index == centerIndex
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    height: 1.35,
+                                  ),
                         ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const Spacer(),
-        Row(
-          children: [
-            if (!_ttsMuted)
-              Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: Icon(
-                  Icons.graphic_eq_rounded,
-                  color: _accent,
-                  size: 20,
-                ),
-              ),
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(
-                  value: (_elapsedMs / _totalDurationMs).clamp(0.0, 1.0),
-                  minHeight: 6,
-                  backgroundColor: Colors.white.withValues(alpha: 0.16),
-                  valueColor: AlwaysStoppedAnimation<Color>(_accent),
+                      ),
+                  ],
                 ),
               ),
             ),
-          ],
-        ),
-        if (_degradedMode) ...[
-          const SizedBox(height: 10),
-          Text(
-            'Playback recovered with timing fallback.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.56),
-                ),
           ),
-        ],
+        ),
+        _SessionOrb(
+          accent: _accent,
+          active: !_playbackFinished && !_showCompletion && !_ttsMuted,
+        ),
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -954,6 +942,59 @@ class _FavoriteReplaceDialog extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SessionOrb extends StatefulWidget {
+  const _SessionOrb({required this.accent, required this.active});
+
+  final Color accent;
+  final bool active;
+
+  @override
+  State<_SessionOrb> createState() => _SessionOrbState();
+}
+
+class _SessionOrbState extends State<_SessionOrb>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2200),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final scale = widget.active ? 0.92 + (_controller.value * 0.12) : 1.0;
+        final glow = widget.active ? 0.35 + (_controller.value * 0.25) : 0.15;
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: widget.accent.withValues(alpha: 0.22),
+              boxShadow: [
+                BoxShadow(
+                  color: widget.accent.withValues(alpha: glow),
+                  blurRadius: 36,
+                  spreadRadius: 8,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

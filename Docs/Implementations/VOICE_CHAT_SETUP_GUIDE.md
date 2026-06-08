@@ -13,24 +13,12 @@ The FoCoCo Voice Chat Modal provides both text-to-text chat and voice agent func
 
 ### 1. Gemini API Key (Required for Voice Features)
 
-#### Get Your API Key:
-1. Go to [Google AI Studio](https://aistudio.google.com/)
-2. Sign in with your Google account
-3. Create a new API key
-4. Copy the key (starts with `AIza...`)
-
-#### Set the API Key:
-```bash
-# Method 1: Command line (Recommended for development)
-fvm flutter run --dart-define=GEMINI_API_KEY=your_actual_api_key_here
-
-# Method 2: Environment variable
-export GEMINI_API_KEY=your_actual_api_key_here
-fvm flutter run
-
-# Method 3: Create .env file (not recommended for production)
-echo "GEMINI_API_KEY=your_actual_api_key_here" > .env
-```
+#### Key storage (server-side only):
+The Gemini API key is stored in **Google Cloud Secret Manager** as
+`GEMINI_KEY_APP` and is only readable by Cloud Functions. The Flutter client
+uses **Firebase AI Logic** (authenticated via App Check) — it does not hold
+a raw key. No `--dart-define=GEMINI_API_KEY` or `.env` setup is required on
+the client.
 
 ### 2. Cartesia API Key (Pre-configured)
 The Cartesia API key is already configured in the code:
@@ -125,16 +113,14 @@ The voice chat adapts to user learning styles:
 
 ## Development Commands
 
-### Run with Gemini API Key
+### Run (no client keys required for Gemini)
 ```bash
-fvm flutter run --dart-define=GEMINI_API_KEY=your_key_here
+fvm flutter run
 ```
-
-### Run with All API Keys
+Gemini is resolved server-side via Secret Manager (`GEMINI_KEY_APP`) + Firebase
+AI Logic. Only non-Gemini keys still need `--dart-define`:
 ```bash
-fvm flutter run \
-  --dart-define=GEMINI_API_KEY=your_gemini_key \
-  --dart-define=OPENAI_API_KEY=your_openai_key
+fvm flutter run --dart-define=OPENAI_API_KEY=your_openai_key
 ```
 
 ### Debug Voice Services

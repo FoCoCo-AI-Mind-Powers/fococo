@@ -3,6 +3,7 @@ import 'dart:collection';
 
 import '/ai_integration/config/cartesia_mcp_config.dart';
 import '/ai_integration/services/cartesia_api_service.dart';
+import '/services/ai_voice_preference_service.dart';
 import '/features/mindcoach_v2/services/mindcoach_v2_debug_logger.dart';
 
 enum MindCoachV2TTSState { idle, speaking, degraded, error }
@@ -97,7 +98,7 @@ class MindCoachV2TTSService {
     }
 
     _voiceProfileKey = voiceProfileKey;
-    _voiceId = _resolveVoiceId(voiceProfileKey);
+    _voiceId = _resolveVoiceId(voiceProfileKey) ?? kFoCoCoDefaultCartesiaVoiceId;
 
     _logger.log(_tag, 'Initializing Cartesia TTS', {
       'deliveryLength': deliveryLength,
@@ -107,9 +108,9 @@ class MindCoachV2TTSService {
 
     try {
       await _cartesia.initialize();
-      if (_voiceId != null) {
-        _cartesia.setVoiceId(_voiceId!);
-      }
+      _cartesia.setVoiceId(_voiceId!);
+      // Label the background / lock-screen media controls for this session.
+      _cartesia.setPlaybackTitle('MindCoach Session');
       _initialized = true;
       _setState(MindCoachV2TTSState.idle);
       _logger.log(_tag, 'Cartesia TTS initialized successfully');
@@ -138,6 +139,9 @@ class MindCoachV2TTSService {
     bool replaceQueue = true,
   }) async {
     if (_disposed) {
+      return;
+    }
+    if (!await AiVoicePreferenceService.isEnabled()) {
       return;
     }
     if (!_initialized) {

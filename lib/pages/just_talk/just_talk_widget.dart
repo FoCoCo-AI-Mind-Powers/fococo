@@ -17,6 +17,7 @@ import '/backend/schema/structs/vark_preferences_struct.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/services/just_talk_livekit_agent_service.dart';
+import '/services/units_preference_service.dart';
 
 import 'just_talk_model.dart';
 
@@ -111,6 +112,7 @@ class _JustTalkWidgetState extends State<JustTalkWidget>
   String? _lastLiveKitFallbackReason;
 
   String? _sessionId;
+  String _unitsAiContextLine = '';
 
   StreamSubscription<LiveKitConnectionState>? _connectionSub;
   StreamSubscription<VoiceModeState>? _voiceModeSub;
@@ -121,7 +123,7 @@ class _JustTalkWidgetState extends State<JustTalkWidget>
   void initState() {
     super.initState();
     _model = createModel(context, () => JustTalkModel());
-    _aiClient = GeminiAIClient(apiKey: GeminiLiveAPIConfig.apiKey);
+    _aiClient = GeminiAIClient();
     _livekitService = widget.liveKitService ?? JustTalkLiveKitAgentService();
     _databaseService = widget.databaseService ?? VoiceChatDatabaseService();
 
@@ -129,6 +131,10 @@ class _JustTalkWidgetState extends State<JustTalkWidget>
   }
 
   Future<void> _initialize() async {
+    try {
+      _unitsAiContextLine = await UnitsPreferenceService.aiContextLine();
+    } catch (_) {}
+
     try {
       await _permissionService.initialize();
       _speechReady = await _speechToText.initialize();
@@ -784,12 +790,14 @@ class _JustTalkWidgetState extends State<JustTalkWidget>
   }
 
   String _justTalkContext() {
+    final unitsLine = _unitsAiContextLine;
     return '''
 JustTalk live conversation mode:
 - Keep responses concise and spoken-language friendly.
 - Prioritize practical coaching steps and clear phrasing.
 - Avoid long tables and dense formatting.
 - Stay within 2-4 short sentences when possible.
+${unitsLine.isEmpty ? '' : '\n$unitsLine'}
 ''';
   }
 

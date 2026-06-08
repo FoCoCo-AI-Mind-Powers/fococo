@@ -78,16 +78,16 @@ class MindCoachV2FirestoreClient {
     required String userId,
     MindCoachV2Pillar? pillar,
   }) {
-    return _firestore
+    final query = _firestore
         .collection('mindcoach_favorites')
-        .where('user_id', isEqualTo: userId)
-        .orderBy('saved_at', descending: true)
-        .snapshots()
-        .map((snapshot) {
+        .where('user_id', isEqualTo: userId);
+
+    return query.snapshots().map((snapshot) {
       final favorites = snapshot.docs
           .map((doc) => MindCoachV2Favorite.fromFirestore(doc.id, doc.data()))
           .where((favorite) => pillar == null || favorite.pillar == pillar)
-          .toList(growable: false);
+          .toList(growable: false)
+        ..sort(_compareFavoritesBySavedAtDesc);
       return favorites;
     });
   }
@@ -96,16 +96,17 @@ class MindCoachV2FirestoreClient {
     required String userId,
     MindCoachV2Pillar? pillar,
   }) async {
-    final snapshot = await _firestore
+    final query = _firestore
         .collection('mindcoach_favorites')
-        .where('user_id', isEqualTo: userId)
-        .orderBy('saved_at', descending: true)
-        .get();
+        .where('user_id', isEqualTo: userId);
+    final snapshot = await query.get();
 
-    return snapshot.docs
+    final favorites = snapshot.docs
         .map((doc) => MindCoachV2Favorite.fromFirestore(doc.id, doc.data()))
         .where((favorite) => pillar == null || favorite.pillar == pillar)
         .toList(growable: false);
+    favorites.sort(_compareFavoritesBySavedAtDesc);
+    return favorites;
   }
 
   Future<String> upsertFavorite({
@@ -161,5 +162,14 @@ class MindCoachV2FirestoreClient {
       SetOptions(merge: true),
     );
     return targetRef.id;
+  }
+
+  static int _compareFavoritesBySavedAtDesc(
+    MindCoachV2Favorite a,
+    MindCoachV2Favorite b,
+  ) {
+    final aTime = a.savedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final bTime = b.savedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    return bTime.compareTo(aTime);
   }
 }

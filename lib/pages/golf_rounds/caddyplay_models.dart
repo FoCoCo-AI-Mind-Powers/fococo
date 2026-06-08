@@ -343,37 +343,47 @@ class CaddyPlayMoment {
 class CaddyPlayHole {
   const CaddyPlayHole({
     required this.holeNumber,
-    this.par = 4,
+    this.par,
     this.distance,
     this.score,
     this.moments = const <CaddyPlayMoment>[],
     this.lastUpdated,
   });
 
+  static const Object _unsetPar = Object();
+  static const Object _unsetScore = Object();
+
   final int holeNumber;
-  final int par;
+  /// User-entered par, or null until set (defaults to 4 for score-to-par when [score] is set).
+  final int? par;
   final int? distance;
   final int? score;
   final List<CaddyPlayMoment> moments;
   final DateTime? lastUpdated;
 
   bool get isComplete => score != null;
+
+  /// When [score] is set, par falls back to 4 for relative score when [par] is null.
+  int get effectiveParForScore => score == null ? 0 : (par ?? 4);
+
+  bool get usesDefaultParWhenScored => score != null && par == null;
+
   int get tapCount => moments.where((moment) => moment.isTap).length;
   int get talkCount => moments.where((moment) => moment.isTalk).length;
   int get mindSnapCount => moments.where((moment) => moment.isMindSnap).length;
 
   CaddyPlayHole copyWith({
-    int? par,
+    Object? par = _unsetPar,
+    Object? score = _unsetScore,
     int? distance,
-    int? score,
     List<CaddyPlayMoment>? moments,
     DateTime? lastUpdated,
   }) {
     return CaddyPlayHole(
       holeNumber: holeNumber,
-      par: par ?? this.par,
+      par: identical(par, _unsetPar) ? this.par : par as int?,
       distance: distance ?? this.distance,
-      score: score ?? this.score,
+      score: identical(score, _unsetScore) ? this.score : score as int?,
       moments: moments ?? this.moments,
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
@@ -407,7 +417,7 @@ class CaddyPlayHole {
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'holeNumber': holeNumber,
-        'par': par,
+        if (par != null) 'par': par,
         'distance': distance,
         'score': score,
         'moments':
@@ -418,7 +428,7 @@ class CaddyPlayHole {
   factory CaddyPlayHole.fromJson(Map<String, dynamic> json) {
     return CaddyPlayHole(
       holeNumber: (json['holeNumber'] as num?)?.toInt() ?? 1,
-      par: (json['par'] as num?)?.toInt() ?? 4,
+      par: (json['par'] as num?)?.toInt(),
       distance: (json['distance'] as num?)?.toInt(),
       score: (json['score'] as num?)?.toInt(),
       moments: ((json['moments'] as List<dynamic>?) ?? const <dynamic>[])
@@ -432,7 +442,7 @@ class CaddyPlayHole {
   factory CaddyPlayHole.fromFirestore(Map<String, dynamic> map) {
     return CaddyPlayHole(
       holeNumber: (map['holeNumber'] as num?)?.toInt() ?? 1,
-      par: (map['par'] as num?)?.toInt() ?? 4,
+      par: (map['par'] as num?)?.toInt(),
       distance: (map['distance'] as num?)?.toInt(),
       score: (map['score'] as num?)?.toInt(),
       lastUpdated: dateTimeFromValue(map['lastUpdated']),
@@ -441,12 +451,60 @@ class CaddyPlayHole {
 
   Map<String, dynamic> toFirestore() => <String, dynamic>{
         'holeNumber': holeNumber,
-        'par': par,
+        if (par != null) 'par': par,
         'distance': distance,
         'score': score,
         'isComplete': isComplete,
         'lastUpdated': FieldValue.serverTimestamp(),
       };
+}
+
+/// Stroke and par sums for holes with a score — single source for score-to-par.
+class CaddyPlayScoringTotals {
+  const CaddyPlayScoringTotals({
+    required this.totalStrokes,
+    required this.totalEffectivePar,
+    required this.usesDefaultedPar,
+  });
+
+  final int totalStrokes;
+  final int totalEffectivePar;
+  final bool usesDefaultedPar;
+
+  int get scoreToPar => totalStrokes - totalEffectivePar;
+}
+
+CaddyPlayScoringTotals caddyPlayScoringTotals(Iterable<CaddyPlayHole> holes) {
+  var strokes = 0;
+  var parSum = 0;
+  var defaulted = false;
+  for (final hole in holes) {
+    final s = hole.score;
+    if (s == null) {
+      continue;
+    }
+    strokes += s;
+    parSum += hole.effectiveParForScore;
+    if (hole.usesDefaultParWhenScored) {
+      defaulted = true;
+    }
+  }
+  return CaddyPlayScoringTotals(
+    totalStrokes: strokes,
+    totalEffectivePar: parSum,
+    usesDefaultedPar: defaulted,
+  );
+}
+
+/// Display label for relative-to-par (e.g. [E], [+2], [-1]); prefix [~] when par was defaulted on any hole.
+String formatCaddyPlayScoreToParLabel(
+  int scoreToPar, {
+  required bool approximate,
+}) {
+  final core = scoreToPar == 0
+      ? 'E'
+      : (scoreToPar > 0 ? '+$scoreToPar' : '$scoreToPar');
+  return approximate ? '~$core' : core;
 }
 
 class CaddyPlayRoundSnapshot {
@@ -459,6 +517,7 @@ class CaddyPlayRoundSnapshot {
     required this.confidenceLabel,
     required this.controlLabel,
     required this.scoreToPar,
+    required this.scoreToParIsApproximate,
     required this.holesPlayed,
     required this.totalMoments,
     required this.tapCount,
@@ -469,6 +528,7 @@ class CaddyPlayRoundSnapshot {
     required this.completionInsight,
     required this.syncedToWebApp,
     required this.availableInWebApp,
+    this.insightsLocked = false,
   });
 
   final String courseName;
@@ -479,6 +539,8 @@ class CaddyPlayRoundSnapshot {
   final String confidenceLabel;
   final String controlLabel;
   final int scoreToPar;
+  /// True when any scored hole used the default par (4) because [CaddyPlayHole.par] was null.
+  final bool scoreToParIsApproximate;
   final int holesPlayed;
   final int totalMoments;
   final int tapCount;
@@ -489,6 +551,7 @@ class CaddyPlayRoundSnapshot {
   final String completionInsight;
   final bool syncedToWebApp;
   final bool availableInWebApp;
+  final bool insightsLocked;
 
   CaddyPlayRoundSnapshot copyWith({
     bool? syncedToWebApp,
@@ -503,6 +566,7 @@ class CaddyPlayRoundSnapshot {
       confidenceLabel: confidenceLabel,
       controlLabel: controlLabel,
       scoreToPar: scoreToPar,
+      scoreToParIsApproximate: scoreToParIsApproximate,
       holesPlayed: holesPlayed,
       totalMoments: totalMoments,
       tapCount: tapCount,
@@ -525,6 +589,7 @@ class CaddyPlayRoundSnapshot {
         'confidenceLabel': confidenceLabel,
         'controlLabel': controlLabel,
         'scoreToPar': scoreToPar,
+        'scoreToParIsApproximate': scoreToParIsApproximate,
         'holesPlayed': holesPlayed,
         'totalMoments': totalMoments,
         'tapCount': tapCount,
@@ -551,6 +616,7 @@ class CaddyPlayRoundSnapshot {
       confidenceLabel: (json['confidenceLabel'] ?? 'Building').toString(),
       controlLabel: (json['controlLabel'] ?? 'Building').toString(),
       scoreToPar: (json['scoreToPar'] as num?)?.toInt() ?? 0,
+      scoreToParIsApproximate: json['scoreToParIsApproximate'] == true,
       holesPlayed: (json['holesPlayed'] as num?)?.toInt() ?? 0,
       totalMoments: (json['totalMoments'] as num?)?.toInt() ?? 0,
       tapCount: (json['tapCount'] as num?)?.toInt() ?? 0,
@@ -791,10 +857,18 @@ class CaddyPlayActiveRound {
       holes.expand((hole) => hole.moments).toList(growable: false)
         ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
   int get holesPlayed => holes.where((hole) => hole.isComplete).length;
-  int get totalScore =>
-      holes.fold<int>(0, (sum, hole) => sum + (hole.score ?? 0));
-  int get totalPar => holes.fold<int>(0, (sum, hole) => sum + hole.par);
-  int get scoreToPar => totalScore - totalPar;
+
+  CaddyPlayScoringTotals get _scoringTotals => caddyPlayScoringTotals(holes);
+
+  /// Sum of strokes on holes where [CaddyPlayHole.score] is set.
+  int get totalScore => _scoringTotals.totalStrokes;
+
+  /// Sum of effective par (user par or 4) on scored holes only.
+  int get totalPar => _scoringTotals.totalEffectivePar;
+
+  int get scoreToPar => _scoringTotals.scoreToPar;
+
+  bool get scoreToParUsesDefaultedPar => _scoringTotals.usesDefaultedPar;
   int get totalMoments => allMoments.length;
   int get tapCount => allMoments.where((moment) => moment.isTap).length;
   int get talkCount => allMoments.where((moment) => moment.isTalk).length;
@@ -1256,11 +1330,49 @@ CaddyPlayMindSnapSequence deriveMindSnapSequence(CaddyPlayActiveRound round) {
   return CaddyPlayMindSnapSequence.general;
 }
 
+/// Minimum data before pillar / momentum insights are shown.
+bool hasMinimumRoundData(CaddyPlayActiveRound round) {
+  if (round.totalMoments == 0) return false;
+  final scoredHoles =
+      round.holes.where((h) => h.score != null && h.score! > 0).length;
+  if (scoredHoles >= 1 && round.totalMoments >= 2) return true;
+  if (round.totalMoments >= 4) return true;
+  return false;
+}
+
 CaddyPlayRoundSnapshot buildRoundSnapshot(
   CaddyPlayActiveRound round, {
   bool syncedToWebApp = false,
   bool availableInWebApp = false,
 }) {
+  final insufficient = !hasMinimumRoundData(round);
+  if (insufficient) {
+    return CaddyPlayRoundSnapshot(
+      courseName: round.courseName,
+      date: round.startedAt,
+      roundType: round.roundType,
+      evaluationPhrase: 'Not enough round data captured yet.',
+      focusLabel: '—',
+      confidenceLabel: '—',
+      controlLabel: '—',
+      scoreToPar: round.scoreToPar,
+      scoreToParIsApproximate: round.scoreToParUsesDefaultedPar,
+      holesPlayed: round.holesPlayed,
+      totalMoments: round.totalMoments,
+      tapCount: round.tapCount,
+      talkCount: round.talkCount,
+      mindSnapCount: round.mindSnapCount,
+      momentumShift:
+          'Play and log more shots to unlock a meaningful SnapShot.',
+      mindsetSummary:
+          'Play and log more shots to unlock a meaningful SnapShot.',
+      completionInsight: '',
+      syncedToWebApp: syncedToWebApp,
+      availableInWebApp: availableInWebApp,
+      insightsLocked: true,
+    );
+  }
+
   final aggregate = aggregateMindset(round);
   final evaluationPhrase = _evaluationPhraseForRound(round, aggregate);
 
@@ -1273,7 +1385,8 @@ CaddyPlayRoundSnapshot buildRoundSnapshot(
     confidenceLabel: descriptorForScore(aggregate.confidence),
     controlLabel: descriptorForScore(aggregate.control),
     scoreToPar: round.scoreToPar,
-    holesPlayed: round.holesPlayed == 0 ? round.currentHole : round.holesPlayed,
+    scoreToParIsApproximate: round.scoreToParUsesDefaultedPar,
+    holesPlayed: round.holesPlayed,
     totalMoments: round.totalMoments,
     tapCount: round.tapCount,
     talkCount: round.talkCount,
@@ -1316,7 +1429,9 @@ String _momentumShift(CaddyPlayActiveRound round) {
   final holeScores = <int, int>{};
   for (final hole in round.holes) {
     if (hole.moments.isEmpty) {
-      holeScores[hole.holeNumber] = (hole.score ?? hole.par) - hole.par + 60;
+      final effectivePar = hole.par ?? 4;
+      holeScores[hole.holeNumber] =
+          (hole.score ?? effectivePar) - effectivePar + 60;
       continue;
     }
     final values = hole.moments.map((moment) {

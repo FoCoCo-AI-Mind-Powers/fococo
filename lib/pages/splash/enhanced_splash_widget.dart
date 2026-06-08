@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:another_flutter_splash_screen/another_flutter_splash_screen.dart';
 import 'dart:math' as math;
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/auth/firebase_auth/auth_util.dart';
-import '/services/auth_flow_service.dart';
+import '/services/app_session_prefs_service.dart';
+import '/services/boot_phase_logger.dart';
+import '/services/startup_auth_service.dart';
 import 'package:flutter/foundation.dart';
 
 class EnhancedSplashWidget extends StatefulWidget {
@@ -81,6 +85,7 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
 
     // Wait a bit then start scale
     await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
     _scaleController.forward();
 
     // Start rotation animation (2 full rotations)
@@ -266,39 +271,68 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
 
   // Navigation logic to determine next screen
   Future<void> _handleNavigation() async {
+    unawaited(BootPhaseLogger.record('splash_navigation_started'));
     try {
-      // Check authentication state
-      final user = currentUser;
-
       if (kDebugMode) {
         print('🔄 Enhanced Splash: Checking user authentication...');
       }
 
+      final authBootstrapFuture = StartupAuthService.instance.bootstrap();
+
       // Wait a minimum time to show the beautiful animation
       await Future.delayed(const Duration(milliseconds: 2500));
+      await authBootstrapFuture.timeout(const Duration(seconds: 2),
+          onTimeout: () {
+        if (kDebugMode) {
+          print('⚠️ Enhanced Splash: auth bootstrap wait timed out');
+        }
+      });
 
       if (!mounted) return;
 
+      // Always read auth state after the animation + bootstrap wait.
+      final user = currentUser;
+
       if (user != null && user.loggedIn) {
         if (kDebugMode) {
-          print('✅ Enhanced Splash: User logged in, resolving destination');
+          print(
+              '✅ Enhanced Splash: User logged in, routing to default tab (deferred paywall check)');
         }
-        final decision =
-            await AuthFlowService.instance.resolvePostAuthDecision();
-        if (!mounted) return;
+        // CRITICAL: do NOT call AuthFlowService.resolvePostAuthDecision() here.
+        // That method reads + writes the user doc in Firestore, which on iOS
+        // during the launch window triggers the native gRPC
+        // `std::__libcpp_condvar_wait` crash. Instead, route to the default
+        // tab immediately. The paywall / onboarding gate can be evaluated
+        // from the destination screen after the app is fully warmed up.
+        unawaited(
+            BootPhaseLogger.record('splash_routing_to_authed_landing'));
         AppStateNotifier.instance.stopShowingSplashImage();
-        context.goNamed(decision.routeName, extra: decision.extra);
+        final tab = await AppSessionPrefsService.postLoginTab();
+        if (!mounted) return;
+        context.goNamed(tab);
       } else {
         if (kDebugMode) {
           print('✅ Enhanced Splash: User not logged in, navigating to login');
         }
+        unawaited(BootPhaseLogger.record('splash_routing_to_login'));
         AppStateNotifier.instance.stopShowingSplashImage();
         context.go('/login');
       }
-    } catch (e) {
+    } catch (e, stack) {
       if (kDebugMode) {
         print('❌ Enhanced Splash: Error during navigation: $e');
       }
+      // Capture splash navigation failures explicitly — these were previously
+      // swallowed and silently rerouted to /login, hiding the real cause of
+      // TestFlight launch crashes.
+      unawaited(BootPhaseLogger.record('splash_navigation_failed'));
+      try {
+        await BootPhaseLogger.setCustomKey(
+            'splash_navigation_error', e.toString());
+      } catch (_) {}
+      // Surface to PlatformDispatcher.onError so it lands in Crashlytics with
+      // a stack — runZonedGuarded in main.dart will catch it.
+      Future<void>.error(e, stack);
       if (mounted) {
         AppStateNotifier.instance.stopShowingSplashImage();
         context.go('/login');

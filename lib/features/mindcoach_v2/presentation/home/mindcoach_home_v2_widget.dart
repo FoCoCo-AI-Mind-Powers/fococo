@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:iconify_flutter/iconify_flutter.dart';
 
 import '/ai_integration/widgets/navbar_widget.dart';
 import '/features/mindcoach_v2/data/mindcoach_v2_repository.dart';
@@ -243,13 +245,14 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
   }
 
   Widget _buildHomeScreen(MindCoachV2Catalog catalog) {
+    final viewPadding = MediaQuery.viewPaddingOf(context);
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(
         22,
-        16,
+        16 + viewPadding.top,
         22,
-        MediaQuery.viewPaddingOf(context).bottom +
+        viewPadding.bottom +
             kFoCoCoBottomNavStripAndTabsHeight +
             24,
       ),
@@ -283,35 +286,14 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
           ),
         ],
         const SizedBox(height: 34),
-        for (final pillar in catalog.pillars) ...[
-          MindCoachGlowCard(
-            color: MindCoachV2Visuals.accentForPillar(pillar.key),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
-            onTap: () => _selectPillar(pillar.key),
-            child: Column(
-              children: [
-                Text(
-                  pillar.label,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: MindCoachV2Visuals.accentForPillar(pillar.key),
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.4,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  pillar.descriptor,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        fontWeight: FontWeight.w500,
-                      ),
-                ),
-              ],
-            ),
+        for (var i = 0; i < MindCoachV2Visuals.homePillarOrder.length; i++) ...[
+          _MindCoachPillarTabCard(
+            pillar: catalog.pillar(MindCoachV2Visuals.homePillarOrder[i]),
+            onTap: () =>
+                _selectPillar(MindCoachV2Visuals.homePillarOrder[i]),
           ),
-          const SizedBox(height: 24),
+          if (i < MindCoachV2Visuals.homePillarOrder.length - 1)
+            const SizedBox(height: 24),
         ],
       ],
     );
@@ -323,24 +305,29 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
       stream: widget.repository.streamFavorites(pillar: pillar.key),
       builder: (context, snapshot) {
         final favorites = snapshot.data ?? const <MindCoachV2Favorite>[];
-        return ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(
-            22,
-            12,
-            22,
-            MediaQuery.viewPaddingOf(context).bottom +
-                kFoCoCoBottomNavStripAndTabsHeight +
-                24,
-          ),
+        final viewPadding = MediaQuery.viewPaddingOf(context);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _PillarHeader(
               title: pillar.label,
               subtitle: pillar.descriptor,
               color: accent,
               onBack: _goBackOneLevel,
+              topInset: viewPadding.top,
             ),
-            const SizedBox(height: 26),
+            Expanded(
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  22,
+                  12,
+                  22,
+                  viewPadding.bottom +
+                      kFoCoCoBottomNavStripAndTabsHeight +
+                      24,
+                ),
+                children: [
             _ContextCard(
               title: 'During Round',
               subtitle:
@@ -355,9 +342,6 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
               subtitle:
                   pillar.rowDescriptors[MindCoachV2ContextMode.beforeRound] ??
                       '',
-              durationHint: pillar
-                  .context(MindCoachV2ContextMode.beforeRound)
-                  .durationHint,
               color: accent,
               onTap: () => _openContext(MindCoachV2ContextMode.beforeRound),
             ),
@@ -367,9 +351,6 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
               subtitle:
                   pillar.rowDescriptors[MindCoachV2ContextMode.afterRound] ??
                       '',
-              durationHint: pillar
-                  .context(MindCoachV2ContextMode.afterRound)
-                  .durationHint,
               color: accent,
               onTap: () => _openContext(MindCoachV2ContextMode.afterRound),
             ),
@@ -383,6 +364,9 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
               },
               onFavoriteTap: _startFavorite,
             ),
+                ],
+              ),
+            ),
           ],
         );
       },
@@ -394,35 +378,46 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
     MindCoachV2CatalogContext contextModel,
   ) {
     final accent = MindCoachV2Visuals.accentForPillar(pillar.key);
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(
-        22,
-        12,
-        22,
-        MediaQuery.viewPaddingOf(context).bottom +
-            kFoCoCoBottomNavStripAndTabsHeight +
-            24,
-      ),
+    final viewPadding = MediaQuery.viewPaddingOf(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _PillarHeader(
           title: pillar.label,
           subtitle: pillar.descriptor,
           color: accent,
           onBack: _goBackOneLevel,
+          topInset: viewPadding.top,
         ),
-        const SizedBox(height: 18),
-        Text(
-          contextModel.label,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 8, 22, 0),
+          child: Column(
+            children: [
+              Text(
+                contextModel.label,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
+              const SizedBox(height: 8),
+              MindCoachGlowLine(color: accent, width: 188),
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
-        MindCoachGlowLine(color: accent, width: 188),
-        const SizedBox(height: 18),
+        Expanded(
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              22,
+              12,
+              22,
+              viewPadding.bottom +
+                  kFoCoCoBottomNavStripAndTabsHeight +
+                  24,
+            ),
+            children: [
         for (final session in contextModel.sessions) ...[
           _SessionListRow(
             color: accent,
@@ -439,6 +434,9 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
           ),
           const SizedBox(height: 18),
         ],
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -486,6 +484,200 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
                                 ),
                     ),
                   ),
+      ),
+    );
+  }
+}
+
+class _MindCoachPillarTabCard extends StatefulWidget {
+  const _MindCoachPillarTabCard({
+    required this.pillar,
+    required this.onTap,
+  });
+
+  final MindCoachV2CatalogPillar pillar;
+  final VoidCallback onTap;
+
+  @override
+  State<_MindCoachPillarTabCard> createState() => _MindCoachPillarTabCardState();
+}
+
+class _MindCoachPillarTabCardState extends State<_MindCoachPillarTabCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _hoverController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 240),
+  );
+
+  bool _pressed = false;
+  bool _hovering = false;
+
+  @override
+  void dispose() {
+    _hoverController.dispose();
+    super.dispose();
+  }
+
+  void _setHighlight(bool active) {
+    if (active) {
+      _hoverController.forward();
+    } else if (!_pressed) {
+      _hoverController.reverse();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = MindCoachV2Visuals.accentForPillar(widget.pillar.key);
+
+    return MouseRegion(
+      onEnter: (_) {
+        _hovering = true;
+        _setHighlight(true);
+      },
+      onExit: (_) {
+        _hovering = false;
+        _setHighlight(false);
+      },
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) {
+          setState(() => _pressed = true);
+          _hoverController.forward();
+        },
+        onTapUp: (_) {
+          setState(() => _pressed = false);
+          if (!_hovering) {
+            _hoverController.reverse();
+          }
+          widget.onTap();
+        },
+        onTapCancel: () {
+          setState(() => _pressed = false);
+          _hoverController.reverse();
+        },
+        child: AnimatedBuilder(
+          animation: _hoverController,
+          builder: (context, child) {
+            final t = Curves.easeOutCubic.transform(_hoverController.value);
+            final scale = 1.0 + (t * 0.022);
+            final borderAlpha = 0.38 + (t * 0.42);
+            final fillAlpha = 0.035 + (t * 0.03);
+            final glowStrength = 0.55 + (t * 0.45);
+
+            return Transform.scale(
+              scale: scale,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  color: Colors.white.withValues(alpha: fillAlpha),
+                  border: Border.all(
+                    color: accent.withValues(alpha: borderAlpha),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.1 + (t * 0.22)),
+                      blurRadius: 24 + (t * 28),
+                      spreadRadius: -8 + (t * 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(
+                            sigmaX: 12 + (t * 4),
+                            sigmaY: 12 + (t * 4),
+                          ),
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 22, 18, 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    widget.pillar.label,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
+                                          color: Color.lerp(
+                                            accent,
+                                            Colors.white,
+                                            t * 0.12,
+                                          ),
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 1.4,
+                                        ),
+                                  ),
+                                ),
+                                Iconify(
+                                  MindCoachV2Visuals.iconAssetForPillar(
+                                    widget.pillar.key,
+                                  ),
+                                  color: accent.withValues(
+                                    alpha: 0.88 + (t * 0.12),
+                                  ),
+                                  size: 34 + (t * 4),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              widget.pillar.descriptor,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    color: Colors.white
+                                        .withValues(alpha: 0.88 + (t * 0.08)),
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.25,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Positioned(
+                        left: 14,
+                        right: 14,
+                        top: -1,
+                        child: Opacity(
+                          opacity: glowStrength,
+                          child: MindCoachGlowLine(
+                            color: accent,
+                            width: double.infinity,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 14,
+                        right: 14,
+                        bottom: -1,
+                        child: Opacity(
+                          opacity: glowStrength,
+                          child: MindCoachGlowLine(
+                            color: accent,
+                            width: double.infinity,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -554,6 +746,7 @@ class _PillarHeader extends StatelessWidget {
     required this.subtitle,
     required this.color,
     required this.onBack,
+    this.topInset = 0,
   });
 
   final String title;
@@ -561,47 +754,77 @@ class _PillarHeader extends StatelessWidget {
   final Color color;
   final VoidCallback onBack;
 
+  /// Status bar / notch inset so the header clears the safe area.
+  final double topInset;
+
+  static const double _leadingWidth = 48;
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              onPressed: onBack,
-              icon: const Icon(
-                Icons.arrow_back_rounded,
-                color: Colors.white,
-              ),
-            ),
-            Flexible(
-              child: Text(
-                title,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.2,
+    final viewPadding = MediaQuery.viewPaddingOf(context);
+    return Padding(
+      padding: EdgeInsets.only(
+        top: topInset + 4,
+        left: viewPadding.left,
+        right: viewPadding.right,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: _leadingWidth,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(
+                      minWidth: _leadingWidth,
+                      minHeight: 44,
                     ),
+                    onPressed: onBack,
+                    icon: Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white.withValues(alpha: 0.95),
+                      size: 24,
+                    ),
+                    tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: 48),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          subtitle,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.78),
-                fontStyle: FontStyle.italic,
-                fontWeight: FontWeight.w400,
+              Expanded(
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                      ),
+                ),
               ),
-        ),
-        const SizedBox(height: 10),
-        MindCoachGlowLine(color: color, width: 168),
-      ],
+              const SizedBox(width: _leadingWidth),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.78),
+                  fontStyle: FontStyle.italic,
+                  fontWeight: FontWeight.w400,
+                ),
+          ),
+          const SizedBox(height: 10),
+          MindCoachGlowLine(color: color, width: 168),
+        ],
+      ),
     );
   }
 }
@@ -820,7 +1043,7 @@ class _FavoriteRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${favorite.contextMode.displayLabel} · ${favorite.durationSec} sec',
+                  favorite.contextMode.displayLabel,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.white.withValues(alpha: 0.56),
                         fontWeight: FontWeight.w600,
@@ -883,14 +1106,6 @@ class _SessionListRow extends StatelessWidget {
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  '${session.durationSec} sec',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.62),
-                        fontWeight: FontWeight.w600,
-                      ),
                 ),
               ],
             ),

@@ -1,7 +1,7 @@
 import '/ai_integration/widgets/navbar_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/services/auth_flow_service.dart';
+import '/pages/vark_onboarding/vark_onboarding_widget.dart';
 import 'package:flutter/material.dart';
 
 class AccountCreatedWidget extends StatefulWidget {
@@ -21,10 +21,9 @@ class _AccountCreatedWidgetState extends State<AccountCreatedWidget> {
   static const Color _textColor = Color(0xFFE8E3C7);
 
   Future<void> _onContinue() async {
-    final decision = await AuthFlowService.instance.resolvePostAuthDecision();
     if (!mounted) return;
     GoRouter.of(context).clearRedirectLocation();
-    context.goNamed(decision.routeName, extra: decision.extra);
+    context.goNamed(VarkOnboardingWidget.routeName);
   }
 
   @override

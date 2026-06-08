@@ -10,6 +10,7 @@ import '/features/mindcoach_v2/presentation/home/mindcoach_home_v2_widget.dart';
 import '/features/mindcoach_v2/presentation/player/mindcoach_session_player_v2_widget.dart';
 import '/features/mindcoach_v2/presentation/shared/mindcoach_v2_visuals.dart';
 import '/features/mindcoach_v2/services/mindcoach_v2_debug_logger.dart';
+import '/features/mindcoach_v2/services/mindcoach_replay_cache.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/pages/coaching_modules/mind_coach_widget.dart';
 
@@ -51,9 +52,14 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to generate session: $e')),
-      );
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      if (messenger != null) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Failed to generate session: $e')),
+        );
+      } else {
+        debugPrint('Failed to generate session (no ScaffoldMessenger): $e');
+      }
     }
   }
 
@@ -109,6 +115,19 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
     });
 
     if (playerResult.nextAction == MindCoachV2PlayerNextAction.playAgain) {
+      final cached = await MindCoachReplayCache.load(response.sessionId);
+      if (cached != null && mounted) {
+        await Navigator.of(context).push<MindCoachV2PlayerResult>(
+          MaterialPageRoute(
+            builder: (_) => MindCoachSessionPlayerV2Widget(
+              generateResponse: cached,
+            ),
+          ),
+        );
+        return;
+      }
+      final delivery = response.session.deliveryLength;
+      const valid = {'auto', 'micro', 'standard', 'deep'};
       await _runGenerationRequest(
         MindCoachV2GenerateRequest(
           contextMode: response.session.contextMode,
@@ -118,7 +137,8 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
           sessionName: response.session.sessionName,
           sessionDescriptor: response.session.sessionDescriptor,
           targetDurationSec: response.session.durationSec,
-          preferredDeliveryLength: response.session.deliveryLength,
+          preferredDeliveryLength:
+              valid.contains(delivery) ? delivery : 'standard',
         ),
       );
     }
@@ -146,13 +166,9 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
           showBottomNav: false,
           appBarForegroundColor: Colors.white,
           showAppBarGlowDivider: false,
-          drawer: user != null
-              ? FoCoCoDrawer(
-                  currentUser: user,
-                  currentRoute: 'mind_coach',
-                  onNavigate: (route) => context.goNamed(route),
-                )
-              : null,
+          // Always mount the drawer so the auto-injected hamburger is
+          // reachable even before the user record stream resolves.
+          drawer: null,
           body: isVisible
               ? MindCoachHomeV2Widget(
                   repository: _repository,

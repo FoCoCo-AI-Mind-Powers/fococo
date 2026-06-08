@@ -39,10 +39,22 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings.delete 'IPHONEOS_DEPLOYMENT_TARGET'
-      
+
+      # permission_handler macros — enable only the permissions FoCoCo asks
+      # for at runtime so unused permission strings don't pull in extra
+      # frameworks. See https://pub.dev/packages/permission_handler#ios
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
+        '$(inherited)',
+        'PERMISSION_MICROPHONE=1',
+        'PERMISSION_LOCATION=1',
+        'PERMISSION_NOTIFICATIONS=1',
+        'PERMISSION_CAMERA=1',
+        'PERMISSION_PHOTOS=1',
+        'PERMISSION_SPEECH_RECOGNIZER=1',
+      ]
     end
   end
-  
+
   # Remove extended attributes that can cause code signing issues
   system("find #{installer.sandbox.root}/Pods -type f -exec xattr -c {} \\; 2>/dev/null || true")
   system("find #{installer.sandbox.root}/Pods -type d -exec xattr -rc {} \\; 2>/dev/null || true")

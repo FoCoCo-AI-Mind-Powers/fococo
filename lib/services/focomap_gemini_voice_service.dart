@@ -22,12 +22,13 @@ class FoCoMapGeminiVoiceService {
   factory FoCoMapGeminiVoiceService() => _instance;
   FoCoMapGeminiVoiceService._internal();
 
-  // Gemini API Configuration
-  // Get API key from Secret Manager / cache / dart-define
+  // Raw-key Gemini path is disabled for the client. FoCoMap voice should be
+  // migrated to firebase_ai Live bidi; this helper only exists so call-sites
+  // compile. It always returns '' and logs a warning in debug.
   static Future<String> _getGeminiApiKey() async {
     final key = await GeminiLiveAPIConfig.getApiKey();
     if (key.isEmpty && kDebugMode) {
-      print('⚠️ GEMINI_API_KEY not configured for FoCoMap voice service');
+      print('⚠️ FoCoMap voice: raw-key Gemini path disabled; use firebase_ai Live.');
     }
     return key;
   }

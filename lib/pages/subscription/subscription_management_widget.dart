@@ -4,7 +4,9 @@ import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/pages/fococo_tab/fococo_tab_widget.dart';
 import '/services/revenuecat_service.dart';
+import '/services/subscription_state_provider.dart';
 import 'subscription_management_model.dart';
 export 'subscription_management_model.dart';
 
@@ -26,15 +28,18 @@ class _SubscriptionManagementWidgetState
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final RevenueCatService _revenueCatService = RevenueCatService();
 
-  bool _isLoading = false;
+  bool _isLoading = true;
+  bool _hasProAccess = false;
   Offerings? _offerings;
   String? _errorMessage;
+  String? _priceString;
+  String? _trialStatusLabel;
 
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => SubscriptionManagementModel());
-    _loadOfferings();
+    _load();
   }
 
   @override
@@ -43,30 +48,62 @@ class _SubscriptionManagementWidgetState
     super.dispose();
   }
 
-  Future<void> _loadOfferings() async {
+  Future<void> _load() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final offerings = await _revenueCatService.getOfferings();
-      setState(() {
-        _offerings = offerings;
-        _isLoading = false;
-      });
+      final hasAccess = await _revenueCatService.hasProAccess();
+      _hasProAccess = hasAccess;
 
-      if (offerings.current == null) {
-        setState(() {
-          _errorMessage = 'No current offering found. Check RevenueCat dashboard configuration.';
-        });
+      if (!hasAccess) {
+        final offerings = await _revenueCatService.getOfferings();
+        _offerings = offerings;
+        final yearly = offerings.current?.annual?.storeProduct;
+        _priceString = _revenueCatService.annualPricingSubtitle(yearly);
+        _trialStatusLabel = _buildTrialLabel();
+        if (offerings.current == null) {
+          _errorMessage =
+              'Subscription plans are temporarily unavailable. Please try again.';
+        }
       }
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
     } catch (e) {
-      debugPrint('❌ Failed to load offerings: $e');
+      if (!mounted) return;
       setState(() {
-        _errorMessage = 'Failed to load subscription plans: $e';
+        _errorMessage = 'Unable to load subscription information.';
         _isLoading = false;
       });
+    }
+  }
+
+  String? _buildTrialLabel() {
+    final sub = SubscriptionStateProvider();
+    if (!sub.isWithinTrialPeriod() || sub.hasActiveSubscription) {
+      return null;
+    }
+    final remaining = sub.getTrialDaysRemaining();
+    final total = SubscriptionStateProvider.trialPeriodDays;
+    if (remaining <= 0) return 'Trial ends today';
+    if (remaining == 1) return 'Trial ends tomorrow';
+    if (remaining <= 7) return '$remaining days left in your trial';
+    return 'Day ${total - remaining} of $total — 14-day free trial';
+  }
+
+  Future<void> _openNativeManageSubscriptions() async {
+    await _revenueCatService.openManageSubscriptions();
+  }
+
+  void _exitSubscription() {
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.goNamed(FoCoCoTabWidget.routeName);
     }
   }
 
@@ -74,54 +111,56 @@ class _SubscriptionManagementWidgetState
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
 
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-        FocusManager.instance.primaryFocus?.unfocus();
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _exitSubscription();
+        }
       },
-      child: Scaffold(
-        key: scaffoldKey,
-        backgroundColor: theme.primaryBackground,
-        body: SafeArea(
-          child: Column(
-            children: [
-              // App Bar
-              _buildAppBar(theme),
-
-              // Main Content
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _offerings?.current != null
-                        ? _buildPaywallView(theme)
-                        : _buildErrorState(theme),
-              ),
-            ],
+      child: GestureDetector(
+        onTap: () {
+          FocusScope.of(context).unfocus();
+          FocusManager.instance.primaryFocus?.unfocus();
+        },
+        child: Scaffold(
+          key: scaffoldKey,
+          backgroundColor: theme.primaryBackground,
+          body: SafeArea(
+            child: Column(
+              children: [
+                _buildAppBar(theme),
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _hasProAccess
+                          ? _buildPrimeStatus(theme)
+                          : _offerings?.current != null
+                              ? _buildPaywallView(theme)
+                              : _buildErrorState(theme),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// Simple App Bar with back button
   Widget _buildAppBar(FlutterFlowTheme theme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
         children: [
-          // Back button
           IconButton(
             icon: Icon(
               Icons.arrow_back_ios,
               color: theme.primaryText,
               size: 20,
             ),
-            onPressed: () => context.pop(),
+            onPressed: _exitSubscription,
           ),
-
           const SizedBox(width: 16),
-
-          // Title
           Expanded(
             child: Text(
               'Subscription',
@@ -136,96 +175,116 @@ class _SubscriptionManagementWidgetState
     );
   }
 
-  /// Paywall View - Full Screen
-  Widget _buildPaywallView(FlutterFlowTheme theme) {
-    return PaywallView(
-      offering: _offerings!.current!,
-    );
-  }
-
-  /// Error state when offerings are not available
-  Widget _buildErrorState(FlutterFlowTheme theme) {
-    return SingleChildScrollView(
+  Widget _buildPrimeStatus(FlutterFlowTheme theme) {
+    return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 60),
-
-          // Error icon
-          Icon(
-            Icons.error_outline,
-            color: theme.error,
-            size: 64,
-          ),
-
           const SizedBox(height: 24),
-
-          // Error title
           Text(
-            'Unable to Load Subscription Plans',
+            "You're on FoCoCo Prime",
             style: theme.headlineSmall.copyWith(
               color: theme.primaryText,
               fontWeight: FontWeight.w700,
             ),
             textAlign: TextAlign.center,
           ),
-
-          const SizedBox(height: 16),
-
-          // Error message
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: theme.error.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: theme.error.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Column(
-              children: [
-                if (_errorMessage != null)
-                  Text(
-                    _errorMessage!,
-                    style: theme.bodyMedium.copyWith(
-                      color: theme.primaryText,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                const SizedBox(height: 16),
-                Text(
-                  'Please check your RevenueCat dashboard configuration:\n\n'
-                  '1. Products created (fococo_monthly_test, fococo_yearly_test)\n'
-                  '2. Products added to an Offering\n'
-                  '3. Offering set as "Current"\n'
-                  '4. Products linked to App Store/Google Play',
-                  style: theme.bodyMedium.copyWith(
-                    color: theme.secondaryText,
-                  ),
-                  textAlign: TextAlign.left,
-                ),
-              ],
-            ),
+          const SizedBox(height: 12),
+          Text(
+            'Your membership is active. Manage billing, renewal, or cancellation in your app store account.',
+            style: theme.bodyMedium.copyWith(color: theme.secondaryText),
+            textAlign: TextAlign.center,
           ),
-
           const SizedBox(height: 32),
-
-          // Retry button
           FFButtonWidget(
-            onPressed: _loadOfferings,
-            text: 'Retry',
+            onPressed: _openNativeManageSubscriptions,
+            text: 'Manage Subscription',
             options: FFButtonOptions(
               width: double.infinity,
               height: 56,
-              padding: EdgeInsets.zero,
-              iconPadding: EdgeInsets.zero,
               color: theme.primary,
               textStyle: theme.titleMedium.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
               ),
-              elevation: 0,
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaywallView(FlutterFlowTheme theme) {
+    return Column(
+      children: [
+        if (_trialStatusLabel != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+            child: Text(
+              _trialStatusLabel!,
+              style: theme.bodyMedium.copyWith(color: theme.secondaryText),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        if (_priceString != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+            child: Text(
+              _priceString!,
+              style: theme.titleMedium.copyWith(fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+          child: Text(
+            _revenueCatService.trialButtonLabel(),
+            style: theme.bodyMedium.copyWith(color: theme.secondaryText),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        Expanded(
+          child: PaywallView(
+            offering: _offerings!.current!,
+            onRestoreCompleted: (_) => _load(),
+            onRestoreError: (_) {},
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorState(FlutterFlowTheme theme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          const SizedBox(height: 40),
+          Icon(Icons.error_outline, color: theme.error, size: 64),
+          const SizedBox(height: 24),
+          Text(
+            'Unable to Load Subscription Plans',
+            style: theme.headlineSmall.copyWith(fontWeight: FontWeight.w700),
+            textAlign: TextAlign.center,
+          ),
+          if (_errorMessage != null) ...[
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage!,
+              style: theme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+          ],
+          const SizedBox(height: 32),
+          FFButtonWidget(
+            onPressed: _load,
+            text: 'Retry',
+            options: FFButtonOptions(
+              width: double.infinity,
+              height: 56,
+              color: theme.primary,
               borderRadius: BorderRadius.circular(16),
             ),
           ),

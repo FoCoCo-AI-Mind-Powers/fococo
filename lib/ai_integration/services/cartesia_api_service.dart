@@ -1,29 +1,45 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart' show MediaItem;
 import 'package:fo_co_co/backend/schema/structs/vark_preferences_struct.dart';
 
+import '../config/cartesia_config.dart';
 import '../config/cartesia_mcp_config.dart';
+import 'cartesia_pcm_audio.dart';
+import 'cartesia_speech_prompt.dart';
+import 'cartesia_streaming_tts.dart';
+import 'cartesia_voice_runtime.dart';
+import '/services/ai_voice_preference_service.dart';
 
-/// Enhanced Cartesia API Service implementing the official API
-/// Based on: https://docs.cartesia.ai/get-started/make-an-api-request
-/// Uses sonic-2-2025-05-08 model with Pro voice clone
+/// Enhanced Cartesia API Service.
+///
+/// Synthesis (TTS) and transcription (STT) are proxied through the
+/// `synthesizeSpeech` / `transcribeSpeech` Cloud Functions so the Cartesia
+/// API key (Secret Manager `CARTESIA_API`) never ships in the client binary.
+/// All the playback / VARK / background-audio behavior stays on-device.
 class CartesiaAPIService {
   CartesiaAPIService._();
+
+  static const Duration _synthesizeTimeout = Duration(seconds: 120);
 
   static CartesiaAPIService? _instance;
   static CartesiaAPIService get instance =>
       _instance ??= CartesiaAPIService._();
 
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final http.Client _httpClient = http.Client();
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   bool _isInitialized = false;
   bool _isSpeaking = false;
-  String _currentVoiceId =
-      'da3224fe-d8d1-4774-8902-e6a7115f5132'; // Voice 1 (Male) - Default
+  // Single FoCoCo coach voice — calm, slower delivery. Override per-call by
+  // passing `voiceId:` to `generateSpeech` / `speakText` if needed.
+  String _currentVoiceId = kFoCoCoDefaultCartesiaVoiceId;
 
   // Stream controllers for state management
   final StreamController<bool> _speakingController =
@@ -54,16 +70,19 @@ class CartesiaAPIService {
     if (_isInitialized) return;
 
     try {
-      // Test API connection
-      await _testAPIConnection();
+      // No client-side connection test — the API key lives server-side in the
+      // synthesizeSpeech / transcribeSpeech Cloud Functions.
 
       // Configure audio player
       await _configureAudioPlayer();
 
       _isInitialized = true;
 
+      unawaited(CartesiaConfig.verifyVoiceId());
+      unawaited(CartesiaStreamingTts.instance.warmConnection());
+
       if (kDebugMode) {
-        print('✅ Cartesia API Service initialized with sonic-2-2025-05-08');
+        print('✅ Cartesia API Service initialized (TTS via Cloud Function)');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -71,26 +90,6 @@ class CartesiaAPIService {
       }
       _errorController.add('Failed to initialize Cartesia API: $e');
       rethrow;
-    }
-  }
-
-  /// Test API connection with a simple request
-  Future<void> _testAPIConnection() async {
-    try {
-      final response = await _httpClient.get(
-        Uri.parse('${CartesiaMCPConfig.baseUrl}/voices'),
-        headers: CartesiaMCPConfig.apiHeaders,
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('API connection failed: ${response.statusCode}');
-      }
-
-      if (kDebugMode) {
-        print('🔗 Cartesia API connection successful');
-      }
-    } catch (e) {
-      throw Exception('Failed to connect to Cartesia API: $e');
     }
   }
 
@@ -129,6 +128,10 @@ class CartesiaAPIService {
     String? contentType,
     VarkPreferencesStruct? varkPreferences,
     double? speedMultiplier,
+    CartesiaSpeechProfile? speechProfile,
+    String? contextId,
+    bool continueGeneration = false,
+    bool transcriptAlreadyPrepared = false,
   }) async {
     if (!_isInitialized) {
       await initialize();
@@ -137,8 +140,13 @@ class CartesiaAPIService {
     try {
       final effectiveVoiceId = voiceId ?? _currentVoiceId;
 
-      // Adapt text for VARK preferences
-      final adaptedText = _adaptTextForVARK(text, varkPreferences);
+      final profile = speechProfile ?? _speechProfileForContent(contentType);
+      final prepared = transcriptAlreadyPrepared
+          ? text.trim()
+          : CartesiaSpeechPrompt.prepareForTts(
+              _adaptTextForVARK(text, varkPreferences),
+              profile: profile,
+            );
 
       // Get voice settings based on content type
       final voiceSettings = _getVoiceSettings(contentType, varkPreferences);
@@ -150,47 +158,72 @@ class CartesiaAPIService {
         explicitSpeedMultiplier: speedMultiplier,
       );
 
-      // Prepare request payload matching your curl command format
-      final payload = {
-        'model_id': CartesiaMCPConfig.defaultVoiceModel,
-        'transcript': adaptedText,
-        'voice': {
-          'mode': 'id',
-          'id': effectiveVoiceId,
-        },
-        'output_format': {
-          'container': 'wav',
-          'encoding': 'pcm_f32le',
-          'sample_rate': 44100,
-        },
-        'language': CartesiaMCPConfig.defaultLanguage,
-        'speed': speedValue, // Dynamic speed based on content type and VARK
-      };
-
-      if (kDebugMode) {
-        print('🎤 Generating speech with payload: ${json.encode(payload)}');
+      final runtime = await CartesiaVoiceRuntime.load();
+      final generationConfig = CartesiaSpeechPrompt.generationConfig(profile);
+      if (speedValue > 0) {
+        generationConfig['speed'] =
+            CartesiaSpeechPrompt.clampSpeed(speedValue);
       }
 
-      // Make API request to TTS bytes endpoint
-      final response = await _httpClient.post(
-        Uri.parse('${CartesiaMCPConfig.baseUrl}/tts/bytes'),
-        headers: CartesiaMCPConfig.apiHeaders,
-        body: json.encode(payload),
+      // Low-latency path: WebSocket + generation_config (speed/emotion/pronunciation).
+      if (contextId == null || contextId.isEmpty) {
+        try {
+          final pcm = await CartesiaStreamingTts.instance.synthesize(
+            transcript: prepared,
+            voiceId: effectiveVoiceId,
+            generationConfig: generationConfig,
+            pronunciationDictId: runtime.pronunciationDictId.isNotEmpty
+                ? runtime.pronunciationDictId
+                : null,
+            language: CartesiaMCPConfig.defaultLanguage,
+          );
+          if (pcm.isNotEmpty) {
+            final wav = pcm16MonoToWav(pcm);
+            if (kDebugMode) {
+              print(
+                '✅ Generated ${wav.length} bytes of audio (streaming WebSocket)',
+              );
+            }
+            return wav;
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('⚠️ Cartesia streaming TTS failed, using callable fallback: $e');
+          }
+          if (e is StateError &&
+              e.message.contains('already been listened')) {
+            await CartesiaStreamingTts.instance.dispose();
+          }
+        }
+      }
+
+      // Callable fallback (continuations / offline websocket).
+      final audioData = await _synthesizeViaCallable(
+        transcript: prepared,
+        voiceId: effectiveVoiceId,
+        generationConfig: generationConfig,
+        pronunciationDictId: runtime.pronunciationDictId.isNotEmpty
+            ? runtime.pronunciationDictId
+            : null,
+        contextId: contextId,
+        continueGeneration: continueGeneration,
       );
 
-      if (response.statusCode != 200) {
-        throw Exception(
-          'TTS generation failed: ${response.statusCode} - ${response.body}',
-        );
-      }
-
-      final audioData = response.bodyBytes;
-
       if (kDebugMode) {
-        print('✅ Generated ${audioData.length} bytes of audio');
+        print('✅ Generated ${audioData.length} bytes of audio (via function)');
       }
 
       return audioData;
+    } on FirebaseFunctionsException catch (e) {
+      final detail = (e.message ?? e.details?.toString() ?? '').trim();
+      final message = detail.isNotEmpty
+          ? 'synthesizeSpeech ${e.code}: $detail'
+          : 'synthesizeSpeech ${e.code}';
+      _errorController.add('Failed to generate speech: $message');
+      if (kDebugMode) {
+        print('❌ Error generating speech: $message');
+      }
+      throw Exception(message);
     } catch (e) {
       _errorController.add('Failed to generate speech: $e');
       if (kDebugMode) {
@@ -198,6 +231,119 @@ class CartesiaAPIService {
       }
       rethrow;
     }
+  }
+
+  static const int _maxCallableTranscriptChars = 1200;
+
+  Future<List<int>> _synthesizeViaCallable({
+    required String transcript,
+    required String voiceId,
+    required Map<String, dynamic> generationConfig,
+    String? pronunciationDictId,
+    String? contextId,
+    bool continueGeneration = false,
+  }) async {
+    final callable = _functions.httpsCallable(
+      CartesiaConfig.synthesizeFunctionName,
+      options: HttpsCallableOptions(timeout: _synthesizeTimeout),
+    );
+
+    Future<List<int>> invokeSegment(
+      String segment, {
+      required Map<String, dynamic> config,
+      String? segmentContextId,
+      bool segmentContinue = false,
+    }) async {
+      final payload = <String, dynamic>{
+        'transcript': segment,
+        'voice_id': voiceId,
+        'language': CartesiaMCPConfig.defaultLanguage,
+        'output_format': {
+          'container': 'wav',
+          'encoding': 'pcm_s16le',
+          'sample_rate': 44100,
+        },
+        if (config.isNotEmpty) 'generation_config': config,
+        if (pronunciationDictId != null && pronunciationDictId.isNotEmpty)
+          'pronunciation_dict_id': pronunciationDictId,
+        if (segmentContextId != null && segmentContextId.isNotEmpty) ...{
+          'context_id': segmentContextId,
+          'continue': segmentContinue,
+        },
+        'max_buffer_delay_ms': 0,
+      };
+      final result = await callable.call<Map<String, dynamic>>(payload);
+      final data = Map<String, dynamic>.from(result.data as Map);
+      final b64 = data['audio_base64'] as String?;
+      if (b64 == null || b64.isEmpty) {
+        throw Exception('synthesizeSpeech returned no audio');
+      }
+      return base64Decode(b64);
+    }
+
+    Future<List<int>> invokeWithRetry(String segment) async {
+      try {
+        return await invokeSegment(
+          segment,
+          config: generationConfig,
+          segmentContextId: contextId,
+          segmentContinue: continueGeneration,
+        );
+      } on FirebaseFunctionsException catch (e) {
+        if (e.code == 'internal' && generationConfig.containsKey('emotion')) {
+          final fallbackConfig = Map<String, dynamic>.from(generationConfig)
+            ..remove('emotion');
+          return invokeSegment(
+            segment,
+            config: fallbackConfig,
+            segmentContextId: contextId,
+            segmentContinue: continueGeneration,
+          );
+        }
+        rethrow;
+      }
+    }
+
+    if (transcript.length <= _maxCallableTranscriptChars) {
+      return invokeWithRetry(transcript);
+    }
+
+    final segments = _splitTranscript(transcript, _maxCallableTranscriptChars);
+    final pcm = BytesBuilder(copy: false);
+    for (final segment in segments) {
+      final wav = await invokeWithRetry(segment);
+      if (wav.length > 44) {
+        pcm.add(wav.sublist(44));
+      }
+    }
+    return pcm16MonoToWav(
+      Uint8List.fromList(pcm.toBytes()),
+      sampleRate: 44100,
+    );
+  }
+
+  List<String> _splitTranscript(String text, int maxChars) {
+    if (text.length <= maxChars) {
+      return [text];
+    }
+
+    final segments = <String>[];
+    var rest = text.trim();
+    while (rest.length > maxChars) {
+      var splitAt = rest.lastIndexOf('. ', maxChars);
+      if (splitAt < maxChars ~/ 2) {
+        splitAt = rest.lastIndexOf(' ', maxChars);
+      }
+      if (splitAt <= 0) {
+        splitAt = maxChars;
+      }
+      segments.add(rest.substring(0, splitAt).trim());
+      rest = rest.substring(splitAt).trim();
+    }
+    if (rest.isNotEmpty) {
+      segments.add(rest);
+    }
+    return segments;
   }
 
   /// Speak text using Cartesia TTS with VARK adaptations
@@ -208,8 +354,14 @@ class CartesiaAPIService {
     String? contentType,
     VarkPreferencesStruct? varkPreferences,
     double? speedMultiplier,
+    CartesiaSpeechProfile? speechProfile,
     VoidCallback? onComplete,
   }) async {
+    if (!await AiVoicePreferenceService.isEnabled()) {
+      onComplete?.call();
+      return;
+    }
+
     if (_isSpeaking) {
       await stopSpeaking();
     }
@@ -226,6 +378,7 @@ class CartesiaAPIService {
         contentType: contentType,
         varkPreferences: varkPreferences,
         speedMultiplier: speedMultiplier,
+        speechProfile: speechProfile,
       );
 
       // Play the generated audio
@@ -244,8 +397,9 @@ class CartesiaAPIService {
     VoidCallback? onComplete,
   }) async {
     try {
-      // Create a temporary audio source from bytes
-      final audioSource = _BytesAudioSource(audioData);
+      // Create a temporary audio source from bytes, tagged so playback can
+      // continue in the background with lock-screen controls.
+      final audioSource = _BytesAudioSource(audioData, tag: _makeMediaItem());
 
       await _audioPlayer.setAudioSource(audioSource);
       await _audioPlayer.play();
@@ -276,8 +430,29 @@ class CartesiaAPIService {
     String? contentType,
     VarkPreferencesStruct? varkPreferences,
     double? speedMultiplier,
+    CartesiaSpeechProfile? speechProfile,
     VoidCallback? onComplete,
+    bool useContinuations = true,
   }) async {
+    if (!await AiVoicePreferenceService.isEnabled()) {
+      onComplete?.call();
+      return;
+    }
+
+    if (useContinuations) {
+      await speakTextWithContinuations(
+        text: text,
+        voiceId: voiceId,
+        voiceProfileKey: voiceProfileKey,
+        contentType: contentType,
+        varkPreferences: varkPreferences,
+        speedMultiplier: speedMultiplier,
+        speechProfile: speechProfile,
+        onComplete: onComplete,
+      );
+      return;
+    }
+
     if (_isSpeaking) {
       await stopSpeaking();
     }
@@ -293,6 +468,7 @@ class CartesiaAPIService {
         contentType: contentType,
         varkPreferences: varkPreferences,
         speedMultiplier: speedMultiplier,
+        speechProfile: speechProfile,
       );
 
       await playAudioDataAndWait(audioData, onComplete: onComplete);
@@ -304,12 +480,37 @@ class CartesiaAPIService {
     }
   }
 
+  /// Prefer one-shot streaming synthesis (instant TTFB). Continuations are only
+  /// used when the callable fallback path is required.
+  Future<void> speakTextWithContinuations({
+    required String text,
+    String? voiceId,
+    String? voiceProfileKey,
+    String? contentType,
+    VarkPreferencesStruct? varkPreferences,
+    double? speedMultiplier,
+    CartesiaSpeechProfile? speechProfile,
+    VoidCallback? onComplete,
+  }) async {
+    await speakTextAndWait(
+      text: text,
+      voiceId: voiceId,
+      voiceProfileKey: voiceProfileKey,
+      contentType: contentType,
+      varkPreferences: varkPreferences,
+      speedMultiplier: speedMultiplier,
+      speechProfile: speechProfile,
+      onComplete: onComplete,
+      useContinuations: false,
+    );
+  }
+
   Future<void> playAudioDataAndWait(
     List<int> audioData, {
     VoidCallback? onComplete,
   }) async {
     try {
-      final audioSource = _BytesAudioSource(audioData);
+      final audioSource = _BytesAudioSource(audioData, tag: _makeMediaItem());
       await _audioPlayer.setAudioSource(audioSource);
 
       final completion = Completer<void>();
@@ -375,6 +576,24 @@ class CartesiaAPIService {
     }
   }
 
+  /// Title shown on the lock-screen / notification media controls while voice
+  /// plays in the background. Callers (e.g. MindCoach) can set this so the
+  /// background control surface reflects the current activity.
+  String _playbackTitle = 'FoCoCo';
+
+  void setPlaybackTitle(String title) {
+    final trimmed = title.trim();
+    _playbackTitle = trimmed.isEmpty ? 'FoCoCo' : trimmed;
+  }
+
+  /// Build the `MediaItem` tag that lets `just_audio_background` keep playback
+  /// alive in the background and render lock-screen controls.
+  MediaItem _makeMediaItem() => MediaItem(
+        id: 'fococo-voice-${DateTime.now().microsecondsSinceEpoch}',
+        title: _playbackTitle,
+        artist: 'FoCoCo',
+      );
+
   double _resolveSpeedValue({
     required Map<String, dynamic> voiceSettings,
     String? voiceProfileKey,
@@ -394,12 +613,14 @@ class CartesiaAPIService {
 
     switch (voiceSettings['speed']) {
       case 'slow':
-        return 0.8;
+        return CartesiaSpeechPrompt.clampSpeed(0.85);
       case 'fast':
-        return 1.2;
+        return CartesiaSpeechPrompt.clampSpeed(1.15);
       case 'normal':
       default:
-        return 1.0;
+        return CartesiaSpeechPrompt.clampSpeed(
+          CartesiaMCPConfig.defaultSpeedMultiplier,
+        );
     }
   }
 
@@ -488,6 +709,76 @@ class CartesiaAPIService {
     return settings;
   }
 
+  CartesiaSpeechProfile _speechProfileForContent(String? contentType) {
+    switch (contentType) {
+      case 'golf_reflection':
+        return CartesiaSpeechPrompt.golfReflection;
+      case 'daily_insight':
+        return CartesiaSpeechPrompt.dailyInsight;
+      case 'meditation':
+        return const CartesiaSpeechProfile(
+          speedRatio: 0.75,
+          emotion: 'peaceful',
+          prependEmotionTag: true,
+          prependSpeedTag: true,
+        );
+      default:
+        return CartesiaSpeechPrompt.mentorCalm;
+    }
+  }
+
+  /// Transcribe recorded audio with the Cartesia speech-to-text API.
+  ///
+  /// Cartesia is the single voice provider for every voice input in the app.
+  /// This mirrors the web app's `/api/golfchat/voice/transcribe` route:
+  /// `POST /stt` (multipart) with model `ink-whisper`.
+  Future<CartesiaTranscript> transcribeAudio({
+    required List<int> audioBytes,
+    String fileName = 'voice-input.wav',
+    MediaType? contentType,
+    String? encoding,
+    int? sampleRate,
+    String? language,
+  }) async {
+    if (audioBytes.isEmpty) {
+      return const CartesiaTranscript(text: '', words: []);
+    }
+
+    try {
+      // Proxy through the Cloud Function — the STT key stays in Secret Manager.
+      final mime = contentType ?? MediaType('audio', 'wav');
+      final callable =
+          _functions.httpsCallable(CartesiaConfig.transcribeFunctionName);
+      final result = await callable.call<Map<String, dynamic>>({
+        'audio_base64': base64Encode(audioBytes),
+        'file_name': fileName,
+        'mime_type': '${mime.type}/${mime.subtype}',
+        if (encoding != null && encoding.isNotEmpty) 'encoding': encoding,
+        if (sampleRate != null) 'sample_rate': sampleRate,
+        if (language != null && language.isNotEmpty) 'language': language,
+      });
+
+      final decoded = Map<String, dynamic>.from(result.data as Map);
+      final words = (decoded['words'] as List<dynamic>? ?? [])
+          .map((w) => w.toString())
+          .where((w) => w.isNotEmpty)
+          .toList();
+
+      return CartesiaTranscript(
+        text: (decoded['text'] ?? '').toString().trim(),
+        words: words,
+        language: decoded['language']?.toString(),
+        durationSeconds: (decoded['duration'] as num?)?.toDouble(),
+      );
+    } catch (e) {
+      _errorController.add('Failed to transcribe audio: $e');
+      if (kDebugMode) {
+        print('❌ Error transcribing audio: $e');
+      }
+      rethrow;
+    }
+  }
+
   /// Dispose resources
   void dispose() {
     _speakingController.close();
@@ -495,26 +786,48 @@ class CartesiaAPIService {
     _playerStateController.close();
     _positionController.close();
     _audioPlayer.dispose();
-    _httpClient.close();
   }
+}
+
+/// Result of a Cartesia speech-to-text transcription.
+class CartesiaTranscript {
+  const CartesiaTranscript({
+    required this.text,
+    required this.words,
+    this.language,
+    this.durationSeconds,
+  });
+
+  final String text;
+  final List<String> words;
+  final String? language;
+  final double? durationSeconds;
+
+  bool get isEmpty => text.trim().isEmpty;
+  bool get isNotEmpty => !isEmpty;
 }
 
 /// Custom audio source for playing bytes data
 class _BytesAudioSource extends StreamAudioSource {
   final List<int> _audioData;
 
-  _BytesAudioSource(this._audioData);
+  _BytesAudioSource(this._audioData, {MediaItem? tag}) : super(tag: tag);
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
-    start ??= 0;
-    end ??= _audioData.length;
+    final rangeStart = start ?? 0;
+    final rangeEnd = end ?? _audioData.length;
 
     return StreamAudioResponse(
       sourceLength: _audioData.length,
-      contentLength: end - start,
-      offset: start,
-      stream: Stream.value(Uint8List.fromList(_audioData.sublist(start, end))),
+      contentLength: rangeEnd - rangeStart,
+      offset: rangeStart,
+      stream: Stream<List<int>>.multi((controller) {
+        controller.add(
+          Uint8List.fromList(_audioData.sublist(rangeStart, rangeEnd)),
+        );
+        controller.close();
+      }),
       contentType: 'audio/wav',
     );
   }

@@ -200,10 +200,9 @@ final spatialResponse = await geminiAPI.generateContent(
 ## Configuration
 
 ### API Keys
-```dart
-// Set in environment
-const String _geminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
-```
+The Gemini key is stored in Google Cloud Secret Manager as `GEMINI_KEY_APP`
+and consumed only by Cloud Functions. The Flutter client uses Firebase AI
+Logic (App Check authenticated) — no `String.fromEnvironment` lookup.
 
 ### Permissions
 ```dart

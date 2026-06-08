@@ -1,27 +1,26 @@
 /// Configuration for Gemini Live API
 /// Based on: https://ai.google.dev/gemini-api/docs/live
-
-import '/services/gemini_key_service.dart';
-
+///
+/// NOTE: The raw-API-key WebSocket path (`wss://...?key=...`) has been
+/// retired. Live bidi traffic must go through `FirebaseAI.googleAI().liveModel(...)`
+/// which authenticates via Firebase App Check. These getters remain only so
+/// call-sites compile; they return empty values and `isConfigured` is always
+/// false for the raw path. Migrate any remaining consumer to `firebase_ai`.
 class GeminiLiveAPIConfig {
   GeminiLiveAPIConfig._();
 
-  /// Gemini Live API WebSocket endpoint
+  /// Gemini Live API WebSocket endpoint (deprecated — use firebase_ai Live).
   static const String websocketEndpoint =
       'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent';
 
-  /// Synchronous accessor — returns the cached key or the compile-time key.
-  /// Call [GeminiKeyService.instance.preload()] after sign-in to populate.
-  static String get apiKey {
-    const keyFromEnv = String.fromEnvironment('GEMINI_API_KEY');
-    return GeminiKeyService.instance.cachedKey ?? keyFromEnv;
-  }
+  /// Always empty — client no longer holds a Gemini key.
+  static String get apiKey => '';
 
-  /// Async accessor — fetches from Secret Manager if not yet cached.
-  static Future<String> getApiKey() => GeminiKeyService.instance.getKey();
+  /// Always empty — use `FirebaseAI.googleAI().liveModel(...)` instead.
+  static Future<String> getApiKey() async => '';
 
-  /// Check if API key is configured
-  static bool get isConfigured => apiKey.isNotEmpty;
+  /// Always false for the raw-key path.
+  static bool get isConfigured => false;
 
   /// Native audio models (best quality, supports thinking)
   static const String nativeAudioModel =

@@ -13,7 +13,12 @@ Required keys:
 - `STRIPE_SECRET_KEY`
 - `LIVEKIT_API_KEY`
 - `LIVEKIT_API_SECRET`
-- `GEMINI_API_KEY`
+- `CARTESIA_LINE_AGENT_ID` (Cartesia Line agent id after `cartesia deploy`)
+- `CARTESIA_PRONUNCIATION_DICT_ID` (optional; sonic-3+ custom pronunciations)
+
+> Gemini and Cartesia API keys are NOT listed here. They live in Google Cloud
+> Secret Manager as `GEMINI_KEY_APP` and `CARTESIA_API`, consumed only by Cloud
+> Functions via `defineSecret(...)`. Never place them in `.env.*`.
 
 Template:
 
@@ -23,7 +28,6 @@ cat > .env.fo-co-co-89gnf5 <<'EOF'
 STRIPE_SECRET_KEY=sk_live_or_test_value
 LIVEKIT_API_KEY=your_livekit_api_key
 LIVEKIT_API_SECRET=your_livekit_api_secret
-GEMINI_API_KEY=your_gemini_api_key
 EOF
 ```
 
@@ -85,6 +89,11 @@ firebase deploy --only functions --project fo-co-co-89gnf5
   - `generateLiveKitToken`
   - `generateMindCoachSessionV2`
   - `completeMindCoachSessionRunV2`
+  - `synthesizeSpeech`
+  - `transcribeSpeech`
+  - `generateGolfChatResponse`
+  - `getCartesiaVoiceRuntimeConfig`
+  - `mintCartesiaAccessToken`
 - Execute one real call path for each:
   - LiveKit token generation.
   - MindCoach generation and completion.

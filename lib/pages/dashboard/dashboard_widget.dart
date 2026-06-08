@@ -163,6 +163,8 @@ class _DashboardWidgetState extends State<DashboardWidget>
                 },
               )
             : null,
+        drawerEnableOpenDragGesture: loggedIn,
+        drawerEdgeDragWidth: loggedIn ? 28.0 : null,
         endDrawer: loggedIn ? _buildNotificationsDrawer(theme) : null,
         body: Container(
           decoration: BoxDecoration(

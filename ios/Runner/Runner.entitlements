@@ -2,11 +2,28 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!--
+	  TestFlight and App Store builds need aps-environment=production. Apple
+	  USUALLY rewrites `development` → `production` automatically when you
+	  upload via Xcode/Transporter, but only when the distribution provisioning
+	  profile contains the production entitlement. With manual signing or older
+	  profiles the value is preserved as-is, which causes APNs registration to
+	  fail and FirebaseMessaging to throw on launch — a plausible source of
+	  the TestFlight launch crash that does not reproduce in local Debug.
+	  Setting `production` here is correct for both TestFlight and the App
+	  Store; for local Debug builds Xcode auto-overrides this to `development`
+	  via the development provisioning profile, so this change does not break
+	  local push testing.
+	-->
 	<key>aps-environment</key>
-	<string>development</string>
+	<string>production</string>
 	<key>com.apple.developer.applesignin</key>
 	<array>
 		<string>Default</string>
+	</array>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.fococo.fococo</string>
 	</array>
 </dict>
 </plist>

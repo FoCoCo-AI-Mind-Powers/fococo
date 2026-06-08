@@ -1,16 +1,15 @@
-import '/auth/firebase_auth/auth_util.dart';
-import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_components.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
+import '/pages/fococo_tab/fococo_tab_widget.dart';
+import '/pages/support/support_submission_widget.dart';
+import '/services/support_submission_service.dart';
 import 'support_model.dart';
 export 'support_model.dart';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:in_app_review/in_app_review.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SupportWidget extends StatefulWidget {
@@ -29,7 +28,6 @@ class _SupportWidgetState extends State<SupportWidget>
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // Animation controllers
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
@@ -40,7 +38,6 @@ class _SupportWidgetState extends State<SupportWidget>
     super.initState();
     _model = createModel(context, () => SupportModel());
 
-    // Initialize animations
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -58,7 +55,6 @@ class _SupportWidgetState extends State<SupportWidget>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
 
-    // Start animations
     _fadeController.forward();
     _slideController.forward();
   }
@@ -83,20 +79,6 @@ class _SupportWidgetState extends State<SupportWidget>
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: theme.primaryBackground,
-        drawer: loggedIn
-            ? StreamBuilder<UserRecord>(
-                stream: UserRecord.getDocument(
-                    FirebaseFirestore.instance.doc('user/${currentUserUid}')),
-                builder: (context, snapshot) {
-                  final userData = snapshot.data;
-                  return FoCoCoDrawer(
-                    currentUser: userData,
-                    currentRoute: 'support',
-                    onNavigate: (route) => context.goNamed(route),
-                  );
-                },
-              )
-            : null,
         body: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -115,66 +97,32 @@ class _SupportWidgetState extends State<SupportWidget>
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  SliverAppBar(
-                    expandedHeight: 100.0,
-                    floating: false,
-                    pinned: true,
-                    backgroundColor: theme.primaryBackground,
-                    elevation: 0,
-                    surfaceTintColor: Colors.transparent,
-                    automaticallyImplyLeading: false,
-                    leading: Padding(
-                      padding: const EdgeInsets.only(left: 16),
-                      child: GestureDetector(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          scaffoldKey.currentState?.openDrawer();
-                        },
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: theme.glassBackground.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: theme.glassBorder.withValues(alpha: 0.2),
-                              width: 1,
-                            ),
+                  SliverToBoxAdapter(
+                    child: SafeArea(
+                      bottom: false,
+                      child: FoCoCoInlineScreenHeader(
+                        title: 'Support',
+                        subtitle: 'Help & contact',
+                        leading: IconButton(
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          constraints: const BoxConstraints(
+                            minWidth: 48,
+                            minHeight: 44,
                           ),
-                          child: Icon(
-                            Icons.menu_rounded,
+                          icon: Icon(
+                            Icons.arrow_back_ios_new_rounded,
                             color: theme.primaryText,
-                            size: 24,
+                            size: 20,
                           ),
-                        ),
-                      ),
-                    ),
-                    flexibleSpace: FlexibleSpaceBar(
-                      background: SafeArea(
-                        bottom: false,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(72, 20, 20, 20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Text(
-                                'Support',
-                                style: theme.headlineMedium.copyWith(
-                                  color: theme.primaryText,
-                                  fontWeight: FontWeight.w800,
-                                  fontFamily: 'Montserrat',
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Help & resources',
-                                style: theme.bodySmall.copyWith(
-                                  color: theme.secondaryText,
-                                ),
-                              ),
-                            ],
-                          ),
+                          tooltip: 'Back',
+                          onPressed: () {
+                            if (context.canPop()) {
+                              context.pop();
+                            } else {
+                              context.goNamed(FoCoCoTabWidget.routeName);
+                            }
+                          },
                         ),
                       ),
                     ),
@@ -183,13 +131,7 @@ class _SupportWidgetState extends State<SupportWidget>
                     padding: const EdgeInsets.all(20),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
-                        _buildQuickHelpSection(theme),
-                        const SizedBox(height: 24),
-                        _buildFAQSection(theme),
-                        const SizedBox(height: 24),
-                        _buildContactSection(theme),
-                        const SizedBox(height: 24),
-                        _buildResourcesSection(theme),
+                        _buildSupportSection(theme),
                         const SizedBox(height: 100),
                       ]),
                     ),
@@ -202,130 +144,17 @@ class _SupportWidgetState extends State<SupportWidget>
         bottomNavigationBar: EnhancedFoCoCoNavBar(
           currentRoute: 'support',
           barBackgroundColor: theme.primaryBackground,
-          onTap: (route) {
-            print('🔄 Support page: Navigation requested to route: $route');
-            context.goNamed(route);
-          },
+          onTap: (route) => context.goNamed(route),
           currentUser: null,
         ),
       ),
     );
   }
 
-  Widget _buildQuickHelpSection(FlutterFlowTheme theme) {
+  Widget _buildSupportSection(FlutterFlowTheme theme) {
     return GlassDashboardCard(
-      title: 'Quick Help',
-      subtitle: 'Get started with common tasks',
-      children: [
-        Column(
-          children: [
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildQuickHelpCard(
-                    theme,
-                    Icons.golf_course,
-                    'Open CaddyPlay',
-                    'Capture a round or practice session',
-                    () => context.goNamed('caddy_play'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildQuickHelpCard(
-                    theme,
-                    Icons.chat_bubble_outline_rounded,
-                    'Open GolfChat',
-                    'Reflect on what happened',
-                    () => context.goNamed('golf_chat'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildQuickHelpCard(
-                    theme,
-                    Icons.insights,
-                    'View Insights',
-                    'Check AI recommendations',
-                    () => context.goNamed('ai_insights'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildQuickHelpCard(
-                    theme,
-                    Icons.person,
-                    'Edit Profile',
-                    'Update your information',
-                    () => context.goNamed('edit_profile'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        )
-      ],
-    );
-  }
-
-  Widget _buildFAQSection(FlutterFlowTheme theme) {
-    final faqs = [
-      {
-        'question': 'How do I log my first golf round?',
-        'answer':
-            'Go to the Golf Rounds page and tap the "+" button. Fill in your course, score, and mental performance ratings.',
-      },
-      {
-        'question': 'What is the Mental Performance Index?',
-        'answer':
-            'The MPI combines your Focus, Confidence, and Control scores to give you an overall mental game rating.',
-      },
-      {
-        'question': 'How do AI Insights work?',
-        'answer':
-            'Our AI analyzes your performance data and provides personalized recommendations to improve your mental game.',
-      },
-      {
-        'question': 'Can I use FoCoCo offline?',
-        'answer':
-            'Some features work offline, but you\'ll need an internet connection for AI insights and data sync.',
-      },
-      {
-        'question': 'How do I cancel my subscription?',
-        'answer':
-            'Go to Settings > Subscription Management to view and manage your subscription.',
-      },
-    ];
-
-    return GlassDashboardCard(
-      title: 'Frequently Asked Questions',
-      subtitle: 'Find answers to common questions',
-      children: [
-        Column(
-          children: [
-            const SizedBox(height: 16),
-            ...faqs
-                .map((faq) => _buildFAQItem(
-                      theme,
-                      faq['question']!,
-                      faq['answer']!,
-                    ))
-                .toList(),
-          ],
-        )
-      ],
-    );
-  }
-
-  Widget _buildContactSection(FlutterFlowTheme theme) {
-    return GlassDashboardCard(
-      title: 'Contact Support',
-      subtitle: 'Get in touch with our team',
+      title: 'Help & Support',
+      subtitle: 'Contact the FoCoCo team',
       children: [
         Column(
           children: [
@@ -334,171 +163,40 @@ class _SupportWidgetState extends State<SupportWidget>
               theme,
               Icons.email_outlined,
               'Email Support',
-              'support@fococo.app',
-              () => _launchEmail('support@fococo.app'),
-            ),
-            _buildContactItem(
-              theme,
-              Icons.chat_outlined,
-              'Live Chat',
-              'Available 9 AM - 5 PM EST',
-              () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Live chat coming soon!'),
-                    backgroundColor: theme.primary,
-                  ),
-                );
-              },
+              'support@fococo.ai',
+              () => _launchEmail(
+                'support@fococo.ai',
+                subject: 'FoCoCo Support',
+              ),
             ),
             _buildContactItem(
               theme,
               Icons.bug_report_outlined,
               'Report a Bug',
               'Help us improve the app',
-              () => _launchEmail('bugs@fococo.app', subject: 'Bug Report'),
+              () => SupportSubmissionWidget.open(
+                context,
+                SupportSubmissionType.bug,
+              ),
             ),
             _buildContactItem(
               theme,
               Icons.feedback_outlined,
               'Send Feedback',
               'Share your thoughts',
-              () =>
-                  _launchEmail('feedback@fococo.app', subject: 'App Feedback'),
+              () => SupportSubmissionWidget.open(
+                context,
+                SupportSubmissionType.feedback,
+              ),
+            ),
+            _buildContactItem(
+              theme,
+              Icons.star_outline_rounded,
+              'Rate App',
+              'Leave a review on the App Store or Google Play',
+              _rateApp,
             ),
           ],
-        )
-      ],
-    );
-  }
-
-  Widget _buildResourcesSection(FlutterFlowTheme theme) {
-    return GlassDashboardCard(
-      title: 'Resources',
-      subtitle: 'Learn more about FoCoCo',
-      children: [
-        Column(
-          children: [
-            const SizedBox(height: 16),
-            _buildResourceItem(
-              theme,
-              Icons.book_outlined,
-              'User Guide',
-              'Complete guide to using FoCoCo',
-              () => _launchURL('https://fococo.app/guide'),
-            ),
-            _buildResourceItem(
-              theme,
-              FontAwesomeIcons.youtube,
-              'Video Tutorials',
-              'Watch how-to videos',
-              () => _launchURL('https://youtube.com/@fococo'),
-            ),
-            _buildResourceItem(
-              theme,
-              Icons.article_outlined,
-              'Blog',
-              'Tips and insights for better golf',
-              () => _launchURL('https://fococo.app/blog'),
-            ),
-            _buildResourceItem(
-              theme,
-              Icons.privacy_tip_outlined,
-              'Privacy Policy',
-              'How we protect your data',
-              () => _launchURL('https://fococo.app/privacy'),
-            ),
-            _buildResourceItem(
-              theme,
-              Icons.description_outlined,
-              'Terms of Service',
-              'App usage terms and conditions',
-              () => _launchURL('https://fococo.app/terms'),
-            ),
-          ],
-        )
-      ],
-    );
-  }
-
-  Widget _buildQuickHelpCard(
-    FlutterFlowTheme theme,
-    IconData icon,
-    String title,
-    String subtitle,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: theme.glassBackground.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: theme.glassBorder.withValues(alpha: 0.1),
-            width: 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: theme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: theme.primary,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: theme.bodyMedium.copyWith(
-                color: theme.primaryText,
-                fontWeight: FontWeight.w600,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: theme.labelSmall.copyWith(
-                color: theme.secondaryText,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFAQItem(FlutterFlowTheme theme, String question, String answer) {
-    return ExpansionTile(
-      title: Text(
-        question,
-        style: theme.bodyMedium.copyWith(
-          color: theme.primaryText,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            answer,
-            style: theme.bodySmall.copyWith(
-              color: theme.secondaryText,
-              height: 1.4,
-            ),
-          ),
         ),
       ],
     );
@@ -521,11 +219,7 @@ class _SupportWidgetState extends State<SupportWidget>
             color: theme.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            color: theme.primary,
-            size: 22,
-          ),
+          child: Icon(icon, color: theme.primary, size: 22),
         ),
         title: Text(
           title,
@@ -536,9 +230,7 @@ class _SupportWidgetState extends State<SupportWidget>
         ),
         subtitle: Text(
           subtitle,
-          style: theme.labelSmall.copyWith(
-            color: theme.secondaryText,
-          ),
+          style: theme.labelSmall.copyWith(color: theme.secondaryText),
         ),
         trailing: Icon(
           Icons.arrow_forward_ios,
@@ -546,97 +238,45 @@ class _SupportWidgetState extends State<SupportWidget>
           size: 16,
         ),
         onTap: onTap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
-  Widget _buildResourceItem(
-    FlutterFlowTheme theme,
-    IconData icon,
-    String title,
-    String subtitle,
-    VoidCallback onTap,
-  ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: theme.secondary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            icon,
-            color: theme.secondary,
-            size: 22,
-          ),
-        ),
-        title: Text(
-          title,
-          style: theme.bodyMedium.copyWith(
-            color: theme.primaryText,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: theme.labelSmall.copyWith(
-            color: theme.secondaryText,
-          ),
-        ),
-        trailing: Icon(
-          Icons.open_in_new,
-          color: theme.secondaryText,
-          size: 16,
-        ),
-        onTap: onTap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-    );
+  Future<void> _rateApp() async {
+    final review = InAppReview.instance;
+    if (await review.isAvailable()) {
+      await review.requestReview();
+    }
   }
 
-  Future<void> _launchEmail(String email, {String? subject}) async {
+  Future<void> _launchEmail(
+    String email, {
+    String? subject,
+    String? body,
+  }) async {
+    final queryParts = <String>[];
+    if (subject != null) {
+      queryParts.add('subject=${Uri.encodeComponent(subject)}');
+    }
+    if (body != null) {
+      queryParts.add('body=${Uri.encodeComponent(body)}');
+    }
     final uri = Uri(
       scheme: 'mailto',
       path: email,
-      query: subject != null ? 'subject=${Uri.encodeComponent(subject)}' : null,
+      query: queryParts.isEmpty ? null : queryParts.join('&'),
     );
 
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not open email app'),
-            backgroundColor: FlutterFlowTheme.of(context).error,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _launchURL(String url) async {
-    final uri = Uri.parse(url);
-
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not open URL'),
-            backgroundColor: FlutterFlowTheme.of(context).error,
-          ),
-        );
-      }
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Could not open email app'),
+          backgroundColor: FlutterFlowTheme.of(context).error,
+        ),
+      );
     }
   }
 }

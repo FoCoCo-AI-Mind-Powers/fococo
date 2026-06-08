@@ -1,22 +1,54 @@
 import 'dart:async';
-import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:just_audio/just_audio.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:fluid_background/fluid_background.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '/ai_integration/config/cartesia_mcp_config.dart';
+import '/ai_integration/services/cartesia_api_service.dart';
+import '/ai_integration/services/cartesia_speech_prompt.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
-import '/auth/firebase_auth/auth_util.dart';
-import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/widgets/fococo_drawer_widget.dart';
 
 import 'fococo_insight_service.dart';
 
+// IMPORTANT — crash-mitigation notes (keep in mind before re-adding features).
+//
+// Symptom: app crashes on iOS launch when the FoCoCo tab is the default route.
+// Native trace ends in `std::__libcpp_condvar_wait` — this is the Firestore /
+// gRPC native thread abort that happens when Firestore is touched while the
+// platform is still warming up (Flutter engine + Firebase plugins + gRPC
+// channel all initializing at the same time).
+//
+// To keep the app from crashing, this screen intentionally touches NO Firebase
+// APIs on mount:
+//   • No FirebaseFirestore.instance.* calls
+//   • No Firebase Functions calls
+//   • No StreamBuilder / FutureBuilder on remote docs
+//   • No user-record drawer (drawer is disabled for now)
+//
+// What we DO do:
+//   • Read the cached insight from SharedPreferences (pure on-disk, safe).
+//   • After a 3s delay — i.e. well past the native init window — kick off the
+//     backend insight refresh in the background ([FoCoCoInsightService] hits
+//     `getOrCreateFoCoCoDailyInsight` with a refreshed ID token; on failure uses
+//     Firebase AI Logic on-device so copy still generates when Functions/Gemini
+//     backend is degraded). Result is persisted to prefs.
+//   • Cartesia TTS runs only after the user taps the speaker (no audio init on
+//     first paint).
+//
+// Daily insight copy is generated server-side (see firebase/functions/
+// fococo_daily_insights.js — model gemini-3.1-pro-preview). Live / richer audio
+// experiments can follow gemini_voice_config live model ids separately.
+//
+// When layering features back in, do so one at a time and confirm on a real
+// TestFlight build before adding the next:
+//   1. Drawer (UserRecord fetch) — only after first successful insight load
+//   2. `markOpened` Firestore write
+//   3. Heavy animations beyond [FluidBackground] + nav logo rotation
+//   4. Screen-time tracking + WidgetsBindingObserver
 class FoCoCoTabWidget extends StatefulWidget {
   const FoCoCoTabWidget({super.key});
 
@@ -27,628 +59,342 @@ class FoCoCoTabWidget extends StatefulWidget {
   State<FoCoCoTabWidget> createState() => _FoCoCoTabWidgetState();
 }
 
-enum _SpeakerState { idle, playing, failed }
+class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget> {
+  static const _prefKeyCurrentJson = 'fococo_insight_json';
+  static const _prefKeyLastJson = 'fococo_insight_last_json';
+  static const _fallbackText =
+      'The MindGame System is ready. Every round, every session, every '
+      'conversation builds the picture of your mental game.';
 
-class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
-  FoCoCoDailyInsight? _insight;
   String? _insightText;
+  FoCoCoDailyInsight? _insight;
   bool _insightLoading = true;
-  bool _hasBootstrapped = false;
-
-  _SpeakerState _speakerState = _SpeakerState.idle;
-  AudioPlayer? _audioPlayer;
-  bool _ttsReady = false;
-  bool _showSpeakerLoader = false;
-  bool _speakerTimedOut = false;
-  bool _audioPreloaded = false;
-
-  Timer? _speakerLoaderTimer;
-  Timer? _speakerHideTimer;
-  DateTime? _screenVisibleSince;
-  bool _isCurrentRouteVisible = true;
-
-  late AnimationController _waveController;
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnim;
-  late AnimationController _shimmerController;
+  bool _refreshBusy = false;
+  bool _audioBusy = false;
+  String? _refreshError;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
+    unawaited(_bootstrapInsight());
+  }
 
-    _waveController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 8),
-    )..repeat();
-
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.45, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-
-    _shimmerController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat();
-
-    _audioPlayer = AudioPlayer();
-    _audioPlayer!.playerStateStream.listen(_onPlayerState);
-
+  Future<void> _bootstrapInsight() async {
+    await _hydrateFromCache();
+    if (!mounted) return;
+    await _refreshInsightSafely();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    unawaited(_flushScreenTime());
-    _cancelSpeakerTimers();
-    _waveController.dispose();
-    _pulseController.dispose();
-    _shimmerController.dispose();
-    _audioPlayer?.dispose();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      if (_isCurrentRouteVisible) {
-        _resumeScreenTimer();
+  Future<void> _hydrateFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonCurrent = prefs.getString(_prefKeyCurrentJson);
+      final jsonLast = prefs.getString(_prefKeyLastJson);
+      final insight = _decodeInsight(jsonCurrent) ?? _decodeInsight(jsonLast);
+      final text = insight?.insightText;
+      if (!mounted) return;
+      setState(() {
+        _insight = insight;
+        _insightText = (text != null && text.isNotEmpty) ? text : _fallbackText;
+        _insightLoading = false;
+        _refreshError = null;
+      });
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('⚠️ FoCoCo cache hydrate failed: $error');
       }
-      return;
-    }
-
-    unawaited(_flushScreenTime());
-    if (_speakerState == _SpeakerState.playing) {
-      unawaited(_audioPlayer?.stop());
-      if (mounted) {
-        setState(() => _speakerState = _SpeakerState.idle);
-      }
+      if (!mounted) return;
+      setState(() {
+        _insightText = _fallbackText;
+        _insightLoading = false;
+      });
     }
   }
 
-  Future<void> _loadInsight() async {
-    setState(() => _insightLoading = true);
+  FoCoCoDailyInsight? _decodeInsight(String? jsonValue) {
+    if (jsonValue == null || jsonValue.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(jsonValue);
+      if (decoded is! Map) return null;
+      return FoCoCoDailyInsight.fromMap(
+        Map<String, dynamic>.from(decoded),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _refreshInsightSafely({bool userInitiated = false}) async {
+    if (_refreshBusy) return;
+    setState(() {
+      _refreshBusy = true;
+      _refreshError = null;
+      if (userInitiated) {
+        _insightLoading = true;
+      }
+    });
     try {
       final insight = await FoCoCoInsightService.instance.getTodayInsight();
       if (!mounted) return;
-
+      final text = insight.insightText.trim().isNotEmpty
+          ? insight.insightText.trim()
+          : _fallbackText;
       setState(() {
         _insight = insight;
-        _insightText = insight.insightText;
+        _insightText = text;
         _insightLoading = false;
+        _refreshBusy = false;
       });
-
-      unawaited(FoCoCoInsightService.instance.markOpened(insight));
-      _resumeScreenTimer();
-      unawaited(_prepareTTS(insight.insightText));
+      if (insight.hasRemoteRecord && !insight.opened) {
+        unawaited(FoCoCoInsightService.instance.markOpened(insight));
+      }
     } catch (error) {
       if (kDebugMode) {
-        debugPrint('⚠️ FoCoCo tab insight load failed: $error');
-      }
-      if (!mounted) return;
-      setState(() => _insightLoading = false);
-    }
-  }
-
-  Future<void> _preloadCachedAudio() async {
-    try {
-      final audioFile = await _todayAudioFile();
-      if (!await audioFile.exists()) return;
-
-      await _preloadAudioFile(audioFile);
-      if (!mounted) return;
-      setState(() {
-        _ttsReady = true;
-        _speakerState = _speakerState == _SpeakerState.failed
-            ? _SpeakerState.failed
-            : _SpeakerState.idle;
-      });
-    } catch (error) {
-      if (kDebugMode) {
-        debugPrint('⚠️ FoCoCoTab cached audio preload failed: $error');
-      }
-    }
-  }
-
-  Future<void> _prepareTTS(String text) async {
-    try {
-      final audioFile = await _todayAudioFile();
-      if (await audioFile.exists()) {
-        await _preloadAudioFile(audioFile);
-        if (!mounted) return;
-        setState(() {
-          _ttsReady = true;
-          _showSpeakerLoader = false;
-          _speakerTimedOut = false;
-          if (_speakerState != _SpeakerState.failed) {
-            _speakerState = _SpeakerState.idle;
-          }
-        });
-        return;
-      }
-
-      _cancelSpeakerTimers();
-      if (mounted) {
-        setState(() {
-          _ttsReady = false;
-          _audioPreloaded = false;
-          _showSpeakerLoader = false;
-          _speakerTimedOut = false;
-          _speakerState = _SpeakerState.idle;
-        });
-      }
-
-      _speakerLoaderTimer = Timer(const Duration(seconds: 2), () {
-        if (!mounted || _ttsReady || _speakerTimedOut) return;
-        setState(() => _showSpeakerLoader = true);
-      });
-
-      _speakerHideTimer = Timer(const Duration(seconds: 5), () {
-        if (!mounted || _ttsReady) return;
-        setState(() {
-          _speakerTimedOut = true;
-          _showSpeakerLoader = false;
-          _speakerState = _SpeakerState.failed;
-        });
-      });
-
-      final audioBytes = await _generateAudioWithRetry(text);
-      if (audioBytes == null) {
-        if (!mounted) return;
-        if (_speakerTimedOut) {
-          setState(() {
-            _showSpeakerLoader = false;
-            _speakerState = _SpeakerState.failed;
-          });
-        }
-        return;
-      }
-
-      await audioFile.writeAsBytes(audioBytes);
-      await _preloadAudioFile(audioFile);
-      if (!mounted) return;
-
-      setState(() {
-        _ttsReady = true;
-        _showSpeakerLoader = false;
-        if (!_speakerTimedOut) {
-          _speakerState = _SpeakerState.idle;
-        }
-      });
-    } catch (error) {
-      if (kDebugMode) {
-        debugPrint('⚠️ FoCoCoTab TTS preparation failed: $error');
+        debugPrint('⚠️ FoCoCo deferred refresh failed: $error');
       }
       if (!mounted) return;
       setState(() {
-        _showSpeakerLoader = false;
-        _speakerState = _SpeakerState.failed;
+        _refreshBusy = false;
+        _insightLoading = false;
+        _refreshError = userInitiated
+            ? 'Could not refresh. Check connection and try again.'
+            : null;
       });
     }
   }
 
-  Future<Uint8List?> _generateAudioWithRetry(String text) async {
-    for (var attempt = 0; attempt < 2; attempt++) {
-      try {
-        return await _generateCartesiaAudio(text);
-      } catch (error) {
-        if (kDebugMode) {
-          debugPrint(
-            '⚠️ FoCoCoTab TTS attempt ${attempt + 1} failed: $error',
-          );
-        }
-      }
-    }
-    return null;
-  }
+  Future<void> _playInsightAudio() async {
+    final text = (_insightText ?? _fallbackText).trim();
+    if (text.isEmpty || _audioBusy) return;
 
-  Future<Uint8List> _generateCartesiaAudio(String text) async {
-    const voiceId = '7442d6b8-ff51-4477-bd30-0c0d16df84eb';
-    final response = await http.post(
-      Uri.parse('${CartesiaMCPConfig.baseUrl}/tts/bytes'),
-      headers: {
-        'X-API-Key': CartesiaMCPConfig.apiKey,
-        'Cartesia-Version': CartesiaMCPConfig.apiVersion,
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'model_id': 'sonic-2',
-        'transcript': text,
-        'voice': {'mode': 'id', 'id': voiceId},
-        'output_format': {
-          'container': 'mp3',
-          'encoding': 'mp3',
-          'sample_rate': 44100,
-        },
-        'language': 'en',
-        'speed': 'slow',
-      }),
-    );
-    if (response.statusCode != 200) {
-      throw Exception('Cartesia ${response.statusCode}');
-    }
-    return response.bodyBytes;
-  }
-
-  Future<void> _preloadAudioFile(File audioFile) async {
-    await _audioPlayer?.setFilePath(audioFile.path);
-    _audioPreloaded = true;
-  }
-
-  Future<File> _todayAudioFile() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final today = DateTime.now();
-    final key =
-        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-    return File('${dir.path}/tts_audio_$key.mp3');
-  }
-
-  Future<void> _togglePlayback() async {
-    if (_speakerState == _SpeakerState.playing) {
-      await _audioPlayer?.stop();
-      if (mounted) setState(() => _speakerState = _SpeakerState.idle);
-      return;
-    }
-
-    if (!_ttsReady || _speakerState == _SpeakerState.failed) {
-      return;
-    }
-
+    setState(() => _audioBusy = true);
     try {
-      final file = await _todayAudioFile();
-      if (!await file.exists()) return;
-
-      if (!_audioPreloaded) {
-        await _preloadAudioFile(file);
-      } else {
-        await _audioPlayer?.seek(Duration.zero);
+      final tts = CartesiaAPIService.instance;
+      if (!tts.isInitialized) {
+        await tts.initialize();
       }
-
-      await _audioPlayer?.play();
-      if (!mounted) return;
-
-      setState(() => _speakerState = _SpeakerState.playing);
-      unawaited(FoCoCoInsightService.instance.markAudioPlayed(_insight));
-      if (_insight != null) {
-        _insight = _insight!.copyWith(playedAudio: true);
-      }
-    } catch (error) {
-      if (kDebugMode) {
-        debugPrint('⚠️ FoCoCoTab playback error: $error');
-      }
-    }
-  }
-
-  void _onPlayerState(PlayerState state) {
-    if (!mounted) return;
-    if (state.processingState == ProcessingState.completed) {
-      setState(() => _speakerState = _SpeakerState.idle);
-    }
-  }
-
-  void _resumeScreenTimer() {
-    if (!_isCurrentRouteVisible ||
-        _insight == null ||
-        !_insight!.hasRemoteRecord) {
-      return;
-    }
-    _screenVisibleSince ??= DateTime.now();
-  }
-
-  Future<void> _flushScreenTime() async {
-    final visibleSince = _screenVisibleSince;
-    _screenVisibleSince = null;
-    if (visibleSince == null || _insight == null) return;
-
-    final elapsed = DateTime.now().difference(visibleSince);
-    if (elapsed.inMilliseconds < 250) return;
-
-    try {
-      await FoCoCoInsightService.instance.addTimeOnScreen(_insight, elapsed);
-      _insight = _insight!.copyWith(
-        timeOnScreenSec:
-            _insight!.timeOnScreenSec + (elapsed.inMilliseconds / 1000),
+      await tts.speakTextWithContinuations(
+        text: text,
+        voiceProfileKey: 'mentor_calm',
+        contentType: 'daily_insight',
+        speechProfile: CartesiaSpeechPrompt.dailyInsight,
       );
-    } catch (error) {
-      if (kDebugMode) {
-        debugPrint('⚠️ FoCoCoTab screen-time flush failed: $error');
+      final insight = _insight;
+      if (insight != null && insight.hasRemoteRecord && !insight.playedAudio) {
+        unawaited(FoCoCoInsightService.instance.markAudioPlayed(insight));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text('Could not play audio: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _audioBusy = false);
       }
     }
   }
 
-  void _syncRouteVisibility() {
-    final isVisible =
-        GoRouterState.of(context).uri.toString().contains('fococo');
-    if (isVisible == _isCurrentRouteVisible) {
-      return;
+  String _headerDateLabel() {
+    final raw = _insight?.insightDate.trim() ?? '';
+    if (raw.isEmpty) {
+      return DateFormat.yMMMMd().format(DateTime.now());
     }
-
-    _isCurrentRouteVisible = isVisible;
-    if (_isCurrentRouteVisible) {
-      _resumeScreenTimer();
-      return;
-    }
-
-    unawaited(_flushScreenTime());
-    if (_speakerState == _SpeakerState.playing) {
-      unawaited(_audioPlayer?.stop());
-      _speakerState = _SpeakerState.idle;
-    }
+    try {
+      final parts = raw.split('-');
+      if (parts.length == 3) {
+        final y = int.parse(parts[0]);
+        final m = int.parse(parts[1]);
+        final d = int.parse(parts[2]);
+        return DateFormat.yMMMMd().format(DateTime(y, m, d));
+      }
+    } catch (_) {}
+    return raw;
   }
 
-  void _cancelSpeakerTimers() {
-    _speakerLoaderTimer?.cancel();
-    _speakerHideTimer?.cancel();
-    _speakerLoaderTimer = null;
-    _speakerHideTimer = null;
-  }
-
-  void _bootstrapIfVisible() {
-    final isVisible =
-        GoRouterState.of(context).uri.toString().contains(FoCoCoTabWidget.routePath);
-    if (!isVisible || _hasBootstrapped) {
-      return;
+  List<Widget> _buildInsightParagraphWidgets(FlutterFlowTheme theme) {
+    final raw = (_insightText ?? _fallbackText).trim();
+    final chunks = raw
+        .split(RegExp(r'\n\s*\n'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    final paragraphs = chunks.isEmpty ? [raw] : chunks;
+    final widgets = <Widget>[];
+    for (var i = 0; i < paragraphs.length; i++) {
+      if (i > 0) {
+        widgets.add(const SizedBox(height: 18));
+      }
+      widgets.add(
+        Text(
+          paragraphs[i],
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.94),
+            fontSize: 18,
+            height: 1.65,
+            fontStyle: FontStyle.italic,
+            fontWeight: FontWeight.w300,
+            fontFamily: theme.bodyLarge.fontFamily,
+          ),
+        ),
+      );
     }
-
-    _hasBootstrapped = true;
-    unawaited(_preloadCachedAudio());
-    unawaited(_loadInsight());
+    return widgets;
   }
 
   @override
   Widget build(BuildContext context) {
-    _syncRouteVisibility();
-    _bootstrapIfVisible();
     final theme = FlutterFlowTheme.of(context);
-    final isVisible =
-        GoRouterState.of(context).uri.toString().contains(FoCoCoTabWidget.routePath);
+    const shellTint = Color(0xFF0F0514);
 
-    return StreamBuilder<UserRecord>(
-      stream: isVisible && loggedIn
-          ? UserRecord.getDocument(
-              FirebaseFirestore.instance.doc('user/$currentUserUid'))
-          : null,
-      builder: (context, userSnapshot) {
-        final user = userSnapshot.data;
-
-        return FoCoCoAdaptiveScaffold(
-          backgroundColor: const Color(0xFF0A0A0A),
-          title: 'FoCoCo',
-          currentRoute: 'fococo',
-          onTap: (route) => context.goNamed(route),
-          showBottomNav: false,
-          enableVoiceButton: false,
-          drawer: user != null
-              ? FoCoCoDrawer(
-                  currentUser: user,
-                  currentRoute: 'fococo',
-                  onNavigate: (route) => context.goNamed(route),
-                )
-              : null,
-          body: Container(
-            color: const Color(0xFF0A0A0A),
-            width: double.infinity,
-            height: double.infinity,
-            child: SafeArea(
-              bottom: false,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: AnimatedBuilder(
-                      animation: _waveController,
-                      builder: (context, _) => CustomPaint(
-                        painter: _WavePainter(_waveController.value),
+    return FoCoCoAdaptiveScaffold(
+      backgroundColor: shellTint,
+      hideAppBar: true,
+      currentRoute: 'fococo',
+      onTap: (route) => context.goNamed(route),
+      showBottomNav: false,
+      enableVoiceButton: false,
+      drawer: FoCoCoDrawer(
+        currentRoute: 'fococo',
+        onNavigate: (route) => context.goNamed(route),
+      ),
+      body: ColoredBox(
+        color: shellTint,
+        child: FluidBackground(
+          initialColors: InitialColors.custom([
+            theme.primary.withValues(alpha: 0.52),
+            theme.secondary.withValues(alpha: 0.48),
+            theme.tertiary.withValues(alpha: 0.42),
+          ]),
+          initialPositions: InitialOffsets.random(3),
+          bubblesSize: 440,
+          velocity: 82,
+          // fluid_background 1.0.5 always cancels this timer in dispose; it
+          // must be constructed whenever the widget is used.
+          bubbleMutationDuration: const Duration(minutes: 45),
+          allowColorChanging: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FoCoCoInlineScreenHeader(
+                title: 'FoCoCo',
+                showDrawerButton: true,
+                compactTitle: true,
+                topInset: MediaQuery.viewPaddingOf(context).top,
+              ),
+              Expanded(
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.viewPaddingOf(context).bottom +
+                          kFoCoCoBottomNavStripAndTabsHeight +
+                          8,
+                    ),
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Daily insight',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.55),
+                                fontSize: 13,
+                                letterSpacing: 1.4,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: theme.bodyLarge.fontFamily,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _headerDateLabel(),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.72),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: theme.bodyLarge.fontFamily,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            if (_insightLoading)
+                              const SizedBox(
+                                width: 28,
+                                height: 28,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Color(0xFFCCCCCC),
+                                  ),
+                                ),
+                              )
+                            else ...[
+                              ..._buildInsightParagraphWidgets(theme),
+                              if (_refreshError != null) ...[
+                                const SizedBox(height: 16),
+                                Text(
+                                  _refreshError!,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.orangeAccent
+                                        .withValues(alpha: 0.9),
+                                    fontSize: 13,
+                                    height: 1.4,
+                                    fontFamily: theme.bodyLarge.fontFamily,
+                                  ),
+                                ),
+                              ],
+                            ],
+                            const SizedBox(height: 24),
+                            IconButton(
+                              tooltip: 'Listen to today’s insight',
+                              onPressed: _insightLoading ||
+                                      _audioBusy ||
+                                      _refreshBusy
+                                  ? null
+                                  : _playInsightAudio,
+                              iconSize: 40,
+                              color: Colors.white.withValues(alpha: 0.92),
+                              icon: _audioBusy
+                                  ? const SizedBox(
+                                      width: 32,
+                                      height: 32,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          Colors.white70,
+                                        ),
+                                      ),
+                                    )
+                                  : const Icon(Icons.volume_up_rounded),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                  Positioned.fill(
-                    child: _buildContent(theme),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildContent(FlutterFlowTheme theme) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewPaddingOf(context).bottom +
-            kFoCoCoBottomNavStripAndTabsHeight +
-            8,
-      ),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildInsightText(),
-              const SizedBox(height: 24),
-              _buildSpeakerIcon(),
             ],
           ),
         ),
       ),
     );
-  }
-
-  Widget _buildInsightText() {
-    if (_insightLoading) {
-      return _buildShimmerText();
-    }
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 500),
-      child: Text(
-        _insightText ?? '',
-        key: ValueKey(_insightText),
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 18,
-          height: 1.65,
-          fontStyle: FontStyle.italic,
-          fontWeight: FontWeight.w300,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildShimmerText() {
-    return AnimatedBuilder(
-      animation: _shimmerController,
-      builder: (context, _) {
-        final shimmer = _shimmerController.value;
-        return Column(
-          children: List.generate(3, (index) {
-            final width = index == 2 ? 0.6 : (index == 0 ? 1.0 : 0.85);
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Container(
-                height: 16,
-                width: MediaQuery.sizeOf(context).width * 0.7 * width,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    stops: [
-                      (shimmer - 0.3).clamp(0.0, 1.0),
-                      shimmer.clamp(0.0, 1.0),
-                      (shimmer + 0.3).clamp(0.0, 1.0),
-                    ],
-                    colors: const [
-                      Color(0xFF1A1A1A),
-                      Color(0xFF2E2E2E),
-                      Color(0xFF1A1A1A),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-        );
-      },
-    );
-  }
-
-  Widget _buildSpeakerIcon() {
-    if (_speakerState == _SpeakerState.failed) {
-      return const SizedBox.shrink();
-    }
-
-    if (!_ttsReady && _showSpeakerLoader) {
-      return AnimatedBuilder(
-        animation: _shimmerController,
-        builder: (context, _) => Opacity(
-          opacity: 0.3 +
-              0.5 * math.sin(_shimmerController.value * math.pi * 2).abs(),
-          child: const Icon(
-            Icons.volume_up_rounded,
-            color: Color(0xFF888888),
-            size: 22,
-          ),
-        ),
-      );
-    }
-
-    if (!_ttsReady) {
-      return const SizedBox(
-        width: 44,
-        height: 44,
-        child: Center(
-          child: Icon(
-            Icons.volume_up_rounded,
-            color: Color(0xFF888888),
-            size: 22,
-          ),
-        ),
-      );
-    }
-
-    if (_speakerState == _SpeakerState.playing) {
-      return AnimatedBuilder(
-        animation: _pulseAnim,
-        builder: (context, _) => Opacity(
-          opacity: _pulseAnim.value,
-          child: GestureDetector(
-            onTap: _togglePlayback,
-            behavior: HitTestBehavior.opaque,
-            child: const SizedBox(
-              width: 44,
-              height: 44,
-              child: Center(
-                child: Icon(
-                  Icons.volume_up_rounded,
-                  color: Color(0xFFC9A84C),
-                  size: 22,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onTap: _togglePlayback,
-      behavior: HitTestBehavior.opaque,
-      child: const SizedBox(
-        width: 44,
-        height: 44,
-        child: Center(
-          child: Icon(
-            Icons.volume_up_rounded,
-            color: Color(0xFF888888),
-            size: 22,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _WavePainter extends CustomPainter {
-  const _WavePainter(this.progress);
-
-  final double progress;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.035)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    for (var wave = 0; wave < 3; wave++) {
-      final phase = progress * 2 * math.pi + wave * (math.pi * 2 / 3);
-      final amplitude = size.height * 0.045;
-      final yCenter = size.height * (0.35 + wave * 0.12);
-
-      final path = Path();
-      for (var x = 0.0; x <= size.width; x++) {
-        final y = yCenter +
-            amplitude * math.sin(x / size.width * 2 * math.pi * 2 + phase);
-        if (x == 0) {
-          path.moveTo(x, y);
-        } else {
-          path.lineTo(x, y);
-        }
-      }
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_WavePainter oldDelegate) {
-    return oldDelegate.progress != progress;
   }
 }

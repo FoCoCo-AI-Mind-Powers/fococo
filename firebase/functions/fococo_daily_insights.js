@@ -2,19 +2,62 @@ const admin = require('firebase-admin');
 const logger = require('firebase-functions/logger');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
-const crypto = require('crypto');
 
-const db = admin.firestore();
-const geminiKey = defineSecret('GEMINI_KEY');
+const {
+  FOCOCO_TAB_GENERATION_VERSION,
+  buildFococoTabFallbackText,
+  deterministicStringify,
+} = require('./intelligence_engine');
+const {
+  COLLECTIONS,
+  FOCOCO_TAB_SURFACE,
+  buildInsightHistoryDocId,
+  ensureContextCacheForSurface,
+  fetchRecentInsightHistory,
+  hasValidatedRepeatedSignal,
+} = require('./intelligence_layer');
+
+const geminiKey = defineSecret('GEMINI_KEY_APP');
 
 const FOCOCO_DAILY_INSIGHT_TYPE = 'fococo_daily';
-const FOCOCO_GENERATION_VERSION = 'fococo_tab_v1';
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-3.1-pro-preview';
+const THINKING_BUDGET_TOKENS = 2048;
 const INITIAL_PHRASE_BLACKLIST = [
   'you tend to',
   'you often',
   "you're starting to",
+  'mindgame system',
+  'unlock your',
+  'elevate your',
+  'every round builds',
+  'you\'ve got this',
 ];
+const GENERIC_COPY_BANNED = [
+  'mindgame system',
+  'unlock your',
+  'elevate your',
+  'your journey',
+  'remember that',
+  'you\'ve got this',
+  'every round builds',
+  'mental performance journey',
+];
+
+const FOCOCO_INSIGHT_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    observation: {
+      type: 'string',
+      description:
+        'One complete second-person observation sentence grounded in insight_inputs.',
+    },
+    direction: {
+      type: 'string',
+      description: 'One complete second-person practical direction sentence for today.',
+    },
+  },
+  required: ['observation', 'direction'],
+};
 const STOP_WORDS = new Set([
   'about',
   'after',
@@ -70,6 +113,10 @@ function ensureAdmin(request) {
   }
 }
 
+function getDb() {
+  return admin.firestore();
+}
+
 function safeString(value, fallback = '') {
   if (value == null) return fallback;
   return String(value).trim();
@@ -82,6 +129,11 @@ function toDate(value) {
   if (typeof value === 'number') return new Date(value);
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function safeNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function getUserTimeZone(userData) {
@@ -131,30 +183,9 @@ function getTimeOfDay(hour) {
   return 'night';
 }
 
-function differenceInDays(from, to) {
-  if (!(from instanceof Date) || !(to instanceof Date)) return null;
-  return Math.max(0, Math.floor((to.getTime() - from.getTime()) / 86400000));
-}
-
-function deterministicStringify(value) {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => deterministicStringify(item)).join(',')}]`;
-  }
-  if (value && typeof value === 'object') {
-    const keys = Object.keys(value).sort();
-    return `{${keys
-      .map((key) => `${JSON.stringify(key)}:${deterministicStringify(value[key])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
-function md5(value) {
-  return crypto.createHash('md5').update(value).digest('hex');
-}
-
-function buildDailyInsightDocId(userId, insightDate) {
-  return `fococo_daily_${userId}_${insightDate}`;
+async function fetchUserRecord(userId) {
+  const userSnapshot = await getDb().collection('user').doc(userId).get();
+  return userSnapshot.exists ? userSnapshot.data() || {} : {};
 }
 
 function pickRandom(items) {
@@ -203,28 +234,6 @@ function tokenize(text) {
     .filter((token) => token.length >= 4 && !STOP_WORDS.has(token));
 }
 
-function countValues(values) {
-  const counts = new Map();
-  for (const value of values) {
-    const key = safeString(value);
-    if (!key) continue;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return counts;
-}
-
-function topCountEntry(counts) {
-  let bestKey = '';
-  let bestCount = 0;
-  for (const [key, count] of counts.entries()) {
-    if (count > bestCount) {
-      bestKey = key;
-      bestCount = count;
-    }
-  }
-  return { value: bestKey, count: bestCount };
-}
-
 function extractRepeatedPhrases(recentInsights) {
   if (recentInsights.length < 3) return [];
 
@@ -245,277 +254,29 @@ function extractRepeatedPhrases(recentInsights) {
     .map(([phrase]) => phrase);
 }
 
-function extractTopKeywords(texts, limit = 5) {
-  const counts = new Map();
-  for (const text of texts) {
-    for (const token of tokenize(text)) {
-      counts.set(token, (counts.get(token) ?? 0) + 1);
-    }
-  }
-  return Array.from(counts.entries())
-    .sort((left, right) => right[1] - left[1])
-    .slice(0, limit)
-    .map(([token]) => token);
-}
-
-function classifySignalStrength(roundCount, sessionCount, golfChatUsed) {
-  if (roundCount >= 2) return 'rounds_available';
-  if (sessionCount >= 2) return 'mindcoach_available';
-  if (golfChatUsed) return 'golfchat_available';
-  return 'thin_data';
-}
-
-function inferRoundPatterns(rounds, now) {
-  const rounds7 = [];
-  const rounds30 = [];
-  for (const round of rounds) {
-    const date = toDate(round.date);
-    if (!date) continue;
-    const daysAgo = differenceInDays(date, now);
-    if (daysAgo <= 7) rounds7.push(round);
-    if (daysAgo <= 30) rounds30.push(round);
-  }
-
-  const sourceRounds = rounds7.length >= 2 ? rounds7 : rounds30;
-  const cueCounts = countValues(sourceRounds.map((round) => round.bestCue));
-  const courseTypeCounts = countValues(sourceRounds.map((round) => round.courseType));
-  const summaryTexts = sourceRounds
-    .flatMap((round) => [round.aiRoundSummary, round.technicalSummary, round.voiceTranscription])
-    .map((value) => safeString(value))
-    .filter(Boolean);
-
-  const averageFocus = average(sourceRounds.map((round) => round.mindsetFocus));
-  const averageConfidence = average(sourceRounds.map((round) => round.mindsetConfidence));
-  const averageControl = average(sourceRounds.map((round) => round.mindsetControl));
-  const pillarScores = [
-    { pillar: 'focus', score: averageFocus },
-    { pillar: 'confidence', score: averageConfidence },
-    { pillar: 'control', score: averageControl },
-  ].filter((entry) => entry.score != null);
-
-  pillarScores.sort((left, right) => (left.score ?? 0) - (right.score ?? 0));
-  const weakestPillar = pillarScores[0]?.pillar ?? '';
-  const strongestPillar = pillarScores[pillarScores.length - 1]?.pillar ?? '';
-  const repeatedCue = topCountEntry(cueCounts);
-  const repeatedCourseType = topCountEntry(courseTypeCounts);
-  const recoveryHeavy = sourceRounds.filter((round) => Array.isArray(round.recoveryHoles) && round.recoveryHoles.length > 0).length >= 2;
-
-  return {
-    totalRounds: rounds.length,
-    roundsInLast7Days: rounds7.length,
-    roundsInLast30Days: rounds30.length,
-    recentRounds: sourceRounds.slice(0, 5).map((round) => ({
-      date: zonedDateParts(toDate(round.date) ?? now, 'UTC').isoDate,
-      courseName: safeString(round.courseName),
-      courseType: safeString(round.courseType),
-      bestCue: safeString(round.bestCue),
-      aiRoundSummary: safeString(round.aiRoundSummary),
-      technicalSummary: safeString(round.technicalSummary),
-      voiceTranscription: safeString(round.voiceTranscription),
-    })),
-    patternCandidates: {
-      weakestPillar,
-      strongestPillar,
-      repeatedBestCue: repeatedCue.count >= 2 ? repeatedCue.value : '',
-      repeatedCourseType: repeatedCourseType.count >= 2 ? repeatedCourseType.value : '',
-      recoveryPattern: recoveryHeavy ? 'recovers after mistakes often enough to be a pattern' : '',
-      dominantKeywords: extractTopKeywords(summaryTexts, 4),
-    },
-  };
-}
-
-function inferMindCoachPatterns(sessions, now) {
-  const sessions7 = [];
-  const sessions30 = [];
-  for (const session of sessions) {
-    const timestamp = toDate(session.timestamp);
-    if (!timestamp) continue;
-    const daysAgo = differenceInDays(timestamp, now);
-    if (daysAgo <= 7) sessions7.push(session);
-    if (daysAgo <= 30) sessions30.push(session);
-  }
-
-  const sourceSessions = sessions7.length >= 2 ? sessions7 : sessions30;
-  const routineCounts = countValues(sourceSessions.map((session) => session.routineType));
-  const scenarioCounts = countValues(sourceSessions.map((session) => session.scenarioTag));
-  const lengthCounts = countValues(sourceSessions.map((session) => session.deliveryLength));
-  const routine = topCountEntry(routineCounts);
-  const scenario = topCountEntry(scenarioCounts);
-  const length = topCountEntry(lengthCounts);
-  const lastSession = sourceSessions[0];
-
-  return {
-    totalSessions: sessions.length,
-    sessionsInLast7Days: sessions7.length,
-    sessionsInLast30Days: sessions30.length,
-    recentSessions: sourceSessions.slice(0, 5).map((session) => ({
-      timestamp: toDate(session.timestamp)?.toISOString() ?? '',
-      routineType: safeString(session.routineType),
-      scenarioTag: safeString(session.scenarioTag),
-      deliveryLength: safeString(session.deliveryLength),
-      cueUsed: safeString(session.cueUsed),
-    })),
-    patternCandidates: {
-      repeatedRoutineType: routine.count >= 2 ? routine.value : '',
-      repeatedScenarioTag: scenario.count >= 2 ? scenario.value : '',
-      repeatedDeliveryLength: length.count >= 2 ? length.value : '',
-      daysSinceLastSession: lastSession ? differenceInDays(toDate(lastSession.timestamp), now) : null,
-    },
-  };
-}
-
-function average(numbers) {
-  const valid = numbers.filter((value) => Number.isFinite(value));
-  if (!valid.length) return null;
-  return valid.reduce((sum, value) => sum + value, 0) / valid.length;
-}
-
-function csvEscape(value) {
-  const text = safeString(value);
-  if (!text.includes(',') && !text.includes('"') && !text.includes('\n')) {
-    return text;
-  }
-  return `"${text.replace(/"/g, '""')}"`;
-}
-
-async function fetchUserRecord(userId) {
-  const userSnapshot = await db.collection('user').doc(userId).get();
-  return userSnapshot.exists ? userSnapshot.data() : {};
-}
-
-async function fetchRecentFoCoCoInsights(userId, limit = 4) {
-  const snapshot = await db
-    .collection('ai_insights')
-    .where('userId', '==', userId)
-    .where('insightType', '==', FOCOCO_DAILY_INSIGHT_TYPE)
-    .orderBy('createdTime', 'desc')
-    .limit(limit)
-    .get();
-
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-}
-
-async function fetchRoundLogs(userId) {
-  const snapshot = await db
-    .collection('round_logs')
-    .where('userId', '==', userId)
-    .orderBy('date', 'desc')
-    .limit(50)
-    .get();
-
-  return snapshot.docs.map((doc) => doc.data());
-}
-
-async function fetchMindCoachSessions(userId) {
-  const snapshot = await db
-    .collection('mindcoach_sessions')
-    .where('userId', '==', userId)
-    .orderBy('timestamp', 'desc')
-    .limit(50)
-    .get();
-
-  return snapshot.docs.map((doc) => doc.data());
-}
-
-async function fetchGolfChatContext(userId, now) {
-  let sessions = [];
-  try {
-    const sessionSnapshot = await db
-      .collection('voice_chat_sessions')
-      .where('userId', '==', userId)
-      .where('sessionMetadata.surface', '==', 'golfchat')
-      .orderBy('startTime', 'desc')
-      .limit(8)
-      .get();
-    sessions = sessionSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    logger.warn('[FoCoCo] GolfChat sessions query failed', { userId, error: error.message });
-    sessions = [];
-  }
-
-  let stats = {};
-  try {
-    const statsSnapshot = await db.collection('user_voice_chat_stats').doc(userId).get();
-    stats = statsSnapshot.exists ? statsSnapshot.data() : {};
-  } catch (error) {
-    logger.warn('[FoCoCo] GolfChat stats read failed', { userId, error: error.message });
-  }
-
-  const recentSessions = sessions.slice(0, 3);
-  const sessionMessages = await Promise.all(
-    recentSessions.map(async (session) => {
-      try {
-        const messagesSnapshot = await db
-          .collection('voice_chat_messages')
-          .where('userId', '==', userId)
-          .where('sessionId', '==', session.id)
-          .orderBy('timestamp', 'asc')
-          .get();
-        return messagesSnapshot.docs.map((doc) => doc.data());
-      } catch (error) {
-        logger.warn('[FoCoCo] GolfChat messages query failed', {
-          userId,
-          sessionId: session.id,
-          error: error.message,
-        });
-        return [];
-      }
-    }),
-  );
-
-  const allUserMessages = sessionMessages
-    .flat()
-    .filter((message) => message?.isUser === true)
-    .map((message) => safeString(message.content))
-    .filter(Boolean);
-
-  const topTopics = Array.isArray(stats?.topTopics)
-    ? stats.topTopics.map((topic) => safeString(topic)).filter(Boolean)
-    : [];
-
-  const lastChatDate = toDate(recentSessions[0]?.startTime);
-  const chatKeywords = extractTopKeywords(allUserMessages, 5);
-
-  return {
-    used: recentSessions.length > 0 || allUserMessages.length > 0 || topTopics.length > 0,
-    totalSessions: sessions.length,
-    recentSessions: recentSessions.map((session) => ({
-      title: safeString(session.title),
-      startTime: toDate(session.startTime)?.toISOString() ?? '',
-      messageCount: session.messageCount ?? 0,
-    })),
-    recentUserMessages: allUserMessages.slice(-8),
-    patternCandidates: {
-      topTopics: topTopics.slice(0, 5),
-      extractedThemes: chatKeywords,
-      daysSinceLastGolfChat: lastChatDate ? differenceInDays(lastChatDate, now) : null,
-    },
-  };
-}
-
 function buildPhraseBlacklist(recentInsights) {
-  return Array.from(new Set([
-    ...INITIAL_PHRASE_BLACKLIST,
-    ...extractRepeatedPhrases(recentInsights),
-  ]));
+  return Array.from(
+    new Set([
+      ...INITIAL_PHRASE_BLACKLIST,
+      ...extractRepeatedPhrases(recentInsights),
+    ]),
+  );
 }
 
-function buildContextPayload({
+function buildGenerationContext({
   userId,
   userData,
-  now,
   timeZone,
-  recentFoCoCoInsights,
-  roundContext,
-  mindCoachContext,
-  golfChatContext,
+  now,
+  contextDocument,
+  recentHistory,
   variation,
 }) {
   const zoned = zonedDateParts(now, timeZone);
-  const recentInsightTexts = recentFoCoCoInsights
-    .map((insight) => safeString(insight.insightContent))
+  const recentInsightTexts = recentHistory
+    .map((entry) => safeString(entry.insight_text))
     .filter(Boolean)
-    .slice(0, 3);
+    .slice(0, 4);
 
   return {
     userId,
@@ -532,79 +293,233 @@ function buildContextPayload({
       season: getSeason(zoned.month),
       timeOfDay: getTimeOfDay(zoned.hour),
     },
-    signalPriority: ['round_logs', 'mindcoach_sessions', 'golfchat'],
-    dataSignals: {
-      rounds: roundContext.totalRounds,
-      mindcoachSessions: mindCoachContext.totalSessions,
-      golfchatUsed: golfChatContext.used,
-      dominantSource: classifySignalStrength(
-        roundContext.roundsInLast30Days,
-        mindCoachContext.sessionsInLast30Days,
-        golfChatContext.used,
-      ),
-    },
-    recency: {
-      primaryWindowDays: 7,
-      secondaryWindowDays: 30,
-      lifetimeBackgroundOnly: true,
-    },
-    roundContext,
-    mindCoachContext,
-    golfChatContext,
+    repeatedSignalValidated: hasValidatedRepeatedSignal(contextDocument),
+    contextHash: safeString(contextDocument.context_hash),
+    dataSignals: contextDocument.data_signals || {},
+    coachingState: contextDocument.coaching_state || {},
+    recentRoundHeadlines: contextDocument.recent_round_headlines || [],
     recentInsights: recentInsightTexts,
     phraseBlacklist: buildPhraseBlacklist(recentInsightTexts),
     variation,
+    payload: contextDocument.payload || {},
+    insight_inputs: contextDocument.payload?.insight_inputs || {},
   };
 }
 
 function systemPrompt(contextPayload) {
   return `
-You are the MindGame System, the AI intelligence engine inside FoCoCo.
-You are generating one home-screen insight for the FoCoCo tab.
+You are the FoCoCo intelligence layer generating one FoCoCo Tab daily insight.
 
 LOCKED RULES:
-- Maximum 2 sentences. Absolute.
-- Write only in second person.
-- No coaching instructions, no advice, no commands.
+- Output exactly two complete sentences on two lines separated by one blank line (line break between them).
+- Line 1: one personal observation grounded in insight_inputs (last round, pillars, patterns, goal, active round, MindCoach, JustTalk, trends).
+- Line 2: one practical direction for today — concrete and calm, not hype.
+- Use only second person.
+- No generic motivation, marketing copy, branding, or incomplete sentences.
 - No exclamation marks.
-- No numbers, scores, percentages, or metrics in the final text.
-- One idea only. Never combine multiple observations.
-- Never sound motivational, preachy, poetic, or abstract.
-- The text must feel like a quiet, accurate observation.
-- It must connect mind to behaviour. The behavioural anchor can be implicit, but it must be present.
-- If you do not have a repeated pattern across multiple data points, switch to thin-data mode: warm, curious, observational about beginning, presence, attention, or consistency. Do not invent trends.
-- GolfChat is low-priority context only. If round patterns exist, GolfChat must not lead.
-- Recent behaviour must lead. Prefer last 7 days, then last 30 days. Lifetime data is background only.
-
-VARIATION RULES:
-- Write in a ${contextPayload.variation.toneType} tone.
-- Use a ${contextPayload.variation.structureType} structure.
-- Focus on the emotional angle of ${contextPayload.variation.angleType}.
-- Variation must never reduce truth or clarity.
-
-ANTI-REPETITION:
-- Avoid repeating themes or phrasing from the recent insights supplied in context.
-- Avoid using any blacklisted phrase supplied in context.
+- No numbers, scores, percentages, or explicit metrics in the final text.
+- One real pattern only on line 1. Do not stack multiple unrelated ideas.
+- Do not claim a repeated pattern unless repeatedSignalValidated is true.
+- If repeatedSignalValidated is false, stay observational and baseline-focused using only what insight_inputs actually contain.
+- Prefer round and JustTalk signals over chat themes when both exist.
+- Avoid phraseBlacklist and recentInsights wording.
 
 FORMAT:
-- Return plain text only.
-- No labels.
-- No markdown.
-- No quotation marks around the answer.
+- Plain text only.
+- No labels, markdown, or quotation marks.
 `.trim();
 }
 
 function userPrompt(contextPayload) {
   return `
-Context payload for today's FoCoCo tab insight:
+Use this context for today's FoCoCo Tab insight:
 ${deterministicStringify(contextPayload)}
 
-Choose the strongest true signal.
-Lead with round behaviour if a repeated round pattern exists.
-Use MindCoach only when it is the strongest repeated pattern.
-Use GolfChat only for reflection theme or tone context.
-Generate the insight now.
+Select the strongest true pattern from the payload.
+If contextHash has already produced a reusable observation, the caller will reuse it separately.
+Generate the text now.
 `.trim();
+}
+
+function isCompleteSentence(sentence) {
+  const trimmed = safeString(sentence);
+  if (trimmed.length < 12) return false;
+  if (!/[.!?]$/.test(trimmed)) return false;
+  if (/\b(and|but|or|when|because|that|which|the|your|to|for|with)\s*$/i.test(trimmed)) {
+    return false;
+  }
+  return true;
+}
+
+function splitInsightSentences(text) {
+  const lineChunks = safeString(text)
+    .split(/\n+/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean);
+  if (lineChunks.length >= 2) {
+    return lineChunks.slice(0, 2);
+  }
+  return safeString(text)
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+    .slice(0, 2);
+}
+
+function normalizeInsightText(text) {
+  const cleaned = safeString(text)
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/!/g, '')
+    .trim()
+    .replace(/^"+|"+$/g, '');
+
+  const sentences = splitInsightSentences(cleaned);
+  if (sentences.length >= 2) {
+    return `${sentences[0]}\n\n${sentences[1]}`.trim();
+  }
+  return cleaned.replace(/\s+/g, ' ').trim();
+}
+
+function validateInsightText(text) {
+  if (!text) return 'empty_output';
+  if (/\d/.test(text)) return 'contains_numbers';
+  if (text.includes('!')) return 'contains_exclamation';
+
+  const lower = text.toLowerCase();
+  if (lower.startsWith('your mindgame system') || lower.startsWith('mindgame system')) {
+    return 'self_reference';
+  }
+  for (const banned of GENERIC_COPY_BANNED) {
+    if (lower.includes(banned)) return 'generic_copy';
+  }
+
+  const sentences = splitInsightSentences(text);
+  if (sentences.length !== 2) return 'needs_exactly_two_sentences';
+  for (const sentence of sentences) {
+    if (!isCompleteSentence(sentence)) return 'incomplete_sentence';
+  }
+  return '';
+}
+
+function parseJsonFromModelText(text) {
+  const raw = safeString(text);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (_) {
+    const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenced) {
+      try {
+        return JSON.parse(fenced[1].trim());
+      } catch (_) {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+function insightTextFromStructuredPayload(parsed) {
+  if (!parsed || typeof parsed !== 'object') return '';
+  const observation = safeString(parsed.observation || parsed.line1 || parsed.line_1);
+  const direction = safeString(parsed.direction || parsed.line2 || parsed.line_2);
+  if (!observation || !direction) return '';
+  return normalizeInsightText(`${observation}\n\n${direction}`);
+}
+
+function coerceInsightTextFromModelOutput(rawText) {
+  const fromStructured = insightTextFromStructuredPayload(parseJsonFromModelText(rawText));
+  if (fromStructured && validateInsightText(fromStructured) === '') {
+    return fromStructured;
+  }
+  return normalizeInsightText(rawText);
+}
+
+function extractModelTextFromGeminiPayload(payload) {
+  return (
+    payload?.candidates?.[0]?.content?.parts
+      ?.filter((part) => part && part.thought !== true)
+      .map((part) => part?.text ?? '')
+      .join(' ')
+      .trim() || ''
+  );
+}
+
+function buildGeminiInsightGenerationConfig(useStructuredOutput) {
+  const generationConfig = {
+    temperature: 0.55,
+    maxOutputTokens: 280,
+    topP: 0.9,
+    thinkingConfig: {
+      thinkingBudget: THINKING_BUDGET_TOKENS,
+    },
+  };
+  if (useStructuredOutput) {
+    generationConfig.responseMimeType = 'application/json';
+    generationConfig.responseSchema = FOCOCO_INSIGHT_RESPONSE_SCHEMA;
+  }
+  return generationConfig;
+}
+
+function isStructuredOutputUnsupported(status, errorText) {
+  if (status !== 400) return false;
+  const lower = safeString(errorText).toLowerCase();
+  return (
+    lower.includes('responsemime') ||
+    lower.includes('responseschema') ||
+    lower.includes('response schema') ||
+    lower.includes('unknown name') ||
+    lower.includes('invalid json schema')
+  );
+}
+
+async function requestGeminiInsightGeneration({
+  apiKey,
+  contextPayload,
+  extraReminder,
+  useStructuredOutput,
+}) {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        system_instruction: {
+          parts: [{ text: `${systemPrompt(contextPayload)}${extraReminder}` }],
+        },
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: userPrompt(contextPayload) }],
+          },
+        ],
+        generationConfig: buildGeminiInsightGenerationConfig(useStructuredOutput),
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    return {
+      ok: false,
+      status: response.status,
+      errorText,
+      payload: null,
+    };
+  }
+
+  const payload = await response.json();
+  return {
+    ok: true,
+    status: response.status,
+    errorText: '',
+    payload,
+  };
 }
 
 async function callGeminiForInsight(contextPayload) {
@@ -623,41 +538,39 @@ async function callGeminiForInsight(contextPayload) {
         ? ''
         : `\nThe previous draft failed validation because: ${lastValidationError}. Rewrite with exact compliance.`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: `${systemPrompt(contextPayload)}${extraReminder}` }],
-          },
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: userPrompt(contextPayload) }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.8,
-            maxOutputTokens: 120,
-            topP: 0.95,
-          },
-        }),
-      },
-    );
+    let geminiResult = await requestGeminiInsightGeneration({
+      apiKey,
+      contextPayload,
+      extraReminder,
+      useStructuredOutput: true,
+    });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new HttpsError('internal', `Gemini request failed: ${response.status} ${errorText}`);
+    if (
+      !geminiResult.ok &&
+      isStructuredOutputUnsupported(geminiResult.status, geminiResult.errorText)
+    ) {
+      logger.warn('[FoCoCo] structured insight output unavailable, falling back to plain text', {
+        status: geminiResult.status,
+      });
+      geminiResult = await requestGeminiInsightGeneration({
+        apiKey,
+        contextPayload,
+        extraReminder,
+        useStructuredOutput: false,
+      });
     }
 
-    const payload = await response.json();
-    lastUsage = payload.usageMetadata ?? {};
-    const text =
-      payload?.candidates?.[0]?.content?.parts?.map((part) => part?.text ?? '').join(' ').trim() ?? '';
+    if (!geminiResult.ok) {
+      throw new HttpsError(
+        'internal',
+        `Gemini request failed: ${geminiResult.status} ${geminiResult.errorText}`,
+      );
+    }
 
-    lastText = normalizeInsightText(text);
+    const payload = geminiResult.payload;
+    lastUsage = payload.usageMetadata ?? {};
+    const rawText = extractModelTextFromGeminiPayload(payload);
+    lastText = coerceInsightTextFromModelOutput(rawText);
     lastValidationError = validateInsightText(lastText);
     if (!lastValidationError) {
       return {
@@ -668,86 +581,195 @@ async function callGeminiForInsight(contextPayload) {
     }
   }
 
-  if (lastText) {
-    return {
-      insightText: lastText,
-      tokensUsed: lastUsage.totalTokenCount ?? 0,
-      rawResponse: { validationWarning: lastValidationError },
-    };
+  if (lastText && lastValidationError) {
+    throw new HttpsError(
+      'internal',
+      `FoCoCo insight validation failed: ${lastValidationError}`,
+    );
   }
 
   throw new HttpsError('internal', 'Gemini returned no usable FoCoCo insight');
 }
 
-function normalizeInsightText(text) {
-  const cleaned = safeString(text)
-    .replace(/[“”]/g, '"')
-    .replace(/[‘’]/g, "'")
-    .replace(/\s+/g, ' ')
-    .replace(/!/g, '')
-    .trim()
-    .replace(/^"+|"+$/g, '');
-
-  const sentences = cleaned
-    .split(/(?<=[.!?])\s+/)
-    .map((sentence) => sentence.trim())
-    .filter(Boolean);
-
-  if (sentences.length <= 2) {
-    return cleaned;
-  }
-  return sentences.slice(0, 2).join(' ').trim();
-}
-
-function validateInsightText(text) {
-  if (!text) return 'empty_output';
-  if (/\d/.test(text)) return 'contains_numbers';
-  if (text.includes('!')) return 'contains_exclamation';
-  const lower = text.toLowerCase();
-  if (lower.startsWith('your mindgame system') || lower.startsWith('mindgame system')) {
-    return 'self_reference';
-  }
-  const sentences = text
-    .split(/(?<=[.!?])\s+/)
-    .map((sentence) => sentence.trim())
-    .filter(Boolean);
-  if (sentences.length > 2) return 'too_many_sentences';
-  return '';
-}
-
-function serializeFoCoCoInsight(doc) {
-  const data = doc.data();
+function serializeHistoryInsight(docId, data) {
   return {
-    insightId: doc.id,
-    insightText: safeString(data?.insightContent),
-    insightDate: safeString(data?.insightDate),
-    playedAudio: data?.playedAudio === true,
+    insightId: docId,
+    insightText: safeString(data?.insight_text || data?.insightContent),
+    insightDate: safeString(data?.date || data?.insightDate),
+    playedAudio: data?.played_audio === true || data?.playedAudio === true,
     opened: data?.opened === true,
-    timeOnScreenSec: Number(data?.timeOnScreenSec ?? 0),
-    generationVersion: safeString(data?.generationVersion, FOCOCO_GENERATION_VERSION),
+    timeOnScreenSec: safeNumber(data?.time_on_screen_sec ?? data?.timeOnScreenSec, 0),
+    generationVersion: safeString(
+      data?.generation_version || data?.generationVersion,
+      FOCOCO_TAB_GENERATION_VERSION,
+    ),
   };
+}
+
+function buildCanonicalHistoryDoc({
+  userId,
+  insightDate,
+  contextDocument,
+  insightText,
+  generationMode,
+  aiModel,
+  tokensUsed,
+  rawResponse,
+  variation,
+}) {
+  return {
+    user_id: userId,
+    surface: FOCOCO_TAB_SURFACE,
+    date: insightDate,
+    context_hash: safeString(contextDocument.context_hash),
+    context_payload: contextDocument.payload || {},
+    insight_text: insightText,
+    generation_version: FOCOCO_TAB_GENERATION_VERSION,
+    generation_mode: generationMode,
+    ai_model: aiModel || null,
+    tokens_used: safeNumber(tokensUsed, 0),
+    raw_ai_response: rawResponse ? JSON.stringify(rawResponse) : '',
+    variation_tone_type: safeString(variation?.toneType),
+    variation_structure_type: safeString(variation?.structureType),
+    variation_angle_type: safeString(variation?.angleType),
+    data_signals: contextDocument.data_signals || {},
+    repeated_signal_validated: hasValidatedRepeatedSignal(contextDocument),
+    opened: false,
+    played_audio: false,
+    time_on_screen_sec: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function buildLegacyInsightMirror(historyDoc) {
+  const createdDate = toDate(historyDoc.created_at) || new Date();
+  return {
+    userId: historyDoc.user_id,
+    sourceId: historyDoc.date,
+    sourceType: FOCOCO_TAB_SURFACE,
+    insightType: FOCOCO_DAILY_INSIGHT_TYPE,
+    category: 'daily_mirror',
+    priority: 'medium',
+    insightTitle: 'Daily Insight',
+    insightContent: historyDoc.insight_text,
+    keyPoints: [],
+    recommendations: [],
+    personalizedElements: [],
+    isRead: false,
+    userRating: 0,
+    userFeedback: '',
+    actionsTaken: [],
+    generatedTime: admin.firestore.Timestamp.fromDate(createdDate),
+    aiModel: historyDoc.ai_model || GEMINI_MODEL,
+    promptUsed: FOCOCO_TAB_GENERATION_VERSION,
+    rawAiResponse: historyDoc.raw_ai_response || '',
+    processingTime: 0,
+    tokensUsed: safeNumber(historyDoc.tokens_used, 0),
+    costPerInsight: 0,
+    generationVersion: historyDoc.generation_version,
+    status: 'active',
+    expiryDate: admin.firestore.Timestamp.fromDate(
+      new Date(createdDate.getTime() + 90 * 24 * 60 * 60 * 1000),
+    ),
+    viewCount: 0,
+    shareCount: 0,
+    relatedInsights: [],
+    followUpGenerated: false,
+    createdTime: admin.firestore.FieldValue.serverTimestamp(),
+    updatedTime: admin.firestore.FieldValue.serverTimestamp(),
+    insightDate: historyDoc.date,
+    contextPayloadHash: historyDoc.context_hash,
+    dataSignals: historyDoc.data_signals || {},
+    variationToneType: historyDoc.variation_tone_type,
+    variationStructureType: historyDoc.variation_structure_type,
+    variationAngleType: historyDoc.variation_angle_type,
+    opened: historyDoc.opened === true,
+    playedAudio: historyDoc.played_audio === true,
+    timeOnScreenSec: safeNumber(historyDoc.time_on_screen_sec, 0),
+  };
+}
+
+async function mirrorHistoryToLegacy(docId, historyDoc) {
+  await getDb().collection('ai_insights').doc(docId).set(buildLegacyInsightMirror(historyDoc), {
+    merge: true,
+  });
+}
+
+async function readExistingLegacyInsight(docId) {
+  const snapshot = await getDb().collection('ai_insights').doc(docId).get();
+  if (!snapshot.exists) {
+    return null;
+  }
+
+  const data = snapshot.data() || {};
+  if (safeString(data.insightType) !== FOCOCO_DAILY_INSIGHT_TYPE) {
+    return null;
+  }
+
+  return {
+    id: snapshot.id,
+    data,
+  };
+}
+
+function migrateLegacyInsightToHistory(legacyInsight, userId, insightDate) {
+  const data = legacyInsight.data;
+  return {
+    user_id: userId,
+    surface: FOCOCO_TAB_SURFACE,
+    date: insightDate,
+    context_hash: safeString(data.contextPayloadHash),
+    context_payload: {},
+    insight_text: safeString(data.insightContent),
+    generation_version: safeString(data.generationVersion, FOCOCO_TAB_GENERATION_VERSION),
+    generation_mode: 'legacy_migrated',
+    ai_model: safeString(data.aiModel),
+    tokens_used: safeNumber(data.tokensUsed, 0),
+    raw_ai_response: safeString(data.rawAiResponse),
+    variation_tone_type: safeString(data.variationToneType),
+    variation_structure_type: safeString(data.variationStructureType),
+    variation_angle_type: safeString(data.variationAngleType),
+    data_signals: data.dataSignals || {},
+    repeated_signal_validated: !!safeString(data.contextPayloadHash),
+    opened: data.opened === true,
+    played_audio: data.playedAudio === true,
+    time_on_screen_sec: safeNumber(data.timeOnScreenSec, 0),
+    created_at: toDate(data.createdTime)?.toISOString() || new Date().toISOString(),
+    updated_at: toDate(data.updatedTime)?.toISOString() || new Date().toISOString(),
+  };
+}
+
+function findReusableInsight(recentHistory, contextHash) {
+  return recentHistory.find((entry) => safeString(entry.context_hash) === safeString(contextHash)) || null;
 }
 
 function buildExportRow(doc) {
-  const data = doc.data();
   return {
     insightId: doc.id,
-    userId: safeString(data.userId),
-    date: safeString(data.insightDate),
-    insightText: safeString(data.insightContent),
-    contextPayloadHash: safeString(data.contextPayloadHash),
-    rounds: Number(data?.dataSignals?.rounds ?? 0),
-    mindcoachSessions: Number(data?.dataSignals?.mindcoachSessions ?? 0),
-    golfchatUsed: data?.dataSignals?.golfchatUsed === true,
-    opened: data?.opened === true,
-    playedAudio: data?.playedAudio === true,
-    timeOnScreenSec: Number(data?.timeOnScreenSec ?? 0),
-    variationToneType: safeString(data?.variationToneType),
-    variationStructureType: safeString(data?.variationStructureType),
-    variationAngleType: safeString(data?.variationAngleType),
-    generationVersion: safeString(data?.generationVersion),
-    createdTime: toDate(data?.createdTime)?.toISOString() ?? '',
+    userId: safeString(doc.user_id),
+    date: safeString(doc.date),
+    insightText: safeString(doc.insight_text),
+    contextHash: safeString(doc.context_hash),
+    rounds: safeNumber(doc.data_signals?.rounds, 0),
+    mindcoachSessions: safeNumber(doc.data_signals?.mindcoach_sessions, 0),
+    golfchatMessages: safeNumber(doc.data_signals?.golfchat_messages, 0),
+    repeatedSignalValidated: doc.repeated_signal_validated === true,
+    generationMode: safeString(doc.generation_mode),
+    opened: doc.opened === true,
+    playedAudio: doc.played_audio === true,
+    timeOnScreenSec: safeNumber(doc.time_on_screen_sec, 0),
+    generationVersion: safeString(doc.generation_version),
+    createdAt: safeString(doc.created_at),
   };
+}
+
+function csvEscape(value) {
+  const text = safeString(value);
+  if (!text.includes(',') && !text.includes('"') && !text.includes('\n')) {
+    return text;
+  }
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 function buildCsv(rows) {
@@ -756,19 +778,19 @@ function buildCsv(rows) {
     'userId',
     'date',
     'insightText',
-    'contextPayloadHash',
+    'contextHash',
     'rounds',
     'mindcoachSessions',
-    'golfchatUsed',
+    'golfchatMessages',
+    'repeatedSignalValidated',
+    'generationMode',
     'opened',
     'playedAudio',
     'timeOnScreenSec',
-    'variationToneType',
-    'variationStructureType',
-    'variationAngleType',
     'generationVersion',
-    'createdTime',
+    'createdAt',
   ];
+
   const lines = [
     headers.join(','),
     ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(',')),
@@ -782,123 +804,145 @@ exports.getOrCreateFoCoCoDailyInsight = onCall(
     ensureAuthenticated(request);
     const userId = request.auth.uid;
     const now = new Date();
-
     const userData = await fetchUserRecord(userId);
     const timeZone = getUserTimeZone(userData);
     const insightDate = zonedDateParts(now, timeZone).isoDate;
-    const docRef = db.collection('ai_insights').doc(buildDailyInsightDocId(userId, insightDate));
+    const historyDocId = buildInsightHistoryDocId(userId, FOCOCO_TAB_SURFACE, insightDate);
+    const historyRef = getDb().collection(COLLECTIONS.insightHistory).doc(historyDocId);
 
-    const existingSnapshot = await docRef.get();
-    if (existingSnapshot.exists) {
-      return serializeFoCoCoInsight(existingSnapshot);
+    const existingHistorySnapshot = await historyRef.get();
+    if (existingHistorySnapshot.exists) {
+      const existingHistory = existingHistorySnapshot.data() || {};
+      const existingVersion = safeString(
+        existingHistory.generation_version || existingHistory.generationVersion,
+      );
+      if (existingVersion === FOCOCO_TAB_GENERATION_VERSION) {
+        return serializeHistoryInsight(historyDocId, existingHistory);
+      }
+      logger.info('[FoCoCo] regenerating daily insight for new generation version', {
+        userId,
+        insightDate,
+        previousVersion: existingVersion,
+        nextVersion: FOCOCO_TAB_GENERATION_VERSION,
+      });
     }
 
-    const [
-      recentFoCoCoInsights,
-      rounds,
-      sessions,
-      golfChatContext,
-    ] = await Promise.all([
-      fetchRecentFoCoCoInsights(userId, 4),
-      fetchRoundLogs(userId),
-      fetchMindCoachSessions(userId),
-      fetchGolfChatContext(userId, now),
+    const legacyInsight = await readExistingLegacyInsight(historyDocId);
+    if (legacyInsight) {
+      const migratedHistory = migrateLegacyInsightToHistory(legacyInsight, userId, insightDate);
+      await historyRef.set(migratedHistory, { merge: true });
+      return serializeHistoryInsight(historyDocId, migratedHistory);
+    }
+
+    const [contextDocument, recentHistory] = await Promise.all([
+      ensureContextCacheForSurface(userId, FOCOCO_TAB_SURFACE),
+      fetchRecentInsightHistory(userId, FOCOCO_TAB_SURFACE, 6),
     ]);
 
-    const previousVariation = recentFoCoCoInsights[0]
+    const previousVariation = recentHistory[0]
       ? {
-          toneType: safeString(recentFoCoCoInsights[0].variationToneType),
-          structureType: safeString(recentFoCoCoInsights[0].variationStructureType),
-          angleType: safeString(recentFoCoCoInsights[0].variationAngleType),
+          toneType: safeString(recentHistory[0].variation_tone_type),
+          structureType: safeString(recentHistory[0].variation_structure_type),
+          angleType: safeString(recentHistory[0].variation_angle_type),
         }
       : null;
     const variation = chooseVariation(previousVariation);
-    const roundContext = inferRoundPatterns(rounds, now);
-    const mindCoachContext = inferMindCoachPatterns(sessions, now);
-    const contextPayload = buildContextPayload({
-      userId,
-      userData,
-      now,
-      timeZone,
-      recentFoCoCoInsights,
-      roundContext,
-      mindCoachContext,
-      golfChatContext,
-      variation,
-    });
+    const reusableInsight = findReusableInsight(recentHistory, contextDocument.context_hash);
 
-    const contextPayloadHash = md5(deterministicStringify(contextPayload));
-    const startedAt = Date.now();
-    const geminiResult = await callGeminiForInsight(contextPayload);
-    const nowTimestamp = admin.firestore.Timestamp.now();
-    const createdData = {
-      userId,
-      sourceId: insightDate,
-      sourceType: 'fococo_tab',
-      insightType: FOCOCO_DAILY_INSIGHT_TYPE,
-      category: 'daily_mirror',
-      priority: 'medium',
-      insightTitle: 'Daily Insight',
-      insightContent: geminiResult.insightText,
-      keyPoints: [],
-      recommendations: [],
-      personalizedElements: [],
-      isRead: false,
-      userRating: 0,
-      userFeedback: '',
-      actionsTaken: [],
-      generatedTime: nowTimestamp,
-      aiModel: GEMINI_MODEL,
-      promptUsed: FOCOCO_GENERATION_VERSION,
-      rawAiResponse: JSON.stringify(geminiResult.rawResponse ?? {}),
-      processingTime: Date.now() - startedAt,
-      tokensUsed: Number(geminiResult.tokensUsed ?? 0),
-      costPerInsight: 0,
-      generationVersion: FOCOCO_GENERATION_VERSION,
-      status: 'active',
-      expiryDate: admin.firestore.Timestamp.fromDate(
-        new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
-      ),
-      viewCount: 0,
-      shareCount: 0,
-      relatedInsights: recentFoCoCoInsights.map((insight) => insight.id).slice(0, 3),
-      followUpGenerated: false,
-      createdTime: admin.firestore.FieldValue.serverTimestamp(),
-      updatedTime: admin.firestore.FieldValue.serverTimestamp(),
-      insightDate,
-      contextPayloadHash,
-      dataSignals: contextPayload.dataSignals,
-      variationToneType: variation.toneType,
-      variationStructureType: variation.structureType,
-      variationAngleType: variation.angleType,
-      opened: false,
-      playedAudio: false,
-      timeOnScreenSec: 0,
-    };
+    let historyDoc;
+    if (reusableInsight) {
+      historyDoc = buildCanonicalHistoryDoc({
+        userId,
+        insightDate,
+        contextDocument,
+        insightText: safeString(reusableInsight.insight_text),
+        generationMode: 'reused_same_context',
+        aiModel: reusableInsight.ai_model || null,
+        tokensUsed: 0,
+        rawResponse: null,
+        variation,
+      });
+    } else {
+      const generationContext = buildGenerationContext({
+        userId,
+        userData,
+        timeZone,
+        now,
+        contextDocument,
+        recentHistory,
+        variation,
+      });
+      try {
+        const geminiResult = await callGeminiForInsight(generationContext);
+        historyDoc = buildCanonicalHistoryDoc({
+          userId,
+          insightDate,
+          contextDocument,
+          insightText: geminiResult.insightText,
+          generationMode: 'gemini',
+          aiModel: GEMINI_MODEL,
+          tokensUsed: geminiResult.tokensUsed,
+          rawResponse: geminiResult.rawResponse,
+          variation,
+        });
+      } catch (error) {
+        logger.error('[FoCoCo] gemini generation failed, using deterministic fallback', {
+          userId,
+          insightDate,
+          contextHash: contextDocument.context_hash,
+          error: error?.message || String(error),
+        });
+        historyDoc = buildCanonicalHistoryDoc({
+          userId,
+          insightDate,
+          contextDocument,
+          insightText: buildFococoTabFallbackText(contextDocument),
+          generationMode: 'gemini_failed_fallback',
+          aiModel: null,
+          tokensUsed: 0,
+          rawResponse: {
+            fallbackReason: error?.message || String(error),
+          },
+          variation,
+        });
+      }
+    }
 
     try {
-      await docRef.create(createdData);
+      await historyRef.create(historyDoc);
     } catch (error) {
-      logger.warn('[FoCoCo] Daily insight create raced with another request', {
+      logger.warn('[FoCoCo] insight history create raced with another request', {
         userId,
         insightDate,
         error: error.message,
       });
     }
 
-    const createdSnapshot = await docRef.get();
-    if (!createdSnapshot.exists) {
+    const createdHistorySnapshot = await historyRef.get();
+    if (!createdHistorySnapshot.exists) {
       throw new HttpsError('internal', 'FoCoCo daily insight was not persisted');
     }
 
-    logger.info('[FoCoCo] Daily insight ready', {
+    const createdHistory = createdHistorySnapshot.data() || historyDoc;
+    try {
+      await mirrorHistoryToLegacy(historyDocId, createdHistory);
+    } catch (error) {
+      // History is the source of truth; legacy mirror failure must not fail the call.
+      logger.error('[FoCoCo] legacy mirror write failed', {
+        userId,
+        insightDate,
+        error: error?.message || String(error),
+      });
+    }
+
+    logger.info('[FoCoCo] daily insight ready', {
       userId,
       insightDate,
-      variation,
-      dataSignals: contextPayload.dataSignals,
+      contextHash: createdHistory.context_hash,
+      generationMode: createdHistory.generation_mode,
     });
 
-    return serializeFoCoCoInsight(createdSnapshot);
+    return serializeHistoryInsight(historyDocId, createdHistory);
   },
 );
 
@@ -906,19 +950,20 @@ exports.exportFoCoCoDailyInsightsReview = onCall(async (request) => {
   ensureAdmin(request);
 
   const format = safeString(request.data?.format).toLowerCase() === 'csv' ? 'csv' : 'json';
-  const limit = Math.max(1, Math.min(Number(request.data?.limit ?? 200), 500));
+  const limit = Math.max(1, Math.min(safeNumber(request.data?.limit, 200), 500));
   const startDate = safeString(request.data?.startDate);
   const endDate = safeString(request.data?.endDate);
 
+  const db = getDb();
   const snapshot = await db
-    .collection('ai_insights')
-    .where('insightType', '==', FOCOCO_DAILY_INSIGHT_TYPE)
-    .orderBy('createdTime', 'desc')
+    .collection(COLLECTIONS.insightHistory)
+    .where('surface', '==', FOCOCO_TAB_SURFACE)
+    .orderBy('created_at', 'desc')
     .limit(limit)
     .get();
 
   const rows = snapshot.docs
-    .map((doc) => buildExportRow(doc))
+    .map((doc) => buildExportRow({ id: doc.id, ...doc.data() }))
     .filter((row) => (!startDate || row.date >= startDate) && (!endDate || row.date <= endDate));
 
   if (format === 'csv') {
@@ -935,3 +980,21 @@ exports.exportFoCoCoDailyInsightsReview = onCall(async (request) => {
     items: rows,
   };
 });
+
+module.exports._private = {
+  buildCanonicalHistoryDoc,
+  buildGenerationContext,
+  buildGeminiInsightGenerationConfig,
+  buildLegacyInsightMirror,
+  buildPhraseBlacklist,
+  coerceInsightTextFromModelOutput,
+  findReusableInsight,
+  insightTextFromStructuredPayload,
+  isCompleteSentence,
+  isStructuredOutputUnsupported,
+  migrateLegacyInsightToHistory,
+  normalizeInsightText,
+  serializeHistoryInsight,
+  splitInsightSentences,
+  validateInsightText,
+};

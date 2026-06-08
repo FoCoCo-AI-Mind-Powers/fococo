@@ -4,6 +4,8 @@ import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/pages/fococo_tab/fococo_tab_widget.dart';
+import '/services/subscription_state_provider.dart';
 import '/services/revenuecat_service.dart';
 import '/services/auth_flow_service.dart';
 import 'subscription_onboarding_model.dart';
@@ -38,6 +40,8 @@ class _SubscriptionOnboardingWidgetState
 
   bool _isLoading = false;
   Offering? _selectedOffering;
+  String? _pricingSubtitle;
+  String? _trialStatusLabel;
 
   @override
   void initState() {
@@ -87,6 +91,9 @@ class _SubscriptionOnboardingWidgetState
           _revenueCatService.getPreferredOffering(offerings);
       setState(() {
         _selectedOffering = selectedOffering;
+        final yearly = selectedOffering?.annual?.storeProduct;
+        _pricingSubtitle = _revenueCatService.annualPricingSubtitle(yearly);
+        _trialStatusLabel = _buildTrialLabel();
         _isLoading = false;
       });
 
@@ -153,14 +160,77 @@ class _SubscriptionOnboardingWidgetState
     );
   }
 
+  String? _buildTrialLabel() {
+    final sub = SubscriptionStateProvider();
+    if (!sub.isWithinTrialPeriod() || sub.hasActiveSubscription) {
+      return null;
+    }
+    final remaining = sub.getTrialDaysRemaining();
+    final total = SubscriptionStateProvider.trialPeriodDays;
+    if (remaining <= 0) return 'Trial ends today';
+    if (remaining == 1) return 'Trial ends tomorrow';
+    if (remaining <= 7) return '$remaining days left in your trial';
+    return 'Day ${total - remaining} of $total — 14-day free trial';
+  }
+
+  void _exitPaywall() {
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.goNamed(FoCoCoTabWidget.routeName);
+    }
+  }
+
+  Widget _buildBackBar(FlutterFlowTheme theme) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: IconButton(
+        icon: Icon(
+          Icons.arrow_back_ios,
+          color: theme.primaryText,
+          size: 20,
+        ),
+        onPressed: _exitPaywall,
+      ),
+    );
+  }
+
   /// Build paywall directly - main view
   Widget _buildPaywallDirect(FlutterFlowTheme theme) {
     return Column(
       children: [
+        if (!widget.isMandatory) _buildBackBar(theme),
+        if (_trialStatusLabel != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+            child: Text(
+              _trialStatusLabel!,
+              style: theme.bodyMedium.copyWith(color: theme.secondaryText),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        if (_pricingSubtitle != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+            child: Text(
+              _pricingSubtitle!,
+              style: theme.titleMedium.copyWith(fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+          child: Text(
+            _revenueCatService.trialButtonLabel(),
+            style: theme.bodySmall.copyWith(color: theme.secondaryText),
+            textAlign: TextAlign.center,
+          ),
+        ),
         Expanded(
           child: PaywallView(
             offering: _selectedOffering!,
-            displayCloseButton: !widget.isMandatory,
+            displayCloseButton: false,
             onPurchaseCompleted: (customerInfo, storeTransaction) async {
               await _handlePaywallUnlock();
             },
@@ -176,6 +246,8 @@ class _SubscriptionOnboardingWidgetState
             onDismiss: () {
               if (widget.isMandatory) {
                 _showMandatoryMessage();
+              } else {
+                _exitPaywall();
               }
             },
           ),
@@ -331,10 +403,25 @@ class _SubscriptionOnboardingWidgetState
   Future<void> _handlePaywallUnlock() async {
     setState(() => _isLoading = true);
     try {
+      // RC-only gate: refresh customer info and verify the user actually has
+      // pro access (active entitlement, intro/trial period, or grace period)
+      // BEFORE flipping the mandatory paywall flag or routing past the wall.
       await _revenueCatService.refreshCustomerInfo();
+      final hasAccess = await _revenueCatService.hasProAccess();
+
+      if (!hasAccess) {
+        _showSnack(
+          'No active subscription or trial detected. Please choose a plan to continue.',
+        );
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
+
       await AuthFlowService.instance.markMandatoryPaywallCompleted();
       if (!mounted) return;
-      context.goNamed('mind_coach');
+      context.goNamed(FoCoCoTabWidget.routeName);
     } catch (e) {
       _showSnack('Unable to finalize subscription access: $e');
       if (mounted) {

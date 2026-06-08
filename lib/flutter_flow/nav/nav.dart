@@ -9,7 +9,6 @@ import '/backend/schema/structs/index.dart';
 import '/auth/base_auth_user_provider.dart';
 
 import '/flutter_flow/flutter_flow_util.dart';
-import '/services/gemini_key_service.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
 
 import '/index.dart';
@@ -24,6 +23,8 @@ import '/pages/security/face_id_settings_widget.dart';
 import '/pages/edit_profile/edit_profile_widget.dart';
 import '/pages/settings/settings_widget.dart';
 import '/pages/support/support_widget.dart';
+import '/pages/support/support_submission_widget.dart';
+import '/services/support_submission_service.dart';
 import '/pages/quick_mind_tools/breathing_tool_widget.dart';
 import '/pages/quick_mind_tools/visualize_tool_widget.dart';
 import '/pages/quick_mind_tools/reset_tool_widget.dart';
@@ -35,6 +36,7 @@ import '/pages/register/age_verification_widget.dart';
 import '/pages/fococo_tab/fococo_tab_widget.dart';
 import '/features/mindcoach_v2/app/mindcoach_v2_entry_widget.dart';
 import '/config/app_feature_flags.dart';
+import '/services/deferred_auth_flow_gate.dart';
 
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
@@ -80,10 +82,6 @@ class AppStateNotifier extends ChangeNotifier {
         user?.uid == null || newUser.uid == null || user?.uid != newUser.uid;
     initialUser ??= newUser;
     user = newUser;
-    // Pre-warm the Gemini API key from Secret Manager on sign-in
-    if (newUser.loggedIn && shouldUpdate) {
-      GeminiKeyService.instance.preload();
-    }
     // Refresh the app on auth change unless explicitly marked otherwise.
     // No need to update unless the user has changed.
     if (notifyOnAuthChange && shouldUpdate) {
@@ -146,8 +144,10 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
                 name: MindCoachWidget.routeName,
                 path: MindCoachWidget.routePath,
                 requireAuth: true,
-                builder: (context, params) => MindCoachV2EntryWidget(
-                  initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
+                builder: (context, params) => ScaffoldMessenger(
+                  child: MindCoachV2EntryWidget(
+                    initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
+                  ),
                 ),
               ).toRoute(appStateNotifier),
             ]),
@@ -185,7 +185,7 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
             name: ProfileWidget.routeName,
             path: ProfileWidget.routePath,
             requireAuth: true,
-            builder: (context, params) => ProfileWidget(),
+            builder: (context, params) => const EditProfileWidget(),
           ),
           FFRoute(
             name: 'face_id_settings',
@@ -207,8 +207,10 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
                 ? MindCoachWidget(
                     initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
                   )
-                : MindCoachV2EntryWidget(
-                    initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
+                : ScaffoldMessenger(
+                    child: MindCoachV2EntryWidget(
+                      initialTabIndex: params.state.extraMap['initialTab'] ?? 0,
+                    ),
                   ),
           ),
           FFRoute(
@@ -238,10 +240,11 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
             path: AgeVerificationWidget.routePath,
             builder: (context, params) => const AgeVerificationWidget(),
           ),
-          if (AppFeatureFlags.varkEnabled)
+          if (AppFeatureFlags.onboardingEnabled)
             FFRoute(
               name: VarkOnboardingWidget.routeName,
               path: VarkOnboardingWidget.routePath,
+              requireAuth: true,
               builder: (context, params) => const VarkOnboardingWidget(),
             ),
           if (AppFeatureFlags.varkEnabled)
@@ -288,6 +291,22 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
             path: '/support',
             requireAuth: true,
             builder: (context, params) => const SupportWidget(),
+          ),
+          FFRoute(
+            name: 'report_bug',
+            path: '/report-bug',
+            requireAuth: true,
+            builder: (context, params) => const SupportSubmissionWidget(
+              type: SupportSubmissionType.bug,
+            ),
+          ),
+          FFRoute(
+            name: 'send_feedback',
+            path: '/send-feedback',
+            requireAuth: true,
+            builder: (context, params) => const SupportSubmissionWidget(
+              type: SupportSubmissionType.feedback,
+            ),
           ),
           FFRoute(
             name: AiAssessmentWidget.routeName,
@@ -351,7 +370,7 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
             path: GolfSyncWidget.routePath,
             targetPath: CaddyPlayWidget.routePath,
           ),
-          if (!AppFeatureFlags.varkEnabled)
+          if (!AppFeatureFlags.onboardingEnabled)
             _buildAliasRoute(
               appStateNotifier: appStateNotifier,
               name: VarkOnboardingWidget.routeName,
@@ -649,11 +668,16 @@ extension GoRouterLocationExtension on GoRouter {
 
 /// Shell widget for the 4 persistent tabs.
 /// Provides the single bottom nav bar; each tab page omits its own nav bar.
-class _FoCoCoTabShell extends StatelessWidget {
+class _FoCoCoTabShell extends StatefulWidget {
   const _FoCoCoTabShell({required this.shell});
 
   final StatefulNavigationShell shell;
 
+  @override
+  State<_FoCoCoTabShell> createState() => _FoCoCoTabShellState();
+}
+
+class _FoCoCoTabShellState extends State<_FoCoCoTabShell> {
   static const List<String> _tabRoutes = [
     'fococo',
     'caddy_play',
@@ -662,21 +686,29 @@ class _FoCoCoTabShell extends StatelessWidget {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(DeferredAuthFlowGate.runIfNeeded(context));
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final currentRoute = _tabRoutes[shell.currentIndex];
+    final currentRoute = _tabRoutes[widget.shell.currentIndex];
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBody: true,
-      body: shell,
+      body: widget.shell,
       bottomNavigationBar: buildFoCoCoBottomNavBar(
         context: context,
         currentRoute: currentRoute,
         onTap: (route) {
           final index = foCoCoNavIndexFromRoute(route);
-          shell.goBranch(
+          widget.shell.goBranch(
             index,
             // Re-navigate to branch root if already on that tab
-            initialLocation: index == shell.currentIndex,
+            initialLocation: index == widget.shell.currentIndex,
           );
         },
       ),

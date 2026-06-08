@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -23,11 +24,15 @@ class FoCoCoNavDestination {
     required this.icon,
     this.selectedIcon,
     required this.label,
+    this.brandLogoAsset,
   });
 
   final IconData icon;
   final IconData? selectedIcon;
   final String label;
+
+  /// When set, the tab shows this asset (e.g. main mark) instead of [icon].
+  final String? brandLogoAsset;
 }
 
 /// FoCoCo bottom nav — 4 tabs matching design spec.
@@ -36,6 +41,7 @@ const List<FoCoCoNavDestination> foCoCoNavDestinations = [
     icon: FontAwesomeIcons.clover,
     selectedIcon: FontAwesomeIcons.clover,
     label: 'FoCoCo',
+    brandLogoAsset: 'assets/images/logo/Logo.png',
   ),
   FoCoCoNavDestination(
     icon: FontAwesomeIcons.flag,
@@ -355,6 +361,7 @@ class FoCoCoBottomNavigationBar extends StatelessWidget {
                                             ? (d.selectedIcon ?? d.icon)
                                             : d.icon,
                                       ),
+                                      brandLogoAsset: d.brandLogoAsset,
                                       label: showLabels
                                           ? (overrides[route] ?? d.label)
                                           : null,
@@ -418,6 +425,7 @@ Widget buildFoCoCoBottomNavBar({
 class _FoCoCoNavTile extends StatefulWidget {
   const _FoCoCoNavTile({
     required this.icon,
+    this.brandLogoAsset,
     this.label,
     required this.isSelected,
     required this.selectedColor,
@@ -426,6 +434,7 @@ class _FoCoCoNavTile extends StatefulWidget {
   });
 
   final IconData icon;
+  final String? brandLogoAsset;
   final String? label;
   final bool isSelected;
   final Color selectedColor;
@@ -436,14 +445,84 @@ class _FoCoCoNavTile extends StatefulWidget {
   State<_FoCoCoNavTile> createState() => _FoCoCoNavTileState();
 }
 
+class _FoCoCoNavBrandMark extends StatefulWidget {
+  const _FoCoCoNavBrandMark({
+    required this.assetPath,
+    required this.size,
+    required this.isSelected,
+  });
+
+  final String assetPath;
+  final double size;
+  final bool isSelected;
+
+  @override
+  State<_FoCoCoNavBrandMark> createState() => _FoCoCoNavBrandMarkState();
+}
+
+class _FoCoCoNavBrandMarkState extends State<_FoCoCoNavBrandMark>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _rotation;
+
+  @override
+  void initState() {
+    super.initState();
+    _rotation = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 40),
+    )..repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FoCoCoNavBrandMark oldWidget) {
+    super.didUpdateWidget(oldWidget);
+  }
+
+  @override
+  void dispose() {
+    _rotation.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _rotation,
+      builder: (context, child) {
+        return Transform.rotate(
+          angle: _rotation.value * 2 * math.pi,
+          child: child,
+        );
+      },
+      child: Opacity(
+        opacity: 1.0,
+        child: Image.asset(
+          widget.assetPath,
+          width: widget.size,
+          height: widget.size,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (_, __, ___) => Icon(
+            FontAwesomeIcons.clover,
+            color: Colors.white70,
+            size: widget.size,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _FoCoCoNavTileState extends State<_FoCoCoNavTile> {
   bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final color =
+    final iconColor = widget.unselectedColor;
+    final labelColor =
         widget.isSelected ? widget.selectedColor : widget.unselectedColor;
     final iconSize = widget.isSelected ? 25.0 : 23.0;
+    final useBrand = widget.brandLogoAsset != null;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -473,40 +552,21 @@ class _FoCoCoNavTileState extends State<_FoCoCoNavTile> {
                     children: [
                       SizedBox(
                         height: 34,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          clipBehavior: Clip.none,
-                          children: [
-                            AnimatedOpacity(
-                              opacity: widget.isSelected ? 1.0 : 0.0,
-                              duration: const Duration(milliseconds: 260),
-                              curve: Curves.easeOutCubic,
-                              child: IgnorePointer(
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(11),
-                                  child: BackdropFilter(
-                                    filter: ImageFilter.blur(
-                                      sigmaX: 18,
-                                      sigmaY: 18,
-                                    ),
-                                    child: Container(
-                                      width: 44,
-                                      height: 30,
-                                      color:
-                                          Colors.white.withValues(alpha: 0.16),
-                                    ),
-                                  ),
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(end: iconSize),
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOut,
+                          builder: (context, size, _) => useBrand
+                              ? _FoCoCoNavBrandMark(
+                                  assetPath: widget.brandLogoAsset!,
+                                  size: size,
+                                  isSelected: widget.isSelected,
+                                )
+                              : Icon(
+                                  widget.icon,
+                                  color: iconColor,
+                                  size: size,
                                 ),
-                              ),
-                            ),
-                            TweenAnimationBuilder<double>(
-                              tween: Tween(end: iconSize),
-                              duration: const Duration(milliseconds: 180),
-                              curve: Curves.easeOut,
-                              builder: (context, size, _) =>
-                                  Icon(widget.icon, color: color, size: size),
-                            ),
-                          ],
                         ),
                       ),
                       if (widget.label != null) ...[
@@ -520,7 +580,7 @@ class _FoCoCoNavTileState extends State<_FoCoCoNavTile> {
                           child: AnimatedDefaultTextStyle(
                             duration: const Duration(milliseconds: 180),
                             style: TextStyle(
-                              color: color,
+                              color: labelColor,
                               fontSize: 10,
                               height: 1.1,
                               fontWeight: widget.isSelected
@@ -544,6 +604,151 @@ class _FoCoCoNavTileState extends State<_FoCoCoNavTile> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+/// Exposes drawer control to inline headers when [FoCoCoAdaptiveScaffold.hideAppBar]
+/// is true.
+class FoCoCoScaffoldScope extends InheritedWidget {
+  const FoCoCoScaffoldScope({
+    super.key,
+    required this.openDrawer,
+    required super.child,
+  });
+
+  final VoidCallback? openDrawer;
+
+  static FoCoCoScaffoldScope? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<FoCoCoScaffoldScope>();
+  }
+
+  @override
+  bool updateShouldNotify(FoCoCoScaffoldScope oldWidget) =>
+      openDrawer != oldWidget.openDrawer;
+}
+
+/// MindCoach-style inline header: optional drawer/back row + centered title/subtitle.
+class FoCoCoInlineScreenHeader extends StatelessWidget {
+  const FoCoCoInlineScreenHeader({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.titleColor,
+    this.subtitleColor,
+    this.leading,
+    this.actions,
+    this.showDrawerButton = false,
+    this.compactTitle = false,
+    this.topInset = 0,
+    this.horizontalPadding = 16,
+  });
+
+  final String title;
+  final String? subtitle;
+  final Color? titleColor;
+  final Color? subtitleColor;
+  final Widget? leading;
+  final List<Widget>? actions;
+  final bool showDrawerButton;
+  final bool compactTitle;
+  final double topInset;
+  final double horizontalPadding;
+
+  static const double _sideSlotWidth = 48;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = FlutterFlowTheme.of(context);
+    final resolvedTitleColor = titleColor ?? Colors.white;
+    final resolvedSubtitleColor =
+        subtitleColor ?? Colors.white.withValues(alpha: 0.62);
+    final scope = FoCoCoScaffoldScope.maybeOf(context);
+
+    Widget? leadingWidget = leading;
+    if (leadingWidget == null && showDrawerButton && scope?.openDrawer != null) {
+      leadingWidget = IconButton(
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+        constraints: const BoxConstraints(
+          minWidth: _sideSlotWidth,
+          minHeight: 44,
+        ),
+        icon: Icon(Icons.menu_rounded, color: theme.primaryText),
+        tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+        onPressed: scope!.openDrawer,
+      );
+    }
+
+    final actionWidgets = actions ?? const <Widget>[];
+    final trailingSlotWidth = actionWidgets.isEmpty
+        ? _sideSlotWidth
+        : _sideSlotWidth * actionWidgets.length;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        horizontalPadding,
+        topInset + 4,
+        horizontalPadding,
+        subtitle == null ? 8 : 0,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: _sideSlotWidth,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: leadingWidget ?? const SizedBox.shrink(),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: (compactTitle ? theme.titleLarge : theme.headlineSmall)
+                      .copyWith(
+                    color: resolvedTitleColor,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: trailingSlotWidth,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: actionWidgets.isEmpty
+                      ? const SizedBox.shrink()
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: actionWidgets,
+                        ),
+                ),
+              ),
+            ],
+          ),
+          if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              subtitle!,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.titleMedium.copyWith(
+                color: resolvedSubtitleColor,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ],
       ),
     );
   }
@@ -671,10 +876,22 @@ class _FoCoCoAdaptiveScaffoldState extends State<FoCoCoAdaptiveScaffold> {
       );
     }
 
+    body = FoCoCoScaffoldScope(
+      openDrawer: widget.drawer == null
+          ? null
+          : () => _scaffoldKey.currentState?.openDrawer(),
+      child: body,
+    );
+
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: pageBg,
       drawer: widget.drawer,
+      // Always allow the user to swipe in from the left edge to reveal the
+      // FoCoCo drawer, even when nested scrollables compete with the gesture.
+      drawerEnableOpenDragGesture: widget.drawer != null,
+      drawerEdgeDragWidth:
+          widget.drawer != null ? _kFoCoCoDrawerEdgeDragWidth : null,
       appBar: appBar,
       extendBody: true,
       body: body,
@@ -689,6 +906,11 @@ class _FoCoCoAdaptiveScaffoldState extends State<FoCoCoAdaptiveScaffold> {
     );
   }
 }
+
+/// Width of the left-edge zone that opens the FoCoCo drawer on swipe. Wider
+/// than Material's default (~20pt) so the gesture wins against horizontal
+/// PageViews and chart panners on the home/coaching pages.
+const double _kFoCoCoDrawerEdgeDragWidth = 28.0;
 
 /// Legacy bottom bar for [Scaffold.bottomNavigationBar].
 class EnhancedFoCoCoNavBar extends StatelessWidget {

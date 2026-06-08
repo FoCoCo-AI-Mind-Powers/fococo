@@ -1,0 +1,1153 @@
+content_id,template_id,template_name,pillar,vark_mode,level,length,scenario_tags,pressure_level,lie_type,wind_condition,region_variant,script_text,cta_question,follow_up_prompt,confidence_rating_hint,do_not_say_flags
+MC_00001,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Visual,Foundation,micro,new_course;warmup_intention,low,tight,calm,AU,"One intention for today: play calm, play clear. One breath. Start.
+Keep it simple and repeatable.
+Picture one clear target line. See the ball start on it.",What tempo do you want to feel on the first hole?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00002,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Visual,Foundation,standard,first_tee_nerves;casual_social_round,low,rough,light,AU,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Keep it simple and repeatable.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s your one intention today?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00003,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Visual,Foundation,deep,new_course;first_tee_nerves,low,rough,calm,AU,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Keep it simple and repeatable.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What’s your one intention today?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00004,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Visual,Build,micro,first_tee_nerves;casual_social_round,low,fairway_bunker,light,UK,"One intention for today: play calm, play clear. One breath. Start.
+Add one detail: pace and commitment.
+Picture one clear target line. See the ball start on it.",What tempo do you want to feel on the first hole?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00005,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Visual,Build,standard,tournament_round;first_tee_nerves,high,tight,light,UK,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Add one detail: pace and commitment.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s your one intention today?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00006,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Visual,Build,deep,first_tee_nerves;tournament_round,medium,perfect,strong,AU,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Add one detail: pace and commitment.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What’s your one intention today?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00007,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Visual,Compete,micro,casual_social_round;first_tee_nerves,medium,perfect,strong,UK,"One intention for today: play calm, play clear. One breath. Start.
+Narrow focus. Execute under pressure.
+Picture one clear target line. See the ball start on it.",What’s your one intention today?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00008,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Visual,Compete,standard,casual_social_round;first_tee_nerves,high,fairway_bunker,moderate,US,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Narrow focus. Execute under pressure.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What tempo do you want to feel on the first hole?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00009,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Visual,Compete,deep,first_tee_nerves;warmup_intention,medium,greenside_bunker,moderate,AU,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Narrow focus. Execute under pressure.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What’s your one intention today?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00010,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Visual,Maintain,micro,casual_social_round;warmup_intention,low,tight,calm,EU,"One intention for today: play calm, play clear. One breath. Start.
+Stay consistent. Trust what works.
+Picture one clear target line. See the ball start on it.",What tempo do you want to feel on the first hole?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00011,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Visual,Maintain,standard,tournament_round;warmup_intention,high,fairway_bunker,moderate,UK,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Stay consistent. Trust what works.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s your one intention today?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00012,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Visual,Maintain,deep,casual_social_round;new_course,medium,fairway_bunker,moderate,US,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Stay consistent. Trust what works.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What’s your one intention today?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00013,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Aural,Foundation,micro,first_tee_nerves;warmup_intention,low,rough,strong,US,"One intention for today: play calm, play clear. One breath. Start.
+Keep it simple and repeatable.
+Say one phrase to yourself: “Smooth and committed.”",What tempo do you want to feel on the first hole?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00014,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Aural,Foundation,standard,first_tee_nerves;casual_social_round,medium,fairway_bunker,calm,AU,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Keep it simple and repeatable.
+Use a quiet cue phrase. One sentence, same tone every time.",What’s your one intention today?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00015,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Aural,Foundation,deep,casual_social_round;warmup_intention,high,tight,strong,AU,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Keep it simple and repeatable.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What tempo do you want to feel on the first hole?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00016,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Aural,Build,micro,casual_social_round;tournament_round,high,rough,light,UK,"One intention for today: play calm, play clear. One breath. Start.
+Add one detail: pace and commitment.
+Say one phrase to yourself: “Smooth and committed.”",What tempo do you want to feel on the first hole?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00017,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Aural,Build,standard,tournament_round;casual_social_round,low,tight,light,US,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Add one detail: pace and commitment.
+Use a quiet cue phrase. One sentence, same tone every time.",What tempo do you want to feel on the first hole?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00018,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Aural,Build,deep,new_course;warmup_intention,high,greenside_bunker,calm,US,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Add one detail: pace and commitment.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What’s your one intention today?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00019,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Aural,Compete,micro,warmup_intention;first_tee_nerves,high,rough,moderate,US,"One intention for today: play calm, play clear. One breath. Start.
+Narrow focus. Execute under pressure.
+Say one phrase to yourself: “Smooth and committed.”",What tempo do you want to feel on the first hole?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00020,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Aural,Compete,standard,casual_social_round;tournament_round,medium,rough,light,US,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Narrow focus. Execute under pressure.
+Use a quiet cue phrase. One sentence, same tone every time.",What tempo do you want to feel on the first hole?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00021,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Aural,Compete,deep,tournament_round;new_course,high,greenside_bunker,moderate,UK,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Narrow focus. Execute under pressure.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What’s your one intention today?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00022,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Aural,Maintain,micro,first_tee_nerves;tournament_round,low,tight,light,UK,"One intention for today: play calm, play clear. One breath. Start.
+Stay consistent. Trust what works.
+Say one phrase to yourself: “Smooth and committed.”",What’s your one intention today?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00023,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Aural,Maintain,standard,new_course;warmup_intention,high,fairway_bunker,calm,US,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Stay consistent. Trust what works.
+Use a quiet cue phrase. One sentence, same tone every time.",What tempo do you want to feel on the first hole?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00024,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Aural,Maintain,deep,tournament_round;first_tee_nerves,high,rough,calm,AU,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Stay consistent. Trust what works.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What’s your one intention today?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00025,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,ReadWrite,Foundation,micro,casual_social_round;new_course,medium,greenside_bunker,moderate,EU,"One intention for today: play calm, play clear. One breath. Start.
+Keep it simple and repeatable.
+Name the task in words: “Pick. Commit. Swing.”",What tempo do you want to feel on the first hole?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00026,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,ReadWrite,Foundation,standard,new_course;tournament_round,low,perfect,moderate,AU,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Keep it simple and repeatable.
+Use a short written-style checklist in your head: target, plan, commit.",What tempo do you want to feel on the first hole?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00027,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,ReadWrite,Foundation,deep,first_tee_nerves;casual_social_round,medium,fairway_bunker,light,UK,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Keep it simple and repeatable.
+Run a 4-line script: target, plan, breath, commit. Then go.",What tempo do you want to feel on the first hole?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00028,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,ReadWrite,Build,micro,tournament_round;first_tee_nerves,high,rough,moderate,UK,"One intention for today: play calm, play clear. One breath. Start.
+Add one detail: pace and commitment.
+Name the task in words: “Pick. Commit. Swing.”",What’s your one intention today?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00029,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,ReadWrite,Build,standard,new_course;tournament_round,medium,perfect,light,EU,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Add one detail: pace and commitment.
+Use a short written-style checklist in your head: target, plan, commit.",What tempo do you want to feel on the first hole?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00030,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,ReadWrite,Build,deep,tournament_round;new_course,high,greenside_bunker,light,AU,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Add one detail: pace and commitment.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s your one intention today?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00031,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,ReadWrite,Compete,micro,tournament_round;new_course,high,perfect,calm,US,"One intention for today: play calm, play clear. One breath. Start.
+Narrow focus. Execute under pressure.
+Name the task in words: “Pick. Commit. Swing.”",What’s your one intention today?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00032,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,ReadWrite,Compete,standard,casual_social_round;first_tee_nerves,low,fairway_bunker,strong,US,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Narrow focus. Execute under pressure.
+Use a short written-style checklist in your head: target, plan, commit.",What tempo do you want to feel on the first hole?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00033,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,ReadWrite,Compete,deep,first_tee_nerves;warmup_intention,high,greenside_bunker,calm,AU,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Narrow focus. Execute under pressure.
+Run a 4-line script: target, plan, breath, commit. Then go.",What tempo do you want to feel on the first hole?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00034,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,ReadWrite,Maintain,micro,warmup_intention;casual_social_round,low,greenside_bunker,strong,EU,"One intention for today: play calm, play clear. One breath. Start.
+Stay consistent. Trust what works.
+Name the task in words: “Pick. Commit. Swing.”",What tempo do you want to feel on the first hole?,Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00035,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,ReadWrite,Maintain,standard,tournament_round;casual_social_round,high,fairway_bunker,light,AU,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Stay consistent. Trust what works.
+Use a short written-style checklist in your head: target, plan, commit.",What’s your one intention today?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00036,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,ReadWrite,Maintain,deep,warmup_intention;tournament_round,high,fairway_bunker,light,US,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Stay consistent. Trust what works.
+Run a 4-line script: target, plan, breath, commit. Then go.",What tempo do you want to feel on the first hole?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00037,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Kinesthetic,Foundation,micro,casual_social_round;new_course,high,rough,moderate,EU,"One intention for today: play calm, play clear. One breath. Start.
+Keep it simple and repeatable.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s your one intention today?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00038,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Kinesthetic,Foundation,standard,tournament_round;new_course,low,perfect,strong,EU,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Keep it simple and repeatable.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What tempo do you want to feel on the first hole?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00039,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Kinesthetic,Foundation,deep,new_course;tournament_round,high,perfect,calm,UK,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Keep it simple and repeatable.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What’s your one intention today?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00040,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Kinesthetic,Build,micro,warmup_intention;first_tee_nerves,low,rough,light,EU,"One intention for today: play calm, play clear. One breath. Start.
+Add one detail: pace and commitment.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s your one intention today?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00041,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Kinesthetic,Build,standard,warmup_intention;casual_social_round,high,tight,light,US,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Add one detail: pace and commitment.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What’s your one intention today?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00042,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Kinesthetic,Build,deep,first_tee_nerves;tournament_round,high,greenside_bunker,strong,US,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Add one detail: pace and commitment.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What’s your one intention today?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00043,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Kinesthetic,Compete,micro,new_course;casual_social_round,high,perfect,strong,US,"One intention for today: play calm, play clear. One breath. Start.
+Narrow focus. Execute under pressure.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s your one intention today?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00044,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Kinesthetic,Compete,standard,warmup_intention;tournament_round,low,rough,calm,AU,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Narrow focus. Execute under pressure.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What tempo do you want to feel on the first hole?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00045,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Kinesthetic,Compete,deep,casual_social_round;new_course,low,fairway_bunker,light,US,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Narrow focus. Execute under pressure.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What’s your one intention today?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00046,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Kinesthetic,Maintain,micro,casual_social_round;first_tee_nerves,high,rough,strong,EU,"One intention for today: play calm, play clear. One breath. Start.
+Stay consistent. Trust what works.
+Feel your feet. One slow exhale. Loose grip pressure.",What tempo do you want to feel on the first hole?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00047,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Kinesthetic,Maintain,standard,casual_social_round;tournament_round,high,rough,calm,AU,"Before you tee off: choose one intention. One breath. One clear plan for the first hole. That’s enough.
+Stay consistent. Trust what works.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What tempo do you want to feel on the first hole?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00048,MC_T01_PRE_ROUND_CLARITY,Pre-Round Clarity,FOCUS,Kinesthetic,Maintain,deep,tournament_round;casual_social_round,medium,tight,strong,US,"Set your round in three lines: intention, tempo, response. Intention: stay present. Tempo: unhurried. Response: reset fast. Then begin.
+Stay consistent. Trust what works.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What’s your one intention today?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00049,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Visual,Foundation,micro,tight_lie;approach_commitment,low,tight,light,US,"Pick the target. Commit to the shot. One breath. Swing.
+Keep it simple and repeatable.
+Picture one clear target line. See the ball start on it.",Are you fully committed to this target?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00050,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Visual,Foundation,standard,club_choice_confusion;indecision_over_ball,medium,rough,moderate,US,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Keep it simple and repeatable.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",Are you fully committed to this target?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00051,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Visual,Foundation,deep,tight_lie;club_choice_confusion,high,rough,light,UK,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Keep it simple and repeatable.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",Are you fully committed to this target?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00052,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Visual,Build,micro,wind_adjustment;tee_shot_commitment,medium,rough,moderate,UK,"Pick the target. Commit to the shot. One breath. Swing.
+Add one detail: pace and commitment.
+Picture one clear target line. See the ball start on it.",Are you fully committed to this target?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00053,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Visual,Build,standard,indecision_over_ball;approach_commitment,low,perfect,light,US,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Add one detail: pace and commitment.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",Are you fully committed to this target?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00054,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Visual,Build,deep,tee_shot_commitment;indecision_over_ball,low,rough,moderate,AU,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Add one detail: pace and commitment.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What’s the simplest shot you can commit to here?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00055,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Visual,Compete,micro,tee_shot_commitment;indecision_over_ball,low,fairway_bunker,calm,AU,"Pick the target. Commit to the shot. One breath. Swing.
+Narrow focus. Execute under pressure.
+Picture one clear target line. See the ball start on it.",Are you fully committed to this target?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00056,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Visual,Compete,standard,club_choice_confusion;tee_shot_commitment,low,greenside_bunker,calm,AU,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Narrow focus. Execute under pressure.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s the simplest shot you can commit to here?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00057,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Visual,Compete,deep,club_choice_confusion;wind_adjustment,low,greenside_bunker,light,AU,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Narrow focus. Execute under pressure.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What’s the simplest shot you can commit to here?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00058,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Visual,Maintain,micro,tee_shot_commitment;wind_adjustment,low,rough,strong,US,"Pick the target. Commit to the shot. One breath. Swing.
+Stay consistent. Trust what works.
+Picture one clear target line. See the ball start on it.",What’s the simplest shot you can commit to here?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00059,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Visual,Maintain,standard,indecision_over_ball;approach_commitment,low,fairway_bunker,strong,UK,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Stay consistent. Trust what works.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s the simplest shot you can commit to here?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00060,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Visual,Maintain,deep,tight_lie;approach_commitment,high,greenside_bunker,calm,EU,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Stay consistent. Trust what works.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What’s the simplest shot you can commit to here?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00061,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Aural,Foundation,micro,wind_adjustment;indecision_over_ball,low,rough,strong,EU,"Pick the target. Commit to the shot. One breath. Swing.
+Keep it simple and repeatable.
+Say one phrase to yourself: “Smooth and committed.”",Are you fully committed to this target?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00062,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Aural,Foundation,standard,indecision_over_ball;wind_adjustment,medium,fairway_bunker,moderate,US,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Keep it simple and repeatable.
+Use a quiet cue phrase. One sentence, same tone every time.",What’s the simplest shot you can commit to here?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00063,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Aural,Foundation,deep,tight_lie;club_choice_confusion,medium,rough,strong,EU,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Keep it simple and repeatable.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",Are you fully committed to this target?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00064,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Aural,Build,micro,club_choice_confusion;tee_shot_commitment,low,tight,strong,EU,"Pick the target. Commit to the shot. One breath. Swing.
+Add one detail: pace and commitment.
+Say one phrase to yourself: “Smooth and committed.”",What’s the simplest shot you can commit to here?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00065,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Aural,Build,standard,club_choice_confusion;tee_shot_commitment,medium,fairway_bunker,moderate,US,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Add one detail: pace and commitment.
+Use a quiet cue phrase. One sentence, same tone every time.",Are you fully committed to this target?,Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00066,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Aural,Build,deep,tee_shot_commitment;wind_adjustment,medium,greenside_bunker,strong,AU,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Add one detail: pace and commitment.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",Are you fully committed to this target?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00067,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Aural,Compete,micro,approach_commitment;wind_adjustment,high,tight,strong,US,"Pick the target. Commit to the shot. One breath. Swing.
+Narrow focus. Execute under pressure.
+Say one phrase to yourself: “Smooth and committed.”",What’s the simplest shot you can commit to here?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00068,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Aural,Compete,standard,club_choice_confusion;wind_adjustment,high,perfect,strong,UK,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Narrow focus. Execute under pressure.
+Use a quiet cue phrase. One sentence, same tone every time.",Are you fully committed to this target?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00069,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Aural,Compete,deep,tee_shot_commitment;approach_commitment,low,rough,strong,UK,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Narrow focus. Execute under pressure.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What’s the simplest shot you can commit to here?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00070,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Aural,Maintain,micro,approach_commitment;club_choice_confusion,low,rough,calm,US,"Pick the target. Commit to the shot. One breath. Swing.
+Stay consistent. Trust what works.
+Say one phrase to yourself: “Smooth and committed.”",Are you fully committed to this target?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00071,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Aural,Maintain,standard,club_choice_confusion;tight_lie,medium,perfect,calm,US,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Stay consistent. Trust what works.
+Use a quiet cue phrase. One sentence, same tone every time.",Are you fully committed to this target?,Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00072,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Aural,Maintain,deep,club_choice_confusion;tee_shot_commitment,high,rough,moderate,US,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Stay consistent. Trust what works.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What’s the simplest shot you can commit to here?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00073,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,ReadWrite,Foundation,micro,wind_adjustment;indecision_over_ball,high,fairway_bunker,strong,AU,"Pick the target. Commit to the shot. One breath. Swing.
+Keep it simple and repeatable.
+Name the task in words: “Pick. Commit. Swing.”",Are you fully committed to this target?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00074,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,ReadWrite,Foundation,standard,wind_adjustment;tight_lie,low,greenside_bunker,strong,AU,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Keep it simple and repeatable.
+Use a short written-style checklist in your head: target, plan, commit.",What’s the simplest shot you can commit to here?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00075,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,ReadWrite,Foundation,deep,club_choice_confusion;tee_shot_commitment,low,fairway_bunker,calm,UK,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Keep it simple and repeatable.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s the simplest shot you can commit to here?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00076,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,ReadWrite,Build,micro,tight_lie;wind_adjustment,low,tight,moderate,UK,"Pick the target. Commit to the shot. One breath. Swing.
+Add one detail: pace and commitment.
+Name the task in words: “Pick. Commit. Swing.”",What’s the simplest shot you can commit to here?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00077,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,ReadWrite,Build,standard,indecision_over_ball;club_choice_confusion,high,greenside_bunker,calm,AU,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Add one detail: pace and commitment.
+Use a short written-style checklist in your head: target, plan, commit.",Are you fully committed to this target?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00078,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,ReadWrite,Build,deep,club_choice_confusion;tight_lie,high,rough,moderate,UK,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Add one detail: pace and commitment.
+Run a 4-line script: target, plan, breath, commit. Then go.",Are you fully committed to this target?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00079,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,ReadWrite,Compete,micro,wind_adjustment;club_choice_confusion,medium,fairway_bunker,strong,UK,"Pick the target. Commit to the shot. One breath. Swing.
+Narrow focus. Execute under pressure.
+Name the task in words: “Pick. Commit. Swing.”",What’s the simplest shot you can commit to here?,Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00080,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,ReadWrite,Compete,standard,tee_shot_commitment;approach_commitment,medium,greenside_bunker,strong,AU,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Narrow focus. Execute under pressure.
+Use a short written-style checklist in your head: target, plan, commit.",Are you fully committed to this target?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00081,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,ReadWrite,Compete,deep,tight_lie;wind_adjustment,low,tight,moderate,AU,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Narrow focus. Execute under pressure.
+Run a 4-line script: target, plan, breath, commit. Then go.",Are you fully committed to this target?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00082,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,ReadWrite,Maintain,micro,approach_commitment;indecision_over_ball,high,greenside_bunker,moderate,US,"Pick the target. Commit to the shot. One breath. Swing.
+Stay consistent. Trust what works.
+Name the task in words: “Pick. Commit. Swing.”",What’s the simplest shot you can commit to here?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00083,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,ReadWrite,Maintain,standard,approach_commitment;club_choice_confusion,high,greenside_bunker,calm,AU,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Stay consistent. Trust what works.
+Use a short written-style checklist in your head: target, plan, commit.",What’s the simplest shot you can commit to here?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00084,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,ReadWrite,Maintain,deep,club_choice_confusion;tight_lie,high,tight,light,AU,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Stay consistent. Trust what works.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s the simplest shot you can commit to here?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00085,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Kinesthetic,Foundation,micro,indecision_over_ball;tight_lie,medium,tight,calm,UK,"Pick the target. Commit to the shot. One breath. Swing.
+Keep it simple and repeatable.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s the simplest shot you can commit to here?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00086,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Kinesthetic,Foundation,standard,tight_lie;indecision_over_ball,high,perfect,strong,US,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Keep it simple and repeatable.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",Are you fully committed to this target?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00087,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Kinesthetic,Foundation,deep,club_choice_confusion;approach_commitment,high,fairway_bunker,light,EU,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Keep it simple and repeatable.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",Are you fully committed to this target?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00088,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Kinesthetic,Build,micro,club_choice_confusion;tee_shot_commitment,low,rough,strong,EU,"Pick the target. Commit to the shot. One breath. Swing.
+Add one detail: pace and commitment.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s the simplest shot you can commit to here?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00089,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Kinesthetic,Build,standard,approach_commitment;club_choice_confusion,low,perfect,calm,US,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Add one detail: pace and commitment.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What’s the simplest shot you can commit to here?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00090,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Kinesthetic,Build,deep,approach_commitment;wind_adjustment,medium,tight,strong,UK,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Add one detail: pace and commitment.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",Are you fully committed to this target?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00091,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Kinesthetic,Compete,micro,tee_shot_commitment;approach_commitment,low,greenside_bunker,calm,UK,"Pick the target. Commit to the shot. One breath. Swing.
+Narrow focus. Execute under pressure.
+Feel your feet. One slow exhale. Loose grip pressure.",Are you fully committed to this target?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00092,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Kinesthetic,Compete,standard,indecision_over_ball;approach_commitment,low,perfect,light,AU,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Narrow focus. Execute under pressure.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",Are you fully committed to this target?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00093,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Kinesthetic,Compete,deep,tee_shot_commitment;club_choice_confusion,low,greenside_bunker,moderate,US,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Narrow focus. Execute under pressure.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What’s the simplest shot you can commit to here?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00094,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Kinesthetic,Maintain,micro,club_choice_confusion;approach_commitment,high,tight,strong,US,"Pick the target. Commit to the shot. One breath. Swing.
+Stay consistent. Trust what works.
+Feel your feet. One slow exhale. Loose grip pressure.",Are you fully committed to this target?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00095,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Kinesthetic,Maintain,standard,wind_adjustment;club_choice_confusion,high,greenside_bunker,light,UK,"Decision first. Then commitment. One breath to slow the moment. One clear target. Then execute.
+Stay consistent. Trust what works.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What’s the simplest shot you can commit to here?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00096,MC_T02_PRE_SHOT_FOCUS,Pre-Shot Focus,FOCUS,Kinesthetic,Maintain,deep,tee_shot_commitment;club_choice_confusion,high,rough,calm,UK,"Run the sequence: choose, commit, breathe, go. If you’re still unsure, simplify the shot until you can fully commit.
+Stay consistent. Trust what works.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What’s the simplest shot you can commit to here?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00097,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Visual,Foundation,micro,walking_reset;fast_group_behind,high,perfect,moderate,AU,"Reset now. Next decision only.
+Keep it simple and repeatable.
+Picture one clear target line. See the ball start on it.",What’s the next decision only?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00098,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Visual,Foundation,standard,waiting_on_tee;slow_play_rumination,medium,fairway_bunker,strong,EU,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Keep it simple and repeatable.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s the next decision only?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00099,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Visual,Foundation,deep,fast_group_behind;walking_reset,low,perfect,light,US,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Keep it simple and repeatable.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What’s the next decision only?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00100,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Visual,Build,micro,waiting_on_tee;walking_reset,low,greenside_bunker,light,EU,"Reset now. Next decision only.
+Add one detail: pace and commitment.
+Picture one clear target line. See the ball start on it.",Do you want a quick reset or a deeper reset on the walk?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00101,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Visual,Build,standard,slow_play_rumination;waiting_on_tee,low,greenside_bunker,strong,EU,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Add one detail: pace and commitment.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",Do you want a quick reset or a deeper reset on the walk?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00102,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Visual,Build,deep,slow_play_rumination;fast_group_behind,low,rough,calm,AU,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Add one detail: pace and commitment.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",Do you want a quick reset or a deeper reset on the walk?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00103,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Visual,Compete,micro,waiting_on_tee;fast_group_behind,low,greenside_bunker,calm,US,"Reset now. Next decision only.
+Narrow focus. Execute under pressure.
+Picture one clear target line. See the ball start on it.",Do you want a quick reset or a deeper reset on the walk?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00104,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Visual,Compete,standard,slow_play_rumination;waiting_on_tee,low,perfect,calm,US,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Narrow focus. Execute under pressure.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s the next decision only?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00105,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Visual,Compete,deep,slow_play_rumination;walking_reset,low,rough,light,US,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Narrow focus. Execute under pressure.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",Do you want a quick reset or a deeper reset on the walk?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00106,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Visual,Maintain,micro,waiting_on_tee;slow_play_rumination,medium,perfect,calm,UK,"Reset now. Next decision only.
+Stay consistent. Trust what works.
+Picture one clear target line. See the ball start on it.",What’s the next decision only?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00107,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Visual,Maintain,standard,slow_play_rumination;fast_group_behind,high,rough,strong,UK,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Stay consistent. Trust what works.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s the next decision only?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00108,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Visual,Maintain,deep,slow_play_rumination;fast_group_behind,low,perfect,calm,US,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Stay consistent. Trust what works.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What’s the next decision only?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00109,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Aural,Foundation,micro,walking_reset;fast_group_behind,high,rough,moderate,EU,"Reset now. Next decision only.
+Keep it simple and repeatable.
+Say one phrase to yourself: “Smooth and committed.”",Do you want a quick reset or a deeper reset on the walk?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00110,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Aural,Foundation,standard,walking_reset;waiting_on_tee,low,perfect,light,EU,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Keep it simple and repeatable.
+Use a quiet cue phrase. One sentence, same tone every time.",What’s the next decision only?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00111,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Aural,Foundation,deep,waiting_on_tee;walking_reset,low,perfect,moderate,AU,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Keep it simple and repeatable.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What’s the next decision only?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00112,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Aural,Build,micro,waiting_on_tee;fast_group_behind,high,tight,calm,UK,"Reset now. Next decision only.
+Add one detail: pace and commitment.
+Say one phrase to yourself: “Smooth and committed.”",Do you want a quick reset or a deeper reset on the walk?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00113,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Aural,Build,standard,fast_group_behind;slow_play_rumination,medium,perfect,moderate,AU,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Add one detail: pace and commitment.
+Use a quiet cue phrase. One sentence, same tone every time.",What’s the next decision only?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00114,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Aural,Build,deep,fast_group_behind;waiting_on_tee,low,fairway_bunker,light,UK,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Add one detail: pace and commitment.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",Do you want a quick reset or a deeper reset on the walk?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00115,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Aural,Compete,micro,waiting_on_tee;fast_group_behind,low,tight,calm,AU,"Reset now. Next decision only.
+Narrow focus. Execute under pressure.
+Say one phrase to yourself: “Smooth and committed.”",Do you want a quick reset or a deeper reset on the walk?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00116,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Aural,Compete,standard,waiting_on_tee;walking_reset,medium,tight,strong,UK,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Narrow focus. Execute under pressure.
+Use a quiet cue phrase. One sentence, same tone every time.",What’s the next decision only?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00117,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Aural,Compete,deep,slow_play_rumination;fast_group_behind,medium,fairway_bunker,strong,UK,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Narrow focus. Execute under pressure.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What’s the next decision only?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00118,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Aural,Maintain,micro,waiting_on_tee;fast_group_behind,medium,greenside_bunker,strong,EU,"Reset now. Next decision only.
+Stay consistent. Trust what works.
+Say one phrase to yourself: “Smooth and committed.”",Do you want a quick reset or a deeper reset on the walk?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00119,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Aural,Maintain,standard,fast_group_behind;slow_play_rumination,medium,rough,light,UK,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Stay consistent. Trust what works.
+Use a quiet cue phrase. One sentence, same tone every time.",Do you want a quick reset or a deeper reset on the walk?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00120,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Aural,Maintain,deep,fast_group_behind;waiting_on_tee,high,fairway_bunker,moderate,UK,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Stay consistent. Trust what works.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",Do you want a quick reset or a deeper reset on the walk?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00121,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,ReadWrite,Foundation,micro,waiting_on_tee;slow_play_rumination,medium,fairway_bunker,light,UK,"Reset now. Next decision only.
+Keep it simple and repeatable.
+Name the task in words: “Pick. Commit. Swing.”",What’s the next decision only?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00122,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,ReadWrite,Foundation,standard,fast_group_behind;waiting_on_tee,medium,rough,calm,UK,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Keep it simple and repeatable.
+Use a short written-style checklist in your head: target, plan, commit.",What’s the next decision only?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00123,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,ReadWrite,Foundation,deep,waiting_on_tee;fast_group_behind,low,rough,moderate,UK,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Keep it simple and repeatable.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s the next decision only?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00124,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,ReadWrite,Build,micro,slow_play_rumination;walking_reset,high,rough,calm,AU,"Reset now. Next decision only.
+Add one detail: pace and commitment.
+Name the task in words: “Pick. Commit. Swing.”",What’s the next decision only?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00125,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,ReadWrite,Build,standard,slow_play_rumination;waiting_on_tee,medium,tight,strong,AU,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Add one detail: pace and commitment.
+Use a short written-style checklist in your head: target, plan, commit.",What’s the next decision only?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00126,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,ReadWrite,Build,deep,fast_group_behind;walking_reset,low,fairway_bunker,moderate,US,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Add one detail: pace and commitment.
+Run a 4-line script: target, plan, breath, commit. Then go.",Do you want a quick reset or a deeper reset on the walk?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00127,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,ReadWrite,Compete,micro,fast_group_behind;waiting_on_tee,high,fairway_bunker,moderate,AU,"Reset now. Next decision only.
+Narrow focus. Execute under pressure.
+Name the task in words: “Pick. Commit. Swing.”",What’s the next decision only?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00128,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,ReadWrite,Compete,standard,slow_play_rumination;fast_group_behind,high,greenside_bunker,moderate,US,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Narrow focus. Execute under pressure.
+Use a short written-style checklist in your head: target, plan, commit.",Do you want a quick reset or a deeper reset on the walk?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00129,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,ReadWrite,Compete,deep,slow_play_rumination;fast_group_behind,low,perfect,strong,US,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Narrow focus. Execute under pressure.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s the next decision only?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00130,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,ReadWrite,Maintain,micro,walking_reset;slow_play_rumination,low,greenside_bunker,light,US,"Reset now. Next decision only.
+Stay consistent. Trust what works.
+Name the task in words: “Pick. Commit. Swing.”",Do you want a quick reset or a deeper reset on the walk?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00131,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,ReadWrite,Maintain,standard,walking_reset;slow_play_rumination,low,perfect,strong,US,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Stay consistent. Trust what works.
+Use a short written-style checklist in your head: target, plan, commit.",What’s the next decision only?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00132,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,ReadWrite,Maintain,deep,walking_reset;waiting_on_tee,medium,fairway_bunker,light,EU,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Stay consistent. Trust what works.
+Run a 4-line script: target, plan, breath, commit. Then go.",Do you want a quick reset or a deeper reset on the walk?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00133,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Kinesthetic,Foundation,micro,fast_group_behind;walking_reset,medium,rough,light,UK,"Reset now. Next decision only.
+Keep it simple and repeatable.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s the next decision only?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00134,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Kinesthetic,Foundation,standard,slow_play_rumination;waiting_on_tee,medium,perfect,moderate,AU,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Keep it simple and repeatable.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",Do you want a quick reset or a deeper reset on the walk?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00135,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Kinesthetic,Foundation,deep,waiting_on_tee;fast_group_behind,high,fairway_bunker,calm,EU,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Keep it simple and repeatable.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",Do you want a quick reset or a deeper reset on the walk?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00136,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Kinesthetic,Build,micro,walking_reset;slow_play_rumination,medium,perfect,light,AU,"Reset now. Next decision only.
+Add one detail: pace and commitment.
+Feel your feet. One slow exhale. Loose grip pressure.",Do you want a quick reset or a deeper reset on the walk?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00137,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Kinesthetic,Build,standard,walking_reset;slow_play_rumination,medium,fairway_bunker,moderate,AU,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Add one detail: pace and commitment.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",Do you want a quick reset or a deeper reset on the walk?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00138,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Kinesthetic,Build,deep,slow_play_rumination;waiting_on_tee,low,greenside_bunker,moderate,EU,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Add one detail: pace and commitment.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",Do you want a quick reset or a deeper reset on the walk?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00139,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Kinesthetic,Compete,micro,fast_group_behind;slow_play_rumination,high,perfect,strong,UK,"Reset now. Next decision only.
+Narrow focus. Execute under pressure.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s the next decision only?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00140,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Kinesthetic,Compete,standard,fast_group_behind;waiting_on_tee,low,greenside_bunker,calm,US,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Narrow focus. Execute under pressure.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",Do you want a quick reset or a deeper reset on the walk?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00141,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Kinesthetic,Compete,deep,slow_play_rumination;walking_reset,low,rough,light,UK,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Narrow focus. Execute under pressure.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",Do you want a quick reset or a deeper reset on the walk?,Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00142,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Kinesthetic,Maintain,micro,slow_play_rumination;fast_group_behind,high,perfect,light,UK,"Reset now. Next decision only.
+Stay consistent. Trust what works.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s the next decision only?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00143,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Kinesthetic,Maintain,standard,slow_play_rumination;fast_group_behind,low,perfect,light,AU,"Between shots: release the replay. Bring attention to walking and breathing. Arrive at the ball neutral.
+Stay consistent. Trust what works.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",Do you want a quick reset or a deeper reset on the walk?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00144,MC_T03_BETWEEN_SHOTS_RESET,Between-Shots Reset,CONTROL,Kinesthetic,Maintain,deep,walking_reset;fast_group_behind,medium,fairway_bunker,light,US,"Use the walk as a reset lane: exhale, shoulders down, eyes up. No story. Just the next decision.
+Stay consistent. Trust what works.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What’s the next decision only?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00145,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Visual,Foundation,micro,after_good_shot_stay_present;three_putt_frustration,low,fairway_bunker,calm,EU,"That shot is done. Let it go.
+Keep it simple and repeatable.
+Picture one clear target line. See the ball start on it.",What’s the plan for the next one?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00146,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Visual,Foundation,standard,after_good_shot_stay_present;three_putt_frustration,high,tight,calm,UK,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Keep it simple and repeatable.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s the plan for the next one?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00147,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Visual,Foundation,deep,after_bad_shot_release;after_good_shot_stay_present,high,tight,moderate,UK,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Keep it simple and repeatable.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",Can you release that shot in one breath?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00148,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Visual,Build,micro,after_bad_shot_release;three_putt_frustration,medium,tight,moderate,US,"That shot is done. Let it go.
+Add one detail: pace and commitment.
+Picture one clear target line. See the ball start on it.",Can you release that shot in one breath?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00149,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Visual,Build,standard,three_putt_frustration;after_bad_shot_release,high,fairway_bunker,moderate,US,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Add one detail: pace and commitment.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s the plan for the next one?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00150,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Visual,Build,deep,after_bad_shot_release;missed_short_putt,high,tight,strong,EU,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Add one detail: pace and commitment.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What’s the plan for the next one?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00151,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Visual,Compete,micro,three_putt_frustration;missed_short_putt,low,rough,light,AU,"That shot is done. Let it go.
+Narrow focus. Execute under pressure.
+Picture one clear target line. See the ball start on it.",What’s the plan for the next one?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00152,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Visual,Compete,standard,missed_short_putt;three_putt_frustration,high,tight,moderate,AU,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Narrow focus. Execute under pressure.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",Can you release that shot in one breath?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00153,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Visual,Compete,deep,after_good_shot_stay_present;three_putt_frustration,high,fairway_bunker,strong,UK,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Narrow focus. Execute under pressure.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",Can you release that shot in one breath?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00154,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Visual,Maintain,micro,after_good_shot_stay_present;three_putt_frustration,medium,fairway_bunker,strong,US,"That shot is done. Let it go.
+Stay consistent. Trust what works.
+Picture one clear target line. See the ball start on it.",What’s the plan for the next one?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00155,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Visual,Maintain,standard,after_bad_shot_release;three_putt_frustration,medium,greenside_bunker,calm,US,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Stay consistent. Trust what works.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",Can you release that shot in one breath?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00156,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Visual,Maintain,deep,after_bad_shot_release;missed_short_putt,medium,rough,light,UK,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Stay consistent. Trust what works.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What’s the plan for the next one?,Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00157,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Aural,Foundation,micro,three_putt_frustration;after_bad_shot_release,low,rough,light,EU,"That shot is done. Let it go.
+Keep it simple and repeatable.
+Say one phrase to yourself: “Smooth and committed.”",Can you release that shot in one breath?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00158,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Aural,Foundation,standard,after_bad_shot_release;missed_short_putt,high,perfect,moderate,EU,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Keep it simple and repeatable.
+Use a quiet cue phrase. One sentence, same tone every time.",What’s the plan for the next one?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00159,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Aural,Foundation,deep,missed_short_putt;three_putt_frustration,high,fairway_bunker,calm,UK,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Keep it simple and repeatable.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",Can you release that shot in one breath?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00160,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Aural,Build,micro,missed_short_putt;after_bad_shot_release,low,rough,light,US,"That shot is done. Let it go.
+Add one detail: pace and commitment.
+Say one phrase to yourself: “Smooth and committed.”",What’s the plan for the next one?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00161,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Aural,Build,standard,after_good_shot_stay_present;after_bad_shot_release,medium,perfect,moderate,EU,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Add one detail: pace and commitment.
+Use a quiet cue phrase. One sentence, same tone every time.",What’s the plan for the next one?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00162,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Aural,Build,deep,three_putt_frustration;after_bad_shot_release,low,rough,light,UK,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Add one detail: pace and commitment.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What’s the plan for the next one?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00163,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Aural,Compete,micro,missed_short_putt;after_good_shot_stay_present,medium,tight,light,AU,"That shot is done. Let it go.
+Narrow focus. Execute under pressure.
+Say one phrase to yourself: “Smooth and committed.”",What’s the plan for the next one?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00164,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Aural,Compete,standard,after_good_shot_stay_present;after_bad_shot_release,high,tight,moderate,EU,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Narrow focus. Execute under pressure.
+Use a quiet cue phrase. One sentence, same tone every time.",What’s the plan for the next one?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00165,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Aural,Compete,deep,after_good_shot_stay_present;three_putt_frustration,high,perfect,moderate,UK,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Narrow focus. Execute under pressure.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",Can you release that shot in one breath?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00166,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Aural,Maintain,micro,after_bad_shot_release;after_good_shot_stay_present,medium,fairway_bunker,moderate,US,"That shot is done. Let it go.
+Stay consistent. Trust what works.
+Say one phrase to yourself: “Smooth and committed.”",What’s the plan for the next one?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00167,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Aural,Maintain,standard,after_bad_shot_release;after_good_shot_stay_present,medium,perfect,calm,US,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Stay consistent. Trust what works.
+Use a quiet cue phrase. One sentence, same tone every time.",What’s the plan for the next one?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00168,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Aural,Maintain,deep,after_good_shot_stay_present;after_bad_shot_release,low,greenside_bunker,light,AU,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Stay consistent. Trust what works.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",Can you release that shot in one breath?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00169,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,ReadWrite,Foundation,micro,after_bad_shot_release;after_good_shot_stay_present,medium,fairway_bunker,moderate,EU,"That shot is done. Let it go.
+Keep it simple and repeatable.
+Name the task in words: “Pick. Commit. Swing.”",Can you release that shot in one breath?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00170,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,ReadWrite,Foundation,standard,after_good_shot_stay_present;three_putt_frustration,low,perfect,light,EU,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Keep it simple and repeatable.
+Use a short written-style checklist in your head: target, plan, commit.",Can you release that shot in one breath?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00171,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,ReadWrite,Foundation,deep,three_putt_frustration;after_bad_shot_release,high,rough,light,US,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Keep it simple and repeatable.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s the plan for the next one?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00172,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,ReadWrite,Build,micro,missed_short_putt;three_putt_frustration,low,perfect,moderate,US,"That shot is done. Let it go.
+Add one detail: pace and commitment.
+Name the task in words: “Pick. Commit. Swing.”",Can you release that shot in one breath?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00173,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,ReadWrite,Build,standard,after_bad_shot_release;missed_short_putt,low,tight,light,US,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Add one detail: pace and commitment.
+Use a short written-style checklist in your head: target, plan, commit.",Can you release that shot in one breath?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00174,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,ReadWrite,Build,deep,three_putt_frustration;after_good_shot_stay_present,medium,tight,calm,AU,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Add one detail: pace and commitment.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s the plan for the next one?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00175,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,ReadWrite,Compete,micro,after_good_shot_stay_present;three_putt_frustration,medium,rough,strong,US,"That shot is done. Let it go.
+Narrow focus. Execute under pressure.
+Name the task in words: “Pick. Commit. Swing.”",Can you release that shot in one breath?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00176,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,ReadWrite,Compete,standard,after_bad_shot_release;missed_short_putt,medium,tight,calm,EU,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Narrow focus. Execute under pressure.
+Use a short written-style checklist in your head: target, plan, commit.",What’s the plan for the next one?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00177,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,ReadWrite,Compete,deep,after_good_shot_stay_present;missed_short_putt,low,greenside_bunker,strong,EU,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Narrow focus. Execute under pressure.
+Run a 4-line script: target, plan, breath, commit. Then go.",Can you release that shot in one breath?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00178,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,ReadWrite,Maintain,micro,after_good_shot_stay_present;after_bad_shot_release,low,tight,calm,UK,"That shot is done. Let it go.
+Stay consistent. Trust what works.
+Name the task in words: “Pick. Commit. Swing.”",Can you release that shot in one breath?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00179,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,ReadWrite,Maintain,standard,after_bad_shot_release;three_putt_frustration,medium,greenside_bunker,calm,US,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Stay consistent. Trust what works.
+Use a short written-style checklist in your head: target, plan, commit.",What’s the plan for the next one?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00180,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,ReadWrite,Maintain,deep,after_bad_shot_release;after_good_shot_stay_present,high,fairway_bunker,calm,US,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Stay consistent. Trust what works.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s the plan for the next one?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00181,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Kinesthetic,Foundation,micro,after_bad_shot_release;missed_short_putt,high,greenside_bunker,moderate,AU,"That shot is done. Let it go.
+Keep it simple and repeatable.
+Feel your feet. One slow exhale. Loose grip pressure.",Can you release that shot in one breath?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00182,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Kinesthetic,Foundation,standard,after_good_shot_stay_present;three_putt_frustration,low,greenside_bunker,moderate,EU,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Keep it simple and repeatable.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What’s the plan for the next one?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00183,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Kinesthetic,Foundation,deep,after_bad_shot_release;after_good_shot_stay_present,low,tight,strong,US,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Keep it simple and repeatable.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",Can you release that shot in one breath?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00184,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Kinesthetic,Build,micro,after_bad_shot_release;missed_short_putt,medium,fairway_bunker,calm,UK,"That shot is done. Let it go.
+Add one detail: pace and commitment.
+Feel your feet. One slow exhale. Loose grip pressure.",Can you release that shot in one breath?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00185,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Kinesthetic,Build,standard,three_putt_frustration;after_good_shot_stay_present,high,tight,light,EU,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Add one detail: pace and commitment.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",Can you release that shot in one breath?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00186,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Kinesthetic,Build,deep,missed_short_putt;after_bad_shot_release,medium,rough,moderate,EU,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Add one detail: pace and commitment.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",Can you release that shot in one breath?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00187,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Kinesthetic,Compete,micro,after_good_shot_stay_present;missed_short_putt,medium,fairway_bunker,light,US,"That shot is done. Let it go.
+Narrow focus. Execute under pressure.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s the plan for the next one?,Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00188,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Kinesthetic,Compete,standard,three_putt_frustration;after_good_shot_stay_present,low,tight,light,AU,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Narrow focus. Execute under pressure.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",Can you release that shot in one breath?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00189,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Kinesthetic,Compete,deep,three_putt_frustration;missed_short_putt,high,rough,light,US,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Narrow focus. Execute under pressure.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What’s the plan for the next one?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00190,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Kinesthetic,Maintain,micro,after_bad_shot_release;missed_short_putt,medium,greenside_bunker,moderate,AU,"That shot is done. Let it go.
+Stay consistent. Trust what works.
+Feel your feet. One slow exhale. Loose grip pressure.",Can you release that shot in one breath?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00191,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Kinesthetic,Maintain,standard,after_bad_shot_release;missed_short_putt,high,greenside_bunker,calm,US,"Quick release: acknowledge it, then move on. Your next swing deserves a clean mind.
+Stay consistent. Trust what works.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",Can you release that shot in one breath?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00192,MC_T04_POST_SHOT_LETTING_GO,Post-Shot Letting Go,CONTROL,Kinesthetic,Maintain,deep,missed_short_putt;after_good_shot_stay_present,low,fairway_bunker,light,AU,"Name it once—good or bad—then release. One breath. Turn your attention to the next plan.
+Stay consistent. Trust what works.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What’s the plan for the next one?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00193,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Visual,Foundation,micro,bunker_miss;double_bogey_stop_bleed,high,rough,light,US,"Stop the bleed. Reset. One smart shot next.
+Keep it simple and repeatable.
+Picture one clear target line. See the ball start on it.",What’s the safest committed shot right now?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00194,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Visual,Foundation,standard,chunked_wedge_recover;penalty_recovery,low,fairway_bunker,calm,AU,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Keep it simple and repeatable.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",Do you want to reset pace or reset focus first?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00195,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Visual,Foundation,deep,lost_ball_reset;penalty_recovery,medium,fairway_bunker,strong,AU,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Keep it simple and repeatable.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What’s the safest committed shot right now?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00196,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Visual,Build,micro,chunked_wedge_recover;lost_ball_reset,high,rough,strong,US,"Stop the bleed. Reset. One smart shot next.
+Add one detail: pace and commitment.
+Picture one clear target line. See the ball start on it.",Do you want to reset pace or reset focus first?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00197,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Visual,Build,standard,chunked_wedge_recover;bunker_miss,medium,greenside_bunker,calm,US,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Add one detail: pace and commitment.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",Do you want to reset pace or reset focus first?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00198,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Visual,Build,deep,penalty_recovery;double_bogey_stop_bleed,high,perfect,strong,US,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Add one detail: pace and commitment.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",Do you want to reset pace or reset focus first?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00199,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Visual,Compete,micro,penalty_recovery;chunked_wedge_recover,low,fairway_bunker,calm,US,"Stop the bleed. Reset. One smart shot next.
+Narrow focus. Execute under pressure.
+Picture one clear target line. See the ball start on it.",What’s the safest committed shot right now?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00200,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Visual,Compete,standard,lost_ball_reset;chunked_wedge_recover,high,tight,light,US,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Narrow focus. Execute under pressure.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s the safest committed shot right now?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00201,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Visual,Compete,deep,bunker_miss;chunked_wedge_recover,low,fairway_bunker,calm,EU,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Narrow focus. Execute under pressure.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",Do you want to reset pace or reset focus first?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00202,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Visual,Maintain,micro,chunked_wedge_recover;double_bogey_stop_bleed,medium,perfect,moderate,AU,"Stop the bleed. Reset. One smart shot next.
+Stay consistent. Trust what works.
+Picture one clear target line. See the ball start on it.",What’s the safest committed shot right now?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00203,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Visual,Maintain,standard,penalty_recovery;bunker_miss,high,tight,moderate,EU,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Stay consistent. Trust what works.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s the safest committed shot right now?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00204,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Visual,Maintain,deep,bunker_miss;lost_ball_reset,low,tight,strong,AU,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Stay consistent. Trust what works.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",Do you want to reset pace or reset focus first?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00205,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Aural,Foundation,micro,double_bogey_stop_bleed;lost_ball_reset,low,fairway_bunker,calm,AU,"Stop the bleed. Reset. One smart shot next.
+Keep it simple and repeatable.
+Say one phrase to yourself: “Smooth and committed.”",What’s the safest committed shot right now?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00206,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Aural,Foundation,standard,lost_ball_reset;double_bogey_stop_bleed,high,greenside_bunker,moderate,AU,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Keep it simple and repeatable.
+Use a quiet cue phrase. One sentence, same tone every time.",Do you want to reset pace or reset focus first?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00207,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Aural,Foundation,deep,chunked_wedge_recover;bunker_miss,low,greenside_bunker,light,AU,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Keep it simple and repeatable.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What’s the safest committed shot right now?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00208,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Aural,Build,micro,double_bogey_stop_bleed;penalty_recovery,high,rough,light,US,"Stop the bleed. Reset. One smart shot next.
+Add one detail: pace and commitment.
+Say one phrase to yourself: “Smooth and committed.”",Do you want to reset pace or reset focus first?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00209,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Aural,Build,standard,chunked_wedge_recover;bunker_miss,low,perfect,calm,US,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Add one detail: pace and commitment.
+Use a quiet cue phrase. One sentence, same tone every time.",Do you want to reset pace or reset focus first?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00210,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Aural,Build,deep,double_bogey_stop_bleed;chunked_wedge_recover,medium,tight,strong,EU,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Add one detail: pace and commitment.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",Do you want to reset pace or reset focus first?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00211,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Aural,Compete,micro,chunked_wedge_recover;lost_ball_reset,medium,perfect,light,US,"Stop the bleed. Reset. One smart shot next.
+Narrow focus. Execute under pressure.
+Say one phrase to yourself: “Smooth and committed.”",What’s the safest committed shot right now?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00212,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Aural,Compete,standard,lost_ball_reset;penalty_recovery,medium,fairway_bunker,strong,AU,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Narrow focus. Execute under pressure.
+Use a quiet cue phrase. One sentence, same tone every time.",Do you want to reset pace or reset focus first?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00213,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Aural,Compete,deep,lost_ball_reset;chunked_wedge_recover,high,rough,moderate,US,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Narrow focus. Execute under pressure.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What’s the safest committed shot right now?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00214,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Aural,Maintain,micro,double_bogey_stop_bleed;penalty_recovery,low,fairway_bunker,light,UK,"Stop the bleed. Reset. One smart shot next.
+Stay consistent. Trust what works.
+Say one phrase to yourself: “Smooth and committed.”",Do you want to reset pace or reset focus first?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00215,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Aural,Maintain,standard,lost_ball_reset;bunker_miss,low,tight,moderate,US,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Stay consistent. Trust what works.
+Use a quiet cue phrase. One sentence, same tone every time.",What’s the safest committed shot right now?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00216,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Aural,Maintain,deep,chunked_wedge_recover;bunker_miss,high,fairway_bunker,strong,AU,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Stay consistent. Trust what works.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What’s the safest committed shot right now?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00217,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,ReadWrite,Foundation,micro,lost_ball_reset;chunked_wedge_recover,medium,greenside_bunker,light,AU,"Stop the bleed. Reset. One smart shot next.
+Keep it simple and repeatable.
+Name the task in words: “Pick. Commit. Swing.”",Do you want to reset pace or reset focus first?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00218,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,ReadWrite,Foundation,standard,penalty_recovery;lost_ball_reset,low,tight,strong,EU,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Keep it simple and repeatable.
+Use a short written-style checklist in your head: target, plan, commit.",What’s the safest committed shot right now?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00219,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,ReadWrite,Foundation,deep,penalty_recovery;lost_ball_reset,low,fairway_bunker,moderate,US,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Keep it simple and repeatable.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s the safest committed shot right now?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00220,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,ReadWrite,Build,micro,double_bogey_stop_bleed;lost_ball_reset,medium,tight,calm,EU,"Stop the bleed. Reset. One smart shot next.
+Add one detail: pace and commitment.
+Name the task in words: “Pick. Commit. Swing.”",Do you want to reset pace or reset focus first?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00221,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,ReadWrite,Build,standard,bunker_miss;lost_ball_reset,medium,rough,light,EU,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Add one detail: pace and commitment.
+Use a short written-style checklist in your head: target, plan, commit.",What’s the safest committed shot right now?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00222,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,ReadWrite,Build,deep,lost_ball_reset;chunked_wedge_recover,medium,tight,calm,UK,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Add one detail: pace and commitment.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s the safest committed shot right now?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00223,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,ReadWrite,Compete,micro,chunked_wedge_recover;double_bogey_stop_bleed,medium,rough,strong,UK,"Stop the bleed. Reset. One smart shot next.
+Narrow focus. Execute under pressure.
+Name the task in words: “Pick. Commit. Swing.”",What’s the safest committed shot right now?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00224,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,ReadWrite,Compete,standard,penalty_recovery;chunked_wedge_recover,high,greenside_bunker,light,UK,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Narrow focus. Execute under pressure.
+Use a short written-style checklist in your head: target, plan, commit.",Do you want to reset pace or reset focus first?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00225,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,ReadWrite,Compete,deep,bunker_miss;double_bogey_stop_bleed,high,tight,moderate,EU,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Narrow focus. Execute under pressure.
+Run a 4-line script: target, plan, breath, commit. Then go.",Do you want to reset pace or reset focus first?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00226,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,ReadWrite,Maintain,micro,chunked_wedge_recover;penalty_recovery,high,greenside_bunker,light,AU,"Stop the bleed. Reset. One smart shot next.
+Stay consistent. Trust what works.
+Name the task in words: “Pick. Commit. Swing.”",What’s the safest committed shot right now?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00227,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,ReadWrite,Maintain,standard,double_bogey_stop_bleed;chunked_wedge_recover,medium,rough,calm,AU,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Stay consistent. Trust what works.
+Use a short written-style checklist in your head: target, plan, commit.",Do you want to reset pace or reset focus first?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00228,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,ReadWrite,Maintain,deep,lost_ball_reset;bunker_miss,high,greenside_bunker,strong,UK,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Stay consistent. Trust what works.
+Run a 4-line script: target, plan, breath, commit. Then go.",Do you want to reset pace or reset focus first?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00229,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Kinesthetic,Foundation,micro,lost_ball_reset;bunker_miss,high,greenside_bunker,strong,EU,"Stop the bleed. Reset. One smart shot next.
+Keep it simple and repeatable.
+Feel your feet. One slow exhale. Loose grip pressure.",Do you want to reset pace or reset focus first?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00230,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Kinesthetic,Foundation,standard,double_bogey_stop_bleed;lost_ball_reset,low,perfect,strong,AU,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Keep it simple and repeatable.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",Do you want to reset pace or reset focus first?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00231,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Kinesthetic,Foundation,deep,bunker_miss;chunked_wedge_recover,high,tight,moderate,EU,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Keep it simple and repeatable.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What’s the safest committed shot right now?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00232,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Kinesthetic,Build,micro,double_bogey_stop_bleed;bunker_miss,medium,greenside_bunker,calm,UK,"Stop the bleed. Reset. One smart shot next.
+Add one detail: pace and commitment.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s the safest committed shot right now?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00233,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Kinesthetic,Build,standard,double_bogey_stop_bleed;chunked_wedge_recover,high,tight,calm,AU,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Add one detail: pace and commitment.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What’s the safest committed shot right now?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00234,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Kinesthetic,Build,deep,chunked_wedge_recover;lost_ball_reset,low,perfect,calm,UK,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Add one detail: pace and commitment.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",Do you want to reset pace or reset focus first?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00235,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Kinesthetic,Compete,micro,chunked_wedge_recover;double_bogey_stop_bleed,high,tight,light,UK,"Stop the bleed. Reset. One smart shot next.
+Narrow focus. Execute under pressure.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s the safest committed shot right now?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00236,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Kinesthetic,Compete,standard,double_bogey_stop_bleed;penalty_recovery,high,tight,light,AU,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Narrow focus. Execute under pressure.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What’s the safest committed shot right now?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00237,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Kinesthetic,Compete,deep,lost_ball_reset;penalty_recovery,high,tight,light,UK,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Narrow focus. Execute under pressure.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",Do you want to reset pace or reset focus first?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00238,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Kinesthetic,Maintain,micro,double_bogey_stop_bleed;lost_ball_reset,low,perfect,calm,EU,"Stop the bleed. Reset. One smart shot next.
+Stay consistent. Trust what works.
+Feel your feet. One slow exhale. Loose grip pressure.",Do you want to reset pace or reset focus first?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00239,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Kinesthetic,Maintain,standard,bunker_miss;double_bogey_stop_bleed,medium,rough,moderate,UK,"After a mistake: slow down. Reset. Choose the simplest next shot you can commit to.
+Stay consistent. Trust what works.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What’s the safest committed shot right now?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00240,MC_T05_MISTAKE_RECOVERY,Mistake Recovery,CONTROL,Kinesthetic,Maintain,deep,chunked_wedge_recover;bunker_miss,low,rough,strong,UK,"Recovery rule: reduce risk, increase commitment. One breath. One simple plan. Then rebuild from there.
+Stay consistent. Trust what works.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",Do you want to reset pace or reset focus first?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00241,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Visual,Foundation,micro,nerves_on_green;match_play_moment,medium,greenside_bunker,calm,UK,"Calm body. Clear target. Commit.
+Keep it simple and repeatable.
+Picture one clear target line. See the ball start on it.",Where is your target line—keep it simple?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00242,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Visual,Foundation,standard,being_watched;nerves_on_green,medium,greenside_bunker,moderate,AU,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Keep it simple and repeatable.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What cue phrase keeps you steady?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00243,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Visual,Foundation,deep,playing_with_better_golfers;being_watched,low,perfect,moderate,EU,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Keep it simple and repeatable.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",Where is your target line—keep it simple?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00244,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Visual,Build,micro,match_play_moment;nerves_on_green,medium,fairway_bunker,strong,US,"Calm body. Clear target. Commit.
+Add one detail: pace and commitment.
+Picture one clear target line. See the ball start on it.",What cue phrase keeps you steady?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00245,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Visual,Build,standard,being_watched;match_play_moment,high,fairway_bunker,calm,US,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Add one detail: pace and commitment.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",Where is your target line—keep it simple?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00246,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Visual,Build,deep,playing_with_better_golfers;nerves_on_green,high,perfect,light,EU,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Add one detail: pace and commitment.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",Where is your target line—keep it simple?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00247,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Visual,Compete,micro,being_watched;closing_holes_pressure,high,greenside_bunker,strong,UK,"Calm body. Clear target. Commit.
+Narrow focus. Execute under pressure.
+Picture one clear target line. See the ball start on it.",What cue phrase keeps you steady?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00248,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Visual,Compete,standard,closing_holes_pressure;playing_with_better_golfers,low,greenside_bunker,moderate,US,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Narrow focus. Execute under pressure.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",Where is your target line—keep it simple?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00249,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Visual,Compete,deep,nerves_on_green;playing_with_better_golfers,medium,greenside_bunker,light,AU,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Narrow focus. Execute under pressure.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What cue phrase keeps you steady?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00250,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Visual,Maintain,micro,closing_holes_pressure;playing_with_better_golfers,medium,rough,light,AU,"Calm body. Clear target. Commit.
+Stay consistent. Trust what works.
+Picture one clear target line. See the ball start on it.",Where is your target line—keep it simple?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00251,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Visual,Maintain,standard,playing_with_better_golfers;match_play_moment,medium,perfect,strong,EU,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Stay consistent. Trust what works.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What cue phrase keeps you steady?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00252,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Visual,Maintain,deep,match_play_moment;nerves_on_green,medium,tight,strong,UK,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Stay consistent. Trust what works.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What cue phrase keeps you steady?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00253,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Aural,Foundation,micro,nerves_on_green;closing_holes_pressure,high,fairway_bunker,calm,AU,"Calm body. Clear target. Commit.
+Keep it simple and repeatable.
+Say one phrase to yourself: “Smooth and committed.”",Where is your target line—keep it simple?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00254,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Aural,Foundation,standard,closing_holes_pressure;nerves_on_green,medium,tight,moderate,AU,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Keep it simple and repeatable.
+Use a quiet cue phrase. One sentence, same tone every time.",What cue phrase keeps you steady?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00255,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Aural,Foundation,deep,match_play_moment;nerves_on_green,high,perfect,strong,AU,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Keep it simple and repeatable.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What cue phrase keeps you steady?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00256,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Aural,Build,micro,being_watched;match_play_moment,medium,fairway_bunker,strong,EU,"Calm body. Clear target. Commit.
+Add one detail: pace and commitment.
+Say one phrase to yourself: “Smooth and committed.”",Where is your target line—keep it simple?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00257,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Aural,Build,standard,nerves_on_green;playing_with_better_golfers,medium,tight,moderate,AU,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Add one detail: pace and commitment.
+Use a quiet cue phrase. One sentence, same tone every time.",What cue phrase keeps you steady?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00258,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Aural,Build,deep,closing_holes_pressure;nerves_on_green,high,perfect,light,EU,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Add one detail: pace and commitment.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",Where is your target line—keep it simple?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00259,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Aural,Compete,micro,nerves_on_green;match_play_moment,medium,greenside_bunker,calm,US,"Calm body. Clear target. Commit.
+Narrow focus. Execute under pressure.
+Say one phrase to yourself: “Smooth and committed.”",Where is your target line—keep it simple?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00260,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Aural,Compete,standard,being_watched;match_play_moment,medium,fairway_bunker,light,US,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Narrow focus. Execute under pressure.
+Use a quiet cue phrase. One sentence, same tone every time.",What cue phrase keeps you steady?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00261,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Aural,Compete,deep,closing_holes_pressure;being_watched,high,greenside_bunker,strong,EU,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Narrow focus. Execute under pressure.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",Where is your target line—keep it simple?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00262,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Aural,Maintain,micro,being_watched;nerves_on_green,medium,fairway_bunker,light,US,"Calm body. Clear target. Commit.
+Stay consistent. Trust what works.
+Say one phrase to yourself: “Smooth and committed.”",What cue phrase keeps you steady?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00263,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Aural,Maintain,standard,playing_with_better_golfers;match_play_moment,high,tight,light,EU,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Stay consistent. Trust what works.
+Use a quiet cue phrase. One sentence, same tone every time.",What cue phrase keeps you steady?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00264,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Aural,Maintain,deep,closing_holes_pressure;playing_with_better_golfers,medium,rough,strong,EU,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Stay consistent. Trust what works.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",Where is your target line—keep it simple?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00265,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,ReadWrite,Foundation,micro,closing_holes_pressure;nerves_on_green,high,rough,calm,EU,"Calm body. Clear target. Commit.
+Keep it simple and repeatable.
+Name the task in words: “Pick. Commit. Swing.”",What cue phrase keeps you steady?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00266,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,ReadWrite,Foundation,standard,playing_with_better_golfers;nerves_on_green,high,rough,calm,US,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Keep it simple and repeatable.
+Use a short written-style checklist in your head: target, plan, commit.",What cue phrase keeps you steady?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00267,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,ReadWrite,Foundation,deep,being_watched;match_play_moment,high,fairway_bunker,light,UK,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Keep it simple and repeatable.
+Run a 4-line script: target, plan, breath, commit. Then go.",Where is your target line—keep it simple?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00268,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,ReadWrite,Build,micro,being_watched;match_play_moment,medium,perfect,strong,AU,"Calm body. Clear target. Commit.
+Add one detail: pace and commitment.
+Name the task in words: “Pick. Commit. Swing.”",Where is your target line—keep it simple?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00269,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,ReadWrite,Build,standard,closing_holes_pressure;being_watched,low,greenside_bunker,light,AU,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Add one detail: pace and commitment.
+Use a short written-style checklist in your head: target, plan, commit.",Where is your target line—keep it simple?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00270,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,ReadWrite,Build,deep,being_watched;playing_with_better_golfers,low,rough,calm,UK,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Add one detail: pace and commitment.
+Run a 4-line script: target, plan, breath, commit. Then go.",What cue phrase keeps you steady?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00271,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,ReadWrite,Compete,micro,closing_holes_pressure;being_watched,low,fairway_bunker,strong,US,"Calm body. Clear target. Commit.
+Narrow focus. Execute under pressure.
+Name the task in words: “Pick. Commit. Swing.”",What cue phrase keeps you steady?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00272,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,ReadWrite,Compete,standard,match_play_moment;playing_with_better_golfers,high,perfect,moderate,EU,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Narrow focus. Execute under pressure.
+Use a short written-style checklist in your head: target, plan, commit.",What cue phrase keeps you steady?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00273,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,ReadWrite,Compete,deep,being_watched;match_play_moment,low,rough,strong,UK,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Narrow focus. Execute under pressure.
+Run a 4-line script: target, plan, breath, commit. Then go.",What cue phrase keeps you steady?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00274,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,ReadWrite,Maintain,micro,playing_with_better_golfers;match_play_moment,high,perfect,strong,UK,"Calm body. Clear target. Commit.
+Stay consistent. Trust what works.
+Name the task in words: “Pick. Commit. Swing.”",Where is your target line—keep it simple?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00275,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,ReadWrite,Maintain,standard,being_watched;closing_holes_pressure,low,tight,calm,US,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Stay consistent. Trust what works.
+Use a short written-style checklist in your head: target, plan, commit.",Where is your target line—keep it simple?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00276,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,ReadWrite,Maintain,deep,nerves_on_green;match_play_moment,medium,perfect,calm,US,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Stay consistent. Trust what works.
+Run a 4-line script: target, plan, breath, commit. Then go.",What cue phrase keeps you steady?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00277,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Kinesthetic,Foundation,micro,playing_with_better_golfers;nerves_on_green,high,fairway_bunker,light,AU,"Calm body. Clear target. Commit.
+Keep it simple and repeatable.
+Feel your feet. One slow exhale. Loose grip pressure.",What cue phrase keeps you steady?,Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00278,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Kinesthetic,Foundation,standard,nerves_on_green;match_play_moment,medium,fairway_bunker,moderate,US,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Keep it simple and repeatable.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",Where is your target line—keep it simple?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00279,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Kinesthetic,Foundation,deep,closing_holes_pressure;match_play_moment,low,perfect,moderate,EU,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Keep it simple and repeatable.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What cue phrase keeps you steady?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00280,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Kinesthetic,Build,micro,nerves_on_green;match_play_moment,medium,fairway_bunker,calm,US,"Calm body. Clear target. Commit.
+Add one detail: pace and commitment.
+Feel your feet. One slow exhale. Loose grip pressure.",Where is your target line—keep it simple?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00281,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Kinesthetic,Build,standard,closing_holes_pressure;nerves_on_green,high,perfect,light,UK,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Add one detail: pace and commitment.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What cue phrase keeps you steady?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00282,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Kinesthetic,Build,deep,playing_with_better_golfers;nerves_on_green,medium,fairway_bunker,strong,UK,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Add one detail: pace and commitment.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",Where is your target line—keep it simple?,Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00283,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Kinesthetic,Compete,micro,closing_holes_pressure;nerves_on_green,low,fairway_bunker,strong,AU,"Calm body. Clear target. Commit.
+Narrow focus. Execute under pressure.
+Feel your feet. One slow exhale. Loose grip pressure.",What cue phrase keeps you steady?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00284,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Kinesthetic,Compete,standard,being_watched;match_play_moment,high,tight,calm,EU,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Narrow focus. Execute under pressure.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What cue phrase keeps you steady?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00285,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Kinesthetic,Compete,deep,nerves_on_green;playing_with_better_golfers,high,rough,light,UK,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Narrow focus. Execute under pressure.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What cue phrase keeps you steady?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00286,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Kinesthetic,Maintain,micro,being_watched;playing_with_better_golfers,medium,greenside_bunker,moderate,US,"Calm body. Clear target. Commit.
+Stay consistent. Trust what works.
+Feel your feet. One slow exhale. Loose grip pressure.",Where is your target line—keep it simple?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00287,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Kinesthetic,Maintain,standard,being_watched;playing_with_better_golfers,low,perfect,moderate,AU,"Pressure is normal. Slow the moment with one breath. Clear target. Commit to your routine.
+Stay consistent. Trust what works.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What cue phrase keeps you steady?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00288,MC_T06_PRESSURE_MOMENTS,Pressure Moments,CONFIDENCE,Kinesthetic,Maintain,deep,closing_holes_pressure;nerves_on_green,low,fairway_bunker,moderate,US,"Pressure plan: breathe, narrow focus, commit. You’re not chasing perfect—you're choosing clear and steady.
+Stay consistent. Trust what works.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What cue phrase keeps you steady?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00289,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Visual,Foundation,micro,after_birdie_rush;protecting_lead,medium,perfect,light,UK,"Stay disciplined. Same routine.
+Keep it simple and repeatable.
+Picture one clear target line. See the ball start on it.",What routine step keeps you disciplined?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00290,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Visual,Foundation,standard,great_start_discipline;protecting_lead,high,tight,calm,UK,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Keep it simple and repeatable.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.","Are you rushing, or staying steady?",Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00291,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Visual,Foundation,deep,great_start_discipline;after_birdie_rush,medium,greenside_bunker,light,EU,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Keep it simple and repeatable.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What routine step keeps you disciplined?,Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00292,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Visual,Build,micro,great_start_discipline;protecting_lead,medium,tight,strong,EU,"Stay disciplined. Same routine.
+Add one detail: pace and commitment.
+Picture one clear target line. See the ball start on it.","Are you rushing, or staying steady?",Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00293,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Visual,Build,standard,great_start_discipline;protecting_score,low,rough,calm,UK,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Add one detail: pace and commitment.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What routine step keeps you disciplined?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00294,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Visual,Build,deep,momentum_swing_back_nine;great_start_discipline,low,fairway_bunker,moderate,AU,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Add one detail: pace and commitment.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.","Are you rushing, or staying steady?",Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00295,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Visual,Compete,micro,after_birdie_rush;momentum_swing_back_nine,high,greenside_bunker,light,UK,"Stay disciplined. Same routine.
+Narrow focus. Execute under pressure.
+Picture one clear target line. See the ball start on it.",What routine step keeps you disciplined?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00296,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Visual,Compete,standard,protecting_lead;great_start_discipline,low,rough,strong,US,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Narrow focus. Execute under pressure.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.","Are you rushing, or staying steady?",Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00297,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Visual,Compete,deep,great_start_discipline;protecting_lead,high,rough,strong,AU,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Narrow focus. Execute under pressure.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What routine step keeps you disciplined?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00298,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Visual,Maintain,micro,protecting_lead;great_start_discipline,medium,fairway_bunker,light,AU,"Stay disciplined. Same routine.
+Stay consistent. Trust what works.
+Picture one clear target line. See the ball start on it.","Are you rushing, or staying steady?",Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00299,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Visual,Maintain,standard,protecting_lead;after_birdie_rush,low,greenside_bunker,strong,UK,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Stay consistent. Trust what works.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.","Are you rushing, or staying steady?",Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00300,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Visual,Maintain,deep,protecting_lead;after_birdie_rush,low,perfect,strong,AU,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Stay consistent. Trust what works.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What routine step keeps you disciplined?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00301,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Aural,Foundation,micro,after_birdie_rush;momentum_swing_back_nine,high,rough,calm,AU,"Stay disciplined. Same routine.
+Keep it simple and repeatable.
+Say one phrase to yourself: “Smooth and committed.”","Are you rushing, or staying steady?",Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00302,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Aural,Foundation,standard,after_birdie_rush;momentum_swing_back_nine,high,tight,light,UK,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Keep it simple and repeatable.
+Use a quiet cue phrase. One sentence, same tone every time.",What routine step keeps you disciplined?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00303,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Aural,Foundation,deep,after_birdie_rush;protecting_lead,low,tight,strong,US,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Keep it simple and repeatable.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.","Are you rushing, or staying steady?",Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00304,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Aural,Build,micro,protecting_lead;protecting_score,low,fairway_bunker,moderate,AU,"Stay disciplined. Same routine.
+Add one detail: pace and commitment.
+Say one phrase to yourself: “Smooth and committed.”","Are you rushing, or staying steady?",Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00305,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Aural,Build,standard,great_start_discipline;momentum_swing_back_nine,high,perfect,light,EU,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Add one detail: pace and commitment.
+Use a quiet cue phrase. One sentence, same tone every time.",What routine step keeps you disciplined?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00306,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Aural,Build,deep,after_birdie_rush;great_start_discipline,medium,rough,light,AU,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Add one detail: pace and commitment.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What routine step keeps you disciplined?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00307,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Aural,Compete,micro,protecting_score;great_start_discipline,medium,rough,light,EU,"Stay disciplined. Same routine.
+Narrow focus. Execute under pressure.
+Say one phrase to yourself: “Smooth and committed.”","Are you rushing, or staying steady?",Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00308,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Aural,Compete,standard,protecting_lead;after_birdie_rush,low,rough,strong,UK,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Narrow focus. Execute under pressure.
+Use a quiet cue phrase. One sentence, same tone every time.","Are you rushing, or staying steady?",Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00309,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Aural,Compete,deep,momentum_swing_back_nine;protecting_score,low,greenside_bunker,light,US,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Narrow focus. Execute under pressure.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What routine step keeps you disciplined?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00310,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Aural,Maintain,micro,after_birdie_rush;great_start_discipline,low,fairway_bunker,strong,US,"Stay disciplined. Same routine.
+Stay consistent. Trust what works.
+Say one phrase to yourself: “Smooth and committed.”",What routine step keeps you disciplined?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00311,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Aural,Maintain,standard,momentum_swing_back_nine;protecting_lead,medium,rough,light,UK,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Stay consistent. Trust what works.
+Use a quiet cue phrase. One sentence, same tone every time.","Are you rushing, or staying steady?",Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00312,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Aural,Maintain,deep,great_start_discipline;protecting_score,high,fairway_bunker,strong,UK,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Stay consistent. Trust what works.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.","Are you rushing, or staying steady?",Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00313,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,ReadWrite,Foundation,micro,great_start_discipline;protecting_lead,low,fairway_bunker,moderate,AU,"Stay disciplined. Same routine.
+Keep it simple and repeatable.
+Name the task in words: “Pick. Commit. Swing.”","Are you rushing, or staying steady?",Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00314,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,ReadWrite,Foundation,standard,great_start_discipline;after_birdie_rush,low,perfect,strong,US,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Keep it simple and repeatable.
+Use a short written-style checklist in your head: target, plan, commit.","Are you rushing, or staying steady?",Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00315,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,ReadWrite,Foundation,deep,great_start_discipline;protecting_lead,medium,perfect,strong,EU,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Keep it simple and repeatable.
+Run a 4-line script: target, plan, breath, commit. Then go.","Are you rushing, or staying steady?",Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00316,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,ReadWrite,Build,micro,after_birdie_rush;protecting_lead,medium,tight,strong,EU,"Stay disciplined. Same routine.
+Add one detail: pace and commitment.
+Name the task in words: “Pick. Commit. Swing.”","Are you rushing, or staying steady?",Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00317,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,ReadWrite,Build,standard,protecting_lead;great_start_discipline,low,greenside_bunker,light,EU,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Add one detail: pace and commitment.
+Use a short written-style checklist in your head: target, plan, commit.",What routine step keeps you disciplined?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00318,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,ReadWrite,Build,deep,great_start_discipline;protecting_score,high,perfect,strong,US,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Add one detail: pace and commitment.
+Run a 4-line script: target, plan, breath, commit. Then go.","Are you rushing, or staying steady?",Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00319,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,ReadWrite,Compete,micro,protecting_score;great_start_discipline,medium,tight,light,EU,"Stay disciplined. Same routine.
+Narrow focus. Execute under pressure.
+Name the task in words: “Pick. Commit. Swing.”",What routine step keeps you disciplined?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00320,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,ReadWrite,Compete,standard,momentum_swing_back_nine;protecting_score,medium,tight,strong,US,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Narrow focus. Execute under pressure.
+Use a short written-style checklist in your head: target, plan, commit.","Are you rushing, or staying steady?",Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00321,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,ReadWrite,Compete,deep,after_birdie_rush;momentum_swing_back_nine,high,tight,strong,US,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Narrow focus. Execute under pressure.
+Run a 4-line script: target, plan, breath, commit. Then go.",What routine step keeps you disciplined?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00322,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,ReadWrite,Maintain,micro,momentum_swing_back_nine;after_birdie_rush,medium,tight,calm,AU,"Stay disciplined. Same routine.
+Stay consistent. Trust what works.
+Name the task in words: “Pick. Commit. Swing.”",What routine step keeps you disciplined?,Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00323,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,ReadWrite,Maintain,standard,after_birdie_rush;momentum_swing_back_nine,high,fairway_bunker,calm,EU,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Stay consistent. Trust what works.
+Use a short written-style checklist in your head: target, plan, commit.","Are you rushing, or staying steady?",Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00324,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,ReadWrite,Maintain,deep,great_start_discipline;protecting_score,high,perfect,moderate,AU,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Stay consistent. Trust what works.
+Run a 4-line script: target, plan, breath, commit. Then go.","Are you rushing, or staying steady?",Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00325,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Kinesthetic,Foundation,micro,protecting_score;momentum_swing_back_nine,high,fairway_bunker,moderate,EU,"Stay disciplined. Same routine.
+Keep it simple and repeatable.
+Feel your feet. One slow exhale. Loose grip pressure.","Are you rushing, or staying steady?",Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00326,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Kinesthetic,Foundation,standard,after_birdie_rush;protecting_score,medium,greenside_bunker,moderate,AU,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Keep it simple and repeatable.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What routine step keeps you disciplined?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00327,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Kinesthetic,Foundation,deep,protecting_lead;great_start_discipline,medium,perfect,calm,US,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Keep it simple and repeatable.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What routine step keeps you disciplined?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00328,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Kinesthetic,Build,micro,protecting_score;momentum_swing_back_nine,high,perfect,light,UK,"Stay disciplined. Same routine.
+Add one detail: pace and commitment.
+Feel your feet. One slow exhale. Loose grip pressure.","Are you rushing, or staying steady?",Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00329,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Kinesthetic,Build,standard,great_start_discipline;protecting_lead,high,tight,moderate,US,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Add one detail: pace and commitment.
+Feel posture, balance, and tempo. Let the body lead, not the noise.","Are you rushing, or staying steady?",Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00330,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Kinesthetic,Build,deep,protecting_lead;great_start_discipline,low,perfect,strong,AU,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Add one detail: pace and commitment.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.","Are you rushing, or staying steady?",Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00331,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Kinesthetic,Compete,micro,great_start_discipline;after_birdie_rush,medium,tight,light,US,"Stay disciplined. Same routine.
+Narrow focus. Execute under pressure.
+Feel your feet. One slow exhale. Loose grip pressure.","Are you rushing, or staying steady?",Want to log this as working well?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00332,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Kinesthetic,Compete,standard,after_birdie_rush;protecting_score,high,perfect,moderate,UK,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Narrow focus. Execute under pressure.
+Feel posture, balance, and tempo. Let the body lead, not the noise.","Are you rushing, or staying steady?",Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00333,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Kinesthetic,Compete,deep,protecting_lead;protecting_score,low,fairway_bunker,calm,EU,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Narrow focus. Execute under pressure.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.","Are you rushing, or staying steady?",Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00334,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Kinesthetic,Maintain,micro,protecting_lead;after_birdie_rush,low,fairway_bunker,moderate,UK,"Stay disciplined. Same routine.
+Stay consistent. Trust what works.
+Feel your feet. One slow exhale. Loose grip pressure.","Are you rushing, or staying steady?",Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00335,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Kinesthetic,Maintain,standard,great_start_discipline;after_birdie_rush,medium,perfect,calm,AU,"When you’re playing well: don’t rush. Same routine, same tempo, same commitment.
+Stay consistent. Trust what works.
+Feel posture, balance, and tempo. Let the body lead, not the noise.","Are you rushing, or staying steady?",Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00336,MC_T07_MOMENTUM_PROTECTION,Momentum Protection,CONFIDENCE,Kinesthetic,Maintain,deep,protecting_lead;after_birdie_rush,low,rough,light,UK,"Protect momentum by staying boring: same pace, same decision quality, same reset after every shot.
+Stay consistent. Trust what works.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.","Are you rushing, or staying steady?",Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00337,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Visual,Foundation,micro,post_round_learn;post_round_next_step,high,fairway_bunker,moderate,AU,"One win. One lesson. One next step.
+Keep it simple and repeatable.
+Picture one clear target line. See the ball start on it.",What’s one thing you’ll repeat next round?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00338,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Visual,Foundation,standard,post_round_next_step;post_round_learn,medium,greenside_bunker,light,AU,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Keep it simple and repeatable.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What was your best decision today?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00339,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Visual,Foundation,deep,tournament_round;post_round_learn,high,tight,light,US,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Keep it simple and repeatable.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What was your best decision today?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00340,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Visual,Build,micro,post_round_learn;post_round_next_step,high,tight,calm,UK,"One win. One lesson. One next step.
+Add one detail: pace and commitment.
+Picture one clear target line. See the ball start on it.",What’s one thing you’ll repeat next round?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00341,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Visual,Build,standard,tournament_round;post_round_learn,medium,tight,calm,AU,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Add one detail: pace and commitment.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s one thing you’ll repeat next round?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00342,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Visual,Build,deep,post_round_learn;practice_round,medium,fairway_bunker,moderate,EU,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Add one detail: pace and commitment.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What was your best decision today?,Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00343,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Visual,Compete,micro,practice_round;tournament_round,medium,fairway_bunker,strong,UK,"One win. One lesson. One next step.
+Narrow focus. Execute under pressure.
+Picture one clear target line. See the ball start on it.",What’s one thing you’ll repeat next round?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00344,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Visual,Compete,standard,post_round_learn;post_round_next_step,high,rough,strong,EU,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Narrow focus. Execute under pressure.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What was your best decision today?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00345,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Visual,Compete,deep,practice_round;tournament_round,high,fairway_bunker,calm,EU,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Narrow focus. Execute under pressure.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What was your best decision today?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00346,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Visual,Maintain,micro,post_round_learn;tournament_round,high,greenside_bunker,strong,AU,"One win. One lesson. One next step.
+Stay consistent. Trust what works.
+Picture one clear target line. See the ball start on it.",What was your best decision today?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00347,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Visual,Maintain,standard,practice_round;tournament_round,high,perfect,moderate,UK,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Stay consistent. Trust what works.
+Picture the target, the start line, and the finish spot. Keep it simple and vivid.",What’s one thing you’ll repeat next round?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00348,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Visual,Maintain,deep,practice_round;post_round_next_step,high,fairway_bunker,moderate,EU,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Stay consistent. Trust what works.
+Build a quick 3-image loop: target → start line → calm finish. Replay it once, then commit.",What’s one thing you’ll repeat next round?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00349,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Aural,Foundation,micro,practice_round;post_round_learn,high,greenside_bunker,calm,UK,"One win. One lesson. One next step.
+Keep it simple and repeatable.
+Say one phrase to yourself: “Smooth and committed.”",What’s one thing you’ll repeat next round?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00350,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Aural,Foundation,standard,tournament_round;post_round_next_step,low,rough,moderate,EU,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Keep it simple and repeatable.
+Use a quiet cue phrase. One sentence, same tone every time.",What’s one thing you’ll repeat next round?,Should we keep this cue for the next hole?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00351,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Aural,Foundation,deep,post_round_learn;post_round_next_step,high,tight,strong,AU,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Keep it simple and repeatable.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What was your best decision today?,Ready to reset and move on?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00352,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Aural,Build,micro,practice_round;tournament_round,medium,greenside_bunker,light,UK,"One win. One lesson. One next step.
+Add one detail: pace and commitment.
+Say one phrase to yourself: “Smooth and committed.”",What’s one thing you’ll repeat next round?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00353,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Aural,Build,standard,post_round_next_step;post_round_learn,low,greenside_bunker,strong,AU,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Add one detail: pace and commitment.
+Use a quiet cue phrase. One sentence, same tone every time.",What’s one thing you’ll repeat next round?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00354,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Aural,Build,deep,post_round_next_step;practice_round,low,perfect,calm,US,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Add one detail: pace and commitment.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What was your best decision today?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00355,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Aural,Compete,micro,post_round_learn;post_round_next_step,low,rough,light,US,"One win. One lesson. One next step.
+Narrow focus. Execute under pressure.
+Say one phrase to yourself: “Smooth and committed.”",What’s one thing you’ll repeat next round?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00356,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Aural,Compete,standard,practice_round;post_round_learn,high,rough,light,AU,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Narrow focus. Execute under pressure.
+Use a quiet cue phrase. One sentence, same tone every time.",What was your best decision today?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00357,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Aural,Compete,deep,post_round_learn;practice_round,high,tight,light,US,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Narrow focus. Execute under pressure.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What was your best decision today?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00358,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Aural,Maintain,micro,practice_round;post_round_learn,low,rough,calm,US,"One win. One lesson. One next step.
+Stay consistent. Trust what works.
+Say one phrase to yourself: “Smooth and committed.”",What’s one thing you’ll repeat next round?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00359,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Aural,Maintain,standard,post_round_next_step;post_round_learn,high,rough,light,AU,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Stay consistent. Trust what works.
+Use a quiet cue phrase. One sentence, same tone every time.",What’s one thing you’ll repeat next round?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00360,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Aural,Maintain,deep,tournament_round;post_round_learn,low,fairway_bunker,moderate,US,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Stay consistent. Trust what works.
+Set your inner voice: calm, firm, simple. One cue phrase, then silence.",What was your best decision today?,Do you want a shorter version next time?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00361,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,ReadWrite,Foundation,micro,post_round_learn;practice_round,high,perfect,strong,AU,"One win. One lesson. One next step.
+Keep it simple and repeatable.
+Name the task in words: “Pick. Commit. Swing.”",What’s one thing you’ll repeat next round?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00362,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,ReadWrite,Foundation,standard,practice_round;post_round_learn,low,greenside_bunker,strong,US,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Keep it simple and repeatable.
+Use a short written-style checklist in your head: target, plan, commit.",What’s one thing you’ll repeat next round?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00363,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,ReadWrite,Foundation,deep,post_round_next_step;post_round_learn,low,fairway_bunker,strong,UK,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Keep it simple and repeatable.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s one thing you’ll repeat next round?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00364,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,ReadWrite,Build,micro,tournament_round;post_round_learn,medium,tight,light,US,"One win. One lesson. One next step.
+Add one detail: pace and commitment.
+Name the task in words: “Pick. Commit. Swing.”",What’s one thing you’ll repeat next round?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00365,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,ReadWrite,Build,standard,post_round_learn;tournament_round,medium,greenside_bunker,moderate,AU,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Add one detail: pace and commitment.
+Use a short written-style checklist in your head: target, plan, commit.",What was your best decision today?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00366,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,ReadWrite,Build,deep,post_round_next_step;tournament_round,medium,rough,moderate,AU,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Add one detail: pace and commitment.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s one thing you’ll repeat next round?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00367,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,ReadWrite,Compete,micro,post_round_next_step;practice_round,low,rough,strong,AU,"One win. One lesson. One next step.
+Narrow focus. Execute under pressure.
+Name the task in words: “Pick. Commit. Swing.”",What was your best decision today?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00368,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,ReadWrite,Compete,standard,post_round_next_step;post_round_learn,high,perfect,strong,EU,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Narrow focus. Execute under pressure.
+Use a short written-style checklist in your head: target, plan, commit.",What’s one thing you’ll repeat next round?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00369,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,ReadWrite,Compete,deep,post_round_next_step;practice_round,low,greenside_bunker,light,UK,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Narrow focus. Execute under pressure.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s one thing you’ll repeat next round?,Do you want to repeat this routine next shot?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00370,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,ReadWrite,Maintain,micro,post_round_learn;practice_round,low,tight,light,AU,"One win. One lesson. One next step.
+Stay consistent. Trust what works.
+Name the task in words: “Pick. Commit. Swing.”",What was your best decision today?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00371,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,ReadWrite,Maintain,standard,post_round_next_step;post_round_learn,low,rough,moderate,AU,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Stay consistent. Trust what works.
+Use a short written-style checklist in your head: target, plan, commit.",What was your best decision today?,Ready to reset and move on?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00372,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,ReadWrite,Maintain,deep,tournament_round;post_round_learn,high,greenside_bunker,strong,UK,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Stay consistent. Trust what works.
+Run a 4-line script: target, plan, breath, commit. Then go.",What’s one thing you’ll repeat next round?,Should we keep this cue for the next hole?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00373,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Kinesthetic,Foundation,micro,practice_round;tournament_round,medium,rough,strong,EU,"One win. One lesson. One next step.
+Keep it simple and repeatable.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s one thing you’ll repeat next round?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00374,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Kinesthetic,Foundation,standard,practice_round;post_round_next_step,low,greenside_bunker,light,AU,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Keep it simple and repeatable.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What was your best decision today?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00375,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Kinesthetic,Foundation,deep,practice_round;post_round_next_step,low,tight,strong,AU,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Keep it simple and repeatable.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What’s one thing you’ll repeat next round?,Do you want a shorter version next time?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00376,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Kinesthetic,Build,micro,practice_round;tournament_round,high,rough,moderate,EU,"One win. One lesson. One next step.
+Add one detail: pace and commitment.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s one thing you’ll repeat next round?,Do you want to repeat this routine next shot?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00377,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Kinesthetic,Build,standard,post_round_next_step;post_round_learn,low,greenside_bunker,light,US,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Add one detail: pace and commitment.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What was your best decision today?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00378,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Kinesthetic,Build,deep,practice_round;post_round_next_step,high,greenside_bunker,calm,UK,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Add one detail: pace and commitment.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What was your best decision today?,Do you want to repeat this routine next shot?,building,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00379,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Kinesthetic,Compete,micro,practice_round;tournament_round,low,greenside_bunker,moderate,AU,"One win. One lesson. One next step.
+Narrow focus. Execute under pressure.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s one thing you’ll repeat next round?,Ready to reset and move on?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00380,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Kinesthetic,Compete,standard,post_round_next_step;practice_round,high,tight,moderate,US,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Narrow focus. Execute under pressure.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What’s one thing you’ll repeat next round?,Do you want a shorter version next time?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00381,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Kinesthetic,Compete,deep,post_round_learn;practice_round,medium,greenside_bunker,moderate,EU,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Narrow focus. Execute under pressure.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What was your best decision today?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00382,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Kinesthetic,Maintain,micro,tournament_round;post_round_next_step,medium,tight,light,UK,"One win. One lesson. One next step.
+Stay consistent. Trust what works.
+Feel your feet. One slow exhale. Loose grip pressure.",What’s one thing you’ll repeat next round?,Want to log this as working well?,stable,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00383,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Kinesthetic,Maintain,standard,post_round_learn;post_round_next_step,medium,greenside_bunker,light,US,"Reflect cleanly: what worked, what slipped, and what you’ll do next time. No judgment—just learning.
+Stay consistent. Trust what works.
+Feel posture, balance, and tempo. Let the body lead, not the noise.",What was your best decision today?,Should we keep this cue for the next hole?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.
+MC_00384,MC_T08_END_OF_ROUND_REFLECTION,End-of-Round Reflection,ALL,Kinesthetic,Maintain,deep,post_round_learn;tournament_round,medium,tight,calm,US,"Review in three parts: (1) best moments, (2) biggest leak, (3) one clear focus for next round. Turn insight into action.
+Stay consistent. Trust what works.
+Use a body scan: feet → hands → shoulders. Exhale, then move with tempo.",What was your best decision today?,Want to log this as working well?,needs_support,No medical/therapy language. No promises/guarantees. No 'psychology' wording.

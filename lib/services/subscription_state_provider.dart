@@ -96,23 +96,42 @@ class SubscriptionStateProvider extends ChangeNotifier {
     }
   }
   
-  /// Load user creation time from Firestore
+  /// Load user creation time from Firestore.
+  ///
+  /// Guarded against permission-denied / auth race so a missing token at the
+  /// very first load doesn't surface as a noisy red error (we'll just retry on
+  /// the next refresh after auth has settled).
   Future<void> _loadUserCreatedTime() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
-      
+
+      // Make sure the SDK has a fresh ID token attached before hitting
+      // Firestore. This avoids `permission-denied` during the auth race that
+      // happens right after sign-in / app cold start.
+      try {
+        await user.getIdToken();
+      } catch (_) {}
+
       final userDoc = await FirebaseFirestore.instance
           .collection('user')
           .doc(user.uid)
           .get();
-      
+
       if (userDoc.exists) {
         final data = userDoc.data();
         if (data != null && data['createdTime'] != null) {
           final timestamp = data['createdTime'] as Timestamp;
           _userCreatedTime = timestamp.toDate();
         }
+      }
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        debugPrint(
+          '⚠️ SubscriptionStateProvider: user doc permission denied (auth/rules race) — will retry next refresh.',
+        );
+      } else {
+        debugPrint('❌ Error loading user created time: $e');
       }
     } catch (e) {
       debugPrint('❌ Error loading user created time: $e');
@@ -141,15 +160,17 @@ class SubscriptionStateProvider extends ChangeNotifier {
     return trialEndDate.difference(now).inDays;
   }
   
-  /// Check if user should see locked state (trial expired and no subscription)
+  /// Check if user should see locked state.
+  ///
+  /// RC-only policy: RevenueCat (`hasActiveSubscription` / active entitlement
+  /// resolved during `refreshSubscriptionState`) is the single source of truth.
+  /// The legacy 16-day Firestore trial is kept only as a soft fallback when RC
+  /// hasn't yet returned a value (e.g. very first refresh on cold start).
   bool shouldShowLock() {
-    // If has active subscription, never show lock
     if (_hasActiveSubscription || isSubscriptionActive()) {
       return false;
     }
-    
-    // Show lock if trial period has expired
-    return !isWithinTrialPeriod();
+    return true;
   }
   
   /// Convert RevenueCat subscription to StoreSubscriptionInfo format

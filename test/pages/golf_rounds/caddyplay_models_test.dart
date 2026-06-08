@@ -82,7 +82,8 @@ void main() {
     expect(aggregate.confidence, greaterThan(0));
     expect(aggregate.control, greaterThan(0));
     expect(snapshot.courseName, 'San Lorenzo GC');
-    expect(snapshot.scoreToPar, -61);
+    expect(snapshot.scoreToPar, 3);
+    expect(snapshot.scoreToParIsApproximate, isFalse);
     expect(snapshot.holesPlayed, 2);
     expect(snapshot.totalMoments, 3);
     expect(snapshot.tapCount, 1);
@@ -140,5 +141,63 @@ void main() {
       ),
       'Routine first.',
     );
+  });
+
+  test('partial round score to par uses scored holes only (5+4+6 on par 4s = +3)', () {
+    final round = CaddyPlayActiveRound.newRound(
+      roundId: 'round_partial',
+      userId: 'user_1',
+      courseName: 'Test GC',
+      holesTotal: 18,
+      roundType: CaddyPlayRoundType.casual,
+      playingPartners: CaddyPlayPlayingPartners.solo,
+      preRoundMindset: CaddyPlayPreRoundMindset.positive,
+      weather: CaddyPlayWeather.good,
+    ).copyWith(
+      holes: [
+        CaddyPlayHole(holeNumber: 1, par: 4, score: 5),
+        CaddyPlayHole(holeNumber: 2, par: 4, score: 4),
+        CaddyPlayHole(holeNumber: 3, par: 4, score: 6),
+        for (var hole = 4; hole <= 18; hole++) CaddyPlayHole(holeNumber: hole),
+      ],
+      currentHole: 3,
+    );
+
+    expect(round.scoreToPar, 3);
+    expect(round.scoreToParUsesDefaultedPar, isFalse);
+    final snap = buildRoundSnapshot(round);
+    expect(snap.scoreToPar, 3);
+    expect(snap.scoreToParIsApproximate, isFalse);
+  });
+
+  test('defaulted par when score set and par null yields approximate flag', () {
+    final round = CaddyPlayActiveRound.newRound(
+      roundId: 'round_approx',
+      userId: 'user_1',
+      courseName: 'Test GC',
+      holesTotal: 9,
+      roundType: CaddyPlayRoundType.practice,
+      playingPartners: CaddyPlayPlayingPartners.solo,
+      preRoundMindset: CaddyPlayPreRoundMindset.positive,
+      weather: CaddyPlayWeather.good,
+    ).copyWith(
+      holes: [
+        CaddyPlayHole(holeNumber: 1, score: 5),
+        CaddyPlayHole(holeNumber: 2, score: 4),
+        CaddyPlayHole(holeNumber: 3, score: 5),
+        for (var hole = 4; hole <= 9; hole++) CaddyPlayHole(holeNumber: hole),
+      ],
+    );
+
+    expect(round.totalPar, 12);
+    expect(round.totalScore, 14);
+    expect(round.scoreToPar, 2);
+    expect(round.scoreToParUsesDefaultedPar, isTrue);
+    expect(
+      formatCaddyPlayScoreToParLabel(round.scoreToPar, approximate: true),
+      '~+2',
+    );
+    final snap = buildRoundSnapshot(round);
+    expect(snap.scoreToParIsApproximate, isTrue);
   });
 }

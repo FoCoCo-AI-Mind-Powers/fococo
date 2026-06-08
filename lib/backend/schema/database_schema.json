@@ -61,7 +61,16 @@
         "platform": "string",
         "referralSource": "string",
         "currentAdaptiveMode": "string",
-        "lastTrainingPlanId": "string"
+        "lastTrainingPlanId": "string",
+        "self_assessment": {
+          "type": "struct",
+          "fields": {
+            "focus_self": "string",
+            "confidence_self": "string",
+            "control_self": "string",
+            "assessed": "boolean"
+          }
+        }
       }
     },
     "achievements": {
@@ -267,6 +276,7 @@
     },
     "golf_rounds": {
       "fields": {
+        "input_type": "string",
         "userId": "string",
         "date": "timestamp",
         "courseName": "string",
@@ -406,6 +416,16 @@
         "pillar": "string",
         "isCompleted": "boolean",
         "trainingPlanId": "string"
+      }
+    },
+    "mindcoach_sessions": {
+      "fields": {
+        "userId": "string",
+        "platform": "string",
+        "templateId": "string",
+        "durationMinutes": "number",
+        "createdTime": "timestamp",
+        "updatedTime": "timestamp"
       }
     },
     "notifications": {

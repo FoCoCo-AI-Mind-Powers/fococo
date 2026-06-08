@@ -1,21 +1,6 @@
 name: fo_co_co
 description: "FoCoCo - Golf Mental Coaching App with AI Integration" 
-
-# The following line prevents the package from being accidentally published to
-# pub.dev using `pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
-
-# The following defines the version and build number for your application.
-# A version number is three numbers separated by dots, like 1.2.43
-# followed by an optional build number separated by a +.
-# Both the version and the builder number may be overridden in flutter
-# build by specifying --build-name and --build-number, respectively.
-# In Android, build-name is used as versionName while build-number used as versionCode.
-# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
-# In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
-# Read more about iOS versioning at
-# https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-version: 1.0.0+21
+version: 1.0.0+36
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -32,24 +17,22 @@ dependencies:
   cached_network_image: 3.4.1
   cached_network_image_platform_interface: 4.1.1
   cached_network_image_web: 1.3.1
-  cloud_firestore: ^6.0.2
-  cloud_firestore_platform_interface: ^7.0.2
-  cloud_firestore_web: ^5.0.2
+  cloud_firestore: ^6.3.0
+  cloud_firestore_platform_interface: ^7.2.0
+  cloud_firestore_web: ^5.3.0
   collection: ^1.19.1
-  firebase_auth: ^6.1.0
-  firebase_auth_platform_interface: ^8.1.2
-  firebase_auth_web: ^6.0.3
-  firebase_core: ^4.1.1
+  firebase_auth: ^6.4.0
+  firebase_auth_platform_interface: ^8.1.9
+  firebase_auth_web: ^6.1.5
+  firebase_core: ^4.7.0
   firebase_core_platform_interface: ^6.0.1
-  firebase_core_web: ^3.1.1
+  firebase_core_web: ^3.6.0
   firebase_crashlytics: ^5.0.2
   firebase_crashlytics_platform_interface: ^3.8.7
   firebase_messaging: ^16.0.2
   firebase_messaging_platform_interface: ^4.6.7
   firebase_messaging_web: ^4.0.2
-  firebase_performance: ^0.11.1
-  firebase_performance_platform_interface: ^0.1.5+7
-  firebase_performance_web: ^0.1.7+13
+  fluid_background: ^1.0.5
   flutter_animate: ^4.5.2
   flutter_cache_manager: 3.4.1
   flutter_local_notifications: ^19.2.1
@@ -60,6 +43,8 @@ dependencies:
   from_css_color: 2.0.0
   go_router: ^16.2.4
   google_fonts: ^6.2.1
+  home_widget: ^0.7.0
+  live_activities: ^2.4.9
   google_sign_in: ^7.2.0
   google_sign_in_android: ^7.2.0
   google_sign_in_ios: ^6.2.1
@@ -92,8 +77,10 @@ dependencies:
   timeago: ^3.7.1
   timezone: ^0.10.1
   url_launcher: ^6.3.1
+  in_app_review: ^2.0.10
   share_plus: ^10.1.3
-  firebase_ai: ^3.10.0
+  firebase_ai: ^3.11.0
+  firebase_performance: ^0.11.0
   url_launcher_android: ^6.3.16
   url_launcher_ios: ^6.3.3
   url_launcher_linux: ^3.2.1
@@ -128,8 +115,10 @@ dependencies:
   audioplayers: ^6.1.0
   web_socket_channel: ^3.0.1
   http: ^1.2.2
+  http_parser: ^4.0.2
+  just_audio_background: ^0.0.1-beta.16
   fl_chart: ^1.1.1
-  cloud_functions: ^6.0.2
+  cloud_functions: ^6.2.0
 
   # Map Dependencies
   apple_maps_flutter: ^1.0.2
@@ -241,5 +230,3 @@ flutter_native_splash:
   web: false
   
   fullscreen: true
-
-

@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 import '/services/subscription_state_provider.dart';
 
 /// RevenueCat Service for managing subscriptions
@@ -13,6 +15,7 @@ class RevenueCatService {
   RevenueCatService._internal();
 
   bool _isInitialized = false;
+  Completer<void>? _initCompleter;
   CustomerInfo? _customerInfo;
 
   // RevenueCat API Keys
@@ -68,6 +71,12 @@ class RevenueCatService {
       debugPrint('✅ RevenueCat already initialized');
       return;
     }
+    // Guard against concurrent callers — only the first one runs configure(),
+    // all others await the same future.
+    if (_initCompleter != null) {
+      return _initCompleter!.future;
+    }
+    _initCompleter = Completer<void>();
 
     try {
       // Get current user ID for RevenueCat user identification
@@ -103,10 +112,9 @@ class RevenueCatService {
 
       await Purchases.configure(configuration);
 
-      // Set user ID if available
-      if (userId != null) {
-        await Purchases.logIn(userId);
-      }
+      // User identity is already set via [PurchasesConfiguration.appUserID].
+      // Calling [Purchases.logIn] with the same id would only log a redundant
+      // "no action will be taken" warning.
 
       // Enable debug logs in development
       if (kDebugMode) {
@@ -116,12 +124,23 @@ class RevenueCatService {
       // Listen to customer info updates
       Purchases.addCustomerInfoUpdateListener(_handleCustomerInfoUpdate);
 
-      // Get initial customer info
-      await refreshCustomerInfo();
+      // Get initial customer info (call Purchases directly — _ensureInitialized
+      // would deadlock here because _initCompleter is already in flight).
+      try {
+        _customerInfo = await Purchases.getCustomerInfo();
+        if (_customerInfo != null) {
+          await _syncSubscriptionToFirestore(_customerInfo!);
+        }
+      } catch (e) {
+        debugPrint('⚠️ Initial customer info fetch failed: $e');
+      }
 
       _isInitialized = true;
+      _initCompleter?.complete();
       debugPrint('✅ RevenueCat initialized successfully');
     } catch (e) {
+      _initCompleter?.completeError(e);
+      _initCompleter = null; // allow retry on next call
       debugPrint('❌ Failed to initialize RevenueCat: $e');
       throw Exception('Failed to initialize RevenueCat: $e');
     }
@@ -135,8 +154,10 @@ class RevenueCatService {
     // Update subscription state provider
     SubscriptionStateProvider().updateAfterPurchase();
 
-    // Sync with Firestore
-    _syncSubscriptionToFirestore(customerInfo);
+    // Sync with Firestore — guard so listener errors don't crash the app.
+    _syncSubscriptionToFirestore(customerInfo).catchError((Object e) {
+      debugPrint('⚠️ Firestore subscription sync failed: $e');
+    });
   }
 
   /// Refresh customer info from RevenueCat
@@ -229,6 +250,50 @@ class RevenueCatService {
 
   Offering? getPreferredOffering(Offerings offerings) {
     return offerings.getOffering(defaultOfferingId) ?? offerings.current;
+  }
+
+  /// Human-readable annual pricing for paywalls (store metadata first).
+  String annualPriceLabel(StoreProduct? product) {
+    final fromStore = product?.priceString?.trim();
+    if (fromStore != null && fromStore.isNotEmpty) {
+      return fromStore;
+    }
+    return '€179.99/year';
+  }
+
+  /// Intro offer line when eligible, otherwise standard annual price.
+  String annualPricingSubtitle(StoreProduct? product) {
+    final intro = product?.introductoryPrice;
+    final standard = annualPriceLabel(product);
+    if (intro != null && intro.priceString.trim().isNotEmpty) {
+      return 'Intro Offer — ${intro.priceString} for your first year. Then $standard.';
+    }
+    return '$standard only';
+  }
+
+  String trialButtonLabel() => 'Start 14-Day Free Trial';
+
+  /// Opens the native subscription management UI when available.
+  Future<void> openManageSubscriptions() async {
+    if (kIsWeb) return;
+
+    try {
+      await _ensureInitialized();
+      final info = await Purchases.getCustomerInfo();
+      final url = info.managementURL;
+      if (url != null && url.isNotEmpty) {
+        await launchURL(url);
+        return;
+      }
+    } catch (e) {
+      debugPrint('⚠️ managementURL lookup failed: $e');
+    }
+
+    if (Platform.isIOS) {
+      await launchURL('https://apps.apple.com/account/subscriptions');
+    } else if (Platform.isAndroid) {
+      await launchURL('https://play.google.com/store/account/subscriptions');
+    }
   }
 
   /// Purchase a package
@@ -329,6 +394,48 @@ class RevenueCatService {
         gracePeriodDays: gracePeriodDays);
   }
 
+  /// True when the user has any RevenueCat-granted access:
+  /// active entitlement, intro-offer / free trial, or active grace period.
+  /// This is the single source of truth used by the post-auth gate.
+  Future<bool> hasProAccess() async {
+    try {
+      await _ensureInitialized();
+      final info = await Purchases.getCustomerInfo();
+      _customerInfo = info;
+
+      final entitlement = info.entitlements.active[_entitlementId];
+      if (entitlement != null && entitlement.isActive) {
+        return true;
+      }
+
+      if (entitlement != null) {
+        final period = entitlement.periodType;
+        if (period == PeriodType.trial || period == PeriodType.intro) {
+          return true;
+        }
+      }
+
+      // Cover non-default entitlements that may still grant access (any active).
+      if (info.entitlements.active.isNotEmpty) {
+        return true;
+      }
+
+      // Grace period fallback for the configured entitlement.
+      if (entitlement != null) {
+        final wrapped =
+            RevenueCatSubscriptionInfo.fromEntitlementInfo(entitlement, info);
+        if (wrapped.isActiveWithGracePeriod(gracePeriodDays: gracePeriodDays)) {
+          return true;
+        }
+      }
+
+      return false;
+    } catch (e) {
+      debugPrint('⚠️ hasProAccess check failed: $e');
+      return false;
+    }
+  }
+
   /// Get subscription tier for user
   Future<String> getUserTier() async {
     final hasEntitlement = await hasActiveEntitlement();
@@ -352,6 +459,16 @@ class RevenueCatService {
           if (tier != null && tier.isNotEmpty && tier != 'junior') {
             return tier;
           }
+        }
+      } on FirebaseException catch (e) {
+        if (e.code == 'permission-denied') {
+          if (kDebugMode) {
+            debugPrint(
+              '⚠️ RevenueCat tier fallback: user doc permission denied (rules/auth).',
+            );
+          }
+        } else {
+          debugPrint('❌ Error getting user tier: $e');
         }
       } catch (e) {
         debugPrint('❌ Error getting user tier: $e');
@@ -384,9 +501,10 @@ class RevenueCatService {
 
       final platform = Platform.isIOS ? 'app_store' : 'google_play';
 
-      // Get expiration date
-      final expirationDate = (entitlement.expirationDate as DateTime?) ??
-          DateTime.now().add(const Duration(days: 30));
+      // entitlement.expirationDate is String? in purchases_flutter — parse it.
+      final expirationDate =
+          DateTime.tryParse(entitlement.expirationDate ?? '') ??
+              DateTime.now().add(const Duration(days: 30));
       final now = DateTime.now();
 
       // Calculate period start (assume 30 days for monthly, 365 for yearly)
@@ -398,16 +516,12 @@ class RevenueCatService {
       final latestPurchase = entitlement.latestPurchaseDate;
       String originalTransactionId = customerInfo.originalAppUserId;
 
-      if (latestPurchase != null) {
-        try {
-          // Try to cast to DateTime
-          final purchaseDate = latestPurchase as DateTime;
-          originalTransactionId =
-              purchaseDate.millisecondsSinceEpoch.toString();
-        } catch (e) {
-          // If not DateTime, use string representation
-          originalTransactionId = latestPurchase.toString();
-        }
+      final purchaseDate = DateTime.tryParse(latestPurchase);
+      if (purchaseDate != null) {
+        originalTransactionId =
+            purchaseDate.millisecondsSinceEpoch.toString();
+      } else if (latestPurchase.isNotEmpty) {
+        originalTransactionId = latestPurchase;
       }
 
       // Create subscription record
@@ -422,8 +536,8 @@ class RevenueCatService {
         'currentPeriodStart': Timestamp.fromDate(periodStart),
         'currentPeriodEnd': Timestamp.fromDate(expirationDate),
         'nextBillingDate': Timestamp.fromDate(expirationDate),
-        'cancelAtPeriodEnd': entitlement.willRenew == false,
-        'autoRenewing': entitlement.willRenew ?? true,
+        'cancelAtPeriodEnd': !entitlement.willRenew,
+        'autoRenewing': entitlement.willRenew,
         'purchaseDate': Timestamp.fromDate(now),
         'priceAmountMicros': 0, // RevenueCat handles pricing
         'priceCurrencyCode': 'USD',
@@ -577,27 +691,24 @@ class RevenueCatSubscriptionInfo {
     final latestPurchase = entitlement.latestPurchaseDate;
     String originalTransactionId = customerInfo.originalAppUserId;
 
-    if (latestPurchase != null) {
-      try {
-        // Try to cast to DateTime
-        final purchaseDate = latestPurchase as DateTime;
-        originalTransactionId = purchaseDate.millisecondsSinceEpoch.toString();
-      } catch (e) {
-        // If not DateTime, use string representation
-        originalTransactionId = latestPurchase.toString();
-      }
+    final purchaseDate = DateTime.tryParse(latestPurchase);
+    if (purchaseDate != null) {
+      originalTransactionId = purchaseDate.millisecondsSinceEpoch.toString();
+    } else if (latestPurchase.isNotEmpty) {
+      originalTransactionId = latestPurchase;
     }
 
-    // Get expiration date
-    final expirationDate = (entitlement.expirationDate as DateTime?) ??
-        DateTime.now().add(const Duration(days: 30));
+    // entitlement.expirationDate is String? in purchases_flutter — parse it.
+    final expirationDate =
+        DateTime.tryParse(entitlement.expirationDate ?? '') ??
+            DateTime.now().add(const Duration(days: 30));
 
     return RevenueCatSubscriptionInfo(
       productIdentifier: entitlement.productIdentifier,
       originalTransactionId: originalTransactionId,
       expirationDate: expirationDate,
       isActive: entitlement.isActive,
-      willRenew: entitlement.willRenew ?? false,
+      willRenew: entitlement.willRenew,
       periodType: entitlement.periodType,
       platform: Platform.isIOS ? 'app_store' : 'google_play',
     );

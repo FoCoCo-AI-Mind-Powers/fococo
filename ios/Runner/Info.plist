@@ -49,11 +49,22 @@
 	<string>NO</string>
 	<key>FirebaseAppCheckTokenAutoRefreshEnabled</key>
 	<false/>
+	<!--
+	  Enabled natively so Crashlytics is live from process start and can catch
+	  crashes that happen during native plugin init (the launch window where
+	  TestFlight crashes have been disappearing). Debug builds still suppress
+	  collection at runtime via BootPhaseLogger.configureCrashlyticsCollection
+	  (gated on kReleaseMode), so debug noise stays out of Firebase.
+	-->
+	<key>FirebaseCrashlyticsCollectionEnabled</key>
+	<true/>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
 	<key>FirebaseMessagingAutoInitEnabled</key>
-	<true/>
+	<false/>
 	<key>FlutterDeepLinkingEnabled</key>
+	<true/>
+	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>GMSApiKey</key>
 	<string>AIzaSyAYkQKNgnVZUj5Yd9C3Iyjjg0lwc4TJXuA</string>
@@ -62,13 +73,13 @@
 	<key>NSCameraUsageDescription</key>
 	<string>FoCoCo uses camera access to enable video-based coaching sessions, capture swing analysis footage, and provide visual feedback for your mental performance training.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>FoCoCo uses Face ID to provide secure and convenient authentication for accessing your mental performance data and coaching insights.</string>
+	<string>FoCoCo uses Face ID to sign you in quickly.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>FoCoCo needs location access to show your position on the golf course map and provide location-based coaching insights.</string>
+	<string>FoCoCo uses your location to identify your course and provide relevant context.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>FoCoCo needs location access to show your position on the golf course map and provide location-based coaching insights.</string>
+	<string>FoCoCo uses your location to identify your course and provide relevant context.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>FoCoCo uses microphone access to enable voice-based coaching interactions, audio journaling features, and AI-powered speech analysis to enhance your mental performance training.</string>
+	<string>FoCoCo uses the microphone for JustTalk round capture, GolfChat voice reflection, and MindCoach audio sessions.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>FoCoCo can save coaching progress screenshots and achievement images to your photo library for easy sharing and reference.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -79,6 +90,27 @@
 	<string>FoCoCo sends notifications to remind you of daily coaching sessions, notify you when AI insights are ready, and help maintain your mental training streaks.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>UIWindowScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>flutter</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).refresh</string>

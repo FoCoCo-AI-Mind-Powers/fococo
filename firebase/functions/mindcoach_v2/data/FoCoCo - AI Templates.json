@@ -1,0 +1,557 @@
+{
+  "schema_version": "1.0",
+  "dataset": "MindCoach_Templates_v1",
+  "authoritative": true,
+  "ai_may_not_create_new_templates": true,
+  "templates": [
+    {
+      "id": "MC_T01_PRE_ROUND_CLARITY",
+      "name": "Pre-Round Clarity",
+      "when_to_use": [
+        "Before tee-off",
+        "Warm-up",
+        "First tee nerves",
+        "New course / unfamiliar conditions"
+      ],
+      "primary_pillar": "FOCUS",
+      "secondary_pillars": [
+        "CONTROL"
+      ],
+      "allowed_routine_types": [
+        "⏳ Pre-Round"
+      ],
+      "allowed_cues": [
+        "😮‍💨 Deep Breath",
+        "🎯 Visualization",
+        "🗣️ Trigger Word"
+      ],
+      "user_outcome_goal": "Clear intention and calm commitment before the round begins.",
+      "ai_variation_zones": {
+        "allowed": [
+          "tone",
+          "length",
+          "vark_format",
+          "wording",
+          "sequence_of_steps",
+          "personalization_using_user_history"
+        ],
+        "forbidden": [
+          "new_cues",
+          "new_pillars",
+          "medical_or_therapeutic_language",
+          "diagnosis",
+          "claims_of_treatment"
+        ]
+      },
+      "delivery_lengths": [
+        "micro_15s",
+        "standard_45s",
+        "deep_2m"
+      ],
+      "vark_supported": [
+        "Visual",
+        "Aural",
+        "ReadWrite",
+        "Kinesthetic"
+      ],
+      "progression_levels": [
+        "Foundation",
+        "Build",
+        "Compete",
+        "Maintain"
+      ],
+      "insight_hooks": {
+        "loggable_fields": [
+          "mindset_rating_before",
+          "mindset_rating_after",
+          "cue_used",
+          "notes",
+          "context_pressure_level"
+        ],
+        "success_signals": [
+          "mindset_improves_or_stabilizes",
+          "user_reports_clear_plan",
+          "reduced_rushed_feeling"
+        ]
+      }
+    },
+    {
+      "id": "MC_T02_PRE_SHOT_FOCUS",
+      "name": "Pre-Shot Focus",
+      "when_to_use": [
+        "Standing over the ball",
+        "Indecision",
+        "Rushing",
+        "Target confusion"
+      ],
+      "primary_pillar": "FOCUS",
+      "secondary_pillars": [
+        "CONFIDENCE"
+      ],
+      "allowed_routine_types": [
+        "📐 Pre-Shot"
+      ],
+      "allowed_cues": [
+        "🎯 Visualization",
+        "🗣️ Trigger Word",
+        "💬 Self-Talk"
+      ],
+      "user_outcome_goal": "Commit to one clear decision and execute with full presence.",
+      "ai_variation_zones": {
+        "allowed": [
+          "tone",
+          "length",
+          "vark_format",
+          "wording",
+          "sequence_of_steps",
+          "personalization_using_user_history"
+        ],
+        "forbidden": [
+          "new_cues",
+          "new_templates",
+          "changing_definitions",
+          "medical_or_therapeutic_language"
+        ]
+      },
+      "delivery_lengths": [
+        "micro_10s",
+        "standard_30s",
+        "deep_90s"
+      ],
+      "vark_supported": [
+        "Visual",
+        "Aural",
+        "ReadWrite",
+        "Kinesthetic"
+      ],
+      "progression_levels": [
+        "Foundation",
+        "Build",
+        "Compete",
+        "Maintain"
+      ],
+      "insight_hooks": {
+        "loggable_fields": [
+          "club",
+          "shot_intent",
+          "commitment_rating",
+          "cue_used",
+          "mindset_rating_before"
+        ],
+        "success_signals": [
+          "higher_commitment_rating",
+          "less_second_guessing",
+          "improved_decision_consistency"
+        ]
+      }
+    },
+    {
+      "id": "MC_T03_BETWEEN_SHOTS_RESET",
+      "name": "Between-Shots Reset",
+      "when_to_use": [
+        "Walking/ride between shots",
+        "Slow play",
+        "After a miss",
+        "Mind wandering"
+      ],
+      "primary_pillar": "CONTROL",
+      "secondary_pillars": [
+        "FOCUS"
+      ],
+      "allowed_routine_types": [
+        "🚶 Between Shots"
+      ],
+      "allowed_cues": [
+        "🔄 Reset",
+        "😮‍💨 Deep Breath"
+      ],
+      "user_outcome_goal": "Return to neutral and keep attention clean between actions.",
+      "ai_variation_zones": {
+        "allowed": [
+          "tone",
+          "length",
+          "vark_format",
+          "wording",
+          "sequence_of_steps"
+        ],
+        "forbidden": [
+          "new_cues",
+          "therapy_language",
+          "new_routine_types"
+        ]
+      },
+      "delivery_lengths": [
+        "micro_10s",
+        "standard_30s",
+        "deep_60s"
+      ],
+      "vark_supported": [
+        "Visual",
+        "Aural",
+        "ReadWrite",
+        "Kinesthetic"
+      ],
+      "progression_levels": [
+        "Foundation",
+        "Build",
+        "Compete",
+        "Maintain"
+      ],
+      "insight_hooks": {
+        "loggable_fields": [
+          "mind_wander_flag",
+          "cue_used",
+          "mindset_rating_before",
+          "mindset_rating_after"
+        ],
+        "success_signals": [
+          "reduced_rumination",
+          "stable_mindset",
+          "improved_next_shot_presence"
+        ]
+      }
+    },
+    {
+      "id": "MC_T04_POST_SHOT_LETTING_GO",
+      "name": "Post-Shot Letting Go",
+      "when_to_use": [
+        "Immediately after any shot",
+        "Strong emotion (good or bad)",
+        "Replay loop"
+      ],
+      "primary_pillar": "CONTROL",
+      "secondary_pillars": [
+        "FOCUS"
+      ],
+      "allowed_routine_types": [
+        "🧘 Post-Shot"
+      ],
+      "allowed_cues": [
+        "✋ Letting Go",
+        "🔄 Reset",
+        "😮‍💨 Deep Breath"
+      ],
+      "user_outcome_goal": "Release outcome attachment and return to neutral for the next decision.",
+      "ai_variation_zones": {
+        "allowed": [
+          "tone",
+          "length",
+          "vark_format",
+          "wording",
+          "sequence_of_steps"
+        ],
+        "forbidden": [
+          "new_cues",
+          "judgmental_language",
+          "diagnosis_or_treatment_claims"
+        ]
+      },
+      "delivery_lengths": [
+        "micro_8s",
+        "standard_25s",
+        "deep_60s"
+      ],
+      "vark_supported": [
+        "Visual",
+        "Aural",
+        "ReadWrite",
+        "Kinesthetic"
+      ],
+      "progression_levels": [
+        "Foundation",
+        "Build",
+        "Compete",
+        "Maintain"
+      ],
+      "insight_hooks": {
+        "loggable_fields": [
+          "shot_result_tag",
+          "emotion_intensity",
+          "cue_used",
+          "mindset_rating_after"
+        ],
+        "success_signals": [
+          "emotion_intensity_decreases",
+          "faster_recovery",
+          "no_carry_over"
+        ]
+      }
+    },
+    {
+      "id": "MC_T05_MISTAKE_RECOVERY",
+      "name": "Mistake Recovery",
+      "when_to_use": [
+        "After big miss",
+        "Penalty",
+        "Double bogey",
+        "Spiral starting"
+      ],
+      "primary_pillar": "CONTROL",
+      "secondary_pillars": [
+        "CONFIDENCE"
+      ],
+      "allowed_routine_types": [
+        "🧘 Post-Shot",
+        "🚶 Between Shots"
+      ],
+      "allowed_cues": [
+        "🔄 Reset",
+        "💬 Self-Talk",
+        "✋ Letting Go"
+      ],
+      "user_outcome_goal": "Stop the bleed and rebuild trust for the next shots.",
+      "ai_variation_zones": {
+        "allowed": [
+          "tone",
+          "length",
+          "vark_format",
+          "wording",
+          "sequence_of_steps",
+          "personalization_using_user_history"
+        ],
+        "forbidden": [
+          "new_cues",
+          "shaming_language",
+          "therapy_or_medical_claims"
+        ]
+      },
+      "delivery_lengths": [
+        "micro_15s",
+        "standard_45s",
+        "deep_2m"
+      ],
+      "vark_supported": [
+        "Visual",
+        "Aural",
+        "ReadWrite",
+        "Kinesthetic"
+      ],
+      "progression_levels": [
+        "Foundation",
+        "Build",
+        "Compete",
+        "Maintain"
+      ],
+      "insight_hooks": {
+        "loggable_fields": [
+          "mistake_type",
+          "cue_used",
+          "mindset_rating_before",
+          "mindset_rating_after",
+          "next_hole_score_delta"
+        ],
+        "success_signals": [
+          "recovery_within_1_hole",
+          "reduced_follow-up_errors",
+          "improved_composure"
+        ]
+      }
+    },
+    {
+      "id": "MC_T06_PRESSURE_MOMENTS",
+      "name": "Pressure Moments",
+      "when_to_use": [
+        "High-stakes shot",
+        "Closing holes",
+        "Match play",
+        "Being watched"
+      ],
+      "primary_pillar": "CONFIDENCE",
+      "secondary_pillars": [
+        "CONTROL"
+      ],
+      "allowed_routine_types": [
+        "📐 Pre-Shot",
+        "🚶 Between Shots"
+      ],
+      "allowed_cues": [
+        "🗣️ Trigger Word",
+        "😮‍💨 Deep Breath",
+        "💬 Self-Talk"
+      ],
+      "user_outcome_goal": "Calm commitment under tension.",
+      "ai_variation_zones": {
+        "allowed": [
+          "tone",
+          "length",
+          "vark_format",
+          "wording",
+          "sequence_of_steps",
+          "personalization_using_user_history"
+        ],
+        "forbidden": [
+          "new_cues",
+          "overpromising_results",
+          "medical_language"
+        ]
+      },
+      "delivery_lengths": [
+        "micro_10s",
+        "standard_30s",
+        "deep_90s"
+      ],
+      "vark_supported": [
+        "Visual",
+        "Aural",
+        "ReadWrite",
+        "Kinesthetic"
+      ],
+      "progression_levels": [
+        "Foundation",
+        "Build",
+        "Compete",
+        "Maintain"
+      ],
+      "insight_hooks": {
+        "loggable_fields": [
+          "pressure_level",
+          "cue_used",
+          "commitment_rating",
+          "mindset_rating_before"
+        ],
+        "success_signals": [
+          "stable_commitment_under_pressure",
+          "reduced_rush",
+          "better_decision_quality"
+        ]
+      }
+    },
+    {
+      "id": "MC_T07_MOMENTUM_PROTECTION",
+      "name": "Momentum Protection",
+      "when_to_use": [
+        "Playing well",
+        "After birdie",
+        "Protecting a score",
+        "Fear of messing up"
+      ],
+      "primary_pillar": "CONFIDENCE",
+      "secondary_pillars": [
+        "FOCUS"
+      ],
+      "allowed_routine_types": [
+        "📐 Pre-Shot",
+        "🚶 Between Shots"
+      ],
+      "allowed_cues": [
+        "🎯 Visualization",
+        "🗣️ Trigger Word",
+        "💬 Self-Talk"
+      ],
+      "user_outcome_goal": "Stay disciplined and intentional when things are going well.",
+      "ai_variation_zones": {
+        "allowed": [
+          "tone",
+          "length",
+          "vark_format",
+          "wording",
+          "sequence_of_steps"
+        ],
+        "forbidden": [
+          "new_cues",
+          "new_templates",
+          "changing_framework_definitions"
+        ]
+      },
+      "delivery_lengths": [
+        "micro_10s",
+        "standard_30s",
+        "deep_90s"
+      ],
+      "vark_supported": [
+        "Visual",
+        "Aural",
+        "ReadWrite",
+        "Kinesthetic"
+      ],
+      "progression_levels": [
+        "Foundation",
+        "Build",
+        "Compete",
+        "Maintain"
+      ],
+      "insight_hooks": {
+        "loggable_fields": [
+          "momentum_state",
+          "cue_used",
+          "pace_flag",
+          "next_3_holes_scoring_trend"
+        ],
+        "success_signals": [
+          "stable_pace",
+          "continued_commitment",
+          "reduced_post-birdie_dropoff"
+        ]
+      }
+    },
+    {
+      "id": "MC_T08_END_OF_ROUND_REFLECTION",
+      "name": "End-of-Round Reflection",
+      "when_to_use": [
+        "Immediately post-round",
+        "Later same day",
+        "Before next round"
+      ],
+      "primary_pillar": "ALL",
+      "secondary_pillars": [],
+      "allowed_routine_types": [
+        "⏳ Pre-Round",
+        "🧘 Post-Shot"
+      ],
+      "allowed_cues": [
+        "😮‍💨 Deep Breath",
+        "💬 Self-Talk",
+        "🎯 Visualization",
+        "🗣️ Trigger Word",
+        "✋ Letting Go",
+        "🔄 Reset"
+      ],
+      "user_outcome_goal": "Convert the round into learning and a clear next-step plan without judgment.",
+      "ai_variation_zones": {
+        "allowed": [
+          "tone",
+          "length",
+          "vark_format",
+          "questions_sequence",
+          "summary_generation_from_user_data"
+        ],
+        "forbidden": [
+          "new_cues",
+          "therapy_language",
+          "claims_of_diagnosis_or_treatment"
+        ]
+      },
+      "delivery_lengths": [
+        "micro_60s",
+        "standard_3m",
+        "deep_7m"
+      ],
+      "vark_supported": [
+        "Visual",
+        "Aural",
+        "ReadWrite",
+        "Kinesthetic"
+      ],
+      "progression_levels": [
+        "Foundation",
+        "Build",
+        "Compete",
+        "Maintain"
+      ],
+      "insight_hooks": {
+        "loggable_fields": [
+          "top_1_win",
+          "top_1_leak",
+          "most_used_cue",
+          "hardest_moment",
+          "next_round_focus"
+        ],
+        "success_signals": [
+          "user_sets_clear_next_step",
+          "reduced_self-criticism",
+          "repeat_usage_after_rounds"
+        ]
+      }
+    }
+  ]
+}

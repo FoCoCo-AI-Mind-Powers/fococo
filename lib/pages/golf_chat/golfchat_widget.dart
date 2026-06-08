@@ -4,15 +4,15 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui';
 
-import 'package:firebase_ai/firebase_ai.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:record/record.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -22,23 +22,27 @@ import 'package:iconify_flutter/icons/carbon.dart';
 import '/adaptive_ui/adaptive_ui.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
-import '/backend/firebase/firebase_config.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import 'golf_chat_visuals.dart';
 import '/ai_integration/gemini_ai_client.dart';
 import '/ai_integration/config/cartesia_mcp_config.dart';
-import '/ai_integration/config/gemini_live_config.dart';
-import '/ai_integration/config/gemini_voice_config.dart';
+import '/ai_integration/services/audio_session_service.dart';
 import '/ai_integration/services/cartesia_api_service.dart';
+import '/ai_integration/services/cartesia_speech_prompt.dart';
+import '/ai_integration/services/cartesia_voice_runtime.dart';
 import '/ai_integration/services/voice_chat_database_service.dart';
+import '/ai_integration/widgets/fococo_line_voice_sheet.dart';
+import '/services/voice_live_activity_service.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
+import '/pages/golf_rounds/caddyplay_models.dart';
+import '/services/first_use_disclosure_service.dart';
+import '/services/ai_voice_preference_service.dart';
+import '/services/units_preference_service.dart';
 
 import 'golfchat_model.dart';
 
 export 'golfchat_model.dart';
-
-/// Space so the message list does not sit under the composer when it is pinned.
-const double _kGolfChatComposerClearance = 140;
 
 /// Breathing room between the tab bar (shell) and the composer — tab shell uses
 /// [kFoCoCoBottomNavStripAndTabsHeight] + [MediaQuery.viewPadding.bottom].
@@ -79,6 +83,9 @@ class _GolfChatMessage {
   final bool isUser;
   final DateTime time;
   final _ReplyPreview? replyTo;
+  // Charts/tables emitted by the model via function calling. Ephemeral — not
+  // persisted, so reloaded history shows text only.
+  final List<Map<String, dynamic>> visuals;
 
   const _GolfChatMessage({
     required this.id,
@@ -86,6 +93,7 @@ class _GolfChatMessage {
     required this.isUser,
     required this.time,
     this.replyTo,
+    this.visuals = const [],
   });
 
   _GolfChatMessage copyWith({_ReplyPreview? replyTo}) => _GolfChatMessage(
@@ -94,6 +102,7 @@ class _GolfChatMessage {
         isUser: isUser,
         time: time,
         replyTo: replyTo ?? this.replyTo,
+        visuals: visuals,
       );
 }
 
@@ -132,8 +141,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   final ScrollController _scrollController = ScrollController();
 
   final VoiceChatDatabaseService _db = VoiceChatDatabaseService();
-  final GeminiAIClient _aiClient =
-      GeminiAIClient(apiKey: GeminiLiveAPIConfig.apiKey);
+  GeminiAIClient? _aiClient;
   final CartesiaAPIService _cartesiaTts = CartesiaAPIService.instance;
 
   bool _isLoading = true;
@@ -146,33 +154,56 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   Map<String, dynamic>? _roundContextSnapshot;
 
   String? _sessionId;
+  String _unitsAiContextLine = '';
   final List<_GolfChatMessage> _messages = <_GolfChatMessage>[];
+  // Mutually exclusive sets — a message can be liked OR disliked, not both.
+  final Set<String> _likedMessageIds = <String>{};
+  final Set<String> _dislikedMessageIds = <String>{};
   _ReplyPreview? _replyPreview;
+
+  void _toggleLike(_GolfChatMessage msg) {
+    setState(() {
+      if (_likedMessageIds.remove(msg.id)) return;
+      _dislikedMessageIds.remove(msg.id);
+      _likedMessageIds.add(msg.id);
+    });
+    if (_likedMessageIds.contains(msg.id)) {
+      _showSnack('Thanks for the feedback');
+    }
+  }
+
+  void _toggleDislike(_GolfChatMessage msg) {
+    setState(() {
+      if (_dislikedMessageIds.remove(msg.id)) return;
+      _likedMessageIds.remove(msg.id);
+      _dislikedMessageIds.add(msg.id);
+    });
+    if (_dislikedMessageIds.contains(msg.id)) {
+      _showReportDialog(context, msg, FlutterFlowTheme.of(context));
+    }
+  }
 
   static const String _boundaryCopy =
       'Reflection only—not in-round coaching. AI helps you understand your game.';
 
-  // Voice mode state
+  // Voice mode — Cartesia STT/TTS + `generateGolfChatResponse` (GEMINI_KEY_APP
+  // secret on Cloud Functions). Does not use client-side Gemini Live.
   bool _isVoiceMode = false;
   _VoiceModeState _voiceState = _VoiceModeState.idle;
-  LiveSession? _liveSession;
   final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
   StreamSubscription<PlayerState>? _audioPlayerStateSubscription;
   StreamSubscription<Uint8List>? _audioStreamSubscription;
-  Future<void>? _liveReceiveTask;
-  bool _keepReceivingLiveResponses = false;
-  bool _isLiveReceiveLoopRunning = false;
   bool _isHandlingVoiceTransportError = false;
-  bool _liveAudioPlaylistLoaded = false;
-  int _liveAudioChunkCount = 0;
-  bool _awaitingPlaybackDrain = false;
-  final BytesBuilder _pcmBuffer = BytesBuilder(copy: false);
-  // Flush threshold: ~200ms of 24kHz 16-bit mono = 9600 bytes
-  static const int _pcmFlushThreshold = 9600;
+  bool _isProcessingVoiceTurn = false;
+  final BytesBuilder _voiceCaptureBuffer = BytesBuilder(copy: false);
+  DateTime? _lastVoiceActivityAt;
+  Timer? _voiceSilenceTimer;
+  static const int _voiceSampleRate = 16000;
+  static const int _voiceMinUtteranceBytes = _voiceSampleRate * 2 ~/ 2;
+  static const Duration _voiceSilenceDuration = Duration(milliseconds: 1500);
+  static const double _voiceActivityThreshold = 0.015;
   String _liveTranscription = '';
-  String _liveInputTranscript = '';
-  String _liveOutputTranscript = '';
   final List<double> _audioLevels = List.filled(64, 0.0);
 
   // Attachments
@@ -194,24 +225,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   }
 
   void _configureAudioPlayer() {
-    _audioPlayerStateSubscription = _audioPlayer.playerStateStream.listen(
-      (state) {
-        if (!_isVoiceMode) {
-          return;
-        }
-
-        if (state.processingState == ProcessingState.completed) {
-          unawaited(_resetLiveAudioPlayback());
-          if (mounted && _awaitingPlaybackDrain) {
-            setState(() {
-              _voiceState = _VoiceModeState.listening;
-              _audioLevels.fillRange(0, _audioLevels.length, 0.0);
-            });
-          }
-          _awaitingPlaybackDrain = false;
-        }
-      },
-    );
+    // Reserved for bubble read-aloud; voice replies use CartesiaAPIService.
+    _audioPlayerStateSubscription = _audioPlayer.playerStateStream.listen((_) {});
   }
 
   void _initAnimations() {
@@ -249,9 +264,16 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     if (!_isLoading) {
       unawaited(_ensureSession());
       if (mounted) {
-        setState(() {});
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() {});
+        });
       }
     }
+  }
+
+  Future<GeminiAIClient> _ensureAiClient() async {
+    _aiClient ??= GeminiAIClient();
+    return _aiClient!;
   }
 
   Future<void> _initTts() async {
@@ -272,14 +294,15 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   }
 
   String? _resolveGolfChatVoiceId() {
-    final profile = CartesiaMCPConfig.getVoiceProfile('coach_conversational') ??
+    // Calm mentor delivery first — slower, smoother flow, matching the
+    // requested coaching tone. Fall back to the central default if profiles
+    // are missing for any reason.
+    final profile = CartesiaMCPConfig.getVoiceProfile('mentor_calm') ??
+        CartesiaMCPConfig.getVoiceProfile('coach_conversational') ??
         CartesiaMCPConfig.getVoiceProfile('coach_confident');
-    if (profile == null) {
-      return null;
-    }
-    final voiceId = profile['voice_id']?.toString().trim();
+    final voiceId = profile?['voice_id']?.toString().trim();
     if (voiceId == null || voiceId.isEmpty) {
-      return null;
+      return CartesiaMCPConfig.defaultVoiceId;
     }
     return voiceId;
   }
@@ -288,6 +311,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     try {
       await _db.initialize();
       _hydrateRoundContextFromWidget();
+      _unitsAiContextLine = await UnitsPreferenceService.aiContextLine();
       await _loadBoundaryFlag();
       await _ensureSession();
     } catch (e) {
@@ -344,23 +368,35 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
       session = null;
     }
 
-    if (session == null) {
-      session = await _db.startSession(
-        title: 'GolfChat Reflection',
-        metadata: <String, dynamic>{
-          'surface': 'golfchat',
-          'tone': 'calm_reflection',
-          if (requestedRoundId != null && requestedRoundId.isNotEmpty)
-            'roundId': requestedRoundId,
-          if (_roundContextSnapshot != null)
-            'caddyplaySnapshot': _roundContextSnapshot,
-        },
-      );
-    } else {
-      _hydrateRoundContextFromSession(session);
+    try {
+      if (session == null) {
+        session = await _db.startSession(
+          title: 'GolfChat Reflection',
+          metadata: <String, dynamic>{
+            'surface': 'golfchat',
+            'tone': 'calm_reflection',
+            if (requestedRoundId != null && requestedRoundId.isNotEmpty)
+              'roundId': requestedRoundId,
+            if (_roundContextSnapshot != null)
+              'caddyplaySnapshot': _roundContextSnapshot,
+          },
+        );
+      } else {
+        _hydrateRoundContextFromSession(session);
+      }
+      _sessionId = session.id;
+    } catch (e) {
+      debugPrint('GolfChat session persistence unavailable: $e');
+      // Fall back to an in-memory session so users can keep chatting.
+      _sessionId ??= DateTime.now().millisecondsSinceEpoch.toString();
+      _messages.clear();
+      if (mounted) {
+        _showSnack(
+          'Chat history is unavailable right now. You can still continue chatting.',
+        );
+      }
+      return;
     }
-
-    _sessionId = session.id;
 
     try {
       final savedMessages =
@@ -403,6 +439,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
 
   @override
   void dispose() {
+    _voiceSilenceTimer?.cancel();
     unawaited(_exitVoiceMode());
     _cartesiaTts.stopSpeaking();
     _audioPlayerStateSubscription?.cancel();
@@ -416,72 +453,59 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     super.dispose();
   }
 
-  int _voiceReconnectAttempts = 0;
-  static const int _maxVoiceReconnectAttempts = 2;
-
   Future<void> _enterVoiceMode() async {
     if (_isVoiceMode) {
       return;
     }
 
+    if (!await AiVoicePreferenceService.isEnabled()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Turn on AI Voice in Preferences to use voice mode.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
     await _stopTtsPlayback();
-    await _resetLiveAudioPlayback();
+    await _cartesiaTts.stopSpeaking();
+
+    final runtime = await CartesiaVoiceRuntime.load();
+    if (runtime.hasLineAgent && mounted) {
+      await FoCoCoLineVoiceSheet.show(
+        context,
+        surface: 'golf_chat',
+        systemPrompt: _golfChatLineSystemPrompt(),
+        introduction: '',
+        metadata: {
+          if (_sessionId != null) 'session_id': _sessionId,
+          if (_roundContextId != null) 'round_id': _roundContextId,
+        },
+      );
+      return;
+    }
+
+    await AudioSessionService.activateVoiceChat();
+    unawaited(VoiceLiveActivityService.instance.start());
 
     setState(() {
       _isVoiceMode = true;
       _voiceState = _VoiceModeState.connecting;
       _liveTranscription = '';
-      _liveInputTranscript = '';
-      _liveOutputTranscript = '';
       _audioLevels.fillRange(0, _audioLevels.length, 0.0);
     });
 
-    _voiceReconnectAttempts = 0;
-    await _connectLiveSession();
-  }
-
-  Future<void> _connectLiveSession() async {
     try {
-      final app = await getGoogleAIFirebaseApp();
-      final modelName = _voiceReconnectAttempts > 0
-          ? GeminiVoiceConfig.nativeAudioDialogModelFallback
-          : GeminiVoiceConfig.nativeAudioDialogModel;
-
-      debugPrint('Connecting Gemini Live with model: $modelName');
-
-      final liveModel = FirebaseAI.googleAI(app: app).liveGenerativeModel(
-        model: modelName,
-        liveGenerationConfig: LiveGenerationConfig(
-          responseModalities: [ResponseModalities.audio],
-          speechConfig: SpeechConfig(
-            voiceName: GeminiVoiceConfig.geminiLiveVoiceName,
-          ),
-          inputAudioTranscription: AudioTranscriptionConfig(),
-          outputAudioTranscription: AudioTranscriptionConfig(),
-        ),
-        systemInstruction:
-            Content.system(GeminiVoiceConfig.voiceCoachingSystemPrompt),
-      );
-
-      _liveSession = await liveModel.connect();
-      _keepReceivingLiveResponses = true;
-      _liveReceiveTask = _processLiveResponses();
-
-      await _startAudioCapture();
+      await _startVoiceCapture();
       if (mounted) {
         setState(() => _voiceState = _VoiceModeState.listening);
       }
+      unawaited(VoiceLiveActivityService.instance.update(status: 'listening'));
     } catch (e) {
-      debugPrint('Voice mode connection failed: $e');
-
-      // If first model fails, try fallback model once
-      if (_voiceReconnectAttempts == 0 && _isVoiceMode) {
-        _voiceReconnectAttempts++;
-        debugPrint('Retrying with fallback model...');
-        await _connectLiveSession();
-        return;
-      }
-
+      debugPrint('Voice mode start failed: $e');
       if (mounted) {
         setState(() => _voiceState = _VoiceModeState.error);
         _showSnack(_describeVoiceError(e));
@@ -489,205 +513,93 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     }
   }
 
-  Future<void> _processLiveResponses() async {
-    final session = _liveSession;
-    if (session == null || _isLiveReceiveLoopRunning) {
-      return;
-    }
-
-    _isLiveReceiveLoopRunning = true;
-    try {
-      while (_keepReceivingLiveResponses && identical(session, _liveSession)) {
-        try {
-          await for (final response in session.receive()) {
-            if (!_keepReceivingLiveResponses ||
-                !identical(session, _liveSession)) {
-              break;
-            }
-            await _handleLiveResponse(response);
-          }
-        } catch (e) {
-          // If the receive() stream threw but we still want responses,
-          // check if it's a transient error and the session is still alive.
-          if (!_keepReceivingLiveResponses ||
-              !identical(session, _liveSession)) {
-            break;
-          }
-          // Re-throw to be caught by outer handler
-          rethrow;
-        }
-
-        if (!_keepReceivingLiveResponses || !identical(session, _liveSession)) {
-          break;
-        }
-
-        // Small delay before re-entering receive() after turnComplete
-        await Future<void>.delayed(const Duration(milliseconds: 16));
-      }
-    } catch (error) {
-      if (_keepReceivingLiveResponses) {
-        await _handleVoiceSessionError(error);
-      }
-    } finally {
-      _isLiveReceiveLoopRunning = false;
-    }
+  String _golfChatLineSystemPrompt() {
+    final ctx = _reflectionContext();
+    return 'You are FoCoCo GolfChat — calm golf mental reflection only. '
+        'No swing mechanics. Short spoken replies. One idea per turn.\n\n'
+        '${ctx.isNotEmpty ? "Player context:\n$ctx" : ""}';
   }
 
-  Future<void> _handleLiveResponse(LiveServerResponse response) async {
-    final message = response.message;
-
-    if (message is GoingAwayNotice) {
-      debugPrint(
-          'Voice session going away soon. Time left: ${message.timeLeft}');
-      // Attempt reconnection before the session terminates
-      if (_isVoiceMode &&
-          _voiceReconnectAttempts < _maxVoiceReconnectAttempts) {
-        _voiceReconnectAttempts++;
-        unawaited(_reconnectLiveSession());
-      }
-      return;
-    }
-
-    if (message is! LiveServerContent) {
-      // Covers LiveServerSetupComplete and other non-content messages
-      debugPrint('Gemini Live non-content message: ${message.runtimeType}');
-      return;
-    }
-
-    _handleTranscriptionChunk(
-      message.inputTranscription,
-      isUser: true,
-    );
-    _handleTranscriptionChunk(
-      message.outputTranscription,
-      isUser: false,
-    );
-
-    final modelTurn = message.modelTurn;
-    if (modelTurn != null) {
-      for (final part in modelTurn.parts) {
-        if (part is TextPart) {
-          _handleOutputTextChunk(part.text);
-        } else if (part is InlineDataPart && part.mimeType.contains('audio')) {
-          if (mounted) {
-            setState(() => _voiceState = _VoiceModeState.speaking);
-          }
-          _updateAudioLevels(part.bytes);
-          await _playPcmAudio(part.bytes);
-        }
-      }
-    }
-
-    if (message.interrupted == true) {
-      _pcmBuffer.clear();
-      await _resetLiveAudioPlayback();
-      if (mounted) {
-        setState(() => _voiceState = _VoiceModeState.listening);
-      }
-      _awaitingPlaybackDrain = false;
-    }
-
-    if (message.turnComplete == true) {
-      // Flush any remaining buffered PCM data before finishing the turn
-      await _flushPcmBuffer();
-      await _commitLiveVoiceTurn();
-      final shouldWaitForPlayback = _liveAudioChunkCount > 0 &&
-          _audioPlayer.processingState != ProcessingState.completed;
-      _awaitingPlaybackDrain = shouldWaitForPlayback;
-      if (!shouldWaitForPlayback && mounted) {
-        setState(() => _voiceState = _VoiceModeState.listening);
-      }
-    }
-  }
-
-  Future<void> _reconnectLiveSession() async {
-    debugPrint('Reconnecting Gemini Live session...');
-    _keepReceivingLiveResponses = false;
-
-    // Stop current audio capture
-    try {
-      await _audioStreamSubscription?.cancel();
-    } catch (_) {}
-    _audioStreamSubscription = null;
-    try {
-      await _audioRecorder.stop();
-    } catch (_) {}
-
-    await _resetLiveAudioPlayback();
-
-    // Close old session
-    try {
-      await _liveSession?.close();
-    } catch (_) {}
-    _liveSession = null;
-
-    try {
-      await _liveReceiveTask;
-    } catch (_) {}
-    _liveReceiveTask = null;
-
-    if (!_isVoiceMode || !mounted) return;
-
-    if (mounted) {
-      setState(() => _voiceState = _VoiceModeState.connecting);
-    }
-
-    // Reconnect
-    await _connectLiveSession();
-  }
-
-  Future<void> _sendAudioChunk(Uint8List audioData) async {
-    final session = _liveSession;
-    if (session == null ||
-        !_keepReceivingLiveResponses ||
-        _voiceState == _VoiceModeState.error ||
-        _voiceState == _VoiceModeState.connecting) {
-      return;
-    }
-
-    try {
-      await session.sendAudioRealtime(
-          InlineDataPart('audio/pcm;rate=16000', audioData));
-    } catch (e) {
-      await _handleVoiceSessionError(e);
-    }
+  Future<void> _startVoiceCapture() async {
+    _voiceCaptureBuffer.clear();
+    _lastVoiceActivityAt = null;
+    _voiceSilenceTimer?.cancel();
+    _voiceSilenceTimer = null;
+    await _startAudioCapture();
   }
 
   Future<void> _exitVoiceMode() async {
-    _keepReceivingLiveResponses = false;
+    _voiceSilenceTimer?.cancel();
+    _voiceSilenceTimer = null;
+    _voiceCaptureBuffer.clear();
+    _lastVoiceActivityAt = null;
+    _isProcessingVoiceTurn = false;
     _audioStreamSubscription?.cancel();
     _audioStreamSubscription = null;
 
     try {
       await _audioRecorder.stop();
     } catch (_) {}
-    await _resetLiveAudioPlayback();
-    try {
-      await _liveSession?.close();
-    } catch (_) {}
-    _liveSession = null;
-    try {
-      await _liveReceiveTask;
-    } catch (_) {}
-    _liveReceiveTask = null;
-    _awaitingPlaybackDrain = false;
+    await _cartesiaTts.stopSpeaking();
+    await AudioSessionService.deactivateVoiceChat();
+    unawaited(VoiceLiveActivityService.instance.stop());
 
     if (mounted) {
       setState(() {
         _isVoiceMode = false;
         _voiceState = _VoiceModeState.idle;
         _liveTranscription = '';
-        _liveInputTranscript = '';
-        _liveOutputTranscript = '';
         _audioLevels.fillRange(0, _audioLevels.length, 0.0);
       });
     }
   }
 
+  /// Request the OS microphone prompt before any recording APIs are touched.
+  /// Returns true when we have a usable permission. Handles permanently
+  /// denied state by inviting the user to open Settings — required for both
+  /// App Store and Play review compliance.
+  Future<bool> _ensureMicrophonePermission() async {
+    final status = await Permission.microphone.status;
+    if (status.isGranted || status.isLimited) {
+      return true;
+    }
+
+    if (status.isPermanentlyDenied || status.isRestricted) {
+      _showSnack(
+        'Microphone access is disabled. Open Settings to enable it for FoCoCo.',
+        action: SnackBarAction(
+          label: 'Settings',
+          onPressed: openAppSettings,
+        ),
+      );
+      return false;
+    }
+
+    // Show our in-app purpose string before the OS prompt so the user
+    // understands what they are about to grant. Apple/Google require this
+    // for permission requests tied to coaching audio.
+    final acknowledged = await FirstUseDisclosureService.instance
+        .ensureAcknowledged(context, FoCoCoDisclosureTopic.microphone);
+    if (!acknowledged) return false;
+
+    final requested = await Permission.microphone.request();
+    if (requested.isGranted || requested.isLimited) {
+      return true;
+    }
+
+    _showSnack(
+      requested.isPermanentlyDenied
+          ? 'Microphone access is blocked. Enable it from Settings to talk with FoCoCo.'
+          : 'Microphone permission is required for voice mode.',
+      action: requested.isPermanentlyDenied
+          ? SnackBarAction(label: 'Settings', onPressed: openAppSettings)
+          : null,
+    );
+    return false;
+  }
+
   Future<void> _startAudioCapture() async {
-    final hasPermission = await _audioRecorder.hasPermission();
-    if (!hasPermission) {
-      _showSnack('Microphone permission required for voice mode.');
+    if (!await _ensureMicrophonePermission()) {
       await _exitVoiceMode();
       return;
     }
@@ -704,9 +616,206 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     );
 
     _audioStreamSubscription = stream.listen((data) {
-      unawaited(_sendAudioChunk(data));
-      _updateAudioLevelsFromInput(data);
+      _onVoicePcmChunk(data);
     });
+  }
+
+  void _onVoicePcmChunk(Uint8List data) {
+    if (!_isVoiceMode || data.isEmpty) {
+      return;
+    }
+
+    if (_voiceState == _VoiceModeState.speaking &&
+        _pcmRms(data) >= _voiceActivityThreshold) {
+      unawaited(_cartesiaTts.stopSpeaking());
+      if (mounted) {
+        setState(() => _voiceState = _VoiceModeState.listening);
+      }
+    }
+
+    if (_voiceState != _VoiceModeState.listening || _isProcessingVoiceTurn) {
+      return;
+    }
+
+    _voiceCaptureBuffer.add(data);
+    _updateAudioLevelsFromInput(data);
+
+    if (_pcmRms(data) >= _voiceActivityThreshold) {
+      _lastVoiceActivityAt = DateTime.now();
+    }
+
+    _voiceSilenceTimer?.cancel();
+    _voiceSilenceTimer = Timer(_voiceSilenceDuration, () {
+      if (_shouldFinalizeVoiceTurn()) {
+        unawaited(_processVoiceTurn());
+      }
+    });
+  }
+
+  double _pcmRms(Uint8List pcm) {
+    if (pcm.length < 2) return 0;
+    var sum = 0.0;
+    final sampleCount = pcm.length ~/ 2;
+    for (var i = 0; i < sampleCount; i++) {
+      final index = i * 2;
+      final sample =
+          (pcm[index] | (pcm[index + 1] << 8)).toSigned(16) / 32768.0;
+      sum += sample * sample;
+    }
+    return math.sqrt(sum / sampleCount);
+  }
+
+  bool _shouldFinalizeVoiceTurn() {
+    if (!_isVoiceMode ||
+        _isProcessingVoiceTurn ||
+        _voiceState != _VoiceModeState.listening) {
+      return false;
+    }
+    if (_voiceCaptureBuffer.length < _voiceMinUtteranceBytes) {
+      return false;
+    }
+    final lastActivity = _lastVoiceActivityAt;
+    if (lastActivity == null) {
+      return false;
+    }
+    return DateTime.now().difference(lastActivity) >= _voiceSilenceDuration;
+  }
+
+  Future<void> _processVoiceTurn() async {
+    if (_isProcessingVoiceTurn || !_isVoiceMode) {
+      return;
+    }
+    _isProcessingVoiceTurn = true;
+    _voiceSilenceTimer?.cancel();
+
+    final pcm = _voiceCaptureBuffer.toBytes();
+    _voiceCaptureBuffer.clear();
+    _lastVoiceActivityAt = null;
+
+    if (pcm.length < _voiceMinUtteranceBytes) {
+      _isProcessingVoiceTurn = false;
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _voiceState = _VoiceModeState.processing);
+    }
+    unawaited(VoiceLiveActivityService.instance.update(status: 'processing'));
+
+    try {
+      final wav = _buildWavFile(pcm, sampleRate: _voiceSampleRate);
+      final transcript = await _cartesiaTts.transcribeAudio(
+        audioBytes: wav,
+        fileName: 'golfchat-voice.wav',
+        contentType: MediaType('audio', 'wav'),
+        encoding: 'pcm_s16le',
+        sampleRate: _voiceSampleRate,
+        language: 'en',
+      );
+
+      final userText = transcript.text.trim();
+      if (userText.isEmpty) {
+        if (mounted) {
+          setState(() => _voiceState = _VoiceModeState.listening);
+        }
+        unawaited(
+            VoiceLiveActivityService.instance.update(status: 'listening'));
+        return;
+      }
+
+      if (mounted) {
+        setState(() => _liveTranscription = userText);
+      }
+      unawaited(VoiceLiveActivityService.instance.update(
+        transcript: _truncateForActivity(userText),
+        status: 'processing',
+      ));
+
+      final now = DateTime.now();
+      final userMsg = _GolfChatMessage(
+        id: now.microsecondsSinceEpoch.toString(),
+        text: userText,
+        isUser: true,
+        time: now,
+      );
+
+      if (mounted) {
+        setState(() {
+          _messages.add(userMsg);
+          _showBoundary = false;
+        });
+      } else {
+        _messages.add(userMsg);
+      }
+      _scrollToBottom();
+      await _persistMessage(userMsg, messageType: 'audio');
+
+      final aiClient = await _ensureAiClient();
+      final response = await aiClient.generateConversationResponse(
+        userId: currentUserUid,
+        conversationId:
+            _sessionId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        userMessage: userText,
+        conversationHistory: _messages
+            .map((msg) => {
+                  'role': msg.isUser ? 'user' : 'assistant',
+                  'content': msg.text,
+                })
+            .toList(growable: false),
+        context: _reflectionContext(),
+      );
+
+      final aiMsg = _GolfChatMessage(
+        id: '${now.microsecondsSinceEpoch + 1}',
+        text: response.response,
+        isUser: false,
+        time: DateTime.now(),
+        visuals: response.visuals,
+      );
+
+      if (mounted) {
+        setState(() {
+          _messages.add(aiMsg);
+          _liveTranscription = response.response;
+        });
+      } else {
+        _messages.add(aiMsg);
+        _liveTranscription = response.response;
+      }
+      _scrollToBottom();
+      await _persistMessage(aiMsg, messageType: 'native_audio');
+
+      if (mounted) {
+        setState(() => _voiceState = _VoiceModeState.speaking);
+      }
+      unawaited(VoiceLiveActivityService.instance.update(
+        transcript: _truncateForActivity(response.response),
+        status: 'speaking',
+      ));
+
+      await _cartesiaTts.speakTextWithContinuations(
+        text: response.response,
+        contentType: 'golf_reflection',
+        speechProfile: CartesiaSpeechPrompt.golfReflection,
+      );
+    } catch (e) {
+      debugPrint('GolfChat voice turn failed: $e');
+      if (mounted) {
+        setState(() => _voiceState = _VoiceModeState.error);
+        _showSnack(_describeVoiceError(e));
+      }
+    } finally {
+      _isProcessingVoiceTurn = false;
+      if (mounted && _isVoiceMode && _voiceState != _VoiceModeState.error) {
+        setState(() {
+          _voiceState = _VoiceModeState.listening;
+          _liveTranscription = '';
+          _audioLevels.fillRange(0, _audioLevels.length, 0.0);
+        });
+        unawaited(
+            VoiceLiveActivityService.instance.update(status: 'listening'));
+      }
+    }
   }
 
   Future<void> _handleVoiceSessionError(Object error) async {
@@ -715,7 +824,6 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     }
 
     _isHandlingVoiceTransportError = true;
-    _keepReceivingLiveResponses = false;
     debugPrint('Voice session error: $error');
 
     try {
@@ -727,12 +835,9 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
       await _audioRecorder.stop();
     } catch (_) {}
 
-    await _resetLiveAudioPlayback();
-
-    try {
-      await _liveSession?.close();
-    } catch (_) {}
-    _liveSession = null;
+    await _cartesiaTts.stopSpeaking();
+    await AudioSessionService.deactivateVoiceChat();
+    unawaited(VoiceLiveActivityService.instance.stop());
 
     if (mounted) {
       setState(() => _voiceState = _VoiceModeState.error);
@@ -746,11 +851,22 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
 
   String _describeVoiceError(Object error) {
     final message = error.toString();
-    if (message.contains('reported as leaked')) {
-      return 'Voice API key was revoked as leaked. Rotate the Firebase/Google AI key or run with --dart-define=GEMINI_API_KEY=NEW_KEY.';
+    if (message.contains('GEMINI_KEY_APP') ||
+        message.contains('Gemini key configuration')) {
+      return 'GolfChat AI is not configured on the server. Confirm the '
+          'GEMINI_KEY_APP secret in Google Secret Manager and redeploy '
+          'Cloud Functions.';
     }
-    if (message.contains('WebSocket Closed')) {
-      return 'Voice connection closed unexpectedly.';
+    if (message.contains('CARTESIA_API')) {
+      return 'Voice transcription is not configured. Check the CARTESIA_API '
+          'secret in Secret Manager.';
+    }
+    if (message.contains('reported as leaked')) {
+      return 'The Gemini API key was flagged. Rotate GEMINI_KEY_APP in '
+          'Secret Manager and redeploy functions.';
+    }
+    if (message.contains('failed-precondition')) {
+      return 'Voice AI is temporarily unavailable. Try again in a moment.';
     }
     return 'Voice connection error';
   }
@@ -777,194 +893,12 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     _updateAudioLevels(audioData);
   }
 
-  Future<void> _playPcmAudio(Uint8List pcmData) async {
-    _pcmBuffer.add(pcmData);
-    if (_pcmBuffer.length >= _pcmFlushThreshold) {
-      await _flushPcmBuffer();
-    }
-  }
-
-  Future<void> _flushPcmBuffer() async {
-    if (_pcmBuffer.isEmpty) return;
-    try {
-      final pcmData = _pcmBuffer.takeBytes();
-      final wavData = _buildWavFile(pcmData, sampleRate: 24000);
-      final audioChunk = _BytesAudioSource(wavData);
-
-      if (!_liveAudioPlaylistLoaded) {
-        await _audioPlayer.setAudioSources(
-          <AudioSource>[audioChunk],
-          preload: true,
-        );
-        _liveAudioPlaylistLoaded = true;
-        _liveAudioChunkCount = 1;
-      } else {
-        await _audioPlayer.addAudioSource(audioChunk);
-        _liveAudioChunkCount += 1;
-      }
-
-      if (!_audioPlayer.playing) {
-        await _audioPlayer.play();
-      }
-    } catch (e) {
-      debugPrint('Audio playback error: $e');
-    }
-  }
-
-  void _handleTranscriptionChunk(
-    Transcription? transcription, {
-    required bool isUser,
-  }) {
-    final text = transcription?.text;
-    if (text == null || text.isEmpty) {
-      return;
-    }
-
-    final current = isUser ? _liveInputTranscript : _liveOutputTranscript;
-    final updated = '$current$text';
-
-    if (!mounted) {
-      if (isUser) {
-        _liveInputTranscript = updated;
-      } else {
-        _liveOutputTranscript = updated;
-      }
-      _liveTranscription = _normalizedTranscript(
-        _liveOutputTranscript.isNotEmpty
-            ? _liveOutputTranscript
-            : _liveInputTranscript,
-      );
-      return;
-    }
-
-    setState(() {
-      if (isUser) {
-        _liveInputTranscript = updated;
-      } else {
-        _liveOutputTranscript = updated;
-      }
-
-      _liveTranscription = _normalizedTranscript(
-        _liveOutputTranscript.isNotEmpty
-            ? _liveOutputTranscript
-            : _liveInputTranscript,
-      );
-
-      if (isUser &&
-          transcription?.finished == true &&
-          _liveOutputTranscript.isEmpty) {
-        _voiceState = _VoiceModeState.processing;
-      }
-    });
-  }
-
-  void _handleOutputTextChunk(String text) {
-    if (text.isEmpty) {
-      return;
-    }
-
-    final updated = '$_liveOutputTranscript$text';
-    if (mounted) {
-      setState(() {
-        _liveOutputTranscript = updated;
-        _liveTranscription = _normalizedTranscript(_liveOutputTranscript);
-      });
-    } else {
-      _liveOutputTranscript = updated;
-      _liveTranscription = _normalizedTranscript(_liveOutputTranscript);
-    }
-  }
-
-  String _normalizedTranscript(String value) {
-    return value.replaceAll(RegExp(r'\s+'), ' ').trim();
-  }
-
-  Future<void> _commitLiveVoiceTurn() async {
-    final userTranscript = _normalizedTranscript(_liveInputTranscript);
-    final modelTranscript = _normalizedTranscript(_liveOutputTranscript);
-
-    _liveInputTranscript = '';
-    _liveOutputTranscript = '';
-
-    if (mounted) {
-      setState(() {
-        _liveTranscription = modelTranscript;
-      });
-    } else {
-      _liveTranscription = modelTranscript;
-    }
-
-    if (userTranscript.isEmpty && modelTranscript.isEmpty) {
-      return;
-    }
-
-    final now = DateTime.now();
-    final newMessages = <_GolfChatMessage>[];
-
-    if (userTranscript.isNotEmpty) {
-      newMessages.add(
-        _GolfChatMessage(
-          id: now.microsecondsSinceEpoch.toString(),
-          text: userTranscript,
-          isUser: true,
-          time: now,
-        ),
-      );
-    }
-
-    if (modelTranscript.isNotEmpty) {
-      newMessages.add(
-        _GolfChatMessage(
-          id: '${now.microsecondsSinceEpoch + 1}',
-          text: modelTranscript,
-          isUser: false,
-          time: now,
-        ),
-      );
-    }
-
-    if (newMessages.isEmpty) {
-      return;
-    }
-
-    if (mounted) {
-      setState(() {
-        _messages.addAll(newMessages);
-        _showBoundary = false;
-      });
-    } else {
-      _messages.addAll(newMessages);
-      _showBoundary = false;
-    }
-
-    _scrollToBottom();
-
-    for (final message in newMessages) {
-      await _persistMessage(
-        message,
-        messageType: message.isUser ? 'audio' : 'native_audio',
-      );
-    }
-  }
-
-  Future<void> _resetLiveAudioPlayback() async {
-    _pcmBuffer.clear();
-
-    try {
-      await _audioPlayer.stop();
-    } catch (_) {}
-
-    try {
-      if (_liveAudioPlaylistLoaded) {
-        await _audioPlayer.setAudioSources(
-          const <AudioSource>[],
-          preload: false,
-        );
-      }
-    } catch (_) {}
-
-    _liveAudioPlaylistLoaded = false;
-    _liveAudioChunkCount = 0;
+  /// Live Activities have a tight payload budget — keep the transcript short
+  /// so the lock-screen + Dynamic Island update reliably.
+  String _truncateForActivity(String text, {int max = 140}) {
+    final clean = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (clean.length <= max) return clean;
+    return '…${clean.substring(clean.length - max)}';
   }
 
   Uint8List _buildWavFile(Uint8List pcmData, {int sampleRate = 24000}) {
@@ -988,112 +922,106 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   }
 
   @override
-  Widget build(BuildContext context) {
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _bootstrapIfVisible();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    final viewPadding = MediaQuery.viewPaddingOf(context);
     final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
     final hasKeyboard = keyboardHeight > 0;
-    final isVisible =
-        GoRouterState.of(context).uri.toString().contains(GolfChatWidget.routePath);
+
+    // Bottom-nav reserve is only used by the voice-mode overlay (which still
+    // floats over the chat). The composer itself is now a normal Column row,
+    // so it no longer needs manual bottom math — Scaffold.resizeToAvoidBottomInset
+    // + SafeArea handles the keyboard and home indicator correctly.
     final bottomNavReserve = hasKeyboard
         ? 0.0
         : (kFoCoCoBottomNavStripAndTabsHeight +
-            viewPadding.bottom +
+            MediaQuery.viewPaddingOf(context).bottom +
             _kGolfChatComposerGapAboveNav);
 
-    return StreamBuilder<UserRecord>(
-      stream: isVisible && currentUserUid.isNotEmpty
-          ? UserRecord.getDocument(
-              FirebaseFirestore.instance.doc('user/$currentUserUid'))
-          : null,
-      builder: (context, snapshot) {
-        final user = snapshot.data;
-        return FoCoCoAdaptiveScaffold(
-          backgroundColor: theme.primaryBackground,
-          title: 'GolfChat',
-          currentRoute: GolfChatWidget.routeName,
-          onTap: (route) => context.goNamed(route),
-          showBottomNav: false,
-          drawer: user != null
-              ? FoCoCoDrawer(
-                  currentUser: user,
-                  currentRoute: GolfChatWidget.routeName,
-                  onNavigate: (route) => context.goNamed(route),
-                )
-              : null,
-          leading: user == null
-              ? Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: FoCoCoAdaptiveIconButton(
-                      onPressed: () {
-                        if (context.canPop()) {
-                          context.pop();
-                        } else {
-                          context.goNamed('mind_coach');
-                        }
-                      },
-                      icon: Icons.arrow_back_ios_new_rounded,
-                      iconColor: theme.primaryText,
-                      style: AdaptiveButtonStyle.plain,
-                      size: AdaptiveButtonSize.small,
-                    ),
-                  ),
-                )
-              : null,
-          enableVoiceButton: !_isVoiceMode,
-          body: Stack(
-            clipBehavior: Clip.none,
+    final canPop = context.canPop();
+
+    // Main content: progress → banners → conversation → composer.
+    // The composer is the LAST row of the Column (not a Positioned overlay),
+    // so the keyboard-aware Scaffold pushes it above the keyboard naturally
+    // and the conversation never overlaps it.
+    final mainColumn = Container(
+          color: theme.primaryBackground,
+          child: Column(
             children: [
-              Container(
-                color: theme.primaryBackground,
-                child: Column(
-                  children: [
-                    SafeArea(
-                      bottom: false,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-                        child: Text(
-                          'Reflect • Understand your game • Reset',
-                          style: theme.bodySmall
-                              .copyWith(color: theme.secondaryText),
+              FoCoCoInlineScreenHeader(
+                title: 'GolfChat',
+                leading: canPop
+                    ? IconButton(
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 44,
                         ),
-                      ),
-                    ),
-                    if (_isLoading) const LinearProgressIndicator(minHeight: 2),
-                    if (_showBoundary) _buildBoundary(theme),
-                    if (_hasRoundContext) _buildRoundContextBanner(theme),
-                    Expanded(
-                      child: _buildConversation(
-                        theme,
-                        extraBottomPadding:
-                            hasKeyboard ? 0 : _kGolfChatComposerClearance,
-                      ),
-                    ),
-                  ],
+                        icon: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: theme.primaryText,
+                          size: 20,
+                        ),
+                        tooltip: 'Back',
+                        onPressed: () => context.pop(),
+                      )
+                    : null,
+                actions: [
+                  IconButton(
+                    icon: Icon(Icons.history_rounded, color: theme.primaryText),
+                    tooltip: 'History',
+                    onPressed: _showChatHistory,
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.add_rounded, color: theme.primaryText),
+                    tooltip: 'New chat',
+                    onPressed: () => unawaited(_startNewConversation()),
+                  ),
+                ],
+                topInset: MediaQuery.viewPaddingOf(context).top,
+              ),
+              if (_isLoading) const LinearProgressIndicator(minHeight: 2),
+              if (_showBoundary) _buildBoundary(theme),
+              if (_hasRoundContext) _buildRoundContextBanner(theme),
+              if (_isVoiceMode &&
+                  (_voiceState == _VoiceModeState.connecting ||
+                      _voiceState == _VoiceModeState.error))
+                _buildVoiceConnectionBanner(theme),
+              Expanded(
+                child: _buildConversation(theme, extraBottomPadding: 0),
+              ),
+              SafeArea(
+                top: false,
+                left: false,
+                right: false,
+                bottom: !hasKeyboard,
+                minimum: EdgeInsets.zero,
+                child: Material(
+                  color: Colors.transparent,
+                  child: _buildInput(
+                    theme,
+                    voiceGlass: _isVoiceMode,
+                  ),
                 ),
               ),
-              if (!_isVoiceMode)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: hasKeyboard ? 0.0 : bottomNavReserve,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: _buildInput(theme),
-                  ),
-                ),
-              if (_isVoiceMode)
-                Positioned.fill(
-                  child: _buildVoiceModeOverlay(theme, bottomNavReserve),
-                ),
             ],
           ),
         );
-      },
+
+    return FoCoCoAdaptiveScaffold(
+      backgroundColor: theme.primaryBackground,
+      hideAppBar: true,
+      currentRoute: GolfChatWidget.routeName,
+      onTap: (route) => context.goNamed(route),
+      showBottomNav: false,
+      enableVoiceButton: !_isVoiceMode,
+      body: mainColumn,
     );
   }
 
@@ -1105,8 +1033,11 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     }
 
     _hasBootstrapped = true;
-    unawaited(_initialize());
-    unawaited(_initTts());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_initialize());
+      unawaited(_initTts());
+    });
   }
 
   Widget _buildVoiceModeOverlay(
@@ -1394,9 +1325,6 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                   _speakMessage(msg);
                 }
               },
-              onShare: () => _shareMessage(msg.text),
-              onReport: () => _showReportDialog(context, msg, theme),
-              onMore: () => _showBubbleContextMenu(context, msg, theme),
             )
                 .animate(
                     delay: Duration(milliseconds: 30 * index.clamp(0, 5)),
@@ -1511,6 +1439,9 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   }
 
   Future<void> _speakMessage(_GolfChatMessage msg) async {
+    if (!await AiVoicePreferenceService.isEnabled()) {
+      return;
+    }
     if (!_ttsAvailable) {
       _showSnack('Voice playback unavailable right now.');
       return;
@@ -1524,6 +1455,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
       await _cartesiaTts.speakText(
         text: msg.text,
         voiceId: _golfChatVoiceId,
+        voiceProfileKey: 'mentor_calm',
         contentType: 'conversation',
       );
       if (mounted) {
@@ -1566,22 +1498,30 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
           'This will flag the message for review. Do you want to continue?',
           style: theme.bodyMedium,
         ),
+        // AlertDialog wraps its actions in an OverflowBar that asks for
+        // intrinsic widths. FoCoCoAdaptiveButton uses LayoutBuilder internally
+        // (which can't return intrinsic dimensions), so plain TextButtons are
+        // used here — same UX, no layout assertions.
         actions: [
-          FoCoCoAdaptiveButton(
+          TextButton(
             onPressed: () => Navigator.pop(context),
-            label: 'Cancel',
-            style: AdaptiveButtonStyle.plain,
-            textColor: theme.secondaryText,
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: theme.secondaryText),
+            ),
           ),
-          FoCoCoAdaptiveButton(
+          TextButton(
             onPressed: () {
               Navigator.pop(context);
               _showSnack('Thank you. Report submitted.');
             },
-            label: 'Report',
-            style: AdaptiveButtonStyle.filled,
-            color: theme.error,
-            textColor: theme.primaryText,
+            child: Text(
+              'Report',
+              style: TextStyle(
+                color: theme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -1589,56 +1529,10 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   }
 
   Widget _buildEmptyState(FlutterFlowTheme theme) {
-    final openers = const <String>[
-      'What happened? What would you do differently?',
-      'Where did your decisions or mindset shift?',
-      'What felt clear—or unclear—about your game today?',
-    ];
-
     return Center(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Iconify(
-                Carbon.chat,
-                size: 44,
-                color: theme.secondaryText.withValues(alpha: 0.72),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Understand your game.',
-                style: theme.titleMedium.copyWith(color: theme.primaryText),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'You reflect and explain. AI analyzes patterns, asks follow-ups, and connects mindset to outcomes.',
-                textAlign: TextAlign.center,
-                style: theme.bodySmall.copyWith(
-                  color: theme.secondaryText.withValues(alpha: 0.9),
-                ),
-              ),
-              const SizedBox(height: 14),
-              ...openers.map(
-                (line) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    line,
-                    textAlign: TextAlign.center,
-                    style: theme.bodySmall.copyWith(
-                      color: theme.secondaryText.withValues(alpha: 0.9),
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              _buildQuickActions(theme),
-            ],
-          ),
-        ),
+      child: GestureDetector(
+        onTap: _enterVoiceMode,
+        child: const _PulsingMicIcon(color: Color(0xFF5B8DEF)),
       ),
     );
   }
@@ -1940,18 +1834,6 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    GestureDetector(
-                      onTap: () => _showAttachmentDialog(theme),
-                      behavior: HitTestBehavior.opaque,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 14, bottom: 12),
-                        child: Iconify(
-                          Carbon.add,
-                          size: 24,
-                          color: iconColor,
-                        ),
-                      ),
-                    ),
                     Expanded(
                       child: TextField(
                         controller: _textController,
@@ -1966,9 +1848,11 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                           hintStyle:
                               theme.bodyMedium.copyWith(color: hintColor),
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 14,
+                          contentPadding: const EdgeInsets.fromLTRB(
+                            16,
+                            14,
+                            8,
+                            14,
                           ),
                           isDense: true,
                         ),
@@ -2186,8 +2070,10 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         maxWidth: 1920,
         maxHeight: 1920,
       );
+      if (!mounted) return;
       if (image != null) {
         final bytes = await image.readAsBytes();
+        if (!mounted) return;
         setState(() {
           _pendingAttachments.add(_ChatAttachment(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -2199,7 +2085,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         });
       }
     } catch (e) {
-      _showSnack('Failed to capture image');
+      if (mounted) _showSnack('Failed to capture image');
     }
   }
 
@@ -2211,8 +2097,10 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         maxWidth: 1920,
         maxHeight: 1920,
       );
+      if (!mounted) return;
       for (final image in images) {
         final bytes = await image.readAsBytes();
+        if (!mounted) return;
         setState(() {
           _pendingAttachments.add(_ChatAttachment(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -2224,7 +2112,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         });
       }
     } catch (e) {
-      _showSnack('Failed to select images');
+      if (mounted) _showSnack('Failed to select images');
     }
   }
 
@@ -2236,10 +2124,12 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         type: FileType.custom,
         allowedExtensions: ['pdf', 'doc', 'docx', 'txt', 'csv', 'xlsx', 'xls'],
       );
+      if (!mounted) return;
       if (result != null) {
         for (final file in result.files) {
           if (file.path != null) {
             final bytes = await File(file.path!).readAsBytes();
+            if (!mounted) return;
             setState(() {
               _pendingAttachments.add(_ChatAttachment(
                 id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -2253,7 +2143,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         }
       }
     } catch (e) {
-      _showSnack('Failed to select file');
+      if (mounted) _showSnack('Failed to select file');
     }
   }
 
@@ -2352,6 +2242,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     if (text.isEmpty || _isSending) return;
 
     _textController.clear();
+    FocusScope.of(context).unfocus();
     setState(() => _isSending = true);
 
     final replyTo = _replyPreview != null
@@ -2381,7 +2272,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     try {
       await _persistMessage(userMsg);
 
-      final response = await _aiClient.generateConversationResponse(
+      final aiClient = await _ensureAiClient();
+      final response = await aiClient.generateConversationResponse(
         userId: currentUserUid,
         conversationId:
             _sessionId ?? DateTime.now().millisecondsSinceEpoch.toString(),
@@ -2400,13 +2292,14 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         text: response.response,
         isUser: false,
         time: DateTime.now(),
+        visuals: response.visuals,
       );
 
       setState(() => _messages.add(aiMsg));
       _scrollToBottom();
       await _persistMessage(aiMsg);
     } catch (e) {
-      _showSnack('Failed to send message: $e');
+      _showSnack(_friendlySendError(e));
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
@@ -2426,7 +2319,10 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
       if ((snapshot?['roundType']?.toString().trim().isNotEmpty ?? false))
         '- Round type: ${snapshot!['roundType']}',
       if (snapshot?['scoreToPar'] != null)
-        '- Score to par: ${snapshot!['scoreToPar']}',
+        '- Score to par: ${formatCaddyPlayScoreToParLabel(
+              (snapshot!['scoreToPar'] as num?)?.toInt() ?? 0,
+              approximate: snapshot['scoreToParIsApproximate'] == true,
+            )}',
       if (snapshot?['holesPlayed'] != null)
         '- Holes played: ${snapshot!['holesPlayed']}',
       if (snapshot?['totalMoments'] != null)
@@ -2466,7 +2362,63 @@ Constraints:
 - If deep analysis is needed, suggest exploring in the WebApp.
 
 ${roundContext.isEmpty ? '' : '\nCaddyPlay round context:\n$roundContext'}
+${_unitsAiContextLine.isEmpty ? '' : '\n$_unitsAiContextLine'}
 ''';
+  }
+
+  Widget _buildVoiceConnectionBanner(FlutterFlowTheme theme) {
+    final isError = _voiceState == _VoiceModeState.error;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Material(
+        color: (isError ? theme.error : theme.secondary)
+            .withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Icon(
+                isError ? Icons.wifi_off_rounded : Icons.sync_rounded,
+                size: 18,
+                color: isError ? theme.error : theme.secondary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  isError
+                      ? 'Voice connection issue. Check network or tap mic to retry.'
+                      : 'Connecting voice…',
+                  style: theme.bodySmall.copyWith(color: theme.primaryText),
+                ),
+              ),
+              if (isError)
+                TextButton(
+                  onPressed: _enterVoiceMode,
+                  child: const Text('Retry'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool _isGeminiUnavailableError(Object error) {
+    final msg = error.toString().toLowerCase();
+    return msg.contains('reported as leaked') ||
+        msg.contains('permission_denied') ||
+        msg.contains('api_key_service_blocked') ||
+        msg.contains('gemini is not available') ||
+        msg.contains('403');
+  }
+
+  String _friendlySendError(Object error) {
+    if (_isGeminiUnavailableError(error)) {
+      return 'AI responses are temporarily unavailable. Rotate the Gemini key in '
+          'Secret Manager / Cloud Functions and try again.';
+    }
+    return 'Failed to send message: $error';
   }
 
   Future<void> _persistMessage(
@@ -2476,18 +2428,23 @@ ${roundContext.isEmpty ? '' : '\nCaddyPlay round context:\n$roundContext'}
     final sessionId = _sessionId;
     if (sessionId == null || currentUserUid.isEmpty) return;
 
-    await _db.saveMessage(
-      VoiceChatMessage(
-        id: message.id,
-        userId: currentUserUid,
-        sessionId: sessionId,
-        content: message.text,
-        isUser: message.isUser,
-        timestamp: message.time,
-        messageType: messageType,
-        isSystem: false,
-      ),
-    );
+    try {
+      await _db.saveMessage(
+        VoiceChatMessage(
+          id: message.id,
+          userId: currentUserUid,
+          sessionId: sessionId,
+          content: message.text,
+          isUser: message.isUser,
+          timestamp: message.time,
+          messageType: messageType,
+          isSystem: false,
+        ),
+      );
+    } catch (e) {
+      // Persistence errors should not block chat generation.
+      debugPrint('GolfChat message persistence failed: $e');
+    }
   }
 
   void _scrollToBottom() {
@@ -2501,11 +2458,14 @@ ${roundContext.isEmpty ? '' : '\nCaddyPlay round context:\n$roundContext'}
     });
   }
 
-  void _showSnack(String message) {
+  void _showSnack(String message, {SnackBarAction? action}) {
     if (!mounted) return;
     try {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+        SnackBar(
+          content: Text(message),
+          action: action,
+        ),
       );
     } catch (_) {
       debugPrint('GolfChat snack: $message');
@@ -2566,9 +2526,6 @@ class _GlassChatBubble extends StatelessWidget {
     required this.onReply,
     required this.onCopy,
     required this.onReadAloud,
-    required this.onShare,
-    required this.onReport,
-    required this.onMore,
   });
 
   final _GolfChatMessage message;
@@ -2578,9 +2535,6 @@ class _GlassChatBubble extends StatelessWidget {
   final VoidCallback onReply;
   final VoidCallback onCopy;
   final VoidCallback onReadAloud;
-  final VoidCallback onShare;
-  final VoidCallback onReport;
-  final VoidCallback onMore;
 
   @override
   Widget build(BuildContext context) {
@@ -2635,70 +2589,18 @@ class _GlassChatBubble extends StatelessWidget {
                     theme: theme,
                     isUserBubble: isUser,
                   ),
-                if (isUser)
-                  Text(
-                    message.text,
-                    style: theme.bodyMedium.copyWith(
-                      color: textColor,
-                      height: 1.35,
-                    ),
-                  )
-                else
-                  MarkdownBody(
-                    data: message.text,
-                    shrinkWrap: true,
-                    selectable: true,
-                    styleSheet: MarkdownStyleSheet(
-                      p: theme.bodyMedium.copyWith(
-                        color: textColor,
-                        height: 1.35,
-                      ),
-                      h1: theme.titleLarge.copyWith(
-                        color: textColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      h2: theme.titleMedium.copyWith(
-                        color: textColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      h3: theme.titleSmall.copyWith(
-                        color: textColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      strong: theme.bodyMedium.copyWith(
-                        color: textColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      em: theme.bodyMedium.copyWith(
-                        color: textColor,
-                        fontStyle: FontStyle.italic,
-                      ),
-                      listBullet: theme.bodyMedium.copyWith(color: textColor),
-                      tableHead: theme.bodySmall.copyWith(
-                        color: textColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      tableBody: theme.bodySmall.copyWith(color: textColor),
-                      tableBorder: TableBorder.all(
-                        color: textColor.withValues(alpha: 0.25),
-                        width: 1,
-                      ),
-                      tableHeadAlign: TextAlign.left,
-                      tableCellsPadding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      code: theme.bodySmall.copyWith(
-                        color: textColor,
-                        backgroundColor: textColor.withValues(alpha: 0.08),
-                        fontFamily: 'monospace',
-                      ),
-                      codeblockDecoration: BoxDecoration(
-                        color: textColor.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      blockSpacing: 8,
-                    ),
+                Text(
+                  message.text,
+                  style: theme.bodyMedium.copyWith(
+                    color: textColor,
+                    height: 1.35,
+                  ),
+                ),
+                if (!isUser && message.visuals.isNotEmpty)
+                  GolfChatVisuals(
+                    visuals: message.visuals,
+                    theme: theme,
+                    textColor: textColor,
                   ),
                 const SizedBox(height: 6),
                 Row(
@@ -2718,37 +2620,21 @@ class _GlassChatBubble extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _BubbleActionIcon(
-                          icon: Icons.thumb_up_outlined,
-                          iconColor: iconColor,
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text('Thanks for feedback'),
-                                behavior: SnackBarBehavior.floating,
-                                backgroundColor: theme.primaryBackground,
-                              ),
-                            );
-                          },
-                        ),
-                        _BubbleActionIcon(
-                          icon: Icons.thumb_down_outlined,
-                          iconColor: iconColor,
-                          onTap: onReport,
-                        ),
-                        _BubbleActionIcon(
                           icon: Icons.replay_rounded,
                           iconColor: iconColor,
                           onTap: onReply,
                         ),
                         _BubbleActionIcon(
-                          icon: Icons.share_outlined,
+                          icon: Icons.copy_rounded,
                           iconColor: iconColor,
-                          onTap: onShare,
+                          onTap: onCopy,
                         ),
                         _BubbleActionIcon(
-                          icon: Icons.more_horiz_rounded,
+                          icon: isTtsSpeaking
+                              ? Icons.stop_circle_outlined
+                              : Icons.volume_up_outlined,
                           iconColor: iconColor,
-                          onTap: onMore,
+                          onTap: onReadAloud,
                         ),
                       ],
                     ),
@@ -3323,5 +3209,55 @@ class _AttachmentPreviewItem extends StatelessWidget {
       default:
         return Icons.insert_drive_file_rounded;
     }
+  }
+}
+
+class _PulsingMicIcon extends StatefulWidget {
+  const _PulsingMicIcon({required this.color});
+
+  final Color color;
+
+  @override
+  State<_PulsingMicIcon> createState() => _PulsingMicIconState();
+}
+
+class _PulsingMicIconState extends State<_PulsingMicIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2500),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final scale = 1.0 + (_controller.value * 0.15);
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: widget.color.withValues(alpha: 0.35),
+                  blurRadius: 24,
+                  spreadRadius: 4,
+                ),
+              ],
+            ),
+            child: Icon(Icons.mic_rounded, size: 56, color: widget.color),
+          ),
+        );
+      },
+    );
   }
 }

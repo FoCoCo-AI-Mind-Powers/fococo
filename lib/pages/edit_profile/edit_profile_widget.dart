@@ -3,6 +3,7 @@ import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
+import '/pages/fococo_tab/fococo_tab_widget.dart';
 import '/services/profile_service.dart';
 import 'edit_profile_model.dart';
 export 'edit_profile_model.dart';
@@ -263,7 +264,7 @@ class _EditProfileWidgetState extends State<EditProfileWidget>
         );
 
         // Navigate back to profile
-        context.goNamed('profile');
+        context.goNamed(FoCoCoTabWidget.routeName);
       }
     } catch (e) {
       print('Error saving profile: $e');
@@ -355,7 +356,7 @@ class _EditProfileWidgetState extends State<EditProfileWidget>
         children: [
           // Back button
           GestureDetector(
-            onTap: () => context.goNamed('profile'),
+            onTap: () => context.goNamed(FoCoCoTabWidget.routeName),
             child: Container(
               width: 44,
               height: 44,

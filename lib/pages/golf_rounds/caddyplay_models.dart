@@ -1346,15 +1346,22 @@ CaddyPlayRoundSnapshot buildRoundSnapshot(
   bool availableInWebApp = false,
 }) {
   final insufficient = !hasMinimumRoundData(round);
+  final aggregate = aggregateMindset(round);
   if (insufficient) {
+    final hasMoments = round.totalMoments > 0;
     return CaddyPlayRoundSnapshot(
       courseName: round.courseName,
       date: round.startedAt,
       roundType: round.roundType,
-      evaluationPhrase: 'Not enough round data captured yet.',
-      focusLabel: '—',
-      confidenceLabel: '—',
-      controlLabel: '—',
+      evaluationPhrase: hasMoments
+          ? 'Early read — log a few more moments for a fuller snapshot.'
+          : 'Not enough round data captured yet.',
+      focusLabel:
+          hasMoments ? descriptorForScore(aggregate.focus) : 'Building',
+      confidenceLabel:
+          hasMoments ? descriptorForScore(aggregate.confidence) : 'Building',
+      controlLabel:
+          hasMoments ? descriptorForScore(aggregate.control) : 'Building',
       scoreToPar: round.scoreToPar,
       scoreToParIsApproximate: round.scoreToParUsesDefaultedPar,
       holesPlayed: round.holesPlayed,
@@ -1362,18 +1369,18 @@ CaddyPlayRoundSnapshot buildRoundSnapshot(
       tapCount: round.tapCount,
       talkCount: round.talkCount,
       mindSnapCount: round.mindSnapCount,
-      momentumShift:
-          'Play and log more shots to unlock a meaningful SnapShot.',
-      mindsetSummary:
-          'Play and log more shots to unlock a meaningful SnapShot.',
+      momentumShift: hasMoments
+          ? 'Keep logging shots to unlock momentum insights.'
+          : 'Play and log more shots to unlock a meaningful SnapShot.',
+      mindsetSummary: hasMoments
+          ? _mindsetSummary(round, aggregate)
+          : 'Play and log more shots to unlock a meaningful SnapShot.',
       completionInsight: '',
       syncedToWebApp: syncedToWebApp,
       availableInWebApp: availableInWebApp,
       insightsLocked: true,
     );
   }
-
-  final aggregate = aggregateMindset(round);
   final evaluationPhrase = _evaluationPhraseForRound(round, aggregate);
 
   return CaddyPlayRoundSnapshot(

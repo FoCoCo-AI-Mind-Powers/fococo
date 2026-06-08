@@ -16,6 +16,43 @@ export '../../widgets/fococo_drawer_widget.dart';
 /// Full reserve above system UI: `kFoCoCoBottomNavStripAndTabsHeight + MediaQuery.viewPadding.bottom`.
 const double kFoCoCoBottomNavStripAndTabsHeight = 82;
 
+/// Approximate height of [FloatingAudioPlayer] above the tab row.
+const double kFoCoCoFloatingAudioPlayerHeight = 52;
+
+/// Routes that own in-feature audio UI — hide the global floating player.
+bool foCoCoShowsGlobalFloatingAudio(String currentRoute) =>
+    currentRoute != 'mind_coach' && currentRoute != 'golf_chat';
+
+/// Scroll/list bottom gap above the tab shell bar (home indicator included).
+double foCoCoTabShellBottomReserve(
+  BuildContext context, {
+  double extra = 24,
+  bool includeFloatingAudio = false,
+}) {
+  return MediaQuery.viewPaddingOf(context).bottom +
+      kFoCoCoBottomNavStripAndTabsHeight +
+      (includeFloatingAudio ? kFoCoCoFloatingAudioPlayerHeight : 0) +
+      extra;
+}
+
+/// Global TTS mini-player anchored above the tab shell bar.
+Widget buildFoCoCoFloatingAudioOverlay(
+  BuildContext context,
+  String currentRoute,
+) {
+  if (!foCoCoShowsGlobalFloatingAudio(currentRoute)) {
+    return const SizedBox.shrink();
+  }
+  final overlayBottom =
+      MediaQuery.viewPaddingOf(context).bottom + kFoCoCoBottomNavStripAndTabsHeight;
+  return Positioned(
+    left: 0,
+    right: 0,
+    bottom: overlayBottom,
+    child: const Center(child: FloatingAudioPlayer()),
+  );
+}
+
 // ─── Nav model (replaces adaptive_platform_ui destinations) ─────────────────
 
 /// Single tab in the FoCoCo bottom bar.
@@ -518,7 +555,8 @@ class _FoCoCoNavTileState extends State<_FoCoCoNavTile> {
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = widget.unselectedColor;
+    final iconColor =
+        widget.isSelected ? widget.selectedColor : widget.unselectedColor;
     final labelColor =
         widget.isSelected ? widget.selectedColor : widget.unselectedColor;
     final iconSize = widget.isSelected ? 25.0 : 23.0;
@@ -809,24 +847,21 @@ class _FoCoCoAdaptiveScaffoldState extends State<FoCoCoAdaptiveScaffold> {
     final theme = FlutterFlowTheme.of(context);
     final pageBg = widget.backgroundColor ?? theme.primaryBackground;
     final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
-    final viewBottom = MediaQuery.viewPaddingOf(context).bottom;
-    final hideVoiceForRoute = widget.currentRoute == 'golf_chat';
+    final hideVoiceForRoute =
+        widget.currentRoute == 'golf_chat' ||
+        widget.currentRoute == 'mind_coach';
     final showVoiceButton =
         widget.enableVoiceButton && !keyboardOpen && !hideVoiceForRoute;
 
     Widget body = widget.body;
-    if (showVoiceButton) {
-      // Match [FoCoCoBottomNavigationBar] total: strip+tabs + viewPadding.bottom.
-      final overlayBottom = viewBottom + kFoCoCoBottomNavStripAndTabsHeight;
+    // Tab-shell pages use [_FoCoCoTabShell] for the global player; only standalone
+    // scaffolds with their own bottom bar mount it here.
+    if (showVoiceButton && widget.showBottomNav) {
       body = Stack(
+        clipBehavior: Clip.none,
         children: [
           body,
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: overlayBottom,
-            child: const Center(child: FloatingAudioPlayer()),
-          ),
+          buildFoCoCoFloatingAudioOverlay(context, widget.currentRoute),
         ],
       );
     }

@@ -2,6 +2,10 @@ const axios = require('axios');
 const functions = require('firebase-functions/v1');
 const logger = require('firebase-functions/logger');
 const { defineSecret, defineString } = require('firebase-functions/params');
+const {
+  CARTESIA_VOICE_ID_SECRET,
+  getCartesiaVoiceIdSafe,
+} = require('./cartesia_voice_config');
 
 const CARTESIA_API_SECRET = defineSecret('CARTESIA_API');
 const CARTESIA_LINE_AGENT_ID = defineString('CARTESIA_LINE_AGENT_ID', {
@@ -42,6 +46,7 @@ async function getCartesiaVoiceRuntimeConfigImpl(_data, context) {
   }
 
   return {
+    voice_id: getCartesiaVoiceIdSafe(),
     line_agent_id: safeString(CARTESIA_LINE_AGENT_ID.value()),
     pronunciation_dict_id: safeString(CARTESIA_PRONUNCIATION_DICT_ID.value()),
     cartesia_version: CARTESIA_VERSION,
@@ -86,7 +91,7 @@ async function mintCartesiaAccessTokenImpl(data, context) {
     const response = await axios.post(
       `${CARTESIA_BASE_URL}/access-token`,
       {
-        grants: { agent: agentId },
+        grants: { agent: true },
         expires_in: expiresIn,
       },
       {
@@ -123,6 +128,12 @@ async function mintCartesiaAccessTokenImpl(data, context) {
         `Cartesia auth problem: ${JSON.stringify(upstream)}`,
       );
     }
+    if (status === 400 || status === 404) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `Cartesia Line is not configured correctly: ${JSON.stringify(upstream)}`,
+      );
+    }
     throw new functions.https.HttpsError(
       'internal',
       `Failed to mint Cartesia access token: ${JSON.stringify(upstream)}`,
@@ -130,9 +141,9 @@ async function mintCartesiaAccessTokenImpl(data, context) {
   }
 }
 
-exports.getCartesiaVoiceRuntimeConfig = functions.https.onCall(
-  getCartesiaVoiceRuntimeConfigImpl,
-);
+exports.getCartesiaVoiceRuntimeConfig = functions
+  .runWith({ secrets: [CARTESIA_VOICE_ID_SECRET] })
+  .https.onCall(getCartesiaVoiceRuntimeConfigImpl);
 
 exports.mintCartesiaAccessToken = functions
   .runWith({ secrets: [CARTESIA_API_SECRET] })

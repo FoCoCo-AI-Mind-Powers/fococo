@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:permission_handler/permission_handler.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:record/record.dart';
 
 import '/ai_integration/services/cartesia_api_service.dart';
@@ -18,6 +19,8 @@ import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/services/haptic_service.dart';
+
+import '/widgets/fococo_confirm_dialog.dart';
 
 import 'caddyplay_models.dart';
 import 'caddyplay_session_service.dart';
@@ -38,6 +41,7 @@ enum _CaddyPlayOverlay {
   none,
   tapLog,
   justTalkRecording,
+  justTalkPreview,
   justTalkProcessing,
   justTalkConfirmation,
   mindSnap,
@@ -98,6 +102,11 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   CaddyPlayTalkAnalysis? _justTalkAnalysis;
   CaddyPlayMoment? _pendingTalkMoment;
   String? _justTalkAudioPath;
+  double _justTalkAmplitude = 0;
+  StreamSubscription<Amplitude>? _justTalkAmplitudeSub;
+  AudioPlayer? _justTalkPreviewPlayer;
+  bool _justTalkPreviewPlaying = false;
+  late final AnimationController _micPulseController;
 
   int _mindSnapStep = 0;
   Timer? _mindSnapTimer;
@@ -126,6 +135,10 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _micPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1300),
+    )..repeat(reverse: true);
   }
 
   @override
@@ -177,14 +190,16 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    setFoCoCoNavLabelOverride(CaddyPlayWidget.routeName, null);
     setFoCoCoNavBarBackgroundOverride(null);
     _courseController.dispose();
     _momentScrollController.dispose();
     _bannerTimer?.cancel();
     _microInsightTimer?.cancel();
     _justTalkTimer?.cancel();
+    _justTalkAmplitudeSub?.cancel();
     _mindSnapTimer?.cancel();
+    _micPulseController.dispose();
+    unawaited(_disposeJustTalkPreviewPlayer());
     unawaited(_audioRecorder.stop());
     _audioRecorder.dispose();
     super.dispose();
@@ -238,6 +253,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       case _CaddyPlayOverlay.tapLog:
         return 'Log Shot';
       case _CaddyPlayOverlay.justTalkRecording:
+      case _CaddyPlayOverlay.justTalkPreview:
       case _CaddyPlayOverlay.justTalkProcessing:
       case _CaddyPlayOverlay.justTalkConfirmation:
         return 'JustTalk';
@@ -269,6 +285,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
 
   Color get _appBarTitleColor {
     if (_overlay == _CaddyPlayOverlay.justTalkRecording ||
+        _overlay == _CaddyPlayOverlay.justTalkPreview ||
         _overlay == _CaddyPlayOverlay.justTalkProcessing ||
         _overlay == _CaddyPlayOverlay.justTalkConfirmation) {
       return _kTalkPurple;
@@ -287,11 +304,25 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
 
     if (_overlay == _CaddyPlayOverlay.tapLog ||
         _overlay == _CaddyPlayOverlay.justTalkRecording ||
+        _overlay == _CaddyPlayOverlay.justTalkPreview ||
         _overlay == _CaddyPlayOverlay.justTalkProcessing ||
         _overlay == _CaddyPlayOverlay.justTalkConfirmation) {
       return IconButton(
         icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.primaryText),
         onPressed: _dismissTalkOrTapOverlay,
+      );
+    }
+
+    if (_screen == _CaddyPlayScreen.snapshot) {
+      return IconButton(
+        icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.primaryText),
+        onPressed: () {
+          if (_activeRound != null) {
+            setState(() => _screen = _CaddyPlayScreen.active);
+          } else {
+            _backToHome();
+          }
+        },
       );
     }
 
@@ -635,7 +666,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     final canGoBack = round.currentHole > 1;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 12, 20, bottomReserve),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, bottomReserve),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -645,9 +676,11 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             style: theme.displaySmall.copyWith(
               color: _kCaddyGreen,
               fontWeight: FontWeight.w700,
+              fontSize: 32,
+              height: 1.2,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             'Moments Captured',
             textAlign: TextAlign.center,
@@ -655,81 +688,90 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
               color: Colors.white.withValues(alpha: 0.7),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           SizedBox(
-            height: 72,
+            height: 56,
             child: _MomentRow(
               controller: _momentScrollController,
               moments: currentHoleMoments,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           const _SectionLabel(label: 'Log Shot'),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _ActionTile(
-                  icon: Icons.touch_app_outlined,
-                  label: 'TAP',
-                  onTap: tapDisabled ? _showTapCapMessage : _openTapLog,
-                  disabled: tapDisabled,
+          const SizedBox(height: 8),
+          Expanded(
+            flex: 5,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _ActionTile(
+                    icon: Icons.touch_app_outlined,
+                    label: 'TAP',
+                    onTap: tapDisabled ? _showTapCapMessage : _openTapLog,
+                    disabled: tapDisabled,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _ActionTile(
-                  icon: Icons.mic_none_rounded,
-                  label: 'TALK',
-                  onTap: _openJustTalk,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _ActionTile(
+                    icon: Icons.mic_none_rounded,
+                    label: 'TALK',
+                    onTap: _openJustTalk,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
                 child: _CaddyGhostButton(
                   label: 'BACK',
+                  compact: true,
                   onTap: canGoBack ? _retreatHole : null,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: _CaddyGlowButton(
                   label: onLastHole ? 'END ROUND' : 'NEXT HOLE',
+                  compact: true,
                   onTap: onLastHole ? _enterSnapshot : _advanceHole,
                 ),
               ),
             ],
           ),
           if (!onLastHole) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             _CaddyGhostButton(
               label: 'END ROUND',
+              compact: true,
               onTap: _enterSnapshot,
             ),
           ],
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _SecondaryActionTile(
-                  icon: Icons.edit_note_rounded,
-                  label: 'Scorecard',
-                  onTap: _openScorecard,
+          const SizedBox(height: 8),
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _SecondaryActionTile(
+                    icon: Icons.edit_note_rounded,
+                    label: 'Scorecard',
+                    onTap: _openScorecard,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _SecondaryActionTile(
-                  icon: Icons.autorenew_rounded,
-                  label: 'MindSnap',
-                  onTap: _openMindSnap,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _SecondaryActionTile(
+                    icon: Icons.autorenew_rounded,
+                    label: 'MindSnap',
+                    onTap: _openMindSnap,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -739,174 +781,228 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   Widget _buildSnapshot(FlutterFlowTheme theme, double bottomReserve) {
     final snapshot = _snapshot;
     if (_snapshotLoading || snapshot == null) {
-      return ListView(
+      return Padding(
         padding: EdgeInsets.fromLTRB(20, 18, 20, bottomReserve),
-        children: const [
-          SizedBox(height: 12),
-          _SkeletonBlock(height: 18, widthFactor: 0.72),
-          SizedBox(height: 16),
-          _SkeletonBlock(height: 42),
-          SizedBox(height: 18),
-          _SkeletonBlock(height: 108),
-          SizedBox(height: 16),
-          _SkeletonBlock(height: 112),
-          SizedBox(height: 16),
-          _SkeletonBlock(height: 92),
-          SizedBox(height: 16),
-          _SkeletonBlock(height: 92),
-        ],
+        child: Column(
+          children: const [
+            _SkeletonBlock(height: 18, widthFactor: 0.72),
+            SizedBox(height: 16),
+            Expanded(child: _SkeletonBlock(height: 42)),
+          ],
+        ),
       );
     }
 
-    return ListView(
-      padding: EdgeInsets.fromLTRB(20, 18, 20, bottomReserve),
-      children: [
-        Text(
-          '${snapshot.courseName} • ${DateFormat('d MMM yyyy').format(snapshot.date)}',
-          textAlign: TextAlign.center,
-          style: theme.bodyLarge.copyWith(color: Colors.white),
-        ),
-        const SizedBox(height: 16),
-        Center(
-          child: _BadgePill(
-            label: enumLabel(snapshot.roundType),
-            borderColor: Colors.white.withValues(alpha: 0.35),
+    final canContinueRound = _activeRound != null;
+    final scoreLabel = snapshot.holesPlayed > 0 ||
+            snapshot.scoreToPar != 0 ||
+            !snapshot.scoreToParIsApproximate
+        ? formatCaddyPlayScoreToParLabel(
+            snapshot.scoreToPar,
+            approximate: snapshot.scoreToParIsApproximate,
+          )
+        : '—';
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 6, 20, bottomReserve),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '${snapshot.courseName} • ${DateFormat('d MMM yyyy').format(snapshot.date)}',
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.bodyMedium.copyWith(color: Colors.white),
           ),
-        ),
-        const SizedBox(height: 18),
-        const _GlowSeparator(),
-        const SizedBox(height: 18),
-        _SummaryCard(
-          child: Row(
-            children: [
-              Expanded(
-                child: _SnapshotMetric(
-                  label: 'FOCUS',
-                  value: snapshot.focusLabel,
-                  color:
-                      snapshot.focusLabel == 'Weak' ? _kWeakRed : Colors.white,
-                ),
-              ),
-              const _VerticalDividerGlow(),
-              Expanded(
-                child: _SnapshotMetric(
-                  label: 'CONFIDENCE',
-                  value: snapshot.confidenceLabel,
-                  color: snapshot.confidenceLabel == 'Building'
-                      ? _kPendingAmber
-                      : snapshot.confidenceLabel == 'Weak'
+          const SizedBox(height: 6),
+          Center(
+            child: _BadgePill(
+              label: enumLabel(snapshot.roundType),
+              borderColor: Colors.white.withValues(alpha: 0.35),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const _GlowSeparator(),
+          const SizedBox(height: 6),
+          Expanded(
+            flex: 2,
+            child: _SummaryCard(
+              compact: true,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: _SnapshotMetric(
+                      label: 'FOCUS',
+                      value: snapshot.focusLabel,
+                      color: snapshot.focusLabel == 'Weak'
                           ? _kWeakRed
                           : Colors.white,
-                ),
-              ),
-              const _VerticalDividerGlow(),
-              Expanded(
-                child: _SnapshotMetric(
-                  label: 'CONTROL',
-                  value: snapshot.controlLabel,
-                  color: snapshot.controlLabel == 'Weak'
-                      ? _kWeakRed
-                      : Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-        _SummaryCard(
-          child: Row(
-            children: [
-              Expanded(
-                child: _SnapshotNumberBlock(
-                  label: 'SCORE',
-                  value: formatCaddyPlayScoreToParLabel(
-                    snapshot.scoreToPar,
-                    approximate: snapshot.scoreToParIsApproximate,
+                    ),
                   ),
-                  sublabel: '${snapshot.holesPlayed} holes',
-                  color: _kCaddyGreen,
-                ),
+                  const _VerticalDividerGlow(flexible: true),
+                  Expanded(
+                    child: _SnapshotMetric(
+                      label: 'CONFIDENCE',
+                      value: snapshot.confidenceLabel,
+                      color: snapshot.confidenceLabel == 'Building'
+                          ? _kPendingAmber
+                          : snapshot.confidenceLabel == 'Weak'
+                              ? _kWeakRed
+                              : Colors.white,
+                    ),
+                  ),
+                  const _VerticalDividerGlow(flexible: true),
+                  Expanded(
+                    child: _SnapshotMetric(
+                      label: 'CONTROL',
+                      value: snapshot.controlLabel,
+                      color: snapshot.controlLabel == 'Weak'
+                          ? _kWeakRed
+                          : Colors.white,
+                    ),
+                  ),
+                ],
               ),
-              const _VerticalDividerGlow(),
-              Expanded(
-                child: _SnapshotNumberBlock(
-                  label: 'MOMENTS CAPTURED',
-                  value: '${snapshot.totalMoments}',
-                  sublabel:
-                      '${snapshot.tapCount} TAP • ${snapshot.talkCount} TALK • ${snapshot.mindSnapCount} RESET',
-                  color: _kPendingAmber,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-        const SizedBox(height: 18),
-        Center(
-          child: _BadgePill(
-            label: '${snapshot.mindSnapCount} MindSnap',
-            borderColor: const Color(0xFF89A8FF),
-            textColor: const Color(0xFF89A8FF),
+          const SizedBox(height: 6),
+          Expanded(
+            flex: 2,
+            child: _SummaryCard(
+              compact: true,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: _SnapshotNumberBlock(
+                      label: 'SCORE',
+                      value: scoreLabel,
+                      sublabel: snapshot.holesPlayed > 0
+                          ? '${snapshot.holesPlayed} holes'
+                          : 'Add scorecard',
+                      color: _kCaddyGreen,
+                    ),
+                  ),
+                  const _VerticalDividerGlow(flexible: true),
+                  Expanded(
+                    child: _SnapshotNumberBlock(
+                      label: 'MOMENTS',
+                      value: '${snapshot.totalMoments}',
+                      sublabel:
+                          '${snapshot.tapCount} TAP • ${snapshot.talkCount} TALK • ${snapshot.mindSnapCount} RESET',
+                      color: _kPendingAmber,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 18),
-        _SummaryCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'MOMENTUM SHIFT',
-                style: theme.labelLarge.copyWith(
-                  color: Colors.white.withValues(alpha: 0.7),
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                snapshot.momentumShift,
-                style: theme.titleLarge.copyWith(
-                  color: _kPendingAmber,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+          const SizedBox(height: 6),
+          Center(
+            child: _BadgePill(
+              label: '${snapshot.mindSnapCount} MindSnap',
+              borderColor: const Color(0xFF89A8FF),
+              textColor: const Color(0xFF89A8FF),
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        _SummaryCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'MINDSET SUMMARY',
-                style: theme.labelLarge.copyWith(
-                  color: Colors.white.withValues(alpha: 0.7),
-                  letterSpacing: 1.2,
-                ),
+          const SizedBox(height: 6),
+          Expanded(
+            flex: 3,
+            child: _SummaryCard(
+              compact: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'MOMENTUM SHIFT',
+                    style: theme.labelSmall.copyWith(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.topLeft,
+                        child: Text(
+                          snapshot.momentumShift,
+                          style: theme.bodyLarge.copyWith(
+                            color: _kPendingAmber,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              Text(
-                snapshot.evaluationPhrase,
-                style: theme.headlineSmall.copyWith(
-                  color: Colors.white,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-        const SizedBox(height: 20),
-        _CaddyGlowButton(
-          label: 'Done',
-          textColor: Colors.white,
-          onTap: _completeRound,
-          fillColor: Colors.black.withValues(alpha: 0.18),
-        ),
-        const SizedBox(height: 14),
-        _CaddyGhostButton(
-          label: 'Reflect in GolfChat',
-          onTap: _openGolfChatWithRoundContext,
-        ),
-      ],
+          const SizedBox(height: 6),
+          Expanded(
+            flex: 2,
+            child: _SummaryCard(
+              compact: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'MINDSET SUMMARY',
+                    style: theme.labelSmall.copyWith(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.topLeft,
+                        child: Text(
+                          snapshot.evaluationPhrase,
+                          style: theme.bodyLarge.copyWith(
+                            color: Colors.white,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (canContinueRound) ...[
+            _CaddyGhostButton(
+              label: 'Back to Round',
+              compact: true,
+              onTap: () => setState(() => _screen = _CaddyPlayScreen.active),
+            ),
+            const SizedBox(height: 6),
+          ],
+          _CaddyGlowButton(
+            label: 'Done',
+            compact: true,
+            textColor: Colors.white,
+            onTap: _confirmCompleteRound,
+            fillColor: Colors.black.withValues(alpha: 0.18),
+          ),
+          const SizedBox(height: 6),
+          _CaddyGhostButton(
+            label: 'Reflect in GolfChat',
+            compact: true,
+            onTap: _openGolfChatWithRoundContext,
+          ),
+        ],
+      ),
     );
   }
 
@@ -981,6 +1077,12 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           children: [
             blurred,
             _buildJustTalkRecording(theme, bottomReserve),
+          ],
+        ),
+      _CaddyPlayOverlay.justTalkPreview => Stack(
+          children: [
+            blurred,
+            _buildJustTalkPreview(theme, bottomReserve),
           ],
         ),
       _CaddyPlayOverlay.justTalkProcessing => Stack(
@@ -1075,29 +1177,107 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   }
 
   Widget _buildJustTalkRecording(FlutterFlowTheme theme, double bottomReserve) {
-    final transcript = _justTalkTranscript.trim();
-    return ListView(
-      padding: EdgeInsets.fromLTRB(20, 18, 20, bottomReserve),
-      children: [
-        Text(
-          'Tap the mic when you\'re done (30s max)',
-          textAlign: TextAlign.center,
-          style: theme.bodyLarge.copyWith(
-            color: Colors.white.withValues(alpha: 0.78),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomReserve),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Text(
+            'Tap the mic when you\'re done (30s max)',
+            textAlign: TextAlign.center,
+            style: theme.bodyLarge.copyWith(
+              color: Colors.white.withValues(alpha: 0.78),
+            ),
           ),
-        ),
-        const SizedBox(height: 28),
-        const _GlowSeparator(color: _kCaddyGreen),
-        const SizedBox(height: 36),
-        Center(
-          child: _MicOrb(
-            warning: _justTalkWarning,
-            transcript: transcript,
-            elapsedLabel: _formatDuration(_justTalkDuration),
-            onTap: _stopJustTalkRecording,
+          const SizedBox(height: 18),
+          const _GlowSeparator(color: _kTalkPurple),
+          const Spacer(flex: 2),
+          Center(
+            child: _MicOrb(
+              warning: _justTalkWarning,
+              elapsedLabel: _formatDuration(_justTalkDuration),
+              amplitude: _justTalkAmplitude,
+              pulseAnimation: _micPulseController,
+              onTap: _stopJustTalkRecording,
+            ),
           ),
-        ),
-      ],
+          const Spacer(flex: 3),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJustTalkPreview(FlutterFlowTheme theme, double bottomReserve) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 12, 20, bottomReserve),
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: IconButton(
+              tooltip: 'Close preview',
+              onPressed: _discardJustTalk,
+              icon: Icon(
+                Icons.close_rounded,
+                color: Colors.white.withValues(alpha: 0.82),
+              ),
+            ),
+          ),
+          Text(
+            'Preview your moment',
+            textAlign: TextAlign.center,
+            style: theme.titleMedium.copyWith(color: Colors.white),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _formatDuration(_justTalkDuration),
+            style: theme.bodyMedium.copyWith(
+              color: Colors.white.withValues(alpha: 0.72),
+            ),
+          ),
+          const Spacer(flex: 2),
+          _JustTalkWaveformPreview(
+            amplitude: _justTalkAmplitude,
+            playing: _justTalkPreviewPlaying,
+          ),
+          const SizedBox(height: 28),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _JustTalkPreviewControl(
+                icon: Icons.replay_rounded,
+                label: 'Re-record',
+                onTap: _reRecordJustTalk,
+              ),
+              const SizedBox(width: 18),
+              _JustTalkPreviewControl(
+                icon: _justTalkPreviewPlaying
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
+                label: _justTalkPreviewPlaying ? 'Pause' : 'Play',
+                highlighted: true,
+                onTap: _toggleJustTalkPreviewPlayback,
+              ),
+              const SizedBox(width: 18),
+              _JustTalkPreviewControl(
+                icon: Icons.stop_rounded,
+                label: 'Stop',
+                onTap: _stopJustTalkPreviewPlayback,
+              ),
+            ],
+          ),
+          const Spacer(flex: 3),
+          _CaddyGlowButton(
+            label: 'Confirm',
+            onTap: _confirmJustTalkRecording,
+          ),
+          const SizedBox(height: 12),
+          _CaddyGhostButton(
+            label: 'Discard',
+            onTap: _discardJustTalk,
+          ),
+        ],
+      ),
     );
   }
 
@@ -1713,11 +1893,14 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     }
 
     try {
+      await _disposeJustTalkPreviewPlayer();
       _justTalkTimer?.cancel();
+      _justTalkAmplitudeSub?.cancel();
       _justTalkDuration = Duration.zero;
       _justTalkWarning = false;
       _justTalkTranscript = '';
       _justTalkAnalysis = null;
+      _justTalkAmplitude = 0;
       _justTalkAudioPath = await _sessionService
           .createTalkAudioPath(_activeRound?.roundId ?? 'draft');
       _pendingTalkMoment = null;
@@ -1731,8 +1914,21 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         path: _justTalkAudioPath!,
       );
 
-      // Transcription is done after recording via Cartesia STT (the single
-      // voice provider) — no live on-device speech recognition here.
+      _justTalkAmplitudeSub = _audioRecorder
+          .onAmplitudeChanged(const Duration(milliseconds: 120))
+          .listen((Amplitude amplitude) {
+        if (!mounted ||
+            _overlay != _CaddyPlayOverlay.justTalkRecording) {
+          return;
+        }
+        final normalized =
+            ((amplitude.current + 45) / 45).clamp(0.0, 1.0);
+        setState(() => _justTalkAmplitude = normalized);
+        if (normalized > 0.62) {
+          unawaited(HapticService.light());
+        }
+      });
+
       _justTalkTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (!mounted) {
           return;
@@ -1751,8 +1947,8 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         });
       });
 
+      await HapticService.medium();
       setState(() => _overlay = _CaddyPlayOverlay.justTalkRecording);
-      _setJustTalkNavLabel(true);
     } catch (error) {
       _showBanner('JustTalk could not start: $error', color: _kPendingAmber);
       await _discardPendingAudioFile();
@@ -1765,18 +1961,124 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     }
 
     _justTalkTimer?.cancel();
+    _justTalkAmplitudeSub?.cancel();
+    _justTalkAmplitudeSub = null;
     final stoppedPath = await _audioRecorder.stop();
     if (stoppedPath != null && stoppedPath.isNotEmpty) {
       _justTalkAudioPath = stoppedPath;
     }
 
+    if (_justTalkAudioPath == null || _justTalkAudioPath!.isEmpty) {
+      _showBanner('Recording failed. Try again.', color: _kPendingAmber);
+      _setOverlay(_CaddyPlayOverlay.none);
+      return;
+    }
+
+    await HapticService.light();
+    await _initJustTalkPreviewPlayer();
+    if (!mounted) {
+      return;
+    }
+    setState(() => _overlay = _CaddyPlayOverlay.justTalkPreview);
+  }
+
+  Future<void> _initJustTalkPreviewPlayer() async {
+    await _disposeJustTalkPreviewPlayer();
+    final path = _justTalkAudioPath;
+    if (path == null || path.isEmpty) {
+      return;
+    }
+    final player = AudioPlayer();
+    _justTalkPreviewPlayer = player;
+    await player.setFilePath(path);
+    player.playerStateStream.listen((state) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _justTalkPreviewPlaying = state.playing);
+    });
+    player.positionStream.listen((position) {
+      if (!mounted || _overlay != _CaddyPlayOverlay.justTalkPreview) {
+        return;
+      }
+      final totalMs = _justTalkDuration.inMilliseconds;
+      if (totalMs <= 0) {
+        return;
+      }
+      setState(() {
+        _justTalkAmplitude =
+            (position.inMilliseconds / totalMs).clamp(0.0, 1.0);
+      });
+    });
+  }
+
+  Future<void> _disposeJustTalkPreviewPlayer() async {
+    final player = _justTalkPreviewPlayer;
+    _justTalkPreviewPlayer = null;
+    _justTalkPreviewPlaying = false;
+    if (player == null) {
+      return;
+    }
+    try {
+      await player.stop();
+      await player.dispose();
+    } catch (_) {
+      // Best effort cleanup.
+    }
+  }
+
+  Future<void> _toggleJustTalkPreviewPlayback() async {
+    final player = _justTalkPreviewPlayer;
+    if (player == null) {
+      return;
+    }
+    if (player.playing) {
+      await player.pause();
+      await HapticService.light();
+      return;
+    }
+    await player.play();
+    await HapticService.light();
+  }
+
+  Future<void> _stopJustTalkPreviewPlayback() async {
+    final player = _justTalkPreviewPlayer;
+    if (player == null) {
+      return;
+    }
+    await player.stop();
+    await player.seek(Duration.zero);
+    if (mounted) {
+      setState(() => _justTalkAmplitude = 0);
+    }
+    await HapticService.light();
+  }
+
+  Future<void> _reRecordJustTalk() async {
+    await _disposeJustTalkPreviewPlayer();
+    await _discardPendingAudioFile();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _justTalkAnalysis = null;
+      _justTalkTranscript = '';
+      _justTalkAmplitude = 0;
+    });
+    await _openJustTalk();
+  }
+
+  Future<void> _confirmJustTalkRecording() async {
+    if (_overlay != _CaddyPlayOverlay.justTalkPreview) {
+      return;
+    }
+
+    await _stopJustTalkPreviewPlayback();
     final round = _activeRound;
     if (round == null) {
       return;
     }
 
-    // Cartesia STT — transcribe the recording (the app's single voice
-    // provider). Show the processing overlay while the request runs.
     setState(() => _overlay = _CaddyPlayOverlay.justTalkProcessing);
     final transcript = await _transcribeJustTalkAudio(_justTalkAudioPath);
     if (!mounted) {
@@ -1839,9 +2141,8 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         audioPath: analysis.audioPath,
         pendingProcessing: false,
       );
+      _overlay = _CaddyPlayOverlay.justTalkConfirmation;
     });
-
-    await _saveJustTalkMoment();
   }
 
   /// Transcribe a JustTalk recording with the Cartesia speech-to-text API.
@@ -1906,6 +2207,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     }
 
     await HapticService.light();
+    await _disposeJustTalkPreviewPlayer();
     final updated = round.addMoment(
       pendingMoment.copyWith(
         pendingProcessing: false,
@@ -1926,6 +2228,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   }
 
   Future<void> _discardJustTalk() async {
+    await _disposeJustTalkPreviewPlayer();
     await _discardPendingAudioFile();
     if (!mounted) {
       return;
@@ -1962,6 +2265,8 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
 
     if (_overlay == _CaddyPlayOverlay.justTalkRecording) {
       _justTalkTimer?.cancel();
+      _justTalkAmplitudeSub?.cancel();
+      _justTalkAmplitudeSub = null;
       await _audioRecorder.stop();
       await _discardPendingAudioFile();
       if (!mounted) {
@@ -1970,6 +2275,21 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       setState(() {
         _pendingTalkMoment = null;
         _justTalkAnalysis = null;
+        _justTalkAmplitude = 0;
+      });
+      _setOverlay(_CaddyPlayOverlay.none);
+      return;
+    }
+
+    if (_overlay == _CaddyPlayOverlay.justTalkPreview) {
+      await _disposeJustTalkPreviewPlayer();
+      await _discardPendingAudioFile();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _justTalkAnalysis = null;
+        _justTalkAmplitude = 0;
       });
       _setOverlay(_CaddyPlayOverlay.none);
       return;
@@ -2161,12 +2481,38 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     });
   }
 
-  Future<void> _completeRound() async {
-    final round = _activeRound;
-    if (round == null) {
+  Future<void> _confirmCompleteRound() async {
+    if (_activeRound == null) {
+      if (_completedRound != null) {
+        setState(() => _screen = _CaddyPlayScreen.home);
+      }
       return;
     }
 
+    final confirmed = await showFoCoCoConfirmDialog(
+      context: context,
+      title: 'Finish this round?',
+      message:
+          'Your round snapshot will be saved and you can start a new round from home.',
+      confirmLabel: 'Done',
+      cancelLabel: 'Keep reviewing',
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    await _completeRound();
+  }
+
+  Future<void> _completeRound() async {
+    if (_activeRound == null) {
+      if (_completedRound != null) {
+        setState(() => _screen = _CaddyPlayScreen.home);
+      }
+      return;
+    }
+
+    final round = _activeRound!;
     setState(() => _isSaving = true);
     try {
       final completed = await _sessionService.completeRound(
@@ -2180,8 +2526,9 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         _completedRound = completed;
         _snapshot = completed.snapshot;
         _activeRound = null;
-        _screen = _CaddyPlayScreen.snapshot;
+        _screen = _CaddyPlayScreen.home;
       });
+      _showBanner('Round saved.');
     } catch (error) {
       _showBanner('Unable to complete round: $error', color: _kPendingAmber);
     } finally {
@@ -2259,24 +2606,11 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   }
 
   void _setOverlay(_CaddyPlayOverlay overlay) {
-    if (overlay != _CaddyPlayOverlay.justTalkRecording &&
-        overlay != _CaddyPlayOverlay.justTalkProcessing &&
-        overlay != _CaddyPlayOverlay.justTalkConfirmation) {
-      _setJustTalkNavLabel(false);
-    }
-
     if (mounted) {
       setState(() => _overlay = overlay);
     } else {
       _overlay = overlay;
     }
-  }
-
-  void _setJustTalkNavLabel(bool enabled) {
-    setFoCoCoNavLabelOverride(
-      CaddyPlayWidget.routeName,
-      enabled ? 'Just Talk' : null,
-    );
   }
 
   String _formatDuration(Duration duration) {
@@ -2374,6 +2708,7 @@ class _CaddyGlowButton extends StatelessWidget {
     this.enabled = true,
     this.textColor = _CaddyPlayWidgetState._kCaddyGreen,
     this.fillColor = Colors.black12,
+    this.compact = false,
   });
 
   final String label;
@@ -2381,9 +2716,12 @@ class _CaddyGlowButton extends StatelessWidget {
   final bool enabled;
   final Color textColor;
   final Color fillColor;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final height = compact ? 56.0 : 72.0;
+    final fontSize = compact ? 18.0 : 20.0;
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 180),
       opacity: enabled ? 1 : 0.5,
@@ -2391,7 +2729,7 @@ class _CaddyGlowButton extends StatelessWidget {
         onTap: enabled ? onTap : null,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          height: 72,
+          height: height,
           decoration: BoxDecoration(
             color: fillColor.withValues(alpha: 0.24),
             borderRadius: BorderRadius.circular(16),
@@ -2410,7 +2748,7 @@ class _CaddyGlowButton extends StatelessWidget {
               label,
               style: TextStyle(
                 color: textColor,
-                fontSize: 20,
+                fontSize: fontSize,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.1,
               ),
@@ -2426,18 +2764,22 @@ class _CaddyGhostButton extends StatelessWidget {
   const _CaddyGhostButton({
     required this.label,
     required this.onTap,
+    this.compact = false,
   });
 
   final String label;
   final VoidCallback? onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final height = compact ? 52.0 : 64.0;
+    final fontSize = compact ? 18.0 : 20.0;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        height: 64,
+        height: height,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
@@ -2447,9 +2789,9 @@ class _CaddyGhostButton extends StatelessWidget {
         child: Center(
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 20,
+              fontSize: fontSize,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.8,
             ),
@@ -2583,7 +2925,6 @@ class _ActionTile extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         opacity: disabled ? 0.45 : 1,
         child: Container(
-          height: 236,
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(18),
@@ -2595,16 +2936,16 @@ class _ActionTile extends StatelessWidget {
               Icon(
                 icon,
                 color: _CaddyPlayWidgetState._kCaddyGreen,
-                size: 82,
+                size: 64,
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
               const _GlowSeparator(),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
               Text(
                 label,
                 style: const TextStyle(
                   color: _CaddyPlayWidgetState._kCaddyGreen,
-                  fontSize: 34,
+                  fontSize: 28,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 1,
                 ),
@@ -2634,7 +2975,6 @@ class _SecondaryActionTile extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        height: 118,
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.14),
           borderRadius: BorderRadius.circular(16),
@@ -2646,14 +2986,14 @@ class _SecondaryActionTile extends StatelessWidget {
             Icon(
               icon,
               color: _CaddyPlayWidgetState._kCaddyGreen,
-              size: 42,
+              size: 34,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               label,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 20,
+                fontSize: 17,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -2769,14 +3109,18 @@ class _MomentDot extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.child});
+  const _SummaryCard({
+    required this.child,
+    this.compact = false,
+  });
 
   final Widget child;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(compact ? 14 : 20),
       decoration: BoxDecoration(
         color: _CaddyPlayWidgetState._kCardColor,
         borderRadius: BorderRadius.circular(22),
@@ -2808,22 +3152,43 @@ class _SnapshotMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    return Column(
-      children: [
-        Text(
-          label,
-          style: theme.labelLarge.copyWith(
-            color: Colors.white.withValues(alpha: 0.72),
-            letterSpacing: 1.1,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: constraints.maxWidth,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.labelSmall.copyWith(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    letterSpacing: 0.6,
+                    fontSize: 10,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.titleMedium.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          value,
-          textAlign: TextAlign.center,
-          style: theme.headlineSmall.copyWith(color: color),
-        ),
-      ],
+        );
+      },
     );
   }
 }
@@ -2844,47 +3209,77 @@ class _SnapshotNumberBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    return Column(
-      children: [
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: theme.labelLarge.copyWith(
-            color: Colors.white.withValues(alpha: 0.72),
-            letterSpacing: 1.1,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: constraints.maxWidth,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.labelSmall.copyWith(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    letterSpacing: 0.6,
+                    fontSize: 10,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.headlineMedium.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  sublabel,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.bodySmall.copyWith(
+                    color: Colors.white.withValues(alpha: 0.78),
+                    fontSize: 10,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          value,
-          textAlign: TextAlign.center,
-          style: theme.displaySmall.copyWith(
-            color: color,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          sublabel,
-          textAlign: TextAlign.center,
-          style: theme.bodyMedium
-              .copyWith(color: Colors.white.withValues(alpha: 0.78)),
-        ),
-      ],
+        );
+      },
     );
   }
 }
 
 class _VerticalDividerGlow extends StatelessWidget {
-  const _VerticalDividerGlow();
+  const _VerticalDividerGlow({this.flexible = false});
+
+  final bool flexible;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final divider = Container(
       width: 1,
-      height: 82,
       color: Colors.white.withValues(alpha: 0.14),
-      margin: const EdgeInsets.symmetric(horizontal: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+    );
+    if (flexible) {
+      return divider;
+    }
+    return SizedBox(
+      height: 82,
+      child: divider,
     );
   }
 }
@@ -2923,66 +3318,220 @@ class _BadgePill extends StatelessWidget {
 class _MicOrb extends StatelessWidget {
   const _MicOrb({
     required this.warning,
-    required this.transcript,
     required this.elapsedLabel,
+    required this.amplitude,
+    required this.pulseAnimation,
     this.onTap,
   });
 
   final bool warning;
-  final String transcript;
   final String elapsedLabel;
+  final double amplitude;
+  final Animation<double> pulseAnimation;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final glowColor = warning
         ? _CaddyPlayWidgetState._kPendingAmber
-        : _CaddyPlayWidgetState._kCaddyGreen;
+        : _CaddyPlayWidgetState._kTalkPurple;
+    final pulseScale = 1 + (pulseAnimation.value * 0.08);
+    final ampScale = 1 + (amplitude * 0.22);
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         GestureDetector(
           onTap: onTap,
-          child: Container(
-          width: 240,
-          height: 240,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: glowColor.withValues(alpha: 0.45),
-                blurRadius: 38,
-                spreadRadius: 10,
-              ),
-            ],
-            gradient: RadialGradient(
-              colors: [
-                glowColor.withValues(alpha: 0.25),
-                Colors.black.withValues(alpha: 0.55),
+          child: AnimatedBuilder(
+            animation: pulseAnimation,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: pulseScale * ampScale,
+                child: child,
+              );
+            },
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                _VoiceWaveRing(
+                  color: glowColor,
+                  amplitude: amplitude,
+                  ringScale: 1.34,
+                ),
+                _VoiceWaveRing(
+                  color: glowColor,
+                  amplitude: amplitude,
+                  ringScale: 1.16,
+                ),
+                Container(
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: glowColor.withValues(
+                          alpha: 0.28 + (amplitude * 0.35),
+                        ),
+                        blurRadius: 34 + (amplitude * 24),
+                        spreadRadius: 8 + (amplitude * 10),
+                      ),
+                    ],
+                    gradient: RadialGradient(
+                      colors: [
+                        glowColor.withValues(alpha: 0.28 + (amplitude * 0.2)),
+                        Colors.black.withValues(alpha: 0.55),
+                      ],
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.mic_rounded,
+                    color: glowColor,
+                    size: 96,
+                  ),
+                ),
               ],
             ),
           ),
-          child: Icon(
-            Icons.mic_rounded,
-            color: glowColor,
-            size: 110,
-          ),
         ),
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         Text(
           elapsedLabel,
-          style: const TextStyle(color: Colors.white70, fontSize: 18),
-        ),
-        if (transcript.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text(
-            transcript,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white, fontSize: 16),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
           ),
-        ],
+        ),
       ],
+    );
+  }
+}
+
+class _VoiceWaveRing extends StatelessWidget {
+  const _VoiceWaveRing({
+    required this.color,
+    required this.amplitude,
+    required this.ringScale,
+  });
+
+  final Color color;
+  final double amplitude;
+  final double ringScale;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = 220 * ringScale * (1 + amplitude * 0.12);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: color.withValues(alpha: 0.18 + (amplitude * 0.45)),
+          width: 2 + (amplitude * 2.5),
+        ),
+      ),
+    );
+  }
+}
+
+class _JustTalkWaveformPreview extends StatelessWidget {
+  const _JustTalkWaveformPreview({
+    required this.amplitude,
+    required this.playing,
+  });
+
+  final double amplitude;
+  final bool playing;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 120,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: List<Widget>.generate(18, (index) {
+          final wave =
+              (math.sin((index * 0.72) + (amplitude * 8)) + 1) / 2;
+          final level = playing
+              ? (0.25 + (wave * 0.75) * (0.35 + amplitude * 0.65))
+              : 0.18 + (amplitude * 0.12);
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOut,
+            width: 6,
+            height: 18 + (level * 72),
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            decoration: BoxDecoration(
+              color: _CaddyPlayWidgetState._kTalkPurple
+                  .withValues(alpha: 0.35 + (level * 0.55)),
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: playing
+                  ? [
+                      BoxShadow(
+                        color: _CaddyPlayWidgetState._kTalkPurple
+                            .withValues(alpha: 0.25),
+                        blurRadius: 8,
+                      ),
+                    ]
+                  : null,
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _JustTalkPreviewControl extends StatelessWidget {
+  const _JustTalkPreviewControl({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.highlighted = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = highlighted
+        ? _CaddyPlayWidgetState._kTalkPurple
+        : Colors.white.withValues(alpha: 0.82);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox(
+        width: 84,
+        child: Column(
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: highlighted
+                    ? color.withValues(alpha: 0.18)
+                    : Colors.white.withValues(alpha: 0.08),
+                border: Border.all(color: color.withValues(alpha: 0.75)),
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: color, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

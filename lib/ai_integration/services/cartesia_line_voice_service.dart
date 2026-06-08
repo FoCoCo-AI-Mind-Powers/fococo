@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io' show WebSocket;
 import 'dart:typed_data';
@@ -6,6 +7,8 @@ import 'dart:typed_data';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart'
+    show MediaItem;
 import 'package:record/record.dart';
 import 'package:web_socket_channel/io.dart';
 
@@ -66,8 +69,15 @@ class CartesiaLineVoiceService {
   CartesiaLineVoiceState _state = CartesiaLineVoiceState.idle;
   bool _keepAlive = false;
   Timer? _pingTimer;
-  final BytesBuilder _outputPcm = BytesBuilder(copy: false);
+  final Queue<Uint8List> _outputQueue = Queue<Uint8List>();
+  int _playbackGeneration = 0;
+  bool _outputDrainActive = false;
+  Future<void> _playbackChain = Future<void>.value();
+  Completer<void>? _ackCompleter;
   static const int _inputSampleRate = 16000;
+  static const int _outputSampleRate = 24000;
+  /// Batch streamed PCM before each play() to avoid rapid setAudioSource churn.
+  static const int _outputBatchBytes = 12000;
 
   Stream<CartesiaLineVoiceState> get stateStream => _stateController.stream;
   Stream<String> get transcriptStream => _transcriptController.stream;
@@ -113,6 +123,7 @@ class CartesiaLineVoiceService {
       }
 
       await AudioSessionService.activateVoiceChat();
+      await _resetPlaybackPipeline();
 
       final uri = Uri.parse(
         '${CartesiaConfig.lineWebSocketBase}/agents/stream/$_agentId',
@@ -170,7 +181,14 @@ class CartesiaLineVoiceService {
         startPayload['agent'] = agentOverrides;
       }
 
+      _ackCompleter = Completer<void>();
       _channel!.sink.add(jsonEncode(startPayload));
+      await _ackCompleter!.future.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw StateError('Cartesia Line did not acknowledge stream start');
+        },
+      );
 
       if (!await _recorder.hasPermission()) {
         throw StateError('Microphone permission denied');
@@ -192,7 +210,13 @@ class CartesiaLineVoiceService {
       return true;
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('❌ Cartesia Line connect failed: $e');
+        if (e is FirebaseFunctionsException) {
+          debugPrint(
+            '❌ Cartesia Line connect failed: ${e.code} ${e.message ?? e.details}',
+          );
+        } else {
+          debugPrint('❌ Cartesia Line connect failed: $e');
+        }
       }
       _setState(CartesiaLineVoiceState.error);
       await disconnect();
@@ -228,7 +252,13 @@ class CartesiaLineVoiceService {
 
     switch (event) {
       case 'ack':
-        _streamId = (data['stream_id'] ?? '').toString();
+        final streamId = (data['stream_id'] ?? '').toString();
+        if (streamId.isEmpty) break;
+        _streamId = streamId;
+        final ack = _ackCompleter;
+        if (ack != null && !ack.isCompleted) {
+          ack.complete();
+        }
         break;
       case 'media_output':
         final media = data['media'];
@@ -237,9 +267,7 @@ class CartesiaLineVoiceService {
         if (b64.isEmpty) break;
         try {
           final bytes = base64Decode(b64);
-          _outputPcm.add(bytes);
-          _setState(CartesiaLineVoiceState.speaking);
-          await _flushOutputAudio();
+          unawaited(_enqueueOutputChunk(bytes));
         } catch (e) {
           if (kDebugMode) {
             debugPrint('⚠️ Line media_output decode failed: $e');
@@ -247,8 +275,15 @@ class CartesiaLineVoiceService {
         }
         break;
       case 'clear':
-        await _interruptPlayback();
-        _setState(CartesiaLineVoiceState.listening);
+        unawaited(_handleClearEvent());
+        break;
+      case 'error':
+        if (kDebugMode) {
+          debugPrint('⚠️ Cartesia Line error event: $data');
+        }
+        if (_keepAlive) {
+          _setState(CartesiaLineVoiceState.error);
+        }
         break;
       case 'transfer_call':
         if (kDebugMode) {
@@ -260,27 +295,118 @@ class CartesiaLineVoiceService {
     }
   }
 
-  Future<void> _interruptPlayback() async {
-    _outputPcm.clear();
+  MediaItem _lineMediaItem() => MediaItem(
+        id: 'fococo-line-${DateTime.now().microsecondsSinceEpoch}',
+        title: 'FoCoCo Voice',
+        artist: 'FoCoCo',
+      );
+
+  Future<void> _resetPlaybackPipeline() async {
+    _playbackGeneration++;
+    _outputQueue.clear();
     try {
       await _player.stop();
     } catch (_) {}
+    _playbackChain = Future<void>.value();
   }
 
-  Future<void> _flushOutputAudio() async {
-    if (_outputPcm.isEmpty) return;
+  Future<void> _enqueueOutputChunk(Uint8List pcm) {
+    if (!_keepAlive || pcm.isEmpty) {
+      return Future<void>.value();
+    }
+    _outputQueue.add(pcm);
+    _playbackChain = _playbackChain.then((_) => _drainOutputQueue());
+    return _playbackChain;
+  }
+
+  Future<void> _drainOutputQueue() async {
+    if (_outputDrainActive || !_keepAlive) return;
+    _outputDrainActive = true;
     try {
-      final pcm = _outputPcm.takeBytes();
-      final wav = _pcmToWav(pcm, sampleRate: 24000);
-      await _player.setAudioSource(_LinePcmSource(wav));
-      if (!_player.playing) {
-        await _player.play();
+      while (_keepAlive && _outputQueue.isNotEmpty) {
+        final generation = _playbackGeneration;
+        final pcm = _takeOutputBatch();
+        if (pcm.isEmpty) continue;
+
+        try {
+          final wav = _pcmToWav(pcm, sampleRate: _outputSampleRate);
+          try {
+            await _player.stop();
+          } catch (_) {}
+          if (!_keepAlive || generation != _playbackGeneration) continue;
+
+          await _player.setAudioSource(
+            AudioSource.uri(
+              Uri.dataFromBytes(wav, mimeType: 'audio/wav'),
+              tag: _lineMediaItem(),
+            ),
+          );
+          if (!_keepAlive || generation != _playbackGeneration) continue;
+
+          _setState(CartesiaLineVoiceState.speaking);
+          await _player.play();
+          if (generation != _playbackGeneration) {
+            try {
+              await _player.stop();
+            } catch (_) {}
+            continue;
+          }
+
+          await _player.processingStateStream.firstWhere(
+            (state) =>
+                state == ProcessingState.completed ||
+                generation != _playbackGeneration,
+          );
+        } catch (e) {
+          if (_isBenignPlaybackError(e, generation)) continue;
+          if (kDebugMode && generation == _playbackGeneration) {
+            debugPrint('⚠️ Line playback failed: $e');
+          }
+        }
       }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('⚠️ Line playback failed: $e');
+    } finally {
+      _outputDrainActive = false;
+      if (_keepAlive && _outputQueue.isNotEmpty) {
+        unawaited(_drainOutputQueue());
+      } else if (_keepAlive &&
+          _state == CartesiaLineVoiceState.speaking &&
+          _outputQueue.isEmpty) {
+        _setState(CartesiaLineVoiceState.listening);
       }
     }
+  }
+
+  Uint8List _takeOutputBatch() {
+    final builder = BytesBuilder(copy: false);
+    while (_outputQueue.isNotEmpty && builder.length < _outputBatchBytes) {
+      builder.add(_outputQueue.removeFirst());
+    }
+    return Uint8List.fromList(builder.toBytes());
+  }
+
+  bool _isBenignPlaybackError(Object error, int generation) {
+    if (generation != _playbackGeneration) return true;
+    final message = error.toString().toLowerCase();
+    return message.contains('loading interrupted') ||
+        message.contains('aborted');
+  }
+
+  Future<void> _handleClearEvent() async {
+    await _interruptPlayback();
+    if (_keepAlive) {
+      _setState(CartesiaLineVoiceState.listening);
+    }
+  }
+
+  Future<void> _interruptPlayback() async {
+    _playbackGeneration++;
+    _outputQueue.clear();
+    try {
+      await _playbackChain;
+    } catch (_) {}
+    try {
+      await _player.stop();
+    } catch (_) {}
   }
 
   void _onSocketError(Object error) {
@@ -325,6 +451,11 @@ class CartesiaLineVoiceService {
     } catch (_) {}
     _channel = null;
     _streamId = null;
+    final ack = _ackCompleter;
+    if (ack != null && !ack.isCompleted) {
+      ack.completeError(StateError('Line session ended'));
+    }
+    _ackCompleter = null;
 
     await _interruptPlayback();
     await AudioSessionService.deactivateVoiceChat();
@@ -356,24 +487,5 @@ class CartesiaLineVoiceService {
     _stateController.close();
     _transcriptController.close();
     _player.dispose();
-  }
-}
-
-class _LinePcmSource extends StreamAudioSource {
-  _LinePcmSource(this._wav);
-
-  final Uint8List _wav;
-
-  @override
-  Future<StreamAudioResponse> request([int? start, int? end]) async {
-    start ??= 0;
-    end ??= _wav.length;
-    return StreamAudioResponse(
-      sourceLength: _wav.length,
-      contentLength: end - start,
-      offset: start,
-      stream: Stream.value(_wav.sublist(start, end)),
-      contentType: 'audio/wav',
-    );
   }
 }

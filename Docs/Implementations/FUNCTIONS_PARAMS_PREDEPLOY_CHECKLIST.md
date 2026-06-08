@@ -16,9 +16,10 @@ Required keys:
 - `CARTESIA_LINE_AGENT_ID` (Cartesia Line agent id after `cartesia deploy`)
 - `CARTESIA_PRONUNCIATION_DICT_ID` (optional; sonic-3+ custom pronunciations)
 
-> Gemini and Cartesia API keys are NOT listed here. They live in Google Cloud
-> Secret Manager as `GEMINI_KEY_APP` and `CARTESIA_API`, consumed only by Cloud
-> Functions via `defineSecret(...)`. Never place them in `.env.*`.
+> Gemini and Cartesia secrets are NOT listed here. They live in Google Cloud
+> Secret Manager as `GEMINI_KEY_APP`, `CARTESIA_API`, and `CARTESIA_VOICE_ID`,
+> consumed only by Cloud Functions via `defineSecret(...)`. Never place them in
+> `.env.*`.
 
 Template:
 

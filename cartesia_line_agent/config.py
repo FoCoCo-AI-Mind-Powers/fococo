@@ -7,9 +7,11 @@ spoken agent voice matches plain TTS (§8 of the migration guide).
 
 import os
 
-# Voice — same ID used by plain TTS so the agent sounds identical (§4/§8).
-# Kept in sync with lib/ai_integration/config/cartesia_config.dart.
-CARTESIA_VOICE_ID = "fee439a9-751d-4d14-9974-a09de45bd053"
+# Voice — loaded from Secret Manager / env (`CARTESIA_VOICE_ID`). Fallback only
+# for local dev before secrets are wired.
+CARTESIA_VOICE_ID = os.getenv(
+    "CARTESIA_VOICE_ID", "fee439a9-751d-4d14-9974-a09de45bd053"
+).strip()
 
 # Gemini does the reasoning/generation; Cartesia provides STT (Ink) + voice.
 GEMINI_MODEL = "gemini/gemini-2.5-flash"

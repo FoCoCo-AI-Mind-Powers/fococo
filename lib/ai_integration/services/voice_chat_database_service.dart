@@ -285,6 +285,50 @@ class VoiceChatDatabaseService {
     }
   }
 
+  /// Live list of GolfChat sessions for the signed-in user (newest first).
+  Stream<List<VoiceChatSession>> streamGolfChatSessions({int limit = 40}) {
+    if (_currentUserId == null) {
+      return const Stream<List<VoiceChatSession>>.empty();
+    }
+
+    return _firestore
+        .collection(_sessionsCollection)
+        .where('userId', isEqualTo: _currentUserId)
+        .orderBy('startTime', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snapshot) {
+      final sessions = snapshot.docs
+          .map((doc) => VoiceChatSession.fromFirestore(
+                doc.data(),
+              ))
+          .where(
+            (session) => session.sessionMetadata['surface'] == 'golfchat',
+          )
+          .toList();
+      return sessions;
+    });
+  }
+
+  /// Fetch a single persisted session by id.
+  Future<VoiceChatSession?> getSessionById(String sessionId) async {
+    if (_currentUserId == null || sessionId.trim().isEmpty) {
+      return null;
+    }
+
+    final doc =
+        await _firestore.collection(_sessionsCollection).doc(sessionId).get();
+    if (!doc.exists) {
+      return null;
+    }
+
+    final session = VoiceChatSession.fromFirestore(doc.data()!);
+    if (session.userId != _currentUserId) {
+      return null;
+    }
+    return session;
+  }
+
   /// Get user's voice chat sessions
   Future<List<VoiceChatSession>> getUserSessions({
     int limit = 20,

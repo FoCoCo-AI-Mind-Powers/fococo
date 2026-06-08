@@ -34,6 +34,7 @@ import '/pages/just_talk/just_talk_widget.dart';
 import '/pages/register/account_created_widget.dart';
 import '/pages/register/age_verification_widget.dart';
 import '/pages/fococo_tab/fococo_tab_widget.dart';
+import '/pages/favorites/favorites_page_widget.dart';
 import '/features/mindcoach_v2/app/mindcoach_v2_entry_widget.dart';
 import '/config/app_feature_flags.dart';
 import '/services/deferred_auth_flow_gate.dart';
@@ -164,6 +165,8 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
                               params.state.extraMap['caddyplaySnapshot'] as Map,
                             )
                           : null,
+                  initialSessionId:
+                      params.state.extraMap['sessionId'] as String?,
                 ),
               ).toRoute(appStateNotifier),
             ]),
@@ -291,6 +294,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
             path: '/support',
             requireAuth: true,
             builder: (context, params) => const SupportWidget(),
+          ),
+          FFRoute(
+            name: FavoritesPageWidget.routeName,
+            path: FavoritesPageWidget.routePath,
+            requireAuth: true,
+            builder: (context, params) => const FavoritesPageWidget(),
           ),
           FFRoute(
             name: 'report_bug',
@@ -699,7 +708,13 @@ class _FoCoCoTabShellState extends State<_FoCoCoTabShell> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBody: true,
-      body: widget.shell,
+      body: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          widget.shell,
+          buildFoCoCoFloatingAudioOverlay(context, currentRoute),
+        ],
+      ),
       bottomNavigationBar: buildFoCoCoBottomNavBar(
         context: context,
         currentRoute: currentRoute,

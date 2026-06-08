@@ -12,11 +12,15 @@ class GolfChatVisuals extends StatelessWidget {
     required this.visuals,
     required this.theme,
     required this.textColor,
+    this.accentColor,
   });
 
   final List<Map<String, dynamic>> visuals;
   final FlutterFlowTheme theme;
   final Color textColor;
+  final Color? accentColor;
+
+  Color get _accent => accentColor ?? theme.primary;
 
   static const List<Color> _palette = [
     Color(0xFF4F8DFD),
@@ -84,6 +88,7 @@ class GolfChatVisuals extends StatelessWidget {
     final title = (spec['title'] ?? '').toString().trim();
     return _framed(
       title: title,
+      accent: _accent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -276,33 +281,54 @@ class GolfChatVisuals extends StatelessWidget {
         : <List<String>>[];
     if (columns.isEmpty || rows.isEmpty) return null;
 
-    final borderColor = textColor.withValues(alpha: 0.2);
+    final borderColor = _accent.withValues(alpha: 0.28);
     final title = (spec['title'] ?? '').toString().trim();
 
     return _framed(
       title: title,
-      child: Table(
-        border: TableBorder.all(color: borderColor, width: 1),
-        defaultColumnWidth: const IntrinsicColumnWidth(),
-        children: [
-          TableRow(
-            decoration:
-                BoxDecoration(color: textColor.withValues(alpha: 0.06)),
-            children: [
-              for (final c in columns)
-                _cell(c, theme.bodySmall.copyWith(
-                    color: textColor, fontWeight: FontWeight.w700)),
-            ],
-          ),
-          for (final row in rows)
+      accent: _accent,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Table(
+          border: TableBorder.all(color: borderColor, width: 1),
+          defaultColumnWidth: const IntrinsicColumnWidth(),
+          children: [
             TableRow(
+              decoration: BoxDecoration(
+                color: _accent.withValues(alpha: 0.16),
+              ),
               children: [
-                for (var i = 0; i < columns.length; i++)
-                  _cell(i < row.length ? row[i] : '',
-                      theme.bodySmall.copyWith(color: textColor)),
+                for (final c in columns)
+                  _cell(
+                    c,
+                    theme.bodySmall.copyWith(
+                      color: _accent,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
               ],
             ),
-        ],
+            for (var r = 0; r < rows.length; r++)
+              TableRow(
+                decoration: BoxDecoration(
+                  color: r.isOdd
+                      ? textColor.withValues(alpha: 0.04)
+                      : Colors.transparent,
+                ),
+                children: [
+                  for (var i = 0; i < columns.length; i++)
+                    _cell(
+                      i < rows[r].length ? rows[r][i] : '',
+                      theme.bodySmall.copyWith(
+                        color: textColor.withValues(alpha: 0.92),
+                        fontWeight:
+                            i == 0 ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -313,15 +339,22 @@ class GolfChatVisuals extends StatelessWidget {
       );
 
   // ── Shared frame (optional title + scroll guard for wide content) ────────
-  Widget _framed({required String title, required Widget child}) => Column(
+  Widget _framed({
+    required String title,
+    required Widget child,
+    Color? accent,
+  }) =>
+      Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           if (title.isNotEmpty) ...[
             Text(
               title,
-              style: theme.bodySmall
-                  .copyWith(color: textColor, fontWeight: FontWeight.w700),
+              style: theme.bodySmall.copyWith(
+                color: accent ?? textColor,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 6),
           ],

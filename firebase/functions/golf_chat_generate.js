@@ -15,7 +15,8 @@ const MAX_HISTORY_TURNS = 24;
 const MAX_MESSAGE_CHARS = 4000;
 // Internal reasoning budget — lets the model decide whether a visual helps and
 // shape the data before answering. Separate from maxOutputTokens.
-const GOLF_CHAT_THINKING_BUDGET = 2048;
+const GOLF_CHAT_THINKING_BUDGET = 1024;
+const GOLF_CHAT_MAX_OUTPUT_TOKENS = 4096;
 // Cap on how many tool-call round-trips a single reply may take. Charts/tables
 // are client-rendered, so one round is normally enough; the cap is a safety net.
 const MAX_TOOL_ROUNDS = 3;
@@ -23,20 +24,25 @@ const MAX_TOOL_ROUNDS = 3;
 const FOCOCO_GOLFCHAT_SYSTEM =
   'GolfChat is not a swing coach. Keep responses focused on the golfer\'s decision, ' +
   'commitment, routine, focus, confidence, control, and response under pressure. ' +
-  'Calm. Short. Observational. Pattern-based. One idea per reply. No lists. No therapy language. ' +
+  'Calm. Observational. Pattern-based. No therapy language. ' +
   'Structure every reply: Acknowledge → One observation from their data → One question only. ' +
-  'Target 80–140 words; never exceed 180 words. Plain conversational text only — no markdown, ' +
-  'headings, bullets, numbered lists, tables, or pipe characters. Never discuss swing mechanics, ' +
+  'Always finish every sentence and thought completely — never stop mid-phrase or mid-sentence. ' +
+  'When the player asks for depth or tips, give a full, helpful answer with as much detail as needed. ' +
+  'Use Markdown when it helps readability (**bold**, lists, ### headings). Never discuss swing mechanics, ' +
   'clubface, ball flight fixes, slice/hook causes, or body rotation sequences. ' +
+  'For round reflections and stat breakdowns, call render_table instead of markdown pipe tables. ' +
   'Follow units_preference in context: metric uses metres and Celsius; do not use yards unless asked.';
 
 const VISUAL_TOOL_GUIDANCE =
   'You can render visuals for the player when it genuinely helps understanding: ' +
   'call render_chart for trends, comparisons, or distributions, and render_table ' +
-  'for side-by-side breakdowns. Prefer plain conversational text for most replies; ' +
-  'reach for a visual only when the data is clearer shown than told. After rendering, ' +
-  'briefly narrate what it shows in one or two sentences. Never invent numbers the ' +
-  'player has not actually provided or that are not in the context.';
+  'for side-by-side breakdowns — especially round overviews (course, date, score, moments). ' +
+  'Prefer render_table over markdown pipe tables in your text. Prefer plain conversational text for most replies; ' +
+  'reach for a visual only when the data is clearer shown than told. If you call a visual tool, ' +
+  'do not send the final player-facing answer until after the tool — the post-tool message must be ' +
+  'a complete reply (full sentences, not a fragment). After rendering, narrate what it shows and ' +
+  'continue the conversation. Never invent numbers the player has not actually provided or that ' +
+  'are not in the context.';
 
 // Client-rendered tools: the function call args ARE the visual spec. The backend
 // does not execute anything — it collects the spec, returns an acknowledgement so
@@ -120,6 +126,15 @@ const VISUAL_TOOLS = [
 function safeString(value, fallback = '') {
   if (value == null) return fallback;
   return String(value).trim();
+}
+
+function extractResponseText(parts) {
+  if (!Array.isArray(parts)) return '';
+  return parts
+    .filter((part) => part && part.functionCall == null && part.thought !== true)
+    .map((part) => part.text || '')
+    .join('')
+    .trim();
 }
 
 // Normalize a model function call into a validated client visual spec, or null
@@ -273,6 +288,7 @@ async function generateGolfChatResponseImpl(data, context) {
 
   const visuals = [];
   let finalText = '';
+  let fallbackText = '';
   let totalAttempts = 0;
 
   try {
@@ -281,19 +297,34 @@ async function generateGolfChatResponseImpl(data, context) {
       totalAttempts += attempts;
 
       const candidate = data?.candidates?.[0];
+      const finishReason = safeString(candidate?.finishReason);
       const parts = Array.isArray(candidate?.content?.parts)
         ? candidate.content.parts
         : [];
 
       const functionCalls = parts.filter((part) => part && part.functionCall);
-      const text = parts
-        .filter((part) => part && part.functionCall == null && part.thought !== true)
-        .map((part) => part.text || '')
-        .join('')
-        .trim();
-      if (text) finalText = text;
+      const text = extractResponseText(parts);
+      if (text) {
+        fallbackText = text;
+      }
 
-      if (functionCalls.length === 0 || round === MAX_TOOL_ROUNDS) {
+      // Only treat text as the player-facing answer when this turn has no pending
+      // tool calls — otherwise we keep a partial preamble ("…when you have") and
+      // stop before the post-tool completion.
+      if (functionCalls.length === 0) {
+        if (text) {
+          finalText = text;
+        }
+        if (finishReason === 'MAX_TOKENS') {
+          logger.warn('[golfChat:gemini] response hit maxOutputTokens', {
+            round,
+            textChars: text.length,
+          });
+        }
+        break;
+      }
+
+      if (round === MAX_TOOL_ROUNDS) {
         break;
       }
 
@@ -331,6 +362,10 @@ async function generateGolfChatResponseImpl(data, context) {
     );
   }
 
+  if (!finalText) {
+    finalText = fallbackText;
+  }
+
   if (!finalText && visuals.length === 0) {
     throw new functions.https.HttpsError('internal', 'Empty response from Gemini');
   }
@@ -355,7 +390,7 @@ async function requestGeneration({ endpoint, apiKey, contents }) {
           generationConfig: {
             temperature: 0.7,
             topP: 0.95,
-            maxOutputTokens: 768,
+            maxOutputTokens: GOLF_CHAT_MAX_OUTPUT_TOKENS,
             thinkingConfig: { thinkingBudget: GOLF_CHAT_THINKING_BUDGET },
           },
           contents,

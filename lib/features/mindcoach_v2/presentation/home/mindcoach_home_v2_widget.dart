@@ -8,6 +8,7 @@ import '/ai_integration/widgets/navbar_widget.dart';
 import '/features/mindcoach_v2/data/mindcoach_v2_repository.dart';
 import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart';
 import '/features/mindcoach_v2/presentation/shared/mindcoach_v2_visuals.dart';
+import '/features/mindcoach_v2/services/mindcoach_favorite_launcher.dart';
 import '/features/mindcoach_v2/services/mindcoach_v2_catalog_service.dart';
 
 class MindCoachHomeV2Widget extends StatefulWidget {
@@ -15,14 +16,11 @@ class MindCoachHomeV2Widget extends StatefulWidget {
     super.key,
     required this.repository,
     required this.onGenerateRequested,
-    required this.onResumeRequested,
   });
 
   final MindCoachV2Repository repository;
   final Future<void> Function(MindCoachV2GenerateRequest request)
       onGenerateRequested;
-  final Future<void> Function(MindCoachV2ResumePayload payload)
-      onResumeRequested;
 
   @override
   State<MindCoachHomeV2Widget> createState() => _MindCoachHomeV2WidgetState();
@@ -30,12 +28,10 @@ class MindCoachHomeV2Widget extends StatefulWidget {
 
 class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
   MindCoachV2Catalog? _catalog;
-  MindCoachV2ResumePayload? _resumePayload;
   MindCoachV2Pillar? _selectedPillar;
   MindCoachV2ContextMode? _selectedContext;
   bool _loading = true;
   bool _starting = false;
-  bool _resumeDismissed = false;
   bool _favoritesExpanded = false;
   String? _loadError;
 
@@ -61,18 +57,14 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
     }
 
     try {
-      final results = await Future.wait<dynamic>([
-        MindCoachV2CatalogService.instance.load(),
-        widget.repository.getResumePayload(),
-      ]);
+      final catalog = await MindCoachV2CatalogService.instance.load();
 
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _catalog = results[0] as MindCoachV2Catalog;
-        _resumePayload = results[1] as MindCoachV2ResumePayload?;
+        _catalog = catalog;
         _loading = false;
       });
       _syncShellChrome();
@@ -166,25 +158,6 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
     }
   }
 
-  Future<void> _handleResume() async {
-    final payload = _resumePayload;
-    if (payload == null || _starting) {
-      return;
-    }
-
-    setState(() => _starting = true);
-    try {
-      await widget.onResumeRequested(payload);
-      if (mounted) {
-        await _loadInitialState();
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _starting = false);
-      }
-    }
-  }
-
   String _deliveryLengthForSession(MindCoachV2CatalogSession session) {
     if (session.contextMode == MindCoachV2ContextMode.duringRound ||
         session.durationSec <= 20) {
@@ -230,18 +203,7 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
   }
 
   Future<void> _startFavorite(MindCoachV2Favorite favorite) {
-    return _startCatalogSession(
-      MindCoachV2CatalogSession(
-        key: favorite.sessionKey,
-        name: favorite.sessionName,
-        descriptor: favorite.sessionDescriptor,
-        durationSec: favorite.durationSec,
-        templateId: favorite.templateId,
-        pillar: favorite.pillar,
-        contextMode: favorite.contextMode,
-      ),
-      entrySource: 'favorite_replay',
-    );
+    return MindCoachFavoriteLauncher.openFavorite(context, favorite);
   }
 
   Widget _buildHomeScreen(MindCoachV2Catalog catalog) {
@@ -252,9 +214,7 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
         22,
         16 + viewPadding.top,
         22,
-        viewPadding.bottom +
-            kFoCoCoBottomNavStripAndTabsHeight +
-            24,
+        foCoCoTabShellBottomReserve(context, extra: 32),
       ),
       children: [
         const SizedBox(height: 4),
@@ -276,15 +236,6 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
                 fontWeight: FontWeight.w400,
               ),
         ),
-        if (_resumePayload != null && !_resumeDismissed) ...[
-          const SizedBox(height: 28),
-          _ResumePill(
-            onResume: _starting ? null : _handleResume,
-            onDismiss: () {
-              setState(() => _resumeDismissed = true);
-            },
-          ),
-        ],
         const SizedBox(height: 34),
         for (var i = 0; i < MindCoachV2Visuals.homePillarOrder.length; i++) ...[
           _MindCoachPillarTabCard(
@@ -323,9 +274,7 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
                   22,
                   12,
                   22,
-                  viewPadding.bottom +
-                      kFoCoCoBottomNavStripAndTabsHeight +
-                      24,
+                  foCoCoTabShellBottomReserve(context, extra: 32),
                 ),
                 children: [
             _ContextCard(
@@ -333,6 +282,9 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
               subtitle:
                   pillar.rowDescriptors[MindCoachV2ContextMode.duringRound] ??
                       '',
+              durationHint: pillar
+                  .context(MindCoachV2ContextMode.duringRound)
+                  .durationHint,
               color: accent,
               onTap: () => _openContext(MindCoachV2ContextMode.duringRound),
             ),
@@ -342,6 +294,9 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
               subtitle:
                   pillar.rowDescriptors[MindCoachV2ContextMode.beforeRound] ??
                       '',
+              durationHint: pillar
+                  .context(MindCoachV2ContextMode.beforeRound)
+                  .durationHint,
               color: accent,
               onTap: () => _openContext(MindCoachV2ContextMode.beforeRound),
             ),
@@ -351,6 +306,9 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
               subtitle:
                   pillar.rowDescriptors[MindCoachV2ContextMode.afterRound] ??
                       '',
+              durationHint: pillar
+                  .context(MindCoachV2ContextMode.afterRound)
+                  .durationHint,
               color: accent,
               onTap: () => _openContext(MindCoachV2ContextMode.afterRound),
             ),
@@ -359,6 +317,7 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
               color: accent,
               expanded: _favoritesExpanded,
               favorites: favorites,
+              starting: _starting,
               onTap: () {
                 setState(() => _favoritesExpanded = !_favoritesExpanded);
               },
@@ -379,31 +338,28 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
   ) {
     final accent = MindCoachV2Visuals.accentForPillar(pillar.key);
     final viewPadding = MediaQuery.viewPaddingOf(context);
+    final contextSubtitle =
+        pillar.rowDescriptors[contextModel.mode] ?? pillar.descriptor;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _PillarHeader(
-          title: pillar.label,
-          subtitle: pillar.descriptor,
+          title: contextModel.label,
+          subtitle: contextSubtitle,
           color: accent,
           onBack: _goBackOneLevel,
           topInset: viewPadding.top,
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(22, 8, 22, 0),
-          child: Column(
-            children: [
-              Text(
-                contextModel.label,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              MindCoachGlowLine(color: accent, width: 188),
-            ],
+          padding: const EdgeInsets.fromLTRB(22, 4, 22, 0),
+          child: Text(
+            '${pillar.label} · ${contextModel.sessions.length} sessions',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.58),
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
+                ),
           ),
         ),
         Expanded(
@@ -411,29 +367,27 @@ class _MindCoachHomeV2WidgetState extends State<MindCoachHomeV2Widget> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.fromLTRB(
               22,
-              12,
+              16,
               22,
-              viewPadding.bottom +
-                  kFoCoCoBottomNavStripAndTabsHeight +
-                  24,
+              foCoCoTabShellBottomReserve(context, extra: 48),
             ),
             children: [
-        for (final session in contextModel.sessions) ...[
-          _SessionListRow(
-            color: accent,
-            session: session,
-            onTap: _starting
-                ? null
-                : () => _startCatalogSession(
-                      session,
-                      entrySource: contextModel.mode ==
-                              MindCoachV2ContextMode.duringRound
-                          ? 'during_round_overlay'
-                          : 'session_list',
-                    ),
-          ),
-          const SizedBox(height: 18),
-        ],
+              for (final session in contextModel.sessions) ...[
+                _SessionStartCard(
+                  color: accent,
+                  session: session,
+                  durationHint: contextModel.durationHint,
+                  starting: _starting,
+                  onStart: () => _startCatalogSession(
+                    session,
+                    entrySource: contextModel.mode ==
+                            MindCoachV2ContextMode.duringRound
+                        ? 'during_round_overlay'
+                        : 'session_list',
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
             ],
           ),
         ),
@@ -683,63 +637,6 @@ class _MindCoachPillarTabCardState extends State<_MindCoachPillarTabCard>
   }
 }
 
-class _ResumePill extends StatelessWidget {
-  const _ResumePill({
-    required this.onResume,
-    required this.onDismiss,
-  });
-
-  final VoidCallback? onResume;
-  final VoidCallback onDismiss;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        color: Colors.white.withValues(alpha: 0.035),
-        border: Border.all(
-          color: const Color(0xFF398EFF).withValues(alpha: 0.44),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              'Resume session?',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.92),
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-          ),
-          TextButton(
-            onPressed: onResume,
-            child: const Text('Resume'),
-          ),
-          Text(
-            '·',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.48),
-              fontSize: 18,
-            ),
-          ),
-          TextButton(
-            onPressed: onDismiss,
-            child: Text(
-              'Dismiss',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.74),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _PillarHeader extends StatelessWidget {
   const _PillarHeader({
     required this.title,
@@ -848,6 +745,7 @@ class _ContextCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return MindCoachGlowCard(
       color: color,
+      showTopGlow: true,
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
       onTap: onTap,
       child: Row(
@@ -902,6 +800,7 @@ class _FavoritesAccordion extends StatelessWidget {
     required this.favorites,
     required this.onTap,
     required this.onFavoriteTap,
+    this.starting = false,
   });
 
   final Color color;
@@ -909,11 +808,13 @@ class _FavoritesAccordion extends StatelessWidget {
   final List<MindCoachV2Favorite> favorites;
   final VoidCallback onTap;
   final Future<void> Function(MindCoachV2Favorite favorite) onFavoriteTap;
+  final bool starting;
 
   @override
   Widget build(BuildContext context) {
     return MindCoachGlowCard(
       color: color,
+      showTopGlow: true,
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
       child: Column(
         children: [
@@ -989,7 +890,7 @@ class _FavoritesAccordion extends StatelessWidget {
                 _FavoriteRow(
                   favorite: favorite,
                   color: color,
-                  onTap: () => onFavoriteTap(favorite),
+                  onTap: starting ? null : () => onFavoriteTap(favorite),
                 ),
                 const SizedBox(height: 14),
               ],
@@ -1020,7 +921,7 @@ class _FavoriteRow extends StatelessWidget {
 
   final MindCoachV2Favorite favorite;
   final Color color;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1060,59 +961,126 @@ class _FavoriteRow extends StatelessWidget {
   }
 }
 
-class _SessionListRow extends StatelessWidget {
-  const _SessionListRow({
+class _SessionStartCard extends StatelessWidget {
+  const _SessionStartCard({
     required this.color,
     required this.session,
-    required this.onTap,
+    required this.onStart,
+    this.durationHint,
+    this.starting = false,
   });
 
   final Color color;
   final MindCoachV2CatalogSession session;
-  final VoidCallback? onTap;
+  final VoidCallback onStart;
+  final String? durationHint;
+  final bool starting;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        child: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        session.name,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        session.descriptor,
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.78),
-                                  fontStyle: FontStyle.italic,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                      ),
-                    ],
+    final durationLabel = MindCoachV2Visuals.formatSessionDuration(
+      session.durationSec,
+    );
+
+    return MindCoachGlowCard(
+      color: color,
+      showTopGlow: true,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      session.name,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.2,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      session.descriptor,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.78),
+                            fontStyle: FontStyle.italic,
+                            height: 1.35,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              if (durationLabel.isNotEmpty) ...[
+                const SizedBox(width: 12),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(99),
+                    color: color.withValues(alpha: 0.14),
+                    border: Border.all(color: color.withValues(alpha: 0.42)),
+                  ),
+                  child: Text(
+                    durationLabel,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontWeight: FontWeight.w700,
+                        ),
                   ),
                 ),
               ],
+            ],
+          ),
+          if (durationHint != null && durationHint!.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              durationHint!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.52),
+                    fontStyle: FontStyle.italic,
+                  ),
             ),
-            const SizedBox(height: 14),
-            MindCoachGlowLine(color: color, width: double.infinity),
           ],
-        ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: starting ? null : () => onStart(),
+              style: FilledButton.styleFrom(
+                backgroundColor: color.withValues(alpha: 0.22),
+                disabledBackgroundColor: color.withValues(alpha: 0.1),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(color: color.withValues(alpha: 0.55)),
+                ),
+              ),
+              child: starting
+                  ? SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        color: color,
+                      ),
+                    )
+                  : const Text(
+                      'Start session',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }

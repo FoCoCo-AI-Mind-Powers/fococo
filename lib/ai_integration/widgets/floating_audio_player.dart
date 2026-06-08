@@ -269,10 +269,42 @@ class _FloatingAudioPlayerState extends State<FloatingAudioPlayer>
                 ),
               ),
             ),
+
+            const SizedBox(width: 6),
+
+            // Close / dismiss
+            GestureDetector(
+              onTap: _closePlayer,
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.close_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _closePlayer() async {
+    HapticFeedback.lightImpact();
+    await _ttsService.stopSpeaking();
+    if (mounted) {
+      setState(() {
+        _isPlaying = false;
+        _isPaused = false;
+      });
+      _slideController.reverse();
+    }
   }
 }
 

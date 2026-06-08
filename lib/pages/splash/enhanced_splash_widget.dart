@@ -9,6 +9,7 @@ import '/auth/firebase_auth/auth_util.dart';
 import '/services/app_session_prefs_service.dart';
 import '/services/boot_phase_logger.dart';
 import '/services/startup_auth_service.dart';
+import '/widgets/maintenance_gate.dart';
 import 'package:flutter/foundation.dart';
 
 class EnhancedSplashWidget extends StatefulWidget {
@@ -104,12 +105,7 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
   Widget _buildCustomSplashBody() {
     final theme = FlutterFlowTheme.of(context);
 
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.black,
-      ),
+    return FoCoCoShellBootBackdrop(
       child: Stack(
         children: [
           // Animated background particles (wind effect)
@@ -345,7 +341,7 @@ class _EnhancedSplashWidgetState extends State<EnhancedSplashWidget>
     return FlutterSplashScreen(
       // Duration must be null when using asyncNavigationCallback
       duration: null,
-      backgroundColor: Colors.black,
+      backgroundColor: kFoCoCoShellTint,
       splashScreenBody: _buildCustomSplashBody(),
       asyncNavigationCallback: _handleNavigation,
       onInit: () {

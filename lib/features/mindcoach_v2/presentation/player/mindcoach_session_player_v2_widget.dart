@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 
 import '/features/mindcoach_v2/data/mindcoach_v2_repository.dart';
 import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart';
+import '/ai_integration/widgets/navbar_widget.dart';
 import '/features/mindcoach_v2/presentation/shared/mindcoach_v2_visuals.dart';
 import '/features/mindcoach_v2/services/mindcoach_v2_debug_logger.dart';
 import '/features/mindcoach_v2/services/mindcoach_v2_tts_service.dart';
 import '/features/mindcoach_v2/services/mindcoach_replay_cache.dart';
-import '/services/haptic_service.dart';
 
 const int kMindCoachFavoriteLimitPerPillar = 5;
 
@@ -95,10 +95,16 @@ class _MindCoachSessionPlayerV2WidgetState
   MindCoachV2Session get _session => widget.generateResponse.session;
   MindCoachV2Pillar get _pillar => _session.pillar;
   Color get _accent => MindCoachV2Visuals.accentForPillar(_pillar);
+  late final MindCoachSessionVisualStyle _visualStyle;
 
   @override
   void initState() {
     super.initState();
+    _visualStyle = MindCoachV2Visuals.visualStyleFor(
+      session: _session,
+      uiMode: widget.generateResponse.uiMode,
+    );
+    _syncSessionChrome();
     _runId = widget.generateResponse.runId;
 
     _timedLines = (_session.lines != null && _session.lines!.isNotEmpty)
@@ -157,6 +163,13 @@ class _MindCoachSessionPlayerV2WidgetState
 
     _startProgressTicker();
     unawaited(_startPlayback());
+  }
+
+  void _syncSessionChrome() {
+    setFoCoCoNavBarBackgroundOverride(
+      MindCoachV2Visuals.shellBackgroundForPillar(_pillar),
+    );
+    setFoCoCoNavSelectedColorOverride('mind_coach', _accent);
   }
 
   @override
@@ -558,103 +571,197 @@ class _MindCoachSessionPlayerV2WidgetState
     }
   }
 
-  Widget _buildPlaybackBody(BuildContext context) {
-    final lineWindow = _windowIndices();
-    final centerIndex =
-        _activeLineIndex ?? _lastCompletedIndex.clamp(0, _lines.length - 1);
+  Widget _buildProgressBar(BuildContext context) {
+    final progress = _totalDurationMs <= 0
+        ? 0.0
+        : (_elapsedMs / _totalDurationMs).clamp(0.0, 1.0);
+    final remainingSec =
+        math.max(0, ((_totalDurationMs - _elapsedMs) / 1000).ceil());
 
-    return Column(
+    return Row(
       children: [
-        Row(
-          children: [
-            IconButton(
-              onPressed: _handleBack,
-              icon: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
-              ),
-            ),
-            Expanded(
-              child: Text(
-                _session.topBarTitle,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.82),
-                      fontWeight: FontWeight.w500,
-                    ),
-              ),
-            ),
-            IconButton(
-              onPressed: _toggleMute,
-              icon: Icon(
-                _ttsMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        Text(
-          _pillar.label,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: _accent,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.6,
-              ),
-        ),
-        const SizedBox(height: 10),
-        MindCoachGlowLine(color: _accent, width: 158),
-        const SizedBox(height: 24),
-        MindCoachGlowLine(color: _accent, width: 158),
-        const SizedBox(height: 24),
-        MindCoachOrb(
-          color: _accent,
-          active: !_ttsMuted && !_playbackFinished,
-        ),
-        const SizedBox(height: 24),
         Expanded(
-          child: Center(
-            child: SingleChildScrollView(
-              physics: const ClampingScrollPhysics(),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 280),
-                child: Column(
-                  key: ValueKey<String>('line_${centerIndex}_$_visibleLineCount'),
-                  children: [
-                    for (final index in lineWindow)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
-                        child: Text(
-                          _lines[index],
-                          textAlign: TextAlign.center,
-                          style:
-                              Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                    color: Colors.white.withValues(
-                                      alpha: index == centerIndex
-                                          ? 0.98
-                                          : index < centerIndex
-                                              ? 0.36
-                                              : 0.3,
-                                    ),
-                                    fontWeight: index == centerIndex
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    height: 1.35,
-                                  ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              minHeight: 5,
+              value: progress,
+              backgroundColor: Colors.white.withValues(alpha: 0.1),
+              color: _accent.withValues(alpha: _visualStyle.progressAccentAlpha),
             ),
           ),
         ),
-        _SessionOrb(
-          accent: _accent,
-          active: !_playbackFinished && !_showCompletion && !_ttsMuted,
+        const SizedBox(width: 12),
+        Text(
+          '$remainingSec sec',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Colors.white.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w600,
+              ),
         ),
-        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildLineCopy(BuildContext context, int centerIndex) {
+    final activeLine = _lines[centerIndex];
+    final subtitleIndex = centerIndex + 1;
+    final hasSubtitle =
+        subtitleIndex < _lines.length && _visualStyle.showLiveHeader;
+
+    if (_visualStyle.showLiveHeader) {
+      return Column(
+        key: ValueKey<String>('live_line_$centerIndex'),
+        children: [
+          Text(
+            activeLine.toUpperCase(),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                  height: 1.25,
+                ),
+          ),
+          if (hasSubtitle) ...[
+            const SizedBox(height: 10),
+            Text(
+              _lines[subtitleIndex],
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.58),
+                    fontWeight: FontWeight.w400,
+                    height: 1.35,
+                  ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    final lineWindow = _windowIndices();
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 280),
+      child: Column(
+        key: ValueKey<String>('guided_line_${centerIndex}_$_visibleLineCount'),
+        children: [
+          for (final index in lineWindow)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Text(
+                _lines[index],
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Colors.white.withValues(
+                        alpha: index == centerIndex
+                            ? 0.98
+                            : index < centerIndex
+                                ? 0.36
+                                : 0.3,
+                      ),
+                      fontWeight: index == centerIndex
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      height: 1.35,
+                    ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlaybackBody(BuildContext context) {
+    final centerIndex =
+        _activeLineIndex ?? _lastCompletedIndex.clamp(0, _lines.length - 1);
+    final headerTitle = _visualStyle.showLiveHeader
+        ? 'LIVE MIND COACH SESSION'
+        : _session.topBarTitle;
+
+    return Column(
+      children: [
+        if (!_visualStyle.showLiveHeader)
+          Row(
+            children: [
+              IconButton(
+                onPressed: _handleBack,
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  headerTitle,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.82),
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ),
+              IconButton(
+                onPressed: _toggleMute,
+                icon: Icon(
+                  _ttsMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        if (_visualStyle.showLiveHeader)
+          Row(
+            children: [
+              IconButton(
+                onPressed: _handleBack,
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  headerTitle,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: _accent,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.1,
+                      ),
+                ),
+              ),
+              IconButton(
+                onPressed: _toggleMute,
+                icon: Icon(
+                  _ttsMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        const SizedBox(height: 8),
+        _buildProgressBar(context),
+        const SizedBox(height: 28),
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              MindCoachSessionPulseOrb(
+                color: _accent,
+                active: !_ttsMuted && !_playbackFinished,
+                diameter: _visualStyle.orbDiameter,
+                pulseDuration:
+                    Duration(milliseconds: _visualStyle.pulseDurationMs),
+                glowStrength: _visualStyle.glowStrength,
+              ),
+              const SizedBox(height: 28),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: _buildLineCopy(context, centerIndex),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -771,7 +878,7 @@ class _MindCoachSessionPlayerV2WidgetState
         }
       },
       child: Scaffold(
-        backgroundColor: MindCoachV2Visuals.baseBackground,
+        backgroundColor: MindCoachV2Visuals.shellBackgroundForPillar(_pillar),
         body: MindCoachV2Backdrop(
           pillar: _pillar,
           child: SafeArea(
@@ -946,55 +1053,3 @@ class _FavoriteReplaceDialog extends StatelessWidget {
   }
 }
 
-class _SessionOrb extends StatefulWidget {
-  const _SessionOrb({required this.accent, required this.active});
-
-  final Color accent;
-  final bool active;
-
-  @override
-  State<_SessionOrb> createState() => _SessionOrbState();
-}
-
-class _SessionOrbState extends State<_SessionOrb>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2200),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final scale = widget.active ? 0.92 + (_controller.value * 0.12) : 1.0;
-        final glow = widget.active ? 0.35 + (_controller.value * 0.25) : 0.15;
-        return Transform.scale(
-          scale: scale,
-          child: Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: widget.accent.withValues(alpha: 0.22),
-              boxShadow: [
-                BoxShadow(
-                  color: widget.accent.withValues(alpha: glow),
-                  blurRadius: 36,
-                  spreadRadius: 8,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}

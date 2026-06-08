@@ -2,6 +2,11 @@ const axios = require('axios');
 const functions = require('firebase-functions/v1');
 const logger = require('firebase-functions/logger');
 const { defineSecret } = require('firebase-functions/params');
+const {
+  CARTESIA_VOICE_ID_SECRET,
+  getCartesiaVoiceIdSafe,
+  safeString,
+} = require('./cartesia_voice_config');
 
 // Single voice provider proxy. The Cartesia key lives in Secret Manager as
 // `CARTESIA_API` and never leaves the Cloud Functions runtime — the client
@@ -9,10 +14,8 @@ const { defineSecret } = require('firebase-functions/params');
 // GEMINI_KEY_APP pattern. Do NOT re-introduce a client-facing key endpoint.
 const CARTESIA_API_SECRET = defineSecret('CARTESIA_API');
 
-// Pinned constants — single source of truth, kept in sync with the Flutter
-// CartesiaConfig (lib/ai_integration/config/cartesia_config.dart).
+// Pinned constants — model/version kept in sync with Flutter CartesiaConfig.
 const CARTESIA_TTS_MODEL = 'sonic-3-2026-01-12';
-const CARTESIA_VOICE_ID = 'fee439a9-751d-4d14-9974-a09de45bd053';
 const CARTESIA_FINE_TUNE_ID = 'fine_tune_WyfawYF7uFdFJdRTia8rG5';
 const CARTESIA_VERSION = '2025-04-16';
 const CARTESIA_BASE_URL = 'https://api.cartesia.ai';
@@ -22,11 +25,6 @@ const MAX_TRANSCRIPT_CHARS = 4000;
 const MAX_TRANSCRIPT_CHARS_PER_CALL = 1200;
 const MAX_TTS_AUDIO_BYTES = 7 * 1024 * 1024; // ~7 MB raw before base64
 const TTS_AXIOS_TIMEOUT_MS = 90000;
-
-function safeString(value, fallback = '') {
-  if (value == null) return fallback;
-  return String(value).trim();
-}
 
 function getCartesiaKeySafe() {
   try {
@@ -69,7 +67,7 @@ async function synthesizeSpeechImpl(data, context) {
     );
   }
 
-  const voiceId = safeString(data.voice_id, CARTESIA_VOICE_ID);
+  const voiceId = safeString(data.voice_id, getCartesiaVoiceIdSafe());
   const modelId = safeString(data.model_id, CARTESIA_TTS_MODEL);
   const language = safeString(data.language, 'en');
   const outputFormat = (data.output_format && typeof data.output_format === 'object')
@@ -109,9 +107,9 @@ async function synthesizeSpeechImpl(data, context) {
       payload.context_id = contextId;
       payload.continue = continueGeneration;
     }
-    if (data.max_buffer_delay_ms != null) {
-      payload.max_buffer_delay_ms = data.max_buffer_delay_ms;
-    }
+    // Instant generation: 0 = start on first transcript (Cartesia docs).
+    payload.max_buffer_delay_ms =
+      data.max_buffer_delay_ms != null ? data.max_buffer_delay_ms : 0;
 
     const response = await axios.post(
       `${CARTESIA_BASE_URL}/tts/bytes`,
@@ -196,7 +194,7 @@ async function synthesizeSpeechImpl(data, context) {
 
 exports.synthesizeSpeech = functions
   .runWith({
-    secrets: [CARTESIA_API_SECRET],
+    secrets: [CARTESIA_API_SECRET, CARTESIA_VOICE_ID_SECRET],
     timeoutSeconds: 120,
     memory: '512MB',
   })
@@ -310,7 +308,7 @@ async function transcribeSpeechImpl(data, context) {
 }
 
 exports.transcribeSpeech = functions
-  .runWith({ secrets: [CARTESIA_API_SECRET] })
+  .runWith({ secrets: [CARTESIA_API_SECRET, CARTESIA_VOICE_ID_SECRET] })
   .https.onCall(transcribeSpeechImpl);
 
 // §2 boot self-check. Hits `GET /api/voices/{id}` so the client can fail-fast
@@ -330,7 +328,7 @@ async function verifyVoiceImpl(data, context) {
     return { valid: false, status: 0, reason: 'CARTESIA_API not configured' };
   }
 
-  const voiceId = safeString(data.voice_id, CARTESIA_VOICE_ID);
+  const voiceId = safeString(data.voice_id, getCartesiaVoiceIdSafe());
   const fineTuneId = safeString(data.fine_tune_id, CARTESIA_FINE_TUNE_ID);
 
   async function fetchVoiceById(id) {
@@ -408,5 +406,5 @@ async function verifyVoiceImpl(data, context) {
 }
 
 exports.verifyVoice = functions
-  .runWith({ secrets: [CARTESIA_API_SECRET] })
+  .runWith({ secrets: [CARTESIA_API_SECRET, CARTESIA_VOICE_ID_SECRET] })
   .https.onCall(verifyVoiceImpl);

@@ -5,9 +5,13 @@ import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/carbon.dart';
 
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/utils/friendly_error_mapper.dart';
 import '../services/cartesia_line_voice_service.dart';
 
 /// Full-screen live coach using Cartesia Line (Gemini + Cartesia voice).
+///
+/// Returns `true` when the user ends a connected session, `false` when connect
+/// fails (caller may fall back to legacy voice), or `null` if dismissed early.
 class FoCoCoLineVoiceSheet extends StatefulWidget {
   const FoCoCoLineVoiceSheet({
     super.key,
@@ -22,17 +26,19 @@ class FoCoCoLineVoiceSheet extends StatefulWidget {
   final String? introduction;
   final Map<String, dynamic>? metadata;
 
-  static Future<void> show(
+  static Future<bool?> show(
     BuildContext context, {
     required String surface,
     String? systemPrompt,
     String? introduction,
     Map<String, dynamic>? metadata,
   }) {
-    return showModalBottomSheet<void>(
+    return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      isDismissible: true,
+      enableDrag: true,
       builder: (ctx) => FoCoCoLineVoiceSheet(
         surface: surface,
         systemPrompt: systemPrompt,
@@ -51,6 +57,15 @@ class _FoCoCoLineVoiceSheetState extends State<FoCoCoLineVoiceSheet> {
   StreamSubscription<CartesiaLineVoiceState>? _stateSub;
   CartesiaLineVoiceState _state = CartesiaLineVoiceState.idle;
   String? _error;
+  bool _connected = false;
+  bool _connectFailed = false;
+  bool _popped = false;
+
+  void _popSheet(bool? result) {
+    if (_popped || !mounted) return;
+    _popped = true;
+    Navigator.of(context).pop(result);
+  }
 
   @override
   void initState() {
@@ -71,16 +86,28 @@ class _FoCoCoLineVoiceSheetState extends State<FoCoCoLineVoiceSheet> {
           metadata: widget.metadata,
         ),
       );
-    } catch (e) {
       if (mounted) {
-        setState(() => _error = e.toString());
+        setState(() => _connected = true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _connectFailed = true;
+        _error = FriendlyErrorMapper.message(
+          e,
+          fallback: 'Live voice is unavailable right now.',
+        );
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      if (mounted) {
+        _popSheet(false);
       }
     }
   }
 
   Future<void> _end() async {
     await _line.disconnect();
-    if (mounted) Navigator.of(context).pop();
+    _popSheet(_connected);
   }
 
   @override
@@ -91,7 +118,7 @@ class _FoCoCoLineVoiceSheetState extends State<FoCoCoLineVoiceSheet> {
   }
 
   String get _statusLabel {
-    if (_error != null) return 'Unavailable';
+    if (_error != null) return _error!;
     switch (_state) {
       case CartesiaLineVoiceState.connecting:
         return 'Connecting…';
@@ -102,7 +129,7 @@ class _FoCoCoLineVoiceSheetState extends State<FoCoCoLineVoiceSheet> {
       case CartesiaLineVoiceState.processing:
         return 'Thinking…';
       case CartesiaLineVoiceState.error:
-        return 'Error';
+        return 'Unavailable';
       case CartesiaLineVoiceState.idle:
         return 'Starting…';
     }
@@ -139,25 +166,33 @@ class _FoCoCoLineVoiceSheetState extends State<FoCoCoLineVoiceSheet> {
               style: theme.titleMedium.copyWith(color: theme.primaryText),
             ),
             const SizedBox(height: 8),
-            Text(
-              _error ?? _statusLabel,
-              style: theme.bodySmall.copyWith(color: theme.secondaryText),
-              textAlign: TextAlign.center,
+            Expanded(
+              child: Center(
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: Text(
+                    _statusLabel,
+                    style: theme.bodySmall.copyWith(color: theme.secondaryText),
+                    textAlign: TextAlign.center,
+                    maxLines: _connectFailed ? 4 : 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
             ),
-            const Spacer(),
             Iconify(
-              Carbon.microphone,
+              Carbon.phone_voice,
               size: 56,
               color: _state == CartesiaLineVoiceState.speaking
                   ? theme.secondary
                   : theme.primaryText.withValues(alpha: 0.85),
             ),
-            const Spacer(),
+            const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _end,
-                child: const Text('End conversation'),
+                onPressed: _connected || _connectFailed ? _end : null,
+                child: Text(_connectFailed ? 'Close' : 'End conversation'),
               ),
             ),
           ],

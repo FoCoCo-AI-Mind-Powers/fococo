@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
-import '/ai_integration/widgets/navbar_widget.dart';
+import '/ai_integration/widgets/navbar_widget.dart'
+    show
+        FoCoCoAdaptiveScaffold,
+        setFoCoCoNavBarBackgroundOverride,
+        setFoCoCoNavSelectedColorOverride;
 import '/features/mindcoach_v2/config/mindcoach_v2_flags.dart';
 import '/features/mindcoach_v2/data/mindcoach_v2_repository.dart';
 import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart';
 import '/features/mindcoach_v2/presentation/home/mindcoach_home_v2_widget.dart';
 import '/features/mindcoach_v2/presentation/player/mindcoach_session_player_v2_widget.dart';
+import '/features/mindcoach_v2/presentation/shared/mindcoach_session_prep_overlay.dart';
 import '/features/mindcoach_v2/presentation/shared/mindcoach_v2_visuals.dart';
 import '/features/mindcoach_v2/services/mindcoach_v2_debug_logger.dart';
 import '/features/mindcoach_v2/services/mindcoach_replay_cache.dart';
@@ -37,53 +42,35 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
       'entrySource': request.entrySource,
       'deliveryLength': request.preferredDeliveryLength,
     });
+
+    final accent = request.pillar == null
+        ? MindCoachV2Visuals.homeNavAccent
+        : MindCoachV2Visuals.accentForPillar(request.pillar!);
+
+    final response = await runMindCoachSessionPrep<MindCoachV2GenerateResponse>(
+      context: context,
+      accentColor: accent,
+      sessionTitle: request.sessionName,
+      work: () => _repository.generateSession(request),
+    );
+
+    if (!mounted || response == null) {
+      return;
+    }
+
     try {
-      final response = await _repository.generateSession(request);
-      if (!mounted) {
-        return;
-      }
       _logger.log(_tag, 'generation succeeded, opening player', {
         'sessionId': response.sessionId,
         'uiMode': response.uiMode.wireValue,
       });
       await _openPlayer(response);
     } catch (e, s) {
-      _logger.error(_tag, '_runGenerationRequest failed', null, e, s);
-      if (!mounted) {
-        return;
-      }
-      final messenger = ScaffoldMessenger.maybeOf(context);
-      if (messenger != null) {
-        messenger.showSnackBar(
-          SnackBar(content: Text('Failed to generate session: $e')),
-        );
-      } else {
-        debugPrint('Failed to generate session (no ScaffoldMessenger): $e');
-      }
+      _logger.error(_tag, '_openPlayer after generation failed', null, e, s);
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text('Failed to open session: $e')),
+      );
     }
-  }
-
-  Future<void> _resume(MindCoachV2ResumePayload payload) async {
-    _logger.log(_tag, '_resume', {
-      'sessionId': payload.session.sessionId,
-      'runId': payload.run.runId,
-      'contextMode': payload.session.contextMode.wireValue,
-    });
-
-    final uiMode =
-        payload.session.contextMode == MindCoachV2ContextMode.duringRound
-            ? MindCoachV2UiMode.liveMinimal
-            : MindCoachV2UiMode.guidedExtended;
-
-    final response = MindCoachV2GenerateResponse(
-      sessionId: payload.session.sessionId,
-      contextMode: payload.session.contextMode,
-      uiMode: uiMode,
-      session: payload.session,
-      runId: payload.run.runId,
-    );
-
-    await _openPlayer(response);
   }
 
   Future<void> _openPlayer(MindCoachV2GenerateResponse response) async {
@@ -92,12 +79,27 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
       'uiMode': response.uiMode.wireValue,
       'templateId': response.session.templateId,
     });
+    final pillar = response.session.pillar;
+    final accent = MindCoachV2Visuals.accentForPillar(pillar);
+    setFoCoCoNavBarBackgroundOverride(
+      MindCoachV2Visuals.shellBackgroundForPillar(pillar),
+    );
+    setFoCoCoNavSelectedColorOverride('mind_coach', accent);
+
+    final shellBg = MindCoachV2Visuals.shellBackgroundForPillar(pillar);
     final playerResult =
-        await Navigator.of(context).push<MindCoachV2PlayerResult>(
-      MaterialPageRoute(
-        builder: (_) => MindCoachSessionPlayerV2Widget(
+        await Navigator.of(context, rootNavigator: true)
+            .push<MindCoachV2PlayerResult>(
+      PageRouteBuilder(
+        opaque: true,
+        barrierColor: shellBg,
+        pageBuilder: (_, __, ___) => MindCoachSessionPlayerV2Widget(
           generateResponse: response,
         ),
+        transitionsBuilder: (_, animation, __, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 220),
       ),
     );
 
@@ -117,11 +119,26 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
     if (playerResult.nextAction == MindCoachV2PlayerNextAction.playAgain) {
       final cached = await MindCoachReplayCache.load(response.sessionId);
       if (cached != null && mounted) {
-        await Navigator.of(context).push<MindCoachV2PlayerResult>(
-          MaterialPageRoute(
-            builder: (_) => MindCoachSessionPlayerV2Widget(
+        final replayPillar = cached.session.pillar;
+        final replayAccent =
+            MindCoachV2Visuals.accentForPillar(replayPillar);
+        setFoCoCoNavBarBackgroundOverride(
+          MindCoachV2Visuals.shellBackgroundForPillar(replayPillar),
+        );
+        setFoCoCoNavSelectedColorOverride('mind_coach', replayAccent);
+        await Navigator.of(context, rootNavigator: true)
+            .push<MindCoachV2PlayerResult>(
+          PageRouteBuilder(
+            opaque: true,
+            barrierColor:
+                MindCoachV2Visuals.shellBackgroundForPillar(replayPillar),
+            pageBuilder: (_, __, ___) => MindCoachSessionPlayerV2Widget(
               generateResponse: cached,
             ),
+            transitionsBuilder: (_, animation, __, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 220),
           ),
         );
         return;
@@ -157,13 +174,13 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
           ? UserRecord.getDocument(
               FirebaseFirestore.instance.doc('user/$currentUserUid'))
           : null,
-      builder: (context, userSnapshot) {
-        final user = userSnapshot.data;
+      builder: (context, _) {
         return FoCoCoAdaptiveScaffold(
           backgroundColor: MindCoachV2Visuals.shellBackgroundForPillar(null),
           currentRoute: 'mind_coach',
           onTap: (route) => context.goNamed(route),
           showBottomNav: false,
+          enableVoiceButton: false,
           appBarForegroundColor: Colors.white,
           showAppBarGlowDivider: false,
           // Always mount the drawer so the auto-injected hamburger is
@@ -173,7 +190,6 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
               ? MindCoachHomeV2Widget(
                   repository: _repository,
                   onGenerateRequested: _runGenerationRequest,
-                  onResumeRequested: _resume,
                 )
               : const SizedBox.shrink(),
         );

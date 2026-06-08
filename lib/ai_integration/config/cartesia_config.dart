@@ -16,9 +16,21 @@ class CartesiaConfig {
   // ── Pinned constants (§0) ────────────────────────────────────────────────
   static const String ttsModel = 'sonic-3-2026-01-12';
 
-  /// FoCoCo fine-tuned voice. Kept in sync with firebase/functions/cartesia_tts.js
-  /// and cartesia_line_agent/config.py.
-  static const String voiceId = 'fee439a9-751d-4d14-9974-a09de45bd053';
+  /// Emulator / pre-auth fallback. Production value comes from Secret Manager
+  /// `CARTESIA_VOICE_ID` via [runtimeConfigFunctionName].
+  static const String fallbackVoiceId = 'fee439a9-751d-4d14-9974-a09de45bd053';
+
+  static String _resolvedVoiceId = fallbackVoiceId;
+
+  /// Active Cartesia voice — updated when [CartesiaVoiceRuntime.load] succeeds.
+  static String get voiceId => _resolvedVoiceId;
+
+  static void applyResolvedVoiceId(String? id) {
+    final trimmed = id?.trim() ?? '';
+    if (trimmed.isNotEmpty) {
+      _resolvedVoiceId = trimmed;
+    }
+  }
 
   /// Provenance only — used with `GET /fine-tunes/{id}/voices`. Never passed
   /// on a per-call TTS request.

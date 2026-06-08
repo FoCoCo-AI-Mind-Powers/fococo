@@ -24,15 +24,15 @@ import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'golf_chat_visuals.dart';
+import 'golf_chat_message_body.dart';
 import '/ai_integration/gemini_ai_client.dart';
 import '/ai_integration/config/cartesia_mcp_config.dart';
 import '/ai_integration/services/audio_session_service.dart';
 import '/ai_integration/services/cartesia_api_service.dart';
 import '/ai_integration/services/cartesia_speech_prompt.dart';
+import '/ai_integration/services/cartesia_line_voice_service.dart';
 import '/ai_integration/services/cartesia_voice_runtime.dart';
 import '/ai_integration/services/voice_chat_database_service.dart';
-import '/ai_integration/widgets/fococo_line_voice_sheet.dart';
 import '/services/voice_live_activity_service.dart';
 import '/ai_integration/widgets/navbar_widget.dart';
 import '/pages/golf_rounds/caddyplay_models.dart';
@@ -46,13 +46,16 @@ export 'golfchat_model.dart';
 
 /// Breathing room between the tab bar (shell) and the composer — tab shell uses
 /// [kFoCoCoBottomNavStripAndTabsHeight] + [MediaQuery.viewPadding.bottom].
-const double _kGolfChatComposerGapAboveNav = 10;
+/// Extra breathing room for the glass voice composer above the tab bar.
+const double _kGolfChatVoiceComposerGapAboveNav = 28;
+const Color _kGolfChatVoiceBlue = Color(0xFF5B8DEF);
 
 class GolfChatWidget extends StatefulWidget {
   const GolfChatWidget({
     super.key,
     this.initialRoundId,
     this.initialCaddyPlaySnapshot,
+    this.initialSessionId,
   });
 
   static const String routeName = 'golf_chat';
@@ -60,6 +63,7 @@ class GolfChatWidget extends StatefulWidget {
 
   final String? initialRoundId;
   final Map<String, dynamic>? initialCaddyPlaySnapshot;
+  final String? initialSessionId;
 
   @override
   State<GolfChatWidget> createState() => _GolfChatWidgetState();
@@ -205,6 +209,9 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   static const double _voiceActivityThreshold = 0.015;
   String _liveTranscription = '';
   final List<double> _audioLevels = List.filled(64, 0.0);
+  final CartesiaLineVoiceService _lineVoice = CartesiaLineVoiceService.instance;
+  StreamSubscription<CartesiaLineVoiceState>? _lineStateSub;
+  bool _usingLineVoice = false;
 
   // Attachments
   final List<_ChatAttachment> _pendingAttachments = [];
@@ -256,7 +263,9 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
       oldWidget.initialCaddyPlaySnapshot,
       widget.initialCaddyPlaySnapshot,
     );
-    if (!roundChanged && !snapshotChanged) {
+    final sessionChanged =
+        oldWidget.initialSessionId != widget.initialSessionId;
+    if (!roundChanged && !snapshotChanged && !sessionChanged) {
       return;
     }
 
@@ -354,15 +363,26 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
 
     VoiceChatSession? session;
     final requestedRoundId = _roundContextId?.trim();
+    final requestedSessionId = widget.initialSessionId?.trim();
     try {
-      session = await _db.getActiveSession();
-      if (session != null && session.sessionMetadata['surface'] != 'golfchat') {
-        session = null;
-      } else if (session != null &&
-          requestedRoundId != null &&
-          requestedRoundId.isNotEmpty &&
-          session.sessionMetadata['roundId']?.toString() != requestedRoundId) {
-        session = null;
+      if (requestedSessionId != null && requestedSessionId.isNotEmpty) {
+        session = await _db.getSessionById(requestedSessionId);
+        if (session != null &&
+            session.sessionMetadata['surface'] != 'golfchat') {
+          session = null;
+        }
+      } else {
+        session = await _db.getActiveSession();
+        if (session != null &&
+            session.sessionMetadata['surface'] != 'golfchat') {
+          session = null;
+        } else if (session != null &&
+            requestedRoundId != null &&
+            requestedRoundId.isNotEmpty &&
+            session.sessionMetadata['roundId']?.toString() !=
+                requestedRoundId) {
+          session = null;
+        }
       }
     } catch (_) {
       session = null;
@@ -447,6 +467,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     _scrollController.dispose();
     _waveAnimationController.dispose();
     _gradientAnimationController.dispose();
+    _lineStateSub?.cancel();
+    unawaited(_lineVoice.disconnect());
     _audioPlayer.dispose();
     _audioRecorder.dispose();
     _model.dispose();
@@ -470,23 +492,95 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
       return;
     }
 
+    if (!await _ensureMicrophonePermission()) {
+      return;
+    }
+
     await _stopTtsPlayback();
     await _cartesiaTts.stopSpeaking();
 
     final runtime = await CartesiaVoiceRuntime.load();
     if (runtime.hasLineAgent && mounted) {
-      await FoCoCoLineVoiceSheet.show(
-        context,
-        surface: 'golf_chat',
-        systemPrompt: _golfChatLineSystemPrompt(),
-        introduction: '',
-        metadata: {
-          if (_sessionId != null) 'session_id': _sessionId,
-          if (_roundContextId != null) 'round_id': _roundContextId,
-        },
-      );
+      await _startLineVoiceMode();
       return;
     }
+
+    await _startLegacyVoiceMode();
+  }
+
+  Future<void> _startLineVoiceMode() async {
+    if (!mounted || _isVoiceMode) return;
+
+    unawaited(VoiceLiveActivityService.instance.start());
+
+    setState(() {
+      _isVoiceMode = true;
+      _usingLineVoice = true;
+      _voiceState = _VoiceModeState.connecting;
+      _liveTranscription = '';
+      _audioLevels.fillRange(0, _audioLevels.length, 0.0);
+    });
+
+    _lineStateSub?.cancel();
+    _lineStateSub = _lineVoice.stateStream.listen(_onLineVoiceState);
+
+    try {
+      await _lineVoice.connect(
+        CartesiaLineVoiceSession(
+          surface: 'golf_chat',
+          systemPrompt: _golfChatLineSystemPrompt(),
+          metadata: {
+            if (_sessionId != null) 'session_id': _sessionId,
+            if (_roundContextId != null) 'round_id': _roundContextId,
+          },
+        ),
+      );
+      if (mounted) {
+        setState(() => _voiceState = _VoiceModeState.listening);
+      }
+      unawaited(VoiceLiveActivityService.instance.update(status: 'listening'));
+    } catch (e) {
+      debugPrint('Line voice mode start failed: $e');
+      _lineStateSub?.cancel();
+      _lineStateSub = null;
+      await _lineVoice.disconnect();
+      _usingLineVoice = false;
+      unawaited(VoiceLiveActivityService.instance.stop());
+      if (mounted) {
+        setState(() {
+          _isVoiceMode = false;
+          _voiceState = _VoiceModeState.idle;
+        });
+        _showSnack('Live voice unavailable. Using standard voice mode.');
+        await _startLegacyVoiceMode();
+      }
+    }
+  }
+
+  void _onLineVoiceState(CartesiaLineVoiceState state) {
+    if (!mounted || !_usingLineVoice) return;
+    final next = switch (state) {
+      CartesiaLineVoiceState.connecting => _VoiceModeState.connecting,
+      CartesiaLineVoiceState.listening => _VoiceModeState.listening,
+      CartesiaLineVoiceState.speaking => _VoiceModeState.speaking,
+      CartesiaLineVoiceState.processing => _VoiceModeState.processing,
+      CartesiaLineVoiceState.error => _VoiceModeState.error,
+      CartesiaLineVoiceState.idle => _VoiceModeState.idle,
+    };
+    if (_voiceState == next) return;
+    setState(() => _voiceState = next);
+    if (next == _VoiceModeState.listening ||
+        next == _VoiceModeState.speaking) {
+      unawaited(
+        VoiceLiveActivityService.instance.update(
+          status: next == _VoiceModeState.speaking ? 'speaking' : 'listening',
+        ),
+      );
+    }
+  }
+
+  Future<void> _startLegacyVoiceMode() async {
+    if (!mounted || _isVoiceMode) return;
 
     await AudioSessionService.activateVoiceChat();
     unawaited(VoiceLiveActivityService.instance.start());
@@ -537,9 +631,17 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     _audioStreamSubscription?.cancel();
     _audioStreamSubscription = null;
 
-    try {
-      await _audioRecorder.stop();
-    } catch (_) {}
+    if (_usingLineVoice) {
+      _lineStateSub?.cancel();
+      _lineStateSub = null;
+      await _lineVoice.disconnect();
+      _usingLineVoice = false;
+    } else {
+      try {
+        await _audioRecorder.stop();
+      } catch (_) {}
+    }
+
     await _cartesiaTts.stopSpeaking();
     await AudioSessionService.deactivateVoiceChat();
     unawaited(VoiceLiveActivityService.instance.stop());
@@ -937,11 +1039,11 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     // floats over the chat). The composer itself is now a normal Column row,
     // so it no longer needs manual bottom math — Scaffold.resizeToAvoidBottomInset
     // + SafeArea handles the keyboard and home indicator correctly.
-    final bottomNavReserve = hasKeyboard
+    final voiceModeBottomReserve = hasKeyboard
         ? 0.0
         : (kFoCoCoBottomNavStripAndTabsHeight +
             MediaQuery.viewPaddingOf(context).bottom +
-            _kGolfChatComposerGapAboveNav);
+            _kGolfChatVoiceComposerGapAboveNav);
 
     final canPop = context.canPop();
 
@@ -986,30 +1088,26 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                 ],
                 topInset: MediaQuery.viewPaddingOf(context).top,
               ),
-              if (_isLoading) const LinearProgressIndicator(minHeight: 2),
-              if (_showBoundary) _buildBoundary(theme),
-              if (_hasRoundContext) _buildRoundContextBanner(theme),
-              if (_isVoiceMode &&
-                  (_voiceState == _VoiceModeState.connecting ||
-                      _voiceState == _VoiceModeState.error))
-                _buildVoiceConnectionBanner(theme),
+              if (_isLoading && !_isVoiceMode) const LinearProgressIndicator(minHeight: 2),
+              if (_showBoundary && !_isVoiceMode) _buildBoundary(theme),
+              if (_hasRoundContext && !_isVoiceMode) _buildRoundContextBanner(theme),
               Expanded(
-                child: _buildConversation(theme, extraBottomPadding: 0),
+                child: _isVoiceMode
+                    ? _buildVoiceModeOverlay(theme, voiceModeBottomReserve)
+                    : _buildConversation(theme, extraBottomPadding: 0),
               ),
-              SafeArea(
-                top: false,
-                left: false,
-                right: false,
-                bottom: !hasKeyboard,
-                minimum: EdgeInsets.zero,
-                child: Material(
-                  color: Colors.transparent,
-                  child: _buildInput(
-                    theme,
-                    voiceGlass: _isVoiceMode,
+              if (!_isVoiceMode)
+                SafeArea(
+                  top: false,
+                  left: false,
+                  right: false,
+                  bottom: !hasKeyboard,
+                  minimum: EdgeInsets.zero,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: _buildInput(theme),
                   ),
                 ),
-              ),
             ],
           ),
         );
@@ -1070,9 +1168,9 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                     audioLevels: _audioLevels,
                     wavePhase: _waveAnimation.value,
                     gradientProgress: _gradientAnimation.value,
-                    primaryColor: theme.primary,
+                    primaryColor: _kGolfChatVoiceBlue,
                     secondaryColor: theme.secondary,
-                    tertiaryColor: theme.tertiary,
+                    tertiaryColor: const Color(0xFF3D6FCC),
                     isActive: _voiceState == _VoiceModeState.listening ||
                         _voiceState == _VoiceModeState.speaking ||
                         _voiceState == _VoiceModeState.processing,
@@ -1111,8 +1209,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         line2 = 'Setting up voice…';
         break;
       case _VoiceModeState.listening:
-        line1 = 'You may start speaking';
-        line2 = null;
+        line1 = 'Listening';
+        line2 = 'You may start speaking';
         break;
       case _VoiceModeState.processing:
         line1 = 'Processing';
@@ -1138,11 +1236,9 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _VoiceMicGlyph(
-          theme: theme,
+        _PulsingVoiceGlyph(
           voiceState: _voiceState,
-          wavePhase: _waveAnimation.value,
-          gradientT: _gradientAnimation.value,
+          color: _kGolfChatVoiceBlue,
         ),
         const SizedBox(height: 20),
         Text(
@@ -1164,7 +1260,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
             ),
           ),
         ],
-        if (_liveTranscription.isNotEmpty) ...[
+        if (_liveTranscription.isNotEmpty && !_usingLineVoice) ...[
           const SizedBox(height: 18),
           Text(
             _liveTranscription,
@@ -1532,7 +1628,10 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     return Center(
       child: GestureDetector(
         onTap: _enterVoiceMode,
-        child: const _PulsingMicIcon(color: Color(0xFF5B8DEF)),
+        child: const _PulsingVoiceGlyph(
+          voiceState: _VoiceModeState.idle,
+          color: _kGolfChatVoiceBlue,
+        ),
       ),
     );
   }
@@ -1868,7 +1967,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                           padding: const EdgeInsets.only(
                               right: 14, bottom: 12, left: 4),
                           child: Iconify(
-                            Carbon.microphone,
+                            Carbon.phone_voice,
                             size: 24,
                             color: iconColor,
                           ),
@@ -1897,7 +1996,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                             ),
                             const SizedBox(width: 10),
                             Iconify(
-                              Carbon.microphone,
+                              Carbon.phone_voice,
                               size: 22,
                               color: Colors.white.withValues(alpha: 0.85),
                             ),
@@ -2016,7 +2115,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(32),
         child: BackdropFilter(
@@ -2348,17 +2447,17 @@ Your role (AI):
 
 User role: They reflect, ask questions, and explain what happened. Meet them there.
 
-Formatting (Markdown):
-- Use **bold** for key insights, patterns, or important phrases.
-- Use *italic* for reflective questions or emphasis.
-- Use bullet lists (- item) to break down observations.
-- Use tables (| col | col |) when comparing stats, patterns, or round data.
-- Use ### headings to separate sections in longer responses.
-- Keep formatting clean and purposeful—don't over-format short replies.
+Formatting:
+- Use **bold** for key insights and GolfChat-blue emphasis in prose.
+- Use ### headings to separate sections in longer round reflections.
+- For round stats, comparisons, or breakdowns, call render_table (preferred) instead of markdown pipe tables.
+- Use render_chart when a trend or distribution is clearer visually.
+- Keep short replies conversational; use structure only when reflecting on round data.
 
 Constraints:
 - Calm, clear, non-judgmental tone. No in-round or shot-by-shot coaching.
 - No medical or therapeutic framing.
+- Always complete every sentence — never stop mid-thought. When the user asks for depth, give a full answer.
 - If deep analysis is needed, suggest exploring in the WebApp.
 
 ${roundContext.isEmpty ? '' : '\nCaddyPlay round context:\n$roundContext'}
@@ -2560,7 +2659,11 @@ class _GlassChatBubble extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            constraints: const BoxConstraints(maxWidth: 320),
+            constraints: BoxConstraints(
+              maxWidth: isUser
+                  ? 320
+                  : MediaQuery.sizeOf(context).width - 56,
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: bubbleColor,
@@ -2589,15 +2692,17 @@ class _GlassChatBubble extends StatelessWidget {
                     theme: theme,
                     isUserBubble: isUser,
                   ),
-                Text(
-                  message.text,
-                  style: theme.bodyMedium.copyWith(
-                    color: textColor,
-                    height: 1.35,
-                  ),
-                ),
-                if (!isUser && message.visuals.isNotEmpty)
-                  GolfChatVisuals(
+                if (isUser)
+                  Text(
+                    message.text,
+                    style: theme.bodyMedium.copyWith(
+                      color: textColor,
+                      height: 1.35,
+                    ),
+                  )
+                else
+                  GolfChatMessageBody(
+                    text: message.text,
                     visuals: message.visuals,
                     theme: theme,
                     textColor: textColor,
@@ -3212,16 +3317,20 @@ class _AttachmentPreviewItem extends StatelessWidget {
   }
 }
 
-class _PulsingMicIcon extends StatefulWidget {
-  const _PulsingMicIcon({required this.color});
+class _PulsingVoiceGlyph extends StatefulWidget {
+  const _PulsingVoiceGlyph({
+    required this.color,
+    required this.voiceState,
+  });
 
   final Color color;
+  final _VoiceModeState voiceState;
 
   @override
-  State<_PulsingMicIcon> createState() => _PulsingMicIconState();
+  State<_PulsingVoiceGlyph> createState() => _PulsingVoiceGlyphState();
 }
 
-class _PulsingMicIconState extends State<_PulsingMicIcon>
+class _PulsingVoiceGlyphState extends State<_PulsingVoiceGlyph>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
@@ -3234,27 +3343,41 @@ class _PulsingMicIconState extends State<_PulsingMicIcon>
     super.dispose();
   }
 
+  bool get _active =>
+      widget.voiceState == _VoiceModeState.listening ||
+      widget.voiceState == _VoiceModeState.speaking ||
+      widget.voiceState == _VoiceModeState.processing;
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        final scale = 1.0 + (_controller.value * 0.15);
+        final pulse = _active ? (_controller.value * 0.15) : 0.0;
+        final scale = 1.0 + pulse;
         return Transform.scale(
           scale: scale,
           child: Container(
             padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
+              color: widget.color.withValues(alpha: _active ? 0.08 : 0.04),
+              border: Border.all(
+                color: widget.color.withValues(alpha: _active ? 0.35 : 0.18),
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: widget.color.withValues(alpha: 0.35),
-                  blurRadius: 24,
-                  spreadRadius: 4,
+                  color: widget.color.withValues(alpha: _active ? 0.45 : 0.28),
+                  blurRadius: _active ? 32 : 24,
+                  spreadRadius: _active ? 6 : 4,
                 ),
               ],
             ),
-            child: Icon(Icons.mic_rounded, size: 56, color: widget.color),
+            child: Iconify(
+              Carbon.phone_voice,
+              size: 56,
+              color: widget.color.withValues(alpha: _active ? 1 : 0.82),
+            ),
           ),
         );
       },

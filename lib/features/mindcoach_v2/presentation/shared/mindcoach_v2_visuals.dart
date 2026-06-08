@@ -3,7 +3,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart';
+import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart'
+    show MindCoachV2Pillar, MindCoachV2Session, MindCoachV2UiMode;
 
 class MindCoachV2Visuals {
   MindCoachV2Visuals._();
@@ -41,6 +42,144 @@ class MindCoachV2Visuals {
     MindCoachV2Pillar.confidence,
     MindCoachV2Pillar.control,
   ];
+
+  static String formatSessionDuration(int durationSec) {
+    if (durationSec <= 0) return '';
+    if (durationSec < 60) return '${durationSec}s';
+    final minutes = durationSec ~/ 60;
+    final seconds = durationSec % 60;
+    if (seconds == 0) return '${minutes}m';
+    return '${minutes}m ${seconds}s';
+  }
+
+  /// Per-session visual tuning so generated runs do not all look identical.
+  static MindCoachSessionVisualStyle visualStyleFor({
+    required MindCoachV2Session session,
+    required MindCoachV2UiMode uiMode,
+  }) {
+    final seed = Object.hash(
+      session.sessionKey,
+      session.templateId,
+      session.contextMode,
+      session.deliveryLength,
+      uiMode,
+    );
+    final rand = math.Random(seed);
+    final live = uiMode == MindCoachV2UiMode.liveMinimal;
+    return MindCoachSessionVisualStyle(
+      pulseDurationMs: live
+          ? 1400 + rand.nextInt(700)
+          : 1800 + rand.nextInt(900),
+      orbDiameter: live
+          ? 112.0 + rand.nextInt(18)
+          : 124.0 + rand.nextInt(22),
+      glowStrength: 0.32 + (rand.nextInt(22) / 100),
+      showLiveHeader: live,
+      progressAccentAlpha: 0.55 + (rand.nextInt(30) / 100),
+    );
+  }
+}
+
+class MindCoachSessionVisualStyle {
+  const MindCoachSessionVisualStyle({
+    required this.pulseDurationMs,
+    required this.orbDiameter,
+    required this.glowStrength,
+    required this.showLiveHeader,
+    required this.progressAccentAlpha,
+  });
+
+  final int pulseDurationMs;
+  final double orbDiameter;
+  final double glowStrength;
+  final bool showLiveHeader;
+  final double progressAccentAlpha;
+}
+
+/// Single session pulse orb — solid fill with breathing glow (no duplicate rings).
+class MindCoachSessionPulseOrb extends StatefulWidget {
+  const MindCoachSessionPulseOrb({
+    super.key,
+    required this.color,
+    this.active = true,
+    this.diameter = 120,
+    this.pulseDuration = const Duration(milliseconds: 2000),
+    this.glowStrength = 0.38,
+  });
+
+  final Color color;
+  final bool active;
+  final double diameter;
+  final Duration pulseDuration;
+  final double glowStrength;
+
+  @override
+  State<MindCoachSessionPulseOrb> createState() =>
+      _MindCoachSessionPulseOrbState();
+}
+
+class _MindCoachSessionPulseOrbState extends State<MindCoachSessionPulseOrb>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: widget.pulseDuration,
+  )..repeat(reverse: true);
+
+  @override
+  void didUpdateWidget(MindCoachSessionPulseOrb oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pulseDuration != widget.pulseDuration) {
+      _controller.duration = widget.pulseDuration;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = Curves.easeInOut.transform(_controller.value);
+        final scale = widget.active ? 0.9 + (t * 0.14) : 1.0;
+        final glowAlpha = widget.active
+            ? widget.glowStrength + (t * 0.28)
+            : widget.glowStrength * 0.45;
+        final blur = widget.active ? 28 + (t * 22) : 18.0;
+        final spread = widget.active ? 4 + (t * 10) : 2.0;
+        final fillAlpha = widget.active ? 0.34 + (t * 0.18) : 0.22;
+
+        return Transform.scale(
+          scale: scale,
+          child: SizedBox(
+            width: widget.diameter + 48,
+            height: widget.diameter + 48,
+            child: Center(
+              child: Container(
+                width: widget.diameter,
+                height: widget.diameter,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: widget.color.withValues(alpha: fillAlpha),
+                  boxShadow: [
+                    BoxShadow(
+                      color: widget.color.withValues(alpha: glowAlpha),
+                      blurRadius: blur,
+                      spreadRadius: spread,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class MindCoachV2Backdrop extends StatelessWidget {

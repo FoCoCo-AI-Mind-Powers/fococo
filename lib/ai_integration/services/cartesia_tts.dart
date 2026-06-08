@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:crypto/crypto.dart';
@@ -8,6 +9,9 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../config/cartesia_config.dart';
+import 'cartesia_api_service.dart';
+import 'cartesia_pcm_audio.dart';
+import 'cartesia_streaming_tts.dart';
 
 /// Output format the audio pipeline expects.
 ///
@@ -39,9 +43,8 @@ class CartesiaAudioFormat {
 
 /// Single Cartesia TTS surface for the whole app (§3 of the migration guide).
 ///
-/// Synthesis goes through the `synthesizeSpeech` Cloud Function so the
-/// Cartesia API key (Secret Manager `CARTESIA_API`) never touches the client.
-/// No screen should call Cartesia HTTP/WS endpoints directly.
+/// Prefers the warmed WebSocket path (`max_buffer_delay_ms: 0`) for instant
+/// generation; falls back to `synthesizeSpeech` when the socket is unavailable.
 class CartesiaTts {
   CartesiaTts._({FirebaseFunctions? functions})
       : _functions = functions ?? FirebaseFunctions.instance;
@@ -59,17 +62,12 @@ class CartesiaTts {
   final AudioPlayer _player = AudioPlayer();
 
   /// LRU cache for static-string audio (key = text + voice + model + format).
-  /// Keeps repeated reads of unchanging UI strings out of the billing path.
   static const int _maxCachedClips = 64;
   final LinkedHashMap<String, Uint8List> _cache = LinkedHashMap();
 
   AudioPlayer get player => _player;
   bool get isPlaying => _player.playing;
 
-  // ── Public API ─────────────────────────────────────────────────────────
-
-  /// Synthesize speech and return the audio bytes. Pass `cache: true` for
-  /// static, unchanging strings so repeat reads are served from memory.
   Future<Uint8List> synthesize({
     required String text,
     String? voiceId,
@@ -85,21 +83,82 @@ class CartesiaTts {
     if (key != null) {
       final hit = _cache.remove(key);
       if (hit != null) {
-        _cache[key] = hit; // refresh LRU position
+        _cache[key] = hit;
         return hit;
       }
     }
 
+    await CartesiaAPIService.instance.initialize();
+
+    Uint8List bytes;
+    if (format == CartesiaAudioFormat.wav44k) {
+      try {
+        final pcm = await CartesiaStreamingTts.instance.synthesize(
+          transcript: text.trim(),
+          voiceId: vid,
+          modelId: mid,
+          language: language,
+        );
+        if (pcm.isNotEmpty) {
+          bytes = pcm16MonoToWav(pcm, sampleRate: kCartesiaStreamingSampleRate);
+        } else {
+          bytes = await _synthesizeViaCallable(
+            text: text,
+            voiceId: vid,
+            modelId: mid,
+            format: format,
+            language: language,
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('⚠️ CartesiaTts websocket fallback: $e');
+        }
+        bytes = await _synthesizeViaCallable(
+          text: text,
+          voiceId: vid,
+          modelId: mid,
+          format: format,
+          language: language,
+        );
+      }
+    } else {
+      bytes = await _synthesizeViaCallable(
+        text: text,
+        voiceId: vid,
+        modelId: mid,
+        format: format,
+        language: language,
+      );
+    }
+
+    if (key != null) {
+      _cache[key] = bytes;
+      while (_cache.length > _maxCachedClips) {
+        _cache.remove(_cache.keys.first);
+      }
+    }
+    return bytes;
+  }
+
+  Future<Uint8List> _synthesizeViaCallable({
+    required String text,
+    required String voiceId,
+    required String modelId,
+    required CartesiaAudioFormat format,
+    required String language,
+  }) async {
     final HttpsCallableResult result;
     try {
       final callable =
           _functions.httpsCallable(CartesiaConfig.synthesizeFunctionName);
       result = await callable.call<Map<String, dynamic>>({
         'transcript': text,
-        'voice_id': vid,
-        'model_id': mid,
+        'voice_id': voiceId,
+        'model_id': modelId,
         'language': language,
         'output_format': format.toJson(),
+        'max_buffer_delay_ms': 0,
       });
     } on FirebaseFunctionsException catch (e) {
       throw CartesiaTtsException(
@@ -113,19 +172,9 @@ class CartesiaTts {
     if (b64 == null || b64.isEmpty) {
       throw CartesiaTtsException('synthesizeSpeech returned no audio');
     }
-    final bytes = base64Decode(b64);
-
-    if (key != null) {
-      _cache[key] = bytes;
-      while (_cache.length > _maxCachedClips) {
-        _cache.remove(_cache.keys.first);
-      }
-    }
-    return bytes;
+    return base64Decode(b64);
   }
 
-  /// Synthesize + play in one call. Returns once playback starts; await
-  /// [_player.playerStateStream] / [isPlaying] to track completion.
   Future<void> speak(
     String text, {
     String? voiceId,
@@ -169,7 +218,6 @@ class CartesiaTtsException implements Exception {
   String toString() => 'CartesiaTtsException($message)';
 }
 
-/// just_audio source that plays an in-memory byte buffer.
 class _BytesAudioSource extends StreamAudioSource {
   final Uint8List _bytes;
   _BytesAudioSource(this._bytes);

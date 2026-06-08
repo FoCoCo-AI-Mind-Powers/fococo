@@ -69,6 +69,7 @@ class CartesiaStreamingTts {
     String? pronunciationDictId,
     String language = 'en',
     void Function(int bytesReceived)? onFirstChunk,
+    void Function(Uint8List chunk)? onPcmChunk,
   }) {
     return _enqueue(() async {
       final trimmed = transcript.trim();
@@ -83,7 +84,10 @@ class CartesiaStreamingTts {
       }
 
       final contextId = const Uuid().v4();
-      final pending = _PendingSynthesis(onFirstChunk: onFirstChunk);
+      final pending = _PendingSynthesis(
+        onFirstChunk: onFirstChunk,
+        onPcmChunk: onPcmChunk,
+      );
       _pending[contextId] = pending;
 
       final payload = <String, dynamic>{
@@ -308,17 +312,24 @@ class CartesiaStreamingTts {
 }
 
 class _PendingSynthesis {
-  _PendingSynthesis({this.onFirstChunk});
+  _PendingSynthesis({
+    this.onFirstChunk,
+    this.onPcmChunk,
+  });
 
   final BytesBuilder _buffer = BytesBuilder(copy: false);
   final Completer<Uint8List> completer = Completer<Uint8List>();
   final void Function(int bytesReceived)? onFirstChunk;
+  final void Function(Uint8List chunk)? onPcmChunk;
   bool _gotFirstChunk = false;
   bool _finished = false;
 
   void addChunk(List<int> bytes) {
     if (_finished) return;
     _buffer.add(bytes);
+    if (bytes.isNotEmpty) {
+      onPcmChunk?.call(Uint8List.fromList(bytes));
+    }
     if (!_gotFirstChunk) {
       _gotFirstChunk = true;
       onFirstChunk?.call(_buffer.length);

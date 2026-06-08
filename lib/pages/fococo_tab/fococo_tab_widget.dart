@@ -12,6 +12,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/widgets/fococo_drawer_widget.dart';
 
+import '/pages/favorites/favorites_page_widget.dart';
 import 'fococo_insight_service.dart';
 
 // IMPORTANT — crash-mitigation notes (keep in mind before re-adding features).
@@ -293,6 +294,23 @@ class _FoCoCoTabWidgetState extends State<FoCoCoTabWidget> {
                 showDrawerButton: true,
                 compactTitle: true,
                 topInset: MediaQuery.viewPaddingOf(context).top,
+                actions: [
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(
+                      minWidth: 48,
+                      minHeight: 44,
+                    ),
+                    icon: Icon(
+                      Icons.bookmark_rounded,
+                      color: theme.primaryText,
+                      size: 22,
+                    ),
+                    tooltip: 'Saved',
+                    onPressed: () => unawaited(FavoritesPageWidget.open(context)),
+                  ),
+                ],
               ),
               Expanded(
                 child: SafeArea(

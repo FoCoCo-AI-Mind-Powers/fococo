@@ -3,7 +3,7 @@ import 'cartesia_config.dart';
 /// Default Cartesia voice used everywhere FoCoCo speaks. Centralized here so
 /// onboarding, MindCoach, GolfChat, FoCoMap, and the LiveKit bridge stay in
 /// sync — the user explicitly requested a single calm coach voice.
-const String kFoCoCoDefaultCartesiaVoiceId = CartesiaConfig.voiceId;
+String get kFoCoCoDefaultCartesiaVoiceId => CartesiaConfig.voiceId;
 
 /// Default playback speed for the calm coaching delivery (Cartesia multiplier).
 const double kFoCoCoDefaultCartesiaSpeed = 1.0;
@@ -25,13 +25,13 @@ class CartesiaMCPConfig {
   static const String sttModel = 'ink-whisper';
 
   /// Single source of truth for the default voice across services.
-  static const String defaultVoiceId = kFoCoCoDefaultCartesiaVoiceId;
+  static String get defaultVoiceId => kFoCoCoDefaultCartesiaVoiceId;
 
   /// Default speed multiplier applied when a caller does not pick a profile.
   static const double defaultSpeedMultiplier = kFoCoCoDefaultCartesiaSpeed;
 
   // Voice configurations optimized for golf coaching with specified voice
-  static const Map<String, Map<String, dynamic>> voiceProfiles = {
+  static Map<String, Map<String, dynamic>> get voiceProfiles => {
     'coach_confident': {
       'voice_id': kFoCoCoDefaultCartesiaVoiceId,
       'model': 'sonic-2',

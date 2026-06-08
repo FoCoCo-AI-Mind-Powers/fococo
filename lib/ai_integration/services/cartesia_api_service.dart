@@ -37,6 +37,7 @@ class CartesiaAPIService {
 
   bool _isInitialized = false;
   bool _isSpeaking = false;
+  int _playbackGeneration = 0;
   // Single FoCoCo coach voice — calm, slower delivery. Override per-call by
   // passing `voiceId:` to `generateSpeech` / `speakText` if needed.
   String _currentVoiceId = kFoCoCoDefaultCartesiaVoiceId;
@@ -75,6 +76,9 @@ class CartesiaAPIService {
 
       // Configure audio player
       await _configureAudioPlayer();
+
+      final runtime = await CartesiaVoiceRuntime.load();
+      _currentVoiceId = runtime.voiceId;
 
       _isInitialized = true;
 
@@ -370,7 +374,6 @@ class CartesiaAPIService {
       _isSpeaking = true;
       _speakingController.add(true);
 
-      // Generate audio data
       final audioData = await generateSpeech(
         text: text,
         voiceId: voiceId,
@@ -381,7 +384,6 @@ class CartesiaAPIService {
         speechProfile: speechProfile,
       );
 
-      // Play the generated audio
       await playAudioData(audioData, onComplete: onComplete);
     } catch (e) {
       _isSpeaking = false;
@@ -396,12 +398,22 @@ class CartesiaAPIService {
     List<int> audioData, {
     VoidCallback? onComplete,
   }) async {
+    if (audioData.isEmpty) {
+      onComplete?.call();
+      return;
+    }
+
+    final generation = _playbackGeneration;
     try {
       // Create a temporary audio source from bytes, tagged so playback can
       // continue in the background with lock-screen controls.
       final audioSource = _BytesAudioSource(audioData, tag: _makeMediaItem());
 
       await _audioPlayer.setAudioSource(audioSource);
+      if (generation != _playbackGeneration) {
+        onComplete?.call();
+        return;
+      }
       await _audioPlayer.play();
 
       // Set up completion callback
@@ -417,6 +429,10 @@ class CartesiaAPIService {
         print('🔊 Playing generated audio');
       }
     } catch (e) {
+      if (_isPlaybackCancelled(e, generation)) {
+        onComplete?.call();
+        return;
+      }
       _isSpeaking = false;
       _speakingController.add(false);
       throw Exception('Failed to play audio: $e');
@@ -480,8 +496,7 @@ class CartesiaAPIService {
     }
   }
 
-  /// Prefer one-shot streaming synthesis (instant TTFB). Continuations are only
-  /// used when the callable fallback path is required.
+  /// WebSocket synthesis (max_buffer_delay_ms: 0) then one continuous WAV per line.
   Future<void> speakTextWithContinuations({
     required String text,
     String? voiceId,
@@ -509,14 +524,30 @@ class CartesiaAPIService {
     List<int> audioData, {
     VoidCallback? onComplete,
   }) async {
+    if (audioData.isEmpty) {
+      onComplete?.call();
+      return;
+    }
+
+    final generation = _playbackGeneration;
     try {
       final audioSource = _BytesAudioSource(audioData, tag: _makeMediaItem());
       await _audioPlayer.setAudioSource(audioSource);
+      if (generation != _playbackGeneration) {
+        onComplete?.call();
+        return;
+      }
 
       final completion = Completer<void>();
       late final StreamSubscription<PlayerState> stateSub;
       stateSub = _audioPlayer.playerStateStream.listen(
         (state) {
+          if (generation != _playbackGeneration) {
+            if (!completion.isCompleted) {
+              completion.complete();
+            }
+            return;
+          }
           if (state.processingState == ProcessingState.completed &&
               !completion.isCompleted) {
             completion.complete();
@@ -530,25 +561,46 @@ class CartesiaAPIService {
       );
 
       await _audioPlayer.play();
+      if (generation != _playbackGeneration) {
+        await stateSub.cancel();
+        onComplete?.call();
+        return;
+      }
       if (!completion.isCompleted) {
         await completion.future;
       }
       await stateSub.cancel();
       onComplete?.call();
     } catch (e) {
+      if (_isPlaybackCancelled(e, generation)) {
+        onComplete?.call();
+        return;
+      }
       _isSpeaking = false;
       _speakingController.add(false);
       throw Exception('Failed to play audio: $e');
     }
   }
 
+  bool _isPlaybackCancelled(Object error, int generation) {
+    if (generation != _playbackGeneration) {
+      return true;
+    }
+    final message = error.toString().toLowerCase();
+    return message.contains('loading interrupted') ||
+        message.contains('aborted');
+  }
+
   /// Stop current speech
   Future<void> stopSpeaking() async {
-    if (_isSpeaking) {
+    _playbackGeneration++;
+    try {
       await _audioPlayer.stop();
-      _isSpeaking = false;
-      _speakingController.add(false);
+    } catch (_) {
+      // Player may already be idle after an interrupt.
     }
+    _isSpeaking = false;
+    _speakingController.add(false);
   }
 
   /// Pause audio playback

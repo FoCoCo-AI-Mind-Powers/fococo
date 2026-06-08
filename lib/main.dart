@@ -24,6 +24,7 @@ import '/services/subscription_state_provider.dart';
 import '/services/widget_data_service.dart';
 import '/widgets/maintenance_gate.dart';
 import '/auth/firebase_auth/auth_util.dart';
+import '/ai_integration/services/cartesia_api_service.dart';
 import '/ai_integration/services/cartesia_voice_runtime.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -263,7 +264,21 @@ class _MyAppState extends State<MyApp> {
       initialize: () => SubscriptionStateProvider().initialize(),
     );
     if (currentUserUid.isNotEmpty) {
-      unawaited(CartesiaVoiceRuntime.load());
+      unawaited(_warmCartesiaVoice());
+    }
+  }
+
+  Future<void> _warmCartesiaVoice() async {
+    try {
+      await CartesiaVoiceRuntime.load();
+      final tts = CartesiaAPIService.instance;
+      if (!tts.isInitialized) {
+        await tts.initialize();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ Cartesia voice warm skipped: $e');
+      }
     }
   }
 
@@ -335,6 +350,7 @@ class _MyAppState extends State<MyApp> {
       if (kDebugMode) {
         print('✅ User logged in: ${user.uid}');
       }
+      unawaited(_warmCartesiaVoice());
       return;
     }
 

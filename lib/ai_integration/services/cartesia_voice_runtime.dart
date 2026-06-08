@@ -23,7 +23,11 @@ class CartesiaVoiceRuntime {
           .httpsCallable(CartesiaConfig.runtimeConfigFunctionName)
           .call<Map<String, dynamic>>();
       final data = Map<String, dynamic>.from(result.data as Map);
+      final voiceId = (data['voice_id'] ?? '').toString().trim();
+      CartesiaConfig.applyResolvedVoiceId(voiceId);
+
       _cached = CartesiaVoiceRuntimeConfig(
+        voiceId: CartesiaConfig.voiceId,
         lineAgentId: (data['line_agent_id'] ?? '').toString().trim(),
         pronunciationDictId:
             (data['pronunciation_dict_id'] ?? '').toString().trim(),
@@ -34,7 +38,8 @@ class CartesiaVoiceRuntime {
       CartesiaConfig.pronunciationDictId = _cached!.pronunciationDictId;
       if (kDebugMode) {
         debugPrint(
-          '🎙 Cartesia runtime: agent=${_cached!.lineAgentId.isEmpty ? "(none)" : _cached!.lineAgentId}',
+          '🎙 Cartesia runtime: voice=${_cached!.voiceId} '
+          'agent=${_cached!.lineAgentId.isEmpty ? "(none)" : _cached!.lineAgentId}',
         );
       }
       return _cached!;
@@ -52,11 +57,13 @@ class CartesiaVoiceRuntime {
 
 class CartesiaVoiceRuntimeConfig {
   const CartesiaVoiceRuntimeConfig({
+    this.voiceId = CartesiaConfig.fallbackVoiceId,
     this.lineAgentId = '',
     this.pronunciationDictId = '',
     this.cartesiaVersion = CartesiaConfig.version,
   });
 
+  final String voiceId;
   final String lineAgentId;
   final String pronunciationDictId;
   final String cartesiaVersion;

@@ -200,4 +200,32 @@ void main() {
     final snap = buildRoundSnapshot(round);
     expect(snap.scoreToParIsApproximate, isTrue);
   });
+
+  test('nullable advanced defaults omit unset keys', () {
+    final defaults = CaddyPlayAdvancedDefaults();
+    final json = defaults.toJson();
+    expect(json.containsKey('roundType'), isFalse);
+    expect(json.containsKey('playingPartners'), isFalse);
+
+    final hydrated = CaddyPlayAdvancedDefaults.fromJson({
+      'roundType': 'practice',
+      'weather': 'good',
+    });
+    expect(hydrated.roundType, CaddyPlayRoundType.practice);
+    expect(hydrated.playingPartners, isNull);
+    expect(hydrated.weather, CaddyPlayWeather.good);
+  });
+
+  test('locked snapshot exposes required copy flags', () {
+    final round = CaddyPlayActiveRound.newRound(
+      roundId: 'round_locked',
+      userId: 'user_1',
+      courseName: kCaddyPlayCoursePlaceholder,
+      holesTotal: 18,
+    );
+    final snapshot = buildRoundSnapshot(round);
+    expect(snapshot.insightsLocked, isTrue);
+    expect(snapshot.mindsetSummary, isNotEmpty);
+    expect(snapshot.momentumShift, isNotEmpty);
+  });
 }

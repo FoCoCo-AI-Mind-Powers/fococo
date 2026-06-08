@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -35,7 +36,7 @@ class CaddyPlayWidget extends StatefulWidget {
   State<CaddyPlayWidget> createState() => _CaddyPlayWidgetState();
 }
 
-enum _CaddyPlayScreen { home, newRound, active, snapshot, completed }
+enum _CaddyPlayScreen { home, newRound, active, snapshot }
 
 enum _CaddyPlayOverlay {
   none,
@@ -74,17 +75,16 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   bool _isLoading = true;
   bool _isSaving = false;
   bool _showAdvancedSettings = false;
+  bool _advancedSettingsTouched = false;
   bool _snapshotLoading = false;
   int _selectedHoles = 18;
 
   CaddyPlayAdvancedDefaults _advancedDefaults =
       const CaddyPlayAdvancedDefaults();
-  CaddyPlayRoundType _selectedRoundType = CaddyPlayRoundType.practice;
-  CaddyPlayPlayingPartners _selectedPlayingPartners =
-      CaddyPlayPlayingPartners.friends;
-  CaddyPlayPreRoundMindset _selectedPreRoundMindset =
-      CaddyPlayPreRoundMindset.positive;
-  CaddyPlayWeather _selectedWeather = CaddyPlayWeather.good;
+  CaddyPlayRoundType? _selectedRoundType;
+  CaddyPlayPlayingPartners? _selectedPlayingPartners;
+  CaddyPlayPreRoundMindset? _selectedPreRoundMindset;
+  CaddyPlayWeather? _selectedWeather;
 
   CaddyPlayActiveRound? _activeRound;
   CaddyPlayActiveRound? _completedRound;
@@ -172,7 +172,8 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         _snapshot = _activeRound!.snapshot;
       }
     } catch (error) {
-      _showBanner('CaddyPlay setup failed: $error', color: _kPendingAmber);
+      debugPrint('CaddyPlay setup failed: $error');
+      _showBanner(_userSafeError('setup'), color: _kPendingAmber);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -234,9 +235,24 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   }
 
   bool _isRouteVisible(BuildContext context) {
-    return GoRouterState.of(context).uri.toString().contains(
-          CaddyPlayWidget.routePath,
-        );
+    try {
+      return GoRouterState.of(context)
+          .uri
+          .toString()
+          .contains(CaddyPlayWidget.routePath);
+    } catch (_) {
+      return true;
+    }
+  }
+
+  String _userSafeError(String context) {
+    return switch (context) {
+      'setup' => 'CaddyPlay could not load. Pull to refresh or try again.',
+      'save' => 'Unable to save your round. Try again in a moment.',
+      'justtalk' => 'JustTalk could not start. Check microphone access.',
+      'complete' => 'Unable to finish the round. Try again in a moment.',
+      _ => 'Something went wrong. Please try again.',
+    };
   }
 
   void _bootstrapIfVisible() {
@@ -270,7 +286,6 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       _CaddyPlayScreen.newRound => 'New Round',
       _CaddyPlayScreen.active => 'Active Round',
       _CaddyPlayScreen.snapshot => 'Round Snapshot',
-      _CaddyPlayScreen.completed => 'Round Completed',
     };
   }
 
@@ -478,7 +493,6 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       _CaddyPlayScreen.newRound => _buildNewRound(theme, bottomReserve),
       _CaddyPlayScreen.active => _buildActiveRound(theme, bottomReserve),
       _CaddyPlayScreen.snapshot => _buildSnapshot(theme, bottomReserve),
-      _CaddyPlayScreen.completed => _buildSnapshot(theme, bottomReserve),
     };
   }
 
@@ -531,7 +545,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   }
 
   Widget _buildNewRound(FlutterFlowTheme theme, double bottomReserve) {
-    final canStart = _courseController.text.trim().isNotEmpty && !_isSaving;
+    final canStart = !_isSaving;
     return ListView(
       padding: EdgeInsets.fromLTRB(20, 18, 20, bottomReserve),
       children: [
@@ -604,7 +618,10 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             values: CaddyPlayRoundType.values,
             selected: _selectedRoundType,
             labelFor: (value) => enumLabel(value),
-            onSelected: (value) => setState(() => _selectedRoundType = value),
+            onSelected: (value) => setState(() {
+              _advancedSettingsTouched = true;
+              _selectedRoundType = value;
+            }),
           ),
           const SizedBox(height: 18),
           _buildChoiceGroup<CaddyPlayPlayingPartners>(
@@ -613,8 +630,10 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             values: CaddyPlayPlayingPartners.values,
             selected: _selectedPlayingPartners,
             labelFor: (value) => enumLabel(value),
-            onSelected: (value) =>
-                setState(() => _selectedPlayingPartners = value),
+            onSelected: (value) => setState(() {
+              _advancedSettingsTouched = true;
+              _selectedPlayingPartners = value;
+            }),
           ),
           const SizedBox(height: 18),
           _buildChoiceGroup<CaddyPlayPreRoundMindset>(
@@ -623,8 +642,10 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             values: CaddyPlayPreRoundMindset.values,
             selected: _selectedPreRoundMindset,
             labelFor: (value) => enumLabel(value),
-            onSelected: (value) =>
-                setState(() => _selectedPreRoundMindset = value),
+            onSelected: (value) => setState(() {
+              _advancedSettingsTouched = true;
+              _selectedPreRoundMindset = value;
+            }),
           ),
           const SizedBox(height: 18),
           _buildChoiceGroup<CaddyPlayWeather>(
@@ -634,7 +655,10 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             selected: _selectedWeather,
             labelFor: (value) =>
                 value == CaddyPlayWeather.ok ? 'OK' : enumLabel(value),
-            onSelected: (value) => setState(() => _selectedWeather = value),
+            onSelected: (value) => setState(() {
+              _advancedSettingsTouched = true;
+              _selectedWeather = value;
+            }),
           ),
         ],
         const SizedBox(height: 24),
@@ -682,7 +706,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           ),
           const SizedBox(height: 4),
           Text(
-            'Moments Captured',
+            'Shots & Moments Captured',
             textAlign: TextAlign.center,
             style: theme.bodyMedium.copyWith(
               color: Colors.white.withValues(alpha: 0.7),
@@ -696,6 +720,18 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
               moments: currentHoleMoments,
             ),
           ),
+          if (round.allMoments.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              _latestMomentPreview(round),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.bodySmall.copyWith(
+                color: Colors.white.withValues(alpha: 0.55),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           const _SectionLabel(label: 'Log Shot'),
           const SizedBox(height: 8),
@@ -727,7 +763,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             children: [
               Expanded(
                 child: _CaddyGhostButton(
-                  label: 'BACK',
+                  label: 'BACK HOLE',
                   compact: true,
                   onTap: canGoBack ? _retreatHole : null,
                 ),
@@ -735,7 +771,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
               const SizedBox(width: 10),
               Expanded(
                 child: _CaddyGlowButton(
-                  label: onLastHole ? 'END ROUND' : 'NEXT HOLE',
+                  label: onLastHole ? 'END ROUND' : 'NEXT',
                   compact: true,
                   onTap: onLastHole ? _enterSnapshot : _advanceHole,
                 ),
@@ -794,6 +830,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     }
 
     final canContinueRound = _activeRound != null;
+    final locked = snapshot.insightsLocked;
     final scoreLabel = snapshot.holesPlayed > 0 ||
             snapshot.scoreToPar != 0 ||
             !snapshot.scoreToParIsApproximate
@@ -825,6 +862,31 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           const SizedBox(height: 6),
           const _GlowSeparator(),
           const SizedBox(height: 6),
+          if (locked) ...[
+            Expanded(
+              flex: 3,
+              child: _SummaryCard(
+                compact: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      snapshot.mindsetSummary,
+                      style: theme.bodyLarge.copyWith(color: Colors.white),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      snapshot.momentumShift,
+                      style: theme.bodyMedium.copyWith(
+                        color: _kPendingAmber,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+          ] else ...[
           Expanded(
             flex: 2,
             child: _SummaryCard(
@@ -868,6 +930,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             ),
           ),
           const SizedBox(height: 6),
+          ],
           Expanded(
             flex: 2,
             child: _SummaryCard(
@@ -907,78 +970,79 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
               textColor: const Color(0xFF89A8FF),
             ),
           ),
-          const SizedBox(height: 6),
-          Expanded(
-            flex: 3,
-            child: _SummaryCard(
-              compact: true,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'MOMENTUM SHIFT',
-                    style: theme.labelSmall.copyWith(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      letterSpacing: 1.0,
+          if (!locked) ...[
+            const SizedBox(height: 6),
+            Expanded(
+              flex: 3,
+              child: _SummaryCard(
+                compact: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'MOMENTUM SHIFT',
+                      style: theme.labelSmall.copyWith(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        letterSpacing: 1.0,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.topLeft,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
+                    const SizedBox(height: 4),
+                    Expanded(
+                      child: Align(
                         alignment: Alignment.topLeft,
-                        child: Text(
-                          snapshot.momentumShift,
-                          style: theme.bodyLarge.copyWith(
-                            color: _kPendingAmber,
-                            fontWeight: FontWeight.w500,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.topLeft,
+                          child: Text(
+                            snapshot.momentumShift,
+                            style: theme.bodyLarge.copyWith(
+                              color: _kPendingAmber,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Expanded(
-            flex: 2,
-            child: _SummaryCard(
-              compact: true,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'MINDSET SUMMARY',
-                    style: theme.labelSmall.copyWith(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      letterSpacing: 1.0,
+            const SizedBox(height: 6),
+            Expanded(
+              flex: 2,
+              child: _SummaryCard(
+                compact: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'MINDSET SUMMARY',
+                      style: theme.labelSmall.copyWith(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        letterSpacing: 1.0,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.topLeft,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
+                    const SizedBox(height: 4),
+                    Expanded(
+                      child: Align(
                         alignment: Alignment.topLeft,
-                        child: Text(
-                          snapshot.evaluationPhrase,
-                          style: theme.bodyLarge.copyWith(
-                            color: Colors.white,
-                            fontStyle: FontStyle.italic,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.topLeft,
+                          child: Text(
+                            snapshot.evaluationPhrase,
+                            style: theme.bodyLarge.copyWith(
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
           const SizedBox(height: 8),
           if (canContinueRound) ...[
             _CaddyGhostButton(
@@ -1113,20 +1177,6 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       padding: EdgeInsets.fromLTRB(20, 18, 20, bottomReserve),
       children: [
         Center(
-          child: _buildChoiceGroup<CaddyPlayShotResult>(
-            theme: theme,
-            label: 'Shot Result',
-            values: CaddyPlayShotResult.values,
-            selected: _tapResult,
-            labelFor: (value) =>
-                value == CaddyPlayShotResult.ok ? 'OK' : enumLabel(value),
-            onSelected: (value) => setState(() => _tapResult = value),
-          ),
-        ),
-        const SizedBox(height: 18),
-        const _GlowSeparator(),
-        const SizedBox(height: 18),
-        Center(
           child: _buildChoiceGroup<CaddyPlayFocusLevel>(
             theme: theme,
             label: 'Focus Level',
@@ -1134,6 +1184,22 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
             selected: _tapFocus,
             labelFor: (value) => enumLabel(value),
             onSelected: (value) => setState(() => _tapFocus = value),
+          ),
+        ),
+        const SizedBox(height: 18),
+        const _GlowSeparator(),
+        const SizedBox(height: 18),
+        Center(
+          child: _buildChoiceGroup<CaddyPlayRoutineStatus>(
+            theme: theme,
+            label: 'Pre-Shot Routine',
+            values: CaddyPlayRoutineStatus.values,
+            selected: _tapRoutine,
+            labelFor: (value) => switch (value) {
+              CaddyPlayRoutineStatus.partly => 'Partly',
+              _ => enumLabel(value),
+            },
+            onSelected: (value) => setState(() => _tapRoutine = value),
           ),
         ),
         const SizedBox(height: 18),
@@ -1153,16 +1219,14 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         const _GlowSeparator(),
         const SizedBox(height: 18),
         Center(
-          child: _buildChoiceGroup<CaddyPlayRoutineStatus>(
+          child: _buildChoiceGroup<CaddyPlayShotResult>(
             theme: theme,
-            label: 'Pre-Shot Routine',
-            values: CaddyPlayRoutineStatus.values,
-            selected: _tapRoutine,
-            labelFor: (value) => switch (value) {
-              CaddyPlayRoutineStatus.partly => 'Partly',
-              _ => enumLabel(value),
-            },
-            onSelected: (value) => setState(() => _tapRoutine = value),
+            label: 'Shot Result',
+            values: CaddyPlayShotResult.values,
+            selected: _tapResult,
+            labelFor: (value) =>
+                value == CaddyPlayShotResult.ok ? 'OK' : enumLabel(value),
+            onSelected: (value) => setState(() => _tapResult = value),
           ),
         ),
         const SizedBox(height: 18),
@@ -1585,24 +1649,20 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
           ),
           Expanded(
             flex: 2,
-            child: _ScoreStepper(
-              value: hole.par,
-              allowBlank: false,
-              onMinus: () => _updateDraftPar(
-                  hole.holeNumber, (hole.par ?? 4) - 1),
-              onPlus: () => _updateDraftPar(
-                  hole.holeNumber, (hole.par ?? 4) + 1),
+            child: _ScoreScrollPicker(
+              label: 'Par',
+              values: List<int>.generate(9, (i) => i + 1),
+              selected: hole.par ?? 4,
+              onSelected: (value) => _updateDraftPar(hole.holeNumber, value),
             ),
           ),
           Expanded(
             flex: 2,
-            child: _ScoreStepper(
-              value: hole.score,
-              allowBlank: true,
-              onMinus: () =>
-                  _updateDraftScore(hole.holeNumber, (hole.score ?? 1) - 1),
-              onPlus: () =>
-                  _updateDraftScore(hole.holeNumber, (hole.score ?? 0) + 1),
+            child: _ScoreScrollPicker(
+              label: 'Score',
+              values: List<int>.generate(15, (i) => i + 1),
+              selected: hole.score ?? 4,
+              onSelected: (value) => _updateDraftScore(hole.holeNumber, value),
             ),
           ),
           Expanded(
@@ -1727,10 +1787,11 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     setState(() {
       _selectedHoles = 18;
       _showAdvancedSettings = false;
-      _selectedRoundType = CaddyPlayRoundType.practice;
-      _selectedPlayingPartners = CaddyPlayPlayingPartners.friends;
-      _selectedPreRoundMindset = CaddyPlayPreRoundMindset.positive;
-      _selectedWeather = CaddyPlayWeather.good;
+      _advancedSettingsTouched = false;
+      _selectedRoundType = null;
+      _selectedPlayingPartners = null;
+      _selectedPreRoundMindset = null;
+      _selectedWeather = null;
       _screen = _CaddyPlayScreen.newRound;
     });
   }
@@ -1779,31 +1840,32 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
   }
 
   Future<void> _startRound() async {
-    final courseName = _courseController.text.trim();
-    if (courseName.isEmpty) {
-      _showBanner('Enter a course name to start your round.',
-          color: _kPendingAmber);
-      return;
-    }
+    final entered = _courseController.text.trim();
+    final courseName =
+        entered.isEmpty ? kCaddyPlayCoursePlaceholder : entered;
 
-    final defaults = CaddyPlayAdvancedDefaults(
-      roundType: _selectedRoundType,
-      playingPartners: _selectedPlayingPartners,
-      preRoundMindset: _selectedPreRoundMindset,
-      weather: _selectedWeather,
-    );
-    await _sessionService.saveAdvancedDefaults(defaults);
-    _advancedDefaults = defaults;
+    if (_advancedSettingsTouched) {
+      final defaults = CaddyPlayAdvancedDefaults(
+        roundType: _selectedRoundType,
+        playingPartners: _selectedPlayingPartners,
+        preRoundMindset: _selectedPreRoundMindset,
+        weather: _selectedWeather,
+      );
+      await _sessionService.saveAdvancedDefaults(defaults);
+      _advancedDefaults = defaults;
+    }
 
     final round = CaddyPlayActiveRound.newRound(
       roundId: 'caddyplay_${DateTime.now().microsecondsSinceEpoch}',
       userId: currentUserUid,
       courseName: courseName,
       holesTotal: _selectedHoles,
-      roundType: _selectedRoundType,
-      playingPartners: _selectedPlayingPartners,
-      preRoundMindset: _selectedPreRoundMindset,
-      weather: _selectedWeather,
+      roundType: _advancedSettingsTouched ? _selectedRoundType : null,
+      playingPartners:
+          _advancedSettingsTouched ? _selectedPlayingPartners : null,
+      preRoundMindset:
+          _advancedSettingsTouched ? _selectedPreRoundMindset : null,
+      weather: _advancedSettingsTouched ? _selectedWeather : null,
     );
 
     await _saveRound(round, nextScreen: _CaddyPlayScreen.active);
@@ -1831,7 +1893,8 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         }
       });
     } catch (error) {
-      _showBanner('Unable to save round: $error', color: _kPendingAmber);
+      debugPrint('Unable to save round: $error');
+      _showBanner(_userSafeError('save'), color: _kPendingAmber);
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -1878,8 +1941,27 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     }
 
     _setOverlay(_CaddyPlayOverlay.none);
-    _showMicroInsight(buildTapMicroInsight(moment));
+    _showBanner('Shot Saved.');
     _scrollMomentRowToEnd();
+  }
+
+  String _latestMomentPreview(CaddyPlayActiveRound round) {
+    final latest = round.allMoments.last;
+    final typeLabel = switch (latest.type) {
+      CaddyPlayMomentType.tap => 'TAP',
+      CaddyPlayMomentType.talk => 'TALK',
+      CaddyPlayMomentType.mindsnap => 'RESET',
+    };
+    final detail = switch (latest.type) {
+      CaddyPlayMomentType.tap =>
+        latest.shotResult != null ? enumLabel(latest.shotResult!) : 'Logged',
+      CaddyPlayMomentType.talk =>
+        (latest.transcript ?? '').trim().isNotEmpty
+            ? latest.transcript!.trim()
+            : 'Voice moment',
+      CaddyPlayMomentType.mindsnap => 'MindSnap reset',
+    };
+    return 'Latest: $typeLabel • Hole ${latest.holeNumber} • $detail';
   }
 
   Future<void> _openJustTalk() async {
@@ -1950,7 +2032,8 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       await HapticService.medium();
       setState(() => _overlay = _CaddyPlayOverlay.justTalkRecording);
     } catch (error) {
-      _showBanner('JustTalk could not start: $error', color: _kPendingAmber);
+      debugPrint('JustTalk start failed: $error');
+      _showBanner(_userSafeError('justtalk'), color: _kPendingAmber);
       await _discardPendingAudioFile();
     }
   }
@@ -1975,11 +2058,63 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
     }
 
     await HapticService.light();
-    await _initJustTalkPreviewPlayer();
-    if (!mounted) {
+    if (!mounted) return;
+    setState(() => _overlay = _CaddyPlayOverlay.justTalkProcessing);
+    await _processAndSaveJustTalk();
+  }
+
+  Future<void> _processAndSaveJustTalk() async {
+    final round = _activeRound;
+    if (round == null) return;
+
+    final transcript = await _transcribeJustTalkAudio(_justTalkAudioPath);
+    if (!mounted) return;
+
+    final analysis = await _runTalkAnalysis(
+      transcript: transcript,
+      audioPath: _justTalkAudioPath,
+      recordingDuration: _justTalkDuration,
+    );
+    if (!mounted) return;
+
+    final trimmed = analysis.transcript.trim();
+    if (trimmed.isEmpty) {
+      await _discardPendingAudioFile();
+      if (!mounted) return;
+      setState(() {
+        _pendingTalkMoment = null;
+        _justTalkAnalysis = null;
+        _overlay = _CaddyPlayOverlay.none;
+      });
+      _showBanner(
+        'We couldn\'t capture that moment. Try speaking a little louder.',
+        color: _kPendingAmber,
+      );
       return;
     }
-    setState(() => _overlay = _CaddyPlayOverlay.justTalkPreview);
+
+    final moment = CaddyPlayMoment(
+      id: 'talk_${DateTime.now().microsecondsSinceEpoch}',
+      holeNumber: round.currentHole,
+      type: CaddyPlayMomentType.talk,
+      timestamp: DateTime.now(),
+      transcript: analysis.transcript,
+      aiInterpretation: analysis.aiInterpretation,
+      pillarTags: analysis.pillarTags,
+      recordingDurationSeconds: analysis.recordingDuration.inSeconds,
+      audioPath: analysis.audioPath,
+    );
+
+    await HapticService.light();
+    final updated = round.addMoment(moment);
+    await _saveRound(updated);
+    if (!mounted) return;
+
+    _pendingTalkMoment = null;
+    _justTalkAnalysis = null;
+    _justTalkAudioPath = null;
+    _setOverlay(_CaddyPlayOverlay.none);
+    _scrollMomentRowToEnd();
   }
 
   Future<void> _initJustTalkPreviewPlayer() async {
@@ -2421,17 +2556,22 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       return;
     }
 
-    final updated = round.copyWith(
+    await HapticService.light();
+    var updated = round.copyWith(
       holes: _scorecardDraft,
       lastUpdatedAt: DateTime.now(),
       syncState: CaddyPlaySyncState.localOnly,
       lastSyncError: null,
     );
+    if (updated.currentHole < updated.holesTotal) {
+      updated = updated.advanceHole();
+    }
     await _saveRound(updated);
     if (!mounted) {
       return;
     }
 
+    _setOverlay(_CaddyPlayOverlay.none);
     _showBanner('Score saved.');
   }
 
@@ -2526,11 +2666,11 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
         _completedRound = completed;
         _snapshot = completed.snapshot;
         _activeRound = null;
-        _screen = _CaddyPlayScreen.home;
       });
-      _showBanner('Round saved.');
+      context.goNamed('fococo_tab');
     } catch (error) {
-      _showBanner('Unable to complete round: $error', color: _kPendingAmber);
+      debugPrint('Unable to complete round: $error');
+      _showBanner(_userSafeError('complete'), color: _kPendingAmber);
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -2551,6 +2691,7 @@ class _CaddyPlayWidgetState extends State<CaddyPlayWidget>
       extra: <String, dynamic>{
         'roundId': roundId,
         if (snapshot != null) 'caddyplaySnapshot': snapshot.toJson(),
+        'autoStartReflection': true,
       },
     );
   }
@@ -3532,6 +3673,60 @@ class _JustTalkPreviewControl extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ScoreScrollPicker extends StatelessWidget {
+  const _ScoreScrollPicker({
+    required this.label,
+    required this.values,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final List<int> values;
+  final int selected;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final index = values.indexOf(selected).clamp(0, values.length - 1);
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.6),
+            fontSize: 11,
+          ),
+        ),
+        SizedBox(
+          height: 88,
+          child: CupertinoPicker(
+            scrollController: FixedExtentScrollController(initialItem: index),
+            itemExtent: 28,
+            magnification: 1.08,
+            squeeze: 1.1,
+            onSelectedItemChanged: (i) => onSelected(values[i]),
+            children: values
+                .map(
+                  (v) => Center(
+                    child: Text(
+                      '$v',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+          ),
+        ),
+      ],
     );
   }
 }

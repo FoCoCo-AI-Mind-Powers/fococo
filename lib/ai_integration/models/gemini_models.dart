@@ -474,6 +474,9 @@ class GeminiConversationResponse extends BaseGeminiResponse {
   /// fields the renderer needs. Empty when the reply is plain text.
   final List<Map<String, dynamic>> visuals;
 
+  /// Optional MindCoach session suggestion (max one per conversation).
+  final Map<String, dynamic>? mindCoachRecommendation;
+
   const GeminiConversationResponse({
     required this.response,
     required this.conversationType,
@@ -484,6 +487,7 @@ class GeminiConversationResponse extends BaseGeminiResponse {
     required super.userId,
     super.tokensUsed,
     this.visuals = const [],
+    this.mindCoachRecommendation,
   });
 
   @override
@@ -494,6 +498,8 @@ class GeminiConversationResponse extends BaseGeminiResponse {
       'sessionId': sessionId,
       'context': context,
       'visuals': visuals,
+      if (mindCoachRecommendation != null)
+        'mindCoachRecommendation': mindCoachRecommendation,
       'timestamp': timestamp.toIso8601String(),
       'model': model,
       'userId': userId,

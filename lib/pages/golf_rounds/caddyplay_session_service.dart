@@ -624,7 +624,9 @@ class CaddyPlaySessionService {
       'scoreToPar': round.scoreToPar,
       'courseRating': round.courseRating,
       'slopeRating': round.slopeRating,
-      'preRoundMood': enumLabel(round.preRoundMindset),
+      'preRoundMood': round.preRoundMindset != null
+          ? enumLabel(round.preRoundMindset!)
+          : '',
       'notes': snapshot.evaluationPhrase,
       'lessonsLearned': snapshot.completionInsight,
       'keyMoments': snapshot.momentumShift,

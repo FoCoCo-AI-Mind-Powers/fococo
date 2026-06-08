@@ -21,6 +21,8 @@ import '/services/ai_voice_preference_service.dart';
 import '/services/app_session_prefs_service.dart';
 import '/services/haptic_service.dart';
 import '/services/account_deletion_service.dart';
+import '/features/mindcoach_v2/services/mindcoach_replay_cache.dart';
+import '/features/mindcoach_v2/services/mindcoach_session_prefetch.dart';
 import '/pages/support/support_submission_widget.dart';
 import '/services/support_submission_service.dart';
 import '/widgets/fococo_confirm_dialog.dart';
@@ -912,6 +914,8 @@ class _FoCoCoDrawerState extends State<FoCoCoDrawer>
     final email = _effectiveUser?.email ?? currentUserEmail;
     await AccountDeletionService.requestDeletion(email: email);
     await AccountDeletionService.clearLocalState();
+    await MindCoachReplayCache.clearAllForUser();
+    MindCoachSessionPrefetch.clear();
     if (!mounted) return;
     final router = GoRouter.of(context);
     await authManager.signOut();
@@ -1047,6 +1051,8 @@ class _FoCoCoDrawerState extends State<FoCoCoDrawer>
           if (confirmed != true) return;
           await HapticService.light();
           await AppSessionPrefsService.setPostLoginTabFoCoCo();
+          await MindCoachReplayCache.clearAllForUser();
+          MindCoachSessionPrefetch.clear();
           final router = GoRouter.of(context);
           await authManager.signOut();
           router.go('/login');

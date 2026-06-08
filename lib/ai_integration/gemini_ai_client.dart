@@ -537,6 +537,7 @@ class GeminiAIClient {
     try {
       String responseText = '';
       List<Map<String, dynamic>> visuals = const [];
+      Map<String, dynamic>? mindCoachRecommendation;
       Object? primaryError;
 
       // Primary path: Cloud Function `generateGolfChatResponse`. It reads
@@ -553,6 +554,7 @@ class GeminiAIClient {
         );
         responseText = callableResult.text;
         visuals = callableResult.visuals;
+        mindCoachRecommendation = callableResult.mindCoachRecommendation;
       } catch (e) {
         primaryError = e;
         if (kDebugMode) {
@@ -608,6 +610,7 @@ class GeminiAIClient {
         userId: userId,
         tokensUsed: _estimateTokens(responseText),
         visuals: visuals,
+        mindCoachRecommendation: mindCoachRecommendation,
       );
 
       await _trackConversationUsage(
@@ -680,8 +683,12 @@ class GeminiAIClient {
   /// underlying Google AI key has been flagged as "leaked"). The callable
   /// reads `GEMINI_KEY_APP` from Secret Manager — the key never travels with
   /// the client.
-  Future<({String text, List<Map<String, dynamic>> visuals})>
-      _generateConversationResponseViaCallable({
+  Future<
+      ({
+        String text,
+        List<Map<String, dynamic>> visuals,
+        Map<String, dynamic>? mindCoachRecommendation,
+      })> _generateConversationResponseViaCallable({
     required String userMessage,
     required List<Map<String, dynamic>> conversationHistory,
     String? context,
@@ -709,9 +716,21 @@ class GeminiAIClient {
               .map((m) => Map<String, dynamic>.from(m))
               .toList(growable: false)
           : const <Map<String, dynamic>>[];
-      return (text: response.trim(), visuals: visuals);
+      final rawRecommendation = data['mindCoachRecommendation'];
+      final mindCoachRecommendation = rawRecommendation is Map
+          ? Map<String, dynamic>.from(rawRecommendation)
+          : null;
+      return (
+        text: response.trim(),
+        visuals: visuals,
+        mindCoachRecommendation: mindCoachRecommendation,
+      );
     }
-    return (text: '', visuals: const <Map<String, dynamic>>[]);
+    return (
+      text: '',
+      visuals: const <Map<String, dynamic>>[],
+      mindCoachRecommendation: null,
+    );
   }
 
   // The legacy `_generateConversationResponseViaRest` helper was removed —

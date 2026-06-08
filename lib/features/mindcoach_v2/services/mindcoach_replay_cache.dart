@@ -9,7 +9,25 @@ import '../domain/models/mindcoach_v2_models.dart';
 class MindCoachReplayCache {
   MindCoachReplayCache._();
 
-  static String _key(String sessionId) => 'mindcoach_replay_$sessionId';
+  static String _key(String sessionId) {
+    final uid = currentUserUid.trim();
+    if (uid.isEmpty) return 'mindcoach_replay_$sessionId';
+    return 'mindcoach_replay_${uid}_$sessionId';
+  }
+
+  static Future<void> clearAllForUser() async {
+    final uid = currentUserUid.trim();
+    if (uid.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final prefix = 'mindcoach_replay_${uid}_';
+    final keys = prefs
+        .getKeys()
+        .where((key) => key.startsWith(prefix))
+        .toList(growable: false);
+    for (final key in keys) {
+      await prefs.remove(key);
+    }
+  }
 
   static Future<void> saveFromResponse(MindCoachV2GenerateResponse response) async {
     final session = response.session;

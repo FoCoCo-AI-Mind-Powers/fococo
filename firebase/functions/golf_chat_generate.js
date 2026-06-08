@@ -28,9 +28,9 @@ const FOCOCO_GOLFCHAT_SYSTEM =
   'Structure every reply: Acknowledge → One observation from their data → One question only. ' +
   'Always finish every sentence and thought completely — never stop mid-phrase or mid-sentence. ' +
   'When the player asks for depth or tips, give a full, helpful answer with as much detail as needed. ' +
-  'Use Markdown when it helps readability (**bold**, lists, ### headings). Never discuss swing mechanics, ' +
-  'clubface, ball flight fixes, slice/hook causes, or body rotation sequences. ' +
-  'For round reflections and stat breakdowns, call render_table instead of markdown pipe tables. ' +
+  'Use plain reflective text only — no Markdown, headings, tables, or charts. ' +
+  'Never discuss swing mechanics, clubface, ball flight fixes, slice/hook causes, or body rotation sequences. ' +
+  'Ask at most one question per reply. ' +
   'Follow units_preference in context: metric uses metres and Celsius; do not use yards unless asked.';
 
 const VISUAL_TOOL_GUIDANCE =
@@ -210,7 +210,7 @@ function enrichContextWithUnits(reflectionContext, preferredUnits) {
 function buildContents({ history, userMessage, context }) {
   const contents = [];
   const trimmedContext = safeString(context);
-  const systemBlock = [FOCOCO_GOLFCHAT_SYSTEM, VISUAL_TOOL_GUIDANCE, trimmedContext]
+  const systemBlock = [FOCOCO_GOLFCHAT_SYSTEM, trimmedContext]
     .filter(Boolean)
     .join('\n\n');
   contents.push({
@@ -221,7 +221,7 @@ function buildContents({ history, userMessage, context }) {
     role: 'model',
     parts: [
       {
-        text: 'Understood. I will reflect, ask short follow-ups, keep my tone calm and non-judgmental, and render a chart or table only when it makes the data clearer.',
+        text: 'Understood. I will reflect in plain text, ask at most one short follow-up, and keep my tone calm and non-judgmental.',
       },
     ],
   });
@@ -370,12 +370,42 @@ async function generateGolfChatResponseImpl(data, context) {
     throw new functions.https.HttpsError('internal', 'Empty response from Gemini');
   }
 
+  const mindCoachRecommendation = await buildMindCoachRecommendation(
+    context.auth.uid,
+    conversationHistory.length,
+  );
+
   return {
     response: finalText,
     visuals,
     model: requestedModel,
     attempts: totalAttempts,
+    mindCoachRecommendation,
   };
+}
+
+async function buildMindCoachRecommendation(userId, historyTurns) {
+  if (historyTurns < 2) return null;
+  try {
+    const admin = require('firebase-admin');
+    const db = admin.firestore();
+    const coachingDoc = await db.collection('coaching_state').doc(userId).get();
+    if (!coachingDoc.exists) return null;
+    const data = coachingDoc.data() || {};
+    const pillar = safeString(data.active_pillar, 'focus');
+    const label = safeString(data.next_best_action_label, 'MindCoach session');
+    return {
+      sessionId: safeString(data.recommended_session_id) || null,
+      pillar,
+      title: label,
+      subtitle: 'Based on your recent rounds and reflection patterns',
+    };
+  } catch (error) {
+    logger.warn('[golfChat:gemini] mindCoachRecommendation failed', {
+      error: error.message,
+    });
+    return null;
+  }
 }
 
 // Single generateContent request with a short retry. Returns the parsed body and
@@ -394,7 +424,6 @@ async function requestGeneration({ endpoint, apiKey, contents }) {
             thinkingConfig: { thinkingBudget: GOLF_CHAT_THINKING_BUDGET },
           },
           contents,
-          tools: VISUAL_TOOLS,
         },
         {
           timeout: 20000,

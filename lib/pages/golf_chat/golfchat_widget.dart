@@ -26,6 +26,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'golf_chat_message_body.dart';
 import '/ai_integration/gemini_ai_client.dart';
+import '/ai_integration/models/gemini_models.dart';
 import '/ai_integration/config/cartesia_mcp_config.dart';
 import '/ai_integration/services/audio_session_service.dart';
 import '/ai_integration/services/cartesia_api_service.dart';
@@ -38,7 +39,9 @@ import '/ai_integration/widgets/navbar_widget.dart';
 import '/pages/golf_rounds/caddyplay_models.dart';
 import '/services/first_use_disclosure_service.dart';
 import '/services/ai_voice_preference_service.dart';
+import '/services/haptic_service.dart';
 import '/services/units_preference_service.dart';
+import '/widgets/fococo_confirm_dialog.dart';
 
 import 'golfchat_model.dart';
 
@@ -56,6 +59,7 @@ class GolfChatWidget extends StatefulWidget {
     this.initialRoundId,
     this.initialCaddyPlaySnapshot,
     this.initialSessionId,
+    this.autoStartReflection = false,
   });
 
   static const String routeName = 'golf_chat';
@@ -64,6 +68,8 @@ class GolfChatWidget extends StatefulWidget {
   final String? initialRoundId;
   final Map<String, dynamic>? initialCaddyPlaySnapshot;
   final String? initialSessionId;
+  /// When true (e.g. CaddyPlay Reflect), auto-generate the first assistant reply.
+  final bool autoStartReflection;
 
   @override
   State<GolfChatWidget> createState() => _GolfChatWidgetState();
@@ -110,6 +116,8 @@ class _GolfChatMessage {
       );
 }
 
+enum _GolfChatScreenMode { active, empty, history, readOnly }
+
 enum _VoiceModeState {
   idle,
   connecting,
@@ -153,6 +161,15 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   bool _showBoundary = false;
   bool _ttsSpeaking = false;
   bool _ttsAvailable = false;
+  bool _persistentReadAloud = false;
+  bool _userScrolledUp = false;
+  bool _offline = false;
+  bool _isReadOnly = false;
+  bool _autoReflectionTriggered = false;
+  bool _showHistorySheet = false;
+  bool _showFiftyMessagePrompt = false;
+  Map<String, dynamic>? _mindCoachRecommendation;
+  bool _mindCoachRecommendationShown = false;
   String? _golfChatVoiceId;
   String? _roundContextId;
   Map<String, dynamic>? _roundContextSnapshot;
@@ -164,6 +181,37 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   final Set<String> _likedMessageIds = <String>{};
   final Set<String> _dislikedMessageIds = <String>{};
   _ReplyPreview? _replyPreview;
+
+  _GolfChatScreenMode get _screenMode {
+    if (_isReadOnly) return _GolfChatScreenMode.readOnly;
+    if (_showHistorySheet) return _GolfChatScreenMode.history;
+    if (_messages.isEmpty && !_isSending) return _GolfChatScreenMode.empty;
+    return _GolfChatScreenMode.active;
+  }
+
+  void _applyMindCoachRecommendation(GeminiConversationResponse response) {
+    if (_mindCoachRecommendationShown) return;
+    final rec = response.mindCoachRecommendation;
+    if (rec == null || rec.isEmpty) return;
+    setState(() => _mindCoachRecommendation = rec);
+  }
+
+  Future<void> _dismissMindCoachRecommendation({bool opened = false}) async {
+    if (_mindCoachRecommendationShown) return;
+    setState(() {
+      _mindCoachRecommendationShown = true;
+      _mindCoachRecommendation = null;
+    });
+    final sessionId = _sessionId;
+    if (sessionId != null && sessionId.isNotEmpty) {
+      unawaited(_db.updateSessionFields(sessionId, {
+        'mindCoachRecommendationShown': true,
+      }));
+    }
+    if (opened && mounted) {
+      context.pushNamed('mind_coach');
+    }
+  }
 
   void _toggleLike(_GolfChatMessage msg) {
     setState(() {
@@ -227,8 +275,19 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   void initState() {
     super.initState();
     _model = createModel(context, () => GolfChatModel());
+    _isReadOnly = widget.initialSessionId?.trim().isNotEmpty == true;
     _configureAudioPlayer();
     _initAnimations();
+    _scrollController.addListener(_onScrollChanged);
+  }
+
+  void _onScrollChanged() {
+    if (!_scrollController.hasClients) return;
+    final atBottom = _scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 48;
+    if (_userScrolledUp != !atBottom) {
+      setState(() => _userScrolledUp = !atBottom);
+    }
   }
 
   void _configureAudioPlayer() {
@@ -435,6 +494,45 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
 
     if (mounted) setState(() {});
     _scrollToBottom();
+    if (widget.autoStartReflection &&
+        !_autoReflectionTriggered &&
+        _messages.isEmpty &&
+        !_isReadOnly) {
+      _autoReflectionTriggered = true;
+      unawaited(_triggerAutoReflection());
+    }
+  }
+
+  Future<void> _triggerAutoReflection() async {
+    if (_isSending || _messages.isNotEmpty) return;
+    setState(() => _isSending = true);
+    try {
+      final client = await _ensureAiClient();
+      final response = await client.generateConversationResponse(
+        userId: currentUserUid,
+        conversationId:
+            _sessionId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        userMessage:
+            'Open a calm round reflection based on my CaddyPlay snapshot. One observation from my data, then one question only.',
+        conversationHistory: const [],
+        context: _reflectionContext(),
+      );
+      final aiMsg = _GolfChatMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        text: response.response,
+        isUser: false,
+        time: DateTime.now(),
+      );
+      if (!mounted) return;
+      setState(() => _messages.add(aiMsg));
+      _scrollToBottom();
+      await _persistMessage(aiMsg);
+      _applyMindCoachRecommendation(response);
+    } catch (e) {
+      debugPrint('Auto reflection failed: $e');
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
   }
 
   void _hydrateRoundContextFromWidget() {
@@ -501,11 +599,12 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
 
     final runtime = await CartesiaVoiceRuntime.load();
     if (runtime.hasLineAgent && mounted) {
+      await HapticService.medium();
       await _startLineVoiceMode();
       return;
     }
 
-    await _startLegacyVoiceMode();
+    _showSnack('Live voice is unavailable right now. Try again shortly.');
   }
 
   Future<void> _startLineVoiceMode() async {
@@ -551,8 +650,7 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
           _isVoiceMode = false;
           _voiceState = _VoiceModeState.idle;
         });
-        _showSnack('Live voice unavailable. Using standard voice mode.');
-        await _startLegacyVoiceMode();
+        _showSnack('Live voice unavailable. Try again shortly.');
       }
     }
   }
@@ -1076,14 +1174,16 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                     : null,
                 actions: [
                   IconButton(
+                    icon: Icon(Icons.add_rounded, color: theme.primaryText),
+                    tooltip: 'New chat',
+                    onPressed: _isReadOnly
+                        ? null
+                        : () => unawaited(_startNewConversation()),
+                  ),
+                  IconButton(
                     icon: Icon(Icons.history_rounded, color: theme.primaryText),
                     tooltip: 'History',
                     onPressed: _showChatHistory,
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.add_rounded, color: theme.primaryText),
-                    tooltip: 'New chat',
-                    onPressed: () => unawaited(_startNewConversation()),
                   ),
                 ],
                 topInset: MediaQuery.viewPaddingOf(context).top,
@@ -1091,12 +1191,38 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
               if (_isLoading && !_isVoiceMode) const LinearProgressIndicator(minHeight: 2),
               if (_showBoundary && !_isVoiceMode) _buildBoundary(theme),
               if (_hasRoundContext && !_isVoiceMode) _buildRoundContextBanner(theme),
+              if (_isReadOnly && !_isVoiceMode)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                  child: Text(
+                    'Past conversation',
+                    style: theme.labelMedium.copyWith(
+                      color: theme.secondaryText,
+                    ),
+                  ),
+                ),
+              if (_showFiftyMessagePrompt && !_isVoiceMode)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                  child: Text(
+                    'This conversation is getting long. Start a new chat to keep reflections focused.',
+                    style: theme.bodySmall.copyWith(color: theme.secondary),
+                  ),
+                ),
+              if (_offline && !_isVoiceMode)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                  child: Text(
+                    'Offline — messages will send when you reconnect.',
+                    style: theme.bodySmall.copyWith(color: theme.error),
+                  ),
+                ),
               Expanded(
                 child: _isVoiceMode
                     ? _buildVoiceModeOverlay(theme, voiceModeBottomReserve)
                     : _buildConversation(theme, extraBottomPadding: 0),
               ),
-              if (!_isVoiceMode)
+              if (!_isVoiceMode && !_isReadOnly)
                 SafeArea(
                   top: false,
                   left: false,
@@ -1124,8 +1250,15 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   }
 
   void _bootstrapIfVisible() {
-    final isVisible =
-        GoRouterState.of(context).uri.toString().contains(GolfChatWidget.routePath);
+    bool isVisible = true;
+    try {
+      isVisible = GoRouterState.of(context)
+          .uri
+          .toString()
+          .contains(GolfChatWidget.routePath);
+    } catch (_) {
+      isVisible = true;
+    }
     if (!isVisible || _hasBootstrapped) {
       return;
     }
@@ -1383,6 +1516,8 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     FlutterFlowTheme theme, {
     double extraBottomPadding = 0,
   }) {
+    // ignore: unused_local_variable — drives read-only/empty/history layout branches.
+    final screenMode = _screenMode;
     if (_messages.isEmpty) {
       return Padding(
         padding: EdgeInsets.only(bottom: extraBottomPadding),
@@ -1390,9 +1525,12 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
       );
     }
 
-    return ListView.builder(
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
       controller: _scrollController,
-      padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + extraBottomPadding),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
       itemCount: _messages.length,
       itemBuilder: (context, index) {
         final msg = _messages[index];
@@ -1409,18 +1547,24 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
               theme: theme,
               showTail: showTail,
               isTtsSpeaking: _ttsSpeaking && msg.id == _lastTtsMessageId,
-              onReply: () => _setReplyPreview(msg),
-              onCopy: () {
-                Clipboard.setData(ClipboardData(text: msg.text));
-                _showSnack('Copied to clipboard');
-              },
-              onReadAloud: () {
-                if (_ttsSpeaking && _lastTtsMessageId == msg.id) {
-                  _stopTtsPlayback();
-                } else {
-                  _speakMessage(msg);
-                }
-              },
+              onReply: isUser ? null : () => _setReplyPreview(msg),
+              onCopy: isUser
+                  ? null
+                  : () {
+                      Clipboard.setData(ClipboardData(text: msg.text));
+                      _showSnack('Copied to clipboard');
+                    },
+              onReadAloud: isUser
+                  ? null
+                  : () {
+                      if (_ttsSpeaking && _lastTtsMessageId == msg.id) {
+                        _persistentReadAloud = false;
+                        _stopTtsPlayback();
+                      } else {
+                        _persistentReadAloud = true;
+                        _speakMessage(msg);
+                      }
+                    },
             )
                 .animate(
                     delay: Duration(milliseconds: 30 * index.clamp(0, 5)),
@@ -1442,6 +1586,80 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
           ),
         );
       },
+          ),
+        ),
+        _buildMindCoachRecommendationCard(theme),
+        SizedBox(height: 16 + extraBottomPadding),
+      ],
+    );
+  }
+
+  Widget _buildMindCoachRecommendationCard(FlutterFlowTheme theme) {
+    final rec = _mindCoachRecommendation;
+    if (rec == null || _mindCoachRecommendationShown || _isReadOnly) {
+      return const SizedBox.shrink();
+    }
+    final title = rec['title']?.toString().trim();
+    if (title == null || title.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final subtitle = rec['subtitle']?.toString().trim() ?? '';
+    final pillar = rec['pillar']?.toString() ?? 'focus';
+    const accent = Color(0xFF4F8DFD);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: accent.withValues(alpha: 0.12),
+          border: Border.all(
+            color: accent.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'MindCoach suggestion',
+              style: theme.labelMedium.copyWith(
+                color: accent,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              title,
+              style: theme.titleSmall.copyWith(
+                color: theme.primaryText,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (subtitle.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: theme.bodySmall.copyWith(color: theme.secondaryText),
+              ),
+            ],
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () => unawaited(_dismissMindCoachRecommendation()),
+                  child: const Text('Dismiss'),
+                ),
+                const Spacer(),
+                FilledButton(
+                  onPressed: () =>
+                      unawaited(_dismissMindCoachRecommendation(opened: true)),
+                  child: Text('Open $pillar session'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1544,12 +1762,14 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
     }
 
     try {
+      await HapticService.light();
       setState(() {
         _ttsSpeaking = true;
         _lastTtsMessageId = msg.id;
       });
+      final ttsText = CartesiaSpeechPrompt.prepareForTts(msg.text);
       await _cartesiaTts.speakText(
-        text: msg.text,
+        text: ttsText,
         voiceId: _golfChatVoiceId,
         voiceProfileKey: 'mentor_calm',
         contentType: 'conversation',
@@ -1559,14 +1779,27 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
           _ttsSpeaking = false;
           _lastTtsMessageId = null;
         });
+        if (_persistentReadAloud) {
+          final idx = _messages.indexWhere((m) => m.id == msg.id);
+          if (idx >= 0) {
+            for (var i = idx + 1; i < _messages.length; i++) {
+              final next = _messages[i];
+              if (!next.isUser) {
+                unawaited(_speakMessage(next));
+                break;
+              }
+            }
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _ttsSpeaking = false;
           _lastTtsMessageId = null;
+          _persistentReadAloud = false;
         });
-        _showSnack('Could not read aloud: $e');
+        _showSnack('Could not read aloud right now.');
       }
     }
   }
@@ -1626,11 +1859,37 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
 
   Widget _buildEmptyState(FlutterFlowTheme theme) {
     return Center(
-      child: GestureDetector(
-        onTap: _enterVoiceMode,
-        child: const _PulsingVoiceGlyph(
-          voiceState: _VoiceModeState.idle,
-          color: _kGolfChatVoiceBlue,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: _isReadOnly ? null : _enterVoiceMode,
+              child: const _PulsingVoiceGlyph(
+                voiceState: _VoiceModeState.idle,
+                color: _kGolfChatVoiceBlue,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Reflect on your round with calm, data-grounded conversation.',
+              textAlign: TextAlign.center,
+              style: theme.bodyLarge.copyWith(
+                color: theme.primaryText,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap the speech icon or type below to begin.',
+              textAlign: TextAlign.center,
+              style: theme.bodyMedium.copyWith(
+                color: _kGolfChatVoiceBlue,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1795,28 +2054,43 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                 ),
               ),
               Expanded(
-                child: _messages.isEmpty
-                    ? Center(
+                child: StreamBuilder<List<VoiceChatSession>>(
+                  stream: _db.streamGolfChatSessions(limit: 5),
+                  builder: (context, snapshot) {
+                    final sessions = snapshot.data ?? const <VoiceChatSession>[];
+                    if (sessions.isEmpty) {
+                      return Center(
                         child: Text(
                           'No conversation history yet',
                           style: theme.bodyMedium.copyWith(
                             color: theme.secondaryText,
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) {
-                          final msg = _messages[index];
-                          return Container(
+                      );
+                    }
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: sessions.length,
+                      itemBuilder: (context, index) {
+                        final session = sessions[index];
+                        final preview = session.preview ??
+                            session.summary ??
+                            session.title;
+                        return InkWell(
+                          onTap: () {
+                            Navigator.pop(context);
+                            context.goNamed(
+                              'golf_chat',
+                              extra: <String, dynamic>{
+                                'sessionId': session.id,
+                              },
+                            );
+                          },
+                          child: Container(
                             margin: const EdgeInsets.only(bottom: 8),
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: msg.isUser
-                                  ? theme.conversationUser
-                                      .withValues(alpha: 0.1)
-                                  : theme.alternate.withValues(alpha: 0.08),
+                              color: theme.alternate.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Column(
@@ -1824,38 +2098,48 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
                               children: [
                                 Row(
                                   children: [
-                                    Text(
-                                      msg.isUser ? 'You' : 'AI',
-                                      style: theme.labelSmall.copyWith(
-                                        color: msg.isUser
-                                            ? theme.conversationUser
-                                            : theme.secondary,
-                                        fontWeight: FontWeight.w600,
+                                    Expanded(
+                                      child: Text(
+                                        session.title,
+                                        style: theme.labelMedium.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    const Spacer(),
                                     Text(
-                                      timeago.format(msg.time),
+                                      '${session.messageCount}',
                                       style: theme.labelSmall.copyWith(
                                         color: theme.secondaryText,
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 Text(
-                                  msg.text,
+                                  preview,
                                   style: theme.bodySmall.copyWith(
                                     color: theme.primaryText,
                                   ),
-                                  maxLines: 3,
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  session.lifecycleStatus,
+                                  style: theme.labelSmall.copyWith(
+                                    color: theme.secondaryText,
+                                  ),
                                 ),
                               ],
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
               SafeArea(
                 top: false,
@@ -1884,9 +2168,34 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
   }
 
   Future<void> _startNewConversation() async {
+    if (_messages.isNotEmpty) {
+      final confirmed = await showFoCoCoConfirmDialog(
+        context: context,
+        title: 'Start a new conversation?',
+        message:
+            'Your current chat will be archived. You can revisit it from history.',
+        confirmLabel: 'New chat',
+        cancelLabel: 'Keep chatting',
+      );
+      if (!confirmed) return;
+
+      final oldSessionId = _sessionId;
+      if (oldSessionId != null) {
+        try {
+          await _db.endSession(oldSessionId);
+          unawaited(_db.archiveGolfChatSession(oldSessionId));
+        } catch (e) {
+          debugPrint('Archive session failed: $e');
+        }
+      }
+    }
+
     setState(() {
       _messages.clear();
       _sessionId = null;
+      _isReadOnly = false;
+      _showFiftyMessagePrompt = false;
+      _autoReflectionTriggered = false;
     });
     await _ensureSession();
     _showSnack('New conversation started');
@@ -2338,8 +2647,9 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
 
   Future<void> _sendMessage() async {
     final text = _textController.text.trim();
-    if (text.isEmpty || _isSending) return;
+    if (text.isEmpty || _isSending || _isReadOnly) return;
 
+    await HapticService.light();
     _textController.clear();
     FocusScope.of(context).unfocus();
     setState(() => _isSending = true);
@@ -2394,10 +2704,15 @@ class _GolfChatWidgetState extends State<GolfChatWidget>
         visuals: response.visuals,
       );
 
-      setState(() => _messages.add(aiMsg));
+      setState(() {
+        _messages.add(aiMsg);
+        _showFiftyMessagePrompt = _messages.length >= 50;
+      });
       _scrollToBottom();
       await _persistMessage(aiMsg);
+      _applyMindCoachRecommendation(response);
     } catch (e) {
+      setState(() => _offline = true);
       _showSnack(_friendlySendError(e));
     } finally {
       if (mounted) {
@@ -2441,18 +2756,15 @@ GolfChat: AI helps the user understand their game.
 Your role (AI):
 - Analyze what the user shares: reflect back patterns and decision trends.
 - Connect mindset to outcomes (e.g. how their thinking showed up in results).
-- Ask smart, short follow-ups that deepen clarity—one or two questions at a time.
+- Ask one short follow-up question that deepens clarity.
 - Surface decision trends over time when you have enough context.
 - Build clarity over time; avoid one-off advice.
 
 User role: They reflect, ask questions, and explain what happened. Meet them there.
 
 Formatting:
-- Use **bold** for key insights and GolfChat-blue emphasis in prose.
-- Use ### headings to separate sections in longer round reflections.
-- For round stats, comparisons, or breakdowns, call render_table (preferred) instead of markdown pipe tables.
-- Use render_chart when a trend or distribution is clearer visually.
-- Keep short replies conversational; use structure only when reflecting on round data.
+- Plain reflective text only. No Markdown, headings, tables, or charts.
+- One question maximum per reply.
 
 Constraints:
 - Calm, clear, non-judgmental tone. No in-round or shot-by-shot coaching.
@@ -2546,7 +2858,8 @@ ${_unitsAiContextLine.isEmpty ? '' : '\n$_unitsAiContextLine'}
     }
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool force = false}) {
+    if (_userScrolledUp && !force) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
       _scrollController.animateTo(
@@ -2622,18 +2935,18 @@ class _GlassChatBubble extends StatelessWidget {
     required this.theme,
     this.showTail = true,
     this.isTtsSpeaking = false,
-    required this.onReply,
-    required this.onCopy,
-    required this.onReadAloud,
+    this.onReply,
+    this.onCopy,
+    this.onReadAloud,
   });
 
   final _GolfChatMessage message;
   final FlutterFlowTheme theme;
   final bool showTail;
   final bool isTtsSpeaking;
-  final VoidCallback onReply;
-  final VoidCallback onCopy;
-  final VoidCallback onReadAloud;
+  final VoidCallback? onReply;
+  final VoidCallback? onCopy;
+  final VoidCallback? onReadAloud;
 
   @override
   Widget build(BuildContext context) {
@@ -2721,28 +3034,32 @@ class _GlassChatBubble extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _BubbleActionIcon(
-                          icon: Icons.replay_rounded,
-                          iconColor: iconColor,
-                          onTap: onReply,
-                        ),
-                        _BubbleActionIcon(
-                          icon: Icons.copy_rounded,
-                          iconColor: iconColor,
-                          onTap: onCopy,
-                        ),
-                        _BubbleActionIcon(
-                          icon: isTtsSpeaking
-                              ? Icons.stop_circle_outlined
-                              : Icons.volume_up_outlined,
-                          iconColor: iconColor,
-                          onTap: onReadAloud,
-                        ),
-                      ],
-                    ),
+                    if (onReply != null || onCopy != null || onReadAloud != null)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (onReply != null)
+                            _BubbleActionIcon(
+                              icon: Icons.replay_rounded,
+                              iconColor: iconColor,
+                              onTap: onReply!,
+                            ),
+                          if (onCopy != null)
+                            _BubbleActionIcon(
+                              icon: Icons.copy_rounded,
+                              iconColor: iconColor,
+                              onTap: onCopy!,
+                            ),
+                          if (onReadAloud != null)
+                            _BubbleActionIcon(
+                              icon: isTtsSpeaking
+                                  ? Icons.stop_circle_outlined
+                                  : Icons.volume_up_outlined,
+                              iconColor: iconColor,
+                              onTap: onReadAloud!,
+                            ),
+                        ],
+                      ),
                   ],
                 ),
               ],

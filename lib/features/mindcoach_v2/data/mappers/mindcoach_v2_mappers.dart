@@ -24,12 +24,16 @@ class MindCoachV2Mappers {
       contextMode: contextMode,
     );
 
+    final monthlyRaw = map['monthly_session_count'];
+    final monthlySessionCount = monthlyRaw is num ? monthlyRaw.toInt() : null;
+
     return MindCoachV2GenerateResponse(
       sessionId: sessionId,
       contextMode: contextMode,
       uiMode: uiMode,
       session: session,
       runId: map['run_id']?.toString(),
+      monthlySessionCount: monthlySessionCount,
     );
   }
 

@@ -602,6 +602,7 @@ class MindCoachV2GenerateResponse {
     required this.uiMode,
     required this.session,
     this.runId,
+    this.monthlySessionCount,
   });
 
   final String sessionId;
@@ -609,6 +610,7 @@ class MindCoachV2GenerateResponse {
   final MindCoachV2UiMode uiMode;
   final MindCoachV2Session session;
   final String? runId;
+  final int? monthlySessionCount;
 }
 
 class MindCoachV2CompleteResponse {

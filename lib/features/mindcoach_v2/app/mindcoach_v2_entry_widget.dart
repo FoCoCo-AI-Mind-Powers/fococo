@@ -16,6 +16,7 @@ import '/features/mindcoach_v2/presentation/shared/mindcoach_session_prep_overla
 import '/features/mindcoach_v2/presentation/shared/mindcoach_v2_visuals.dart';
 import '/features/mindcoach_v2/services/mindcoach_v2_debug_logger.dart';
 import '/features/mindcoach_v2/services/mindcoach_replay_cache.dart';
+import '/features/mindcoach_v2/services/mindcoach_session_prefetch.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/pages/coaching_modules/mind_coach_widget.dart';
 
@@ -51,11 +52,30 @@ class _MindCoachV2EntryWidgetState extends State<MindCoachV2EntryWidget> {
       context: context,
       accentColor: accent,
       sessionTitle: request.sessionName,
-      work: () => _repository.generateSession(request),
+      work: () async {
+        final prefetched = MindCoachSessionPrefetch.take();
+        if (prefetched != null) {
+          return prefetched;
+        }
+        return _repository.generateSession(request);
+      },
     );
 
     if (!mounted || response == null) {
       return;
+    }
+
+    final monthlyCount = response.monthlySessionCount;
+    if (monthlyCount != null && monthlyCount >= 80) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'You\'ve had a strong month of MindCoach sessions. '
+            'Take a breath when you need one.',
+          ),
+          duration: Duration(seconds: 4),
+        ),
+      );
     }
 
     try {

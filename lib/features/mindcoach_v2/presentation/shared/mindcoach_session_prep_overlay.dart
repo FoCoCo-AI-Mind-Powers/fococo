@@ -68,14 +68,14 @@ class _MindCoachSessionPrepDialogState<T>
       final result = await widget.work();
       if (!mounted) return;
       setState(() => _phase = _PrepPhase.ready);
-      await Future<void>.delayed(const Duration(milliseconds: 850));
+      await Future<void>.delayed(const Duration(milliseconds: 120));
       if (!mounted) return;
       Navigator.of(context).pop(result);
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _phase = _PrepPhase.failed;
-        _errorMessage = e.toString();
+        _errorMessage = 'Could not prepare your session. Try again.';
       });
     }
   }

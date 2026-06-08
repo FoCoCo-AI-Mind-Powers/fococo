@@ -28,62 +28,71 @@ enum CaddyPlayPillarTag { focus, confidence, control }
 
 enum CaddyPlayMindSnapSequence { general, recovery, refocus, composure }
 
+/// Placeholder course name when the player starts without entering a course.
+const String kCaddyPlayCoursePlaceholder = 'Add Course Name to Start Round.';
+
 class CaddyPlayAdvancedDefaults {
   const CaddyPlayAdvancedDefaults({
-    this.roundType = CaddyPlayRoundType.practice,
-    this.playingPartners = CaddyPlayPlayingPartners.friends,
-    this.preRoundMindset = CaddyPlayPreRoundMindset.positive,
-    this.weather = CaddyPlayWeather.good,
+    this.roundType,
+    this.playingPartners,
+    this.preRoundMindset,
+    this.weather,
   });
 
-  final CaddyPlayRoundType roundType;
-  final CaddyPlayPlayingPartners playingPartners;
-  final CaddyPlayPreRoundMindset preRoundMindset;
-  final CaddyPlayWeather weather;
+  final CaddyPlayRoundType? roundType;
+  final CaddyPlayPlayingPartners? playingPartners;
+  final CaddyPlayPreRoundMindset? preRoundMindset;
+  final CaddyPlayWeather? weather;
+
+  bool get hasAnyValue =>
+      roundType != null ||
+      playingPartners != null ||
+      preRoundMindset != null ||
+      weather != null;
 
   CaddyPlayAdvancedDefaults copyWith({
     CaddyPlayRoundType? roundType,
     CaddyPlayPlayingPartners? playingPartners,
     CaddyPlayPreRoundMindset? preRoundMindset,
     CaddyPlayWeather? weather,
+    bool clearRoundType = false,
+    bool clearPlayingPartners = false,
+    bool clearPreRoundMindset = false,
+    bool clearWeather = false,
   }) {
     return CaddyPlayAdvancedDefaults(
-      roundType: roundType ?? this.roundType,
-      playingPartners: playingPartners ?? this.playingPartners,
-      preRoundMindset: preRoundMindset ?? this.preRoundMindset,
-      weather: weather ?? this.weather,
+      roundType: clearRoundType ? null : (roundType ?? this.roundType),
+      playingPartners:
+          clearPlayingPartners ? null : (playingPartners ?? this.playingPartners),
+      preRoundMindset:
+          clearPreRoundMindset ? null : (preRoundMindset ?? this.preRoundMindset),
+      weather: clearWeather ? null : (weather ?? this.weather),
     );
   }
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
-        'roundType': roundType.name,
-        'playingPartners': playingPartners.name,
-        'preRoundMindset': preRoundMindset.name,
-        'weather': weather.name,
-      };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{};
+    if (roundType != null) json['roundType'] = roundType!.name;
+    if (playingPartners != null) {
+      json['playingPartners'] = playingPartners!.name;
+    }
+    if (preRoundMindset != null) {
+      json['preRoundMindset'] = preRoundMindset!.name;
+    }
+    if (weather != null) json['weather'] = weather!.name;
+    return json;
+  }
 
   factory CaddyPlayAdvancedDefaults.fromJson(Map<String, dynamic> json) {
     return CaddyPlayAdvancedDefaults(
-      roundType: enumFromName(
-        CaddyPlayRoundType.values,
-        json['roundType'],
-        CaddyPlayRoundType.practice,
-      ),
-      playingPartners: enumFromName(
-        CaddyPlayPlayingPartners.values,
-        json['playingPartners'],
-        CaddyPlayPlayingPartners.friends,
-      ),
-      preRoundMindset: enumFromName(
+      roundType: enumOrNull(CaddyPlayRoundType.values, json['roundType']),
+      playingPartners:
+          enumOrNull(CaddyPlayPlayingPartners.values, json['playingPartners']),
+      preRoundMindset: enumOrNull(
         CaddyPlayPreRoundMindset.values,
         json['preRoundMindset'],
-        CaddyPlayPreRoundMindset.positive,
       ),
-      weather: enumFromName(
-        CaddyPlayWeather.values,
-        json['weather'],
-        CaddyPlayWeather.good,
-      ),
+      weather: enumOrNull(CaddyPlayWeather.values, json['weather']),
     );
   }
 }
@@ -600,6 +609,7 @@ class CaddyPlayRoundSnapshot {
         'completionInsight': completionInsight,
         'syncedToWebApp': syncedToWebApp,
         'availableInWebApp': availableInWebApp,
+        'insightsLocked': insightsLocked,
       };
 
   factory CaddyPlayRoundSnapshot.fromJson(Map<String, dynamic> json) {
@@ -627,6 +637,7 @@ class CaddyPlayRoundSnapshot {
       completionInsight: (json['completionInsight'] ?? '').toString(),
       syncedToWebApp: json['syncedToWebApp'] == true,
       availableInWebApp: json['availableInWebApp'] == true,
+      insightsLocked: json['insightsLocked'] == true,
     );
   }
 }
@@ -640,10 +651,10 @@ class CaddyPlayActiveRound {
     required this.currentHole,
     required this.startedAt,
     required this.lastUpdatedAt,
-    required this.roundType,
-    required this.playingPartners,
-    required this.preRoundMindset,
-    required this.weather,
+    this.roundType,
+    this.playingPartners,
+    this.preRoundMindset,
+    this.weather,
     required this.holes,
     this.completedAt,
     this.syncState = CaddyPlaySyncState.localOnly,
@@ -665,10 +676,10 @@ class CaddyPlayActiveRound {
   final int currentHole;
   final DateTime startedAt;
   final DateTime lastUpdatedAt;
-  final CaddyPlayRoundType roundType;
-  final CaddyPlayPlayingPartners playingPartners;
-  final CaddyPlayPreRoundMindset preRoundMindset;
-  final CaddyPlayWeather weather;
+  final CaddyPlayRoundType? roundType;
+  final CaddyPlayPlayingPartners? playingPartners;
+  final CaddyPlayPreRoundMindset? preRoundMindset;
+  final CaddyPlayWeather? weather;
   final List<CaddyPlayHole> holes;
   final DateTime? completedAt;
   final CaddyPlaySyncState syncState;
@@ -687,10 +698,10 @@ class CaddyPlayActiveRound {
     required String userId,
     required String courseName,
     required int holesTotal,
-    required CaddyPlayRoundType roundType,
-    required CaddyPlayPlayingPartners playingPartners,
-    required CaddyPlayPreRoundMindset preRoundMindset,
-    required CaddyPlayWeather weather,
+    CaddyPlayRoundType? roundType,
+    CaddyPlayPlayingPartners? playingPartners,
+    CaddyPlayPreRoundMindset? preRoundMindset,
+    CaddyPlayWeather? weather,
   }) {
     return CaddyPlayActiveRound(
       roundId: roundId,
@@ -729,26 +740,14 @@ class CaddyPlayActiveRound {
       currentHole: (json['currentHole'] as num?)?.toInt() ?? 1,
       startedAt: dateTimeFromValue(json['startedAt']) ?? DateTime.now(),
       lastUpdatedAt: dateTimeFromValue(json['lastUpdatedAt']) ?? DateTime.now(),
-      roundType: enumFromName(
-        CaddyPlayRoundType.values,
-        json['roundType'],
-        CaddyPlayRoundType.practice,
-      ),
-      playingPartners: enumFromName(
-        CaddyPlayPlayingPartners.values,
-        json['playingPartners'],
-        CaddyPlayPlayingPartners.friends,
-      ),
-      preRoundMindset: enumFromName(
+      roundType: enumOrNull(CaddyPlayRoundType.values, json['roundType']),
+      playingPartners:
+          enumOrNull(CaddyPlayPlayingPartners.values, json['playingPartners']),
+      preRoundMindset: enumOrNull(
         CaddyPlayPreRoundMindset.values,
         json['preRoundMindset'],
-        CaddyPlayPreRoundMindset.positive,
       ),
-      weather: enumFromName(
-        CaddyPlayWeather.values,
-        json['weather'],
-        CaddyPlayWeather.good,
-      ),
+      weather: enumOrNull(CaddyPlayWeather.values, json['weather']),
       holes: holes.isEmpty
           ? List<CaddyPlayHole>.generate(
               holesTotal == 0 ? 18 : holesTotal,
@@ -819,22 +818,14 @@ class CaddyPlayActiveRound {
       roundType: enumOrNull(CaddyPlayRoundType.values, data['roundType']) ??
           (((data['mode'] as String?) == CaddyPlayMode.practice.name)
               ? CaddyPlayRoundType.practice
-              : CaddyPlayRoundType.casual),
-      playingPartners: enumFromName(
-        CaddyPlayPlayingPartners.values,
-        data['playingPartners'],
-        CaddyPlayPlayingPartners.friends,
-      ),
-      preRoundMindset: enumFromName(
+              : null),
+      playingPartners:
+          enumOrNull(CaddyPlayPlayingPartners.values, data['playingPartners']),
+      preRoundMindset: enumOrNull(
         CaddyPlayPreRoundMindset.values,
         data['preRoundMindset'],
-        CaddyPlayPreRoundMindset.positive,
       ),
-      weather: enumFromName(
-        CaddyPlayWeather.values,
-        data['weather'],
-        CaddyPlayWeather.good,
-      ),
+      weather: enumOrNull(CaddyPlayWeather.values, data['weather']),
       holes: normalizedHoles,
       completedAt: dateTimeFromValue(data['completedAt']),
       syncState: CaddyPlaySyncState.synced,
@@ -850,7 +841,7 @@ class CaddyPlayActiveRound {
 
   CaddyPlayMode get mode => roundType == CaddyPlayRoundType.practice
       ? CaddyPlayMode.practice
-      : CaddyPlayMode.play;
+      : CaddyPlayMode.play; // null roundType defaults to play mode
   bool get isPractice => mode == CaddyPlayMode.practice;
   bool get isCompleted => completedAt != null;
   List<CaddyPlayMoment> get allMoments =>
@@ -1010,7 +1001,8 @@ class CaddyPlayActiveRound {
     );
   }
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
         'roundId': roundId,
         'userId': userId,
         'courseName': courseName,
@@ -1018,10 +1010,6 @@ class CaddyPlayActiveRound {
         'currentHole': currentHole,
         'startedAt': startedAt.toIso8601String(),
         'lastUpdatedAt': lastUpdatedAt.toIso8601String(),
-        'roundType': roundType.name,
-        'playingPartners': playingPartners.name,
-        'preRoundMindset': preRoundMindset.name,
-        'weather': weather.name,
         'holes': holes.map((hole) => hole.toJson()).toList(growable: false),
         'completedAt': completedAt?.toIso8601String(),
         'syncState': syncState.name,
@@ -1035,9 +1023,19 @@ class CaddyPlayActiveRound {
         'courseRating': courseRating,
         'slopeRating': slopeRating,
       };
+    if (roundType != null) json['roundType'] = roundType!.name;
+    if (playingPartners != null) {
+      json['playingPartners'] = playingPartners!.name;
+    }
+    if (preRoundMindset != null) {
+      json['preRoundMindset'] = preRoundMindset!.name;
+    }
+    if (weather != null) json['weather'] = weather!.name;
+    return json;
+  }
 
   Map<String, dynamic> toFirestoreSession() {
-    return <String, dynamic>{
+    final data = <String, dynamic>{
       'userId': userId,
       'courseName': courseName,
       'mode': mode.name,
@@ -1052,10 +1050,6 @@ class CaddyPlayActiveRound {
       'updatedAt': FieldValue.serverTimestamp(),
       'completedAt':
           completedAt != null ? Timestamp.fromDate(completedAt!) : null,
-      'roundType': roundType.name,
-      'playingPartners': playingPartners.name,
-      'preRoundMindset': preRoundMindset.name,
-      'weather': weather.name,
       'lockedContext': true,
       'linkedRoundLogId': linkedRoundLogId ?? roundId,
       'linkedGolfRoundId': linkedGolfRoundId,
@@ -1065,6 +1059,15 @@ class CaddyPlayActiveRound {
       'slopeRating': slopeRating,
       'mindSnapCount': mindSnapCount,
     };
+    if (roundType != null) data['roundType'] = roundType!.name;
+    if (playingPartners != null) {
+      data['playingPartners'] = playingPartners!.name;
+    }
+    if (preRoundMindset != null) {
+      data['preRoundMindset'] = preRoundMindset!.name;
+    }
+    if (weather != null) data['weather'] = weather!.name;
+    return data;
   }
 }
 
@@ -1352,7 +1355,7 @@ CaddyPlayRoundSnapshot buildRoundSnapshot(
     return CaddyPlayRoundSnapshot(
       courseName: round.courseName,
       date: round.startedAt,
-      roundType: round.roundType,
+      roundType: round.roundType ?? CaddyPlayRoundType.casual,
       evaluationPhrase: hasMoments
           ? 'Early read — log a few more moments for a fuller snapshot.'
           : 'Not enough round data captured yet.',
@@ -1386,7 +1389,7 @@ CaddyPlayRoundSnapshot buildRoundSnapshot(
   return CaddyPlayRoundSnapshot(
     courseName: round.courseName,
     date: round.startedAt,
-    roundType: round.roundType,
+    roundType: round.roundType ?? CaddyPlayRoundType.casual,
     evaluationPhrase: evaluationPhrase,
     focusLabel: descriptorForScore(aggregate.focus),
     confidenceLabel: descriptorForScore(aggregate.confidence),
@@ -1429,13 +1432,17 @@ String _evaluationPhraseForRound(
 }
 
 String _momentumShift(CaddyPlayActiveRound round) {
-  if (round.holes.length <= 1) {
+  final playedHoles =
+      round.holes.where((hole) => hole.isComplete || hole.moments.isNotEmpty);
+  final playedList = playedHoles.toList(growable: false);
+  if (playedList.length <= 1) {
     return 'Momentum held steady through the round.';
   }
 
   final holeScores = <int, int>{};
-  for (final hole in round.holes) {
+  for (final hole in playedList) {
     if (hole.moments.isEmpty) {
+      if (!hole.isComplete) continue;
       final effectivePar = hole.par ?? 4;
       holeScores[hole.holeNumber] =
           (hole.score ?? effectivePar) - effectivePar + 60;

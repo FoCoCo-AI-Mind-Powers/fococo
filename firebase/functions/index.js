@@ -47,6 +47,7 @@ const mindCoachGenerateV2 = require('./mindcoach_v2/generate_session_v2');
 const mindCoachCompleteRunV2 = require('./mindcoach_v2/complete_run_v2');
 const mindCoachWebappSessions = require('./mindcoach_v2/webapp_sessions');
 const golfChatGenerate = require('./golf_chat_generate');
+const golfChatArchive = require('./golf_chat_archive');
 const cartesiaTts = require('./cartesia_tts');
 const cartesiaAccess = require('./cartesia_access');
 const accountDeletion = require('./account_deletion');
@@ -360,6 +361,7 @@ exports.getWebAppMindCoachSessions =
 // ============================================================================
 
 exports.generateGolfChatResponse = golfChatGenerate.generateGolfChatResponse;
+exports.archiveGolfChatSession = golfChatArchive.archiveGolfChatSession;
 
 // ============================================================================
 // CARTESIA TTS - SERVER-SIDE PROXY (uses CARTESIA_API secret)

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
@@ -82,6 +83,10 @@ class VoiceChatSession {
   final int messageCount;
   final bool isDeepThinking;
   final String status; // 'active', 'completed', 'error'
+  final String? preview;
+  final String? summary;
+  final String lifecycleStatus; // active | completed | archived
+  final bool mindCoachRecommendationShown;
 
   VoiceChatSession({
     required this.id,
@@ -94,6 +99,10 @@ class VoiceChatSession {
     this.messageCount = 0,
     this.isDeepThinking = false,
     this.status = 'active',
+    this.preview,
+    this.summary,
+    this.lifecycleStatus = 'active',
+    this.mindCoachRecommendationShown = false,
   });
 
   Map<String, dynamic> toFirestore() {
@@ -108,6 +117,10 @@ class VoiceChatSession {
       'messageCount': messageCount,
       'isDeepThinking': isDeepThinking,
       'status': status,
+      if (preview != null) 'preview': preview,
+      if (summary != null) 'summary': summary,
+      'lifecycleStatus': lifecycleStatus,
+      'mindCoachRecommendationShown': mindCoachRecommendationShown,
       'lastUpdated': FieldValue.serverTimestamp(),
     };
   }
@@ -126,6 +139,12 @@ class VoiceChatSession {
       messageCount: data['messageCount'] ?? 0,
       isDeepThinking: data['isDeepThinking'] ?? false,
       status: data['status'] ?? 'active',
+      preview: data['preview'] as String?,
+      summary: data['summary'] as String?,
+      lifecycleStatus: (data['lifecycleStatus'] ?? data['status'] ?? 'active')
+          .toString(),
+      mindCoachRecommendationShown:
+          data['mindCoachRecommendationShown'] == true,
     );
   }
 }
@@ -274,6 +293,7 @@ class VoiceChatDatabaseService {
     await _firestore.collection(_sessionsCollection).doc(sessionId).update({
       'endTime': Timestamp.fromDate(DateTime.now()),
       'status': 'completed',
+      'lifecycleStatus': 'completed',
       'lastUpdated': FieldValue.serverTimestamp(),
     });
 
@@ -282,6 +302,31 @@ class VoiceChatDatabaseService {
 
     if (kDebugMode) {
       print('✅ Ended voice chat session: $sessionId');
+    }
+  }
+
+  Future<void> updateSessionFields(
+    String sessionId,
+    Map<String, dynamic> fields,
+  ) async {
+    if (_currentUserId == null || sessionId.trim().isEmpty) return;
+    await _firestore.collection(_sessionsCollection).doc(sessionId).update({
+      ...fields,
+      'lastUpdated': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Archive and summarize a completed GolfChat session (async server-side).
+  Future<void> archiveGolfChatSession(String sessionId) async {
+    if (_currentUserId == null || sessionId.trim().isEmpty) return;
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable('archiveGolfChatSession')
+          .call(<String, dynamic>{'sessionId': sessionId});
+    } catch (e) {
+      if (kDebugMode) {
+        print('archiveGolfChatSession failed: $e');
+      }
     }
   }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '/services/haptic_service.dart';
 
 import '/features/mindcoach_v2/data/mindcoach_v2_repository.dart';
 import '/features/mindcoach_v2/domain/models/mindcoach_v2_models.dart';
@@ -51,7 +52,7 @@ class MindCoachSessionPlayerV2Widget extends StatefulWidget {
 }
 
 class _MindCoachSessionPlayerV2WidgetState
-    extends State<MindCoachSessionPlayerV2Widget> {
+    extends State<MindCoachSessionPlayerV2Widget> with WidgetsBindingObserver {
   static const String _tag = 'PLAYER';
 
   final MindCoachV2Repository _repository = MindCoachV2Repository.instance;
@@ -88,6 +89,7 @@ class _MindCoachSessionPlayerV2WidgetState
   bool _favoriteSaved = false;
   String? _runId;
   bool _ttsMuted = false;
+  bool _lifecycleInterruptShown = false;
 
   bool get _isLiveMinimal =>
       widget.generateResponse.uiMode == MindCoachV2UiMode.liveMinimal;
@@ -100,6 +102,7 @@ class _MindCoachSessionPlayerV2WidgetState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _visualStyle = MindCoachV2Visuals.visualStyleFor(
       session: _session,
       uiMode: widget.generateResponse.uiMode,
@@ -174,6 +177,7 @@ class _MindCoachSessionPlayerV2WidgetState
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _lineEventsSub?.cancel();
     _ttsStateSub?.cancel();
     _progressTicker?.cancel();
@@ -181,6 +185,146 @@ class _MindCoachSessionPlayerV2WidgetState
     _ttsService.dispose();
     _logger.log(_tag, 'disposed');
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      if (!_playbackFinished && !_lifecycleInterruptShown && mounted) {
+        _lifecycleInterruptShown = true;
+        unawaited(_showInterruptSheet());
+      }
+    }
+  }
+
+  Future<void> _showInterruptSheet() async {
+    if (!mounted || _playbackFinished) return;
+    await _ttsService.stop(clearQueue: false);
+    if (!mounted) return;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF141820),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Session interrupted',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                title: const Text('Resume', style: TextStyle(color: Colors.white)),
+                onTap: () => Navigator.pop(context, 'resume'),
+              ),
+              ListTile(
+                title: const Text('Restart', style: TextStyle(color: Colors.white)),
+                onTap: () => Navigator.pop(context, 'restart'),
+              ),
+              ListTile(
+                title: const Text('Back', style: TextStyle(color: Colors.white70)),
+                onTap: () => Navigator.pop(context, 'back'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _lifecycleInterruptShown = false;
+    switch (action) {
+      case 'resume':
+        await _startPlayback();
+      case 'restart':
+        setState(() {
+          _visibleLineCount = 0;
+          _elapsedMs = 0;
+          _spokenDurationMs = 0;
+          _playbackFinished = false;
+          _showCompletion = false;
+        });
+        await _startPlayback();
+      case 'back':
+        await _handleBack();
+      default:
+        break;
+    }
+  }
+
+  Future<void> _showPausedRecoverySheet() async {
+    if (!mounted) return;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF141820),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Audio unavailable',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'You can resume audio or continue reading at your pace.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.72),
+                    ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                title: const Text('Resume audio', style: TextStyle(color: Colors.white)),
+                onTap: () => Navigator.pop(context, 'resume_audio'),
+              ),
+              ListTile(
+                title: const Text('Continue reading',
+                    style: TextStyle(color: Colors.white)),
+                onTap: () => Navigator.pop(context, 'continue_reading'),
+              ),
+              ListTile(
+                title: const Text('Restart', style: TextStyle(color: Colors.white)),
+                onTap: () => Navigator.pop(context, 'restart'),
+              ),
+              ListTile(
+                title: const Text('Back', style: TextStyle(color: Colors.white70)),
+                onTap: () => Navigator.pop(context, 'back'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    switch (action) {
+      case 'resume_audio':
+        await _startPlayback();
+      case 'continue_reading':
+        _startFallbackPlayback(reason: 'user_continue_reading');
+      case 'restart':
+        setState(() {
+          _visibleLineCount = 0;
+          _elapsedMs = 0;
+          _spokenDurationMs = 0;
+          _playbackFinished = false;
+        });
+        await _startPlayback();
+      case 'back':
+        await _handleBack();
+      default:
+        break;
+    }
   }
 
   List<String> _tokenizeLines(String text) {
@@ -237,11 +381,6 @@ class _MindCoachSessionPlayerV2WidgetState
         voiceProfileKey: 'mentor_calm',
       );
 
-      if (_ttsMuted) {
-        _startFallbackPlayback(reason: 'muted_start');
-        return;
-      }
-
       _playbackClock
         ..reset()
         ..start();
@@ -249,12 +388,14 @@ class _MindCoachSessionPlayerV2WidgetState
     } catch (error, stackTrace) {
       _logger.error(
         _tag,
-        'Cartesia playback init failed; switching to timed fallback',
+        'Cartesia playback init failed',
         null,
         error,
         stackTrace,
       );
-      _startFallbackPlayback(reason: 'tts_init_failure');
+      if (mounted) {
+        await _showPausedRecoverySheet();
+      }
     }
   }
 
@@ -465,6 +606,15 @@ class _MindCoachSessionPlayerV2WidgetState
 
     final initialResult = await _repository.saveFavorite(session: _session);
     if (initialResult.saved) {
+      await HapticService.medium();
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text('Saved to Favorites.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
       return true;
     }
     if (!initialResult.needsReplacement || !mounted) {
@@ -490,6 +640,17 @@ class _MindCoachSessionPlayerV2WidgetState
       session: _session,
       replaceFavoriteId: replacement.favoriteId,
     );
+    if (replaced.saved) {
+      await HapticService.medium();
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text('Saved to Favorites.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
     return replaced.saved;
   }
 
@@ -562,13 +723,6 @@ class _MindCoachSessionPlayerV2WidgetState
   void _toggleMute() {
     setState(() => _ttsMuted = !_ttsMuted);
     _ttsService.setMuted(_ttsMuted);
-
-    if (_ttsMuted && !_playbackFinished) {
-      _startFallbackPlayback(
-        reason: 'user_muted',
-        continueFromCurrent: true,
-      );
-    }
   }
 
   Widget _buildProgressBar(BuildContext context) {

@@ -486,6 +486,57 @@ function pickNearestDeliveryLength({ template, targetSec, preferred = 'auto', co
   });
 }
 
+async function loadMindCoachContextCache(userId) {
+  try {
+    const docId = `mindcoach__${userId}`;
+    const snap = await db.collection('context_cache').doc(docId).get();
+    if (!snap.exists) {
+      return null;
+    }
+    return snap.data() || null;
+  } catch (error) {
+    logger.warn('[MCv2:generate] context_cache read failed', {
+      error: error.message,
+      userId,
+    });
+    return null;
+  }
+}
+
+function formatIntelligenceContext(cacheDoc) {
+  if (!cacheDoc) {
+    return '';
+  }
+  const payload = cacheDoc.payload && typeof cacheDoc.payload === 'object'
+    ? cacheDoc.payload
+    : {};
+  const coaching = payload.coaching_state || cacheDoc.coaching_state || {};
+  const training = payload.training_summary || cacheDoc.training_summary || {};
+  const rounds = payload.recent_round_headlines || cacheDoc.recent_round_headlines || [];
+  const insights = payload.recent_insights || cacheDoc.recent_insights || [];
+
+  const roundText = Array.isArray(rounds)
+    ? rounds.slice(0, 3).map((item) => safeString(item)).filter(Boolean).join(' | ')
+    : '';
+  const insightText = Array.isArray(insights)
+    ? insights.slice(0, 2).map((item) => safeString(item)).filter(Boolean).join(' | ')
+    : '';
+
+  return [
+    'Intelligence context (mindcoach surface):',
+    `- Active pillar: ${safeString(coaching.active_pillar, 'unknown')}`,
+    `- Active need: ${safeString(coaching.active_need, 'unknown')}`,
+    `- Next best action: ${safeString(coaching.next_best_action_label, 'none')}`,
+    `- Focus sessions: ${Number(training.focus_sessions || 0)}`,
+    `- Confidence sessions: ${Number(training.confidence_sessions || 0)}`,
+    `- Control sessions: ${Number(training.control_sessions || 0)}`,
+    roundText ? `- Recent rounds: ${roundText}` : null,
+    insightText ? `- Recent insights: ${insightText}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 function buildPromptText({
   template,
   content,
@@ -497,6 +548,7 @@ function buildPromptText({
   userMessage,
   customization,
   scenarioTags,
+  intelligenceContext,
 }) {
   if (!promptCache) {
     const promptPath = path.join(__dirname, 'prompts', 'mindcoach_system_v1.txt');
@@ -512,9 +564,11 @@ function buildPromptText({
   const targetSec = fixedTargetSec || parseTargetSeconds(selectedDeliveryLength);
   const lineRange = lineRangeForDuration(targetSec);
 
+  const intelligenceBlock = safeString(intelligenceContext);
+
   return `${promptCache}
 
-Context mode: ${contextMode}
+${intelligenceBlock ? `${intelligenceBlock}\n\n` : ''}Context mode: ${contextMode}
 Locked pillar: ${safeString(lockedSession?.pillar, 'none')}
 Locked session key: ${safeString(lockedSession?.key, 'none')}
 Locked session name: ${safeString(lockedSession?.name, 'none')}
@@ -1049,9 +1103,11 @@ async function trackMonthlySessionUsage(userId) {
     { merge: true },
   );
 
-  if (nextCount === 80) {
+  if (nextCount >= 80) {
     logger.info('[MCv2:usage] monthly soft nudge threshold', { userId, nextCount });
   }
+
+  return nextCount;
 }
 
 async function assertUserConsent(userId) {
@@ -1181,7 +1237,7 @@ async function _generateMindCoachSessionV2Impl(data, context) {
   logger.info('[MCv2:generate] checking consent');
   await assertUserConsent(userId);
   logger.info('[MCv2:generate] consent OK, tracking monthly usage');
-  await trackMonthlySessionUsage(userId);
+  const monthlySessionCount = await trackMonthlySessionUsage(userId);
 
   const lockedSession = sessionKey ? getMindCoachSessionDefinition(sessionKey) : null;
   if (sessionKey && !lockedSession) {
@@ -1391,6 +1447,9 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     usedFallback: selectedContent == null,
   });
 
+  const contextCacheDoc = await loadMindCoachContextCache(userId);
+  const intelligenceContext = formatIntelligenceContext(contextCacheDoc);
+
   const prompt = buildPromptText({
     template: effectiveTemplate,
     content: selectedContent,
@@ -1413,6 +1472,7 @@ async function _generateMindCoachSessionV2Impl(data, context) {
       vark_mode: effectiveVarkMode,
     },
     scenarioTags,
+    intelligenceContext,
   });
 
   logger.info('[MCv2:generate] calling Gemini');
@@ -1629,6 +1689,7 @@ async function _generateMindCoachSessionV2Impl(data, context) {
     run_id: runRef.id,
     context_mode: resolved.contextMode,
     ui_mode: resolved.uiMode,
+    monthly_session_count: monthlySessionCount,
     session: {
       schema_version: SCHEMA_VERSION,
       pillar: safeString(requestedPillar, safeString(lockedSession?.pillar, 'focus')),

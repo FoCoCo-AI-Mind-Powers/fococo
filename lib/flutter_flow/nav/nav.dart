@@ -167,6 +167,8 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
                           : null,
                   initialSessionId:
                       params.state.extraMap['sessionId'] as String?,
+                  autoStartReflection:
+                      params.state.extraMap['autoStartReflection'] == true,
                 ),
               ).toRoute(appStateNotifier),
             ]),

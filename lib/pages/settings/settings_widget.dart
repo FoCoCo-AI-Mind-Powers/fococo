@@ -17,6 +17,8 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/glass_components.dart';
 import '/services/ai_voice_preference_service.dart';
 import '/services/account_deletion_service.dart';
+import '/features/mindcoach_v2/services/mindcoach_replay_cache.dart';
+import '/features/mindcoach_v2/services/mindcoach_session_prefetch.dart';
 import '/services/app_session_prefs_service.dart';
 import '/services/cms_content_service.dart';
 import '/services/haptic_service.dart';
@@ -677,6 +679,8 @@ class _SettingsWidgetState extends State<SettingsWidget>
     if (confirmed && mounted) {
       await HapticService.light();
       await AppSessionPrefsService.setPostLoginTabFoCoCo();
+      await MindCoachReplayCache.clearAllForUser();
+      MindCoachSessionPrefetch.clear();
       await authManager.signOut();
       if (mounted) {
         context.go('/login');
@@ -690,6 +694,8 @@ class _SettingsWidgetState extends State<SettingsWidget>
     final email = currentUserEmail;
     await AccountDeletionService.requestDeletion(email: email);
     await AccountDeletionService.clearLocalState();
+    await MindCoachReplayCache.clearAllForUser();
+    MindCoachSessionPrefetch.clear();
     if (!mounted) return;
     final router = GoRouter.of(context);
     await authManager.signOut();
